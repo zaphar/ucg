@@ -1,0 +1,16 @@
+[package]
+name = "ucg"
+version = "0.0.1"
+authors = ["Jeremy Wall <jeremy@marzhillstudios.com>"]
+
+[dependencies]
+nom = "^2.2"
+quick-error = "^1.2.0"
+
+[lib]
+name = "ucglib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ucg"
+path = "src/main.rs"
