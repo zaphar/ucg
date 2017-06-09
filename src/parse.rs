@@ -70,14 +70,14 @@ pub enum Statement<'a> {
 
     // Named bindings
     Let {
-        name: Value<'a>,
+        name: &'a str,
         value: Expression<'a>,
     },
 
     // Include a file.
     Import {
-        path: Value<'a>,
-        name: Value<'a>,
+        path: &'a str,
+        name: &'a str,
     },
 }
 
@@ -113,10 +113,19 @@ fn symbol_to_value<'a>(s: &'a str) -> ParseResult<Value<'a>> {
 named!(symbol<Value>, map_res!(field, symbol_to_value));
 
 // quoted is a quoted string.
-named!(quoted<Value>,
+named!(quoted<&str>,
        map_res!(delimited!(doublequote, take_until!("\""), doublequote),
-                |s| from_utf8(s).map(|s| Value::String(s))
+                from_utf8
        )
+);
+
+fn str_to_value<'a>(s: &'a str) -> ParseResult<Value<'a>> {
+    Ok(Value::String(s))
+}
+
+// quoted_value is a quoted string.
+named!(quoted_value<Value>,
+       map_res!(quoted, str_to_value)
 );
 
 // Helper function to make the return types work for down below.
@@ -199,7 +208,7 @@ fn test_number_parsing() {
                IResult::Done(&b""[..], Value::Float(0.1)) );
 }
 
-named!(value<Value>, alt!(number | quoted | symbol | tuple));
+named!(value<Value>, alt!(number | quoted_value | symbol | tuple));
 
 named!(
     #[doc="Capture a field and value pair composed of `<symbol> = <value>,`"],
@@ -527,7 +536,7 @@ fn tuple_to_select<'a>(t: (Expression<'a>, Expression<'a>, Value<'a>))
     }
 }
 
-named!(select_selector<Value>, alt!(symbol | quoted | number));
+named!(select_selector<Value>, alt!(symbol | quoted_value | number));
 
 named!(select_expression<Expression>,
        map_res!(
@@ -793,7 +802,7 @@ fn test_expression_statement_parse() {
                                  Expression::Simple(Value::String("foo")))));
 }
 
-fn tuple_to_let<'a>(t: (Value<'a>, Expression<'a>)) -> ParseResult<Statement<'a>> {
+fn tuple_to_let<'a>(t: (&'a str, Expression<'a>)) -> ParseResult<Statement<'a>> {
     Ok(Statement::Let {
         name: t.0,
         value: t.1,
@@ -804,7 +813,7 @@ named!(let_statement<Statement>,
        map_res!(
            terminated!(do_parse!(
                let_word >>
-                   name: ws!(symbol) >>
+                   name: ws!(field) >>
                    equal >>
                    val: ws!(expression) >>
                    (name, val)
@@ -826,19 +835,19 @@ fn test_let_statement_parse() {
 
     assert_eq!(let_statement(&b"let foo = 1.0 ;"[..]),
                IResult::Done(&b""[..],
-                             Statement::Let{name: Value::Symbol("foo"),
+                             Statement::Let{name: "foo",
                                             value: Expression::Simple(Value::Float(1.0))}));
     assert_eq!(let_statement(&b"let foo= 1.0;"[..]),
                IResult::Done(&b""[..],
-                             Statement::Let{name: Value::Symbol("foo"),
+                             Statement::Let{name: "foo",
                                             value: Expression::Simple(Value::Float(1.0))}));
     assert_eq!(let_statement(&b"let foo =1.0;"[..]),
                IResult::Done(&b""[..],
-                             Statement::Let{name: Value::Symbol("foo"),
+                             Statement::Let{name: "foo",
                                             value: Expression::Simple(Value::Float(1.0))}));
 }
 
-fn tuple_to_import<'a>(t: (Value<'a>, Value<'a>)) -> ParseResult<Statement<'a>> {
+fn tuple_to_import<'a>(t: (&'a str, &'a str)) -> ParseResult<Statement<'a>> {
     Ok(Statement::Import {
         name: t.0,
         path: t.1,
@@ -851,7 +860,7 @@ named!(import_statement<Statement>,
                import_word >>
                    path: ws!(quoted) >>
                    as_word >>
-                   name: ws!(symbol) >>
+                   name: ws!(field) >>
                    (name, path)
            ), semicolon),
            tuple_to_import
@@ -868,8 +877,8 @@ fn test_import_parse() {
     assert_eq!(import_statement(&b"import \"foo\" as foo;"[..]),
                IResult::Done(&b""[..],
                              Statement::Import{
-                                 path: Value::String("foo"),
-                                 name: Value::Symbol("foo")
+                                 path: "foo",
+                                 name: "foo"
                              }
                )
     );
@@ -888,8 +897,8 @@ fn test_statement_parse() {
     assert_eq!(statement(&b"import \"foo\" as foo;"[..]),
                IResult::Done(&b""[..],
                              Statement::Import{
-                                 path: Value::String("foo"),
-                                 name: Value::Symbol("foo")
+                                 path: "foo",
+                                 name: "foo"
                              }
                )
     );
@@ -897,7 +906,7 @@ fn test_statement_parse() {
 
     assert_eq!(statement(&b"let foo = 1.0 ;"[..]),
                IResult::Done(&b""[..],
-                             Statement::Let{name: Value::Symbol("foo"),
+                             Statement::Let{name: "foo",
                                             value: Expression::Simple(Value::Float(1.0))}));
     assert_eq!(statement(&b"1.0;"[..]),
                IResult::Done(&b""[..],
@@ -926,11 +935,11 @@ fn test_parse() {
     assert_eq!(tpl.1,
                vec![
                    Statement::Import{
-                       path: Value::String("mylib"),
-                       name: Value::Symbol("lib")
+                       path: "mylib",
+                       name: "lib"
                    },
                    Statement::Let{
-                       name: Value::Symbol("foo"),
+                       name: "foo",
                        value: Expression::Simple(Value::Int(1))
                    },
                    Statement::Expression(
