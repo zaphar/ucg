@@ -17,8 +17,8 @@ use nom::{alpha, is_alphanumeric, digit, IResult};
 
 type ParseResult<O> = Result<O, Box<Error>>;
 
-type FieldList<'a> = Vec<(&'a str, Expression<'a>)>; // str is expected to be a symbol
-type SelectorList<'a> = Vec<&'a str>; // str is expected to always be a symbol.
+pub type FieldList<'a> = Vec<(&'a str, Expression<'a>)>; // str is expected to be a symbol
+pub type SelectorList<'a> = Vec<&'a str>; // str is expected to always be a symbol.
 
 /// Value represents a Value in the UCG parsed AST.
 #[derive(Debug,PartialEq)]
