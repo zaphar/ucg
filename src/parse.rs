@@ -8,12 +8,11 @@ quick_error! {
     }
 }
 
-use std::collections::HashMap;
 use std::str::FromStr;
 use std::str::from_utf8;
 use std::error::Error;
 
-use nom::{alpha, is_alphanumeric, digit, IResult};
+use nom::{alpha, is_alphanumeric, digit};
 
 type ParseResult<O> = Result<O, Box<Error>>;
 
@@ -21,17 +20,33 @@ pub type FieldList<'a> = Vec<(&'a str, Expression<'a>)>; // str is expected to b
 pub type SelectorList<'a> = Vec<&'a str>; // str is expected to always be a symbol.
 
 /// Value represents a Value in the UCG parsed AST.
-#[derive(Debug,PartialEq)]
+#[derive(Debug,PartialEq,Clone)]
 pub enum Value<'a> {
+    // Constant Values
     Int(i64),
     Float(f64),
     String(&'a str),
     Symbol(&'a str),
+    // Complex Values
     Tuple(FieldList<'a>),
+    Selector(SelectorList<'a>),
+}
+
+impl<'a> Value<'a> {
+    pub fn type_name(&self) -> String {
+        match self {
+            &Value::Int(_) => "Integer".to_string(),
+            &Value::Float(_) => "Float".to_string(),
+            &Value::String(_) => "String".to_string(),
+            &Value::Symbol(_) => "Symbol".to_string(),
+            &Value::Tuple(_) => "Tuple".to_string(),
+            &Value::Selector(_) => "Selector".to_string(),
+        }
+    }
 }
 
 /// Expression encodes an expression. Expressions compute a value from operands.
-#[derive(Debug,PartialEq)]
+#[derive(Debug,PartialEq,Clone)]
 pub enum Expression<'a> {
     // Base Expression
     Simple(Value<'a>),
@@ -44,7 +59,6 @@ pub enum Expression<'a> {
 
     // Complex Expressions
     Copy(SelectorList<'a>, FieldList<'a>),
-    Selector(SelectorList<'a>),
     Grouped(Box<Expression<'a>>),
 
     Call {
@@ -83,7 +97,6 @@ pub enum Statement<'a> {
 
 // sentinels and punctuation
 named!(doublequote, tag!("\""));
-named!(singlequote, tag!("'"));
 named!(comma, tag!(","));
 named!(lbrace, tag!("{"));
 named!(rbrace, tag!("}"));
@@ -95,7 +108,6 @@ named!(minus, tag!("-"));
 named!(mul, tag!("*"));
 named!(div, tag!("/"));
 named!(equal, tag!("="));
-named!(slashes, tag!("//"));
 named!(semicolon, tag!(";"));
 named!(fatcomma, tag!("=>"));
 
@@ -194,20 +206,6 @@ named!(number<Value>,
        )
 );
 
-#[test]
-fn test_number_parsing() {
-    assert!(number(&b"."[..]).is_err() );
-    assert!(number(&b". "[..]).is_err() );
-    assert_eq!(number(&b"1.0"[..]),
-               IResult::Done(&b""[..], Value::Float(1.0)) );
-    assert_eq!(number(&b"1."[..]),
-               IResult::Done(&b""[..], Value::Float(1.0)) );
-    assert_eq!(number(&b"1"[..]),
-               IResult::Done(&b""[..], Value::Int(1)) );
-    assert_eq!(number(&b".1"[..]),
-               IResult::Done(&b""[..], Value::Float(0.1)) );
-}
-
 named!(value<Value>, alt!(number | quoted_value | symbol | tuple));
 
 named!(
@@ -220,21 +218,6 @@ named!(
             (field, value)
     )
 );
-
-#[test]
-fn test_field_value_parse() {
-    assert!(field_value(&b"foo"[..]).is_incomplete() );
-    assert!(field_value(&b"foo ="[..]).is_incomplete() );
-
-    assert_eq!(field_value(&b"foo = 1"[..]),
-               IResult::Done(&b""[..], ("foo", Expression::Simple(Value::Int(1)))) );
-    assert_eq!(field_value(&b"foo = \"1\""[..]),
-               IResult::Done(&b""[..], ("foo", Expression::Simple(Value::String("1")))) );
-    assert_eq!(field_value(&b"foo = bar"[..]),
-               IResult::Done(&b""[..], ("foo", Expression::Simple(Value::Symbol("bar")))) );
-    assert_eq!(field_value(&b"foo = bar "[..]),
-               IResult::Done(&b""[..], ("foo", Expression::Simple(Value::Symbol("bar")))) );
-}
 
 // Helper function to make the return types work for down below.
 fn vec_to_tuple<'a>(v: FieldList<'a>) -> ParseResult<Value<'a>> {
@@ -254,43 +237,6 @@ named!(
         vec_to_tuple
     )
 );
-
-#[test]
-fn test_tuple_parse() {
-    assert!(tuple(&b"{"[..]).is_incomplete() );
-    assert!(tuple(&b"{ foo"[..]).is_incomplete() );
-    assert!(tuple(&b"{ foo ="[..]).is_incomplete() );
-    assert!(tuple(&b"{ foo = 1"[..]).is_incomplete() );
-    assert!(tuple(&b"{ foo = 1,"[..]).is_err() );
-    assert!(tuple(&b"{ foo = 1, bar ="[..]).is_err() );
-
-    assert_eq!(tuple(&b"{ }"[..]),
-            IResult::Done(&b""[..],
-                          Value::Tuple(
-                              vec![])));
-
-    assert_eq!(tuple(&b"{ foo = 1 }"[..]),
-            IResult::Done(&b""[..],
-                          Value::Tuple(
-                              vec![
-                                  ("foo", Expression::Simple(Value::Int(1)))
-                              ])));
-
-    assert_eq!(tuple(&b"{ foo = 1, bar = \"1\" }"[..]),
-            IResult::Done(&b""[..],
-                          Value::Tuple(
-                              vec![
-                                  ("foo", Expression::Simple(Value::Int(1))),
-                                  ("bar", Expression::Simple(Value::String("1")))
-                              ])));
-    assert_eq!(tuple(&b"{ foo = 1, bar = {} }"[..]),
-            IResult::Done(&b""[..],
-                          Value::Tuple(
-                              vec![
-                                  ("foo", Expression::Simple(Value::Int(1))),
-                                  ("bar", Expression::Simple(Value::Tuple(Vec::new())))
-                              ])));
-}
 
 // keywords
 named!(let_word, tag!("let"));
@@ -385,32 +331,6 @@ named!(grouped_expression<Expression>,
        )
 );
 
-#[test]
-fn test_grouped_expression_parse() {
-    assert!(grouped_expression(&b"foo"[..]).is_err() );
-    assert!(grouped_expression(&b"(foo"[..]).is_incomplete() );
-    assert_eq!(grouped_expression(&b"(foo)"[..]),
-            IResult::Done(&b""[..],
-                          Expression::Grouped(
-                              Box::new(
-                                  Expression::Simple(
-                                      Value::Symbol("foo")))))
-    );
-    assert_eq!(grouped_expression(&b"(1 + 1)"[..]),
-            IResult::Done(&b""[..],
-                          Expression::Grouped(
-                              Box::new(
-                                  Expression::Add(
-                                      Box::new(Value::Int(1)),
-                                      Box::new(Expression::Simple(
-                                          Value::Int(1)))
-                                  )
-                              )
-                          )
-            )
-    );
-}
-
 named!(selector_list<SelectorList>, separated_nonempty_list!(dot, field));
 
 fn tuple_to_copy<'a>(t: (SelectorList<'a>, FieldList<'a>)) -> ParseResult<Expression<'a>> {
@@ -430,25 +350,6 @@ named!(copy_expression<Expression>,
        )
 );
 
-#[test]
-fn test_copy_parse() {
-    assert!(copy_expression(&b"{}"[..]).is_err() );
-    assert!(copy_expression(&b"foo"[..]).is_incomplete() );
-    assert!(copy_expression(&b"foo{"[..]).is_incomplete() );
-    assert_eq!(copy_expression(&b"foo{}"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Copy(vec!["foo"],
-                                              Vec::new())
-               )
-    );
-    assert_eq!(copy_expression(&b"foo{bar=1}"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Copy(vec!["foo"],
-                                              vec![("bar", Expression::Simple(Value::Int(1)))])
-               )
-    );
-}
-
 fn tuple_to_lambda<'a>(t: (Vec<Value<'a>>, Value<'a>)) -> ParseResult<Expression<'a>> {
     match t.1 {
         Value::Tuple(v) => {
@@ -466,17 +367,6 @@ fn tuple_to_lambda<'a>(t: (Vec<Value<'a>>, Value<'a>)) -> ParseResult<Expression
 
 named!(arglist<Vec<Value> >, separated_list!(ws!(comma), symbol));
 
-#[test]
-fn test_arglist_parse() {
-    assert!(arglist(&b"arg"[..]).is_done());
-    assert!(arglist(&b"arg1, arg2"[..]).is_done());
-    assert_eq!(arglist(&b"arg1, arg2"[..]), IResult::Done(&b""[..],
-                                                  vec![
-                                                      Value::Symbol("arg1"),
-                                                      Value::Symbol("arg2")
-                                                  ]));
-}
-
 named!(lambda_expression<Expression>,
        map_res!(
            do_parse!(
@@ -491,33 +381,6 @@ named!(lambda_expression<Expression>,
            tuple_to_lambda
        )
 );
-
-#[test]
-fn test_lambda_expression_parsing() {
-    assert!(lambda_expression(&b"foo"[..]).is_err() );
-    assert!(lambda_expression(&b"lambda \"foo\""[..]).is_err() );
-    assert!(lambda_expression(&b"lambda 1"[..]).is_err() );
-    assert!(lambda_expression(&b"lambda"[..]).is_incomplete() );
-    assert!(lambda_expression(&b"lambda ("[..]).is_incomplete() );
-    assert!(lambda_expression(&b"lambda (arg"[..]).is_incomplete() );
-    assert!(lambda_expression(&b"lambda (arg, arg2"[..]).is_incomplete() );
-    assert!(lambda_expression(&b"lambda (arg1, arg2) =>"[..]).is_incomplete() );
-    assert!(lambda_expression(&b"lambda (arg1, arg2) => {"[..]).is_incomplete() );
-    assert!(lambda_expression(&b"lambda (arg1, arg2) => { foo"[..]).is_incomplete() );
-    assert!(lambda_expression(&b"lambda (arg1, arg2) => { foo ="[..]).is_incomplete() );
-
-    assert_eq!(lambda_expression(&b"lambda (arg1, arg2) => {foo=1,bar=2}"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Lambda{
-                                 arglist: vec![Value::Symbol("arg1"),
-                                               Value::Symbol("arg2")],
-                                 tuple: vec![("foo", Expression::Simple(Value::Int(1))),
-                                             ("bar", Expression::Simple(Value::Int(2)))
-                                 ]
-                             }
-               )
-    );
-}
 
 fn tuple_to_select<'a>(t: (Expression<'a>, Expression<'a>, Value<'a>))
                        -> ParseResult<Expression<'a>> {
@@ -536,8 +399,6 @@ fn tuple_to_select<'a>(t: (Expression<'a>, Expression<'a>, Value<'a>))
     }
 }
 
-named!(select_selector<Value>, alt!(symbol | quoted_value | number));
-
 named!(select_expression<Expression>,
        map_res!(
            terminated!(do_parse!(
@@ -551,28 +412,8 @@ named!(select_expression<Expression>,
        )
 );
 
-#[test]
-fn test_select_parse() {
-    assert!(select_expression(&b"select"[..]).is_incomplete());
-    assert!(select_expression(&b"select foo"[..]).is_incomplete());
-    assert!(select_expression(&b"select foo, 1"[..]).is_incomplete());
-    assert!(select_expression(&b"select foo, 1, {"[..]).is_incomplete());
-
-    assert_eq!(select_expression(&b"select foo, 1, { foo = 2 };"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Select{
-                                 val: Box::new(Expression::Simple(Value::Symbol("foo"))),
-                                 default: Box::new(Expression::Simple(Value::Int(1))),
-                                 tuple: vec![
-                                     ("foo", Expression::Simple(Value::Int(2)))
-                                 ]
-                             }
-               )
-    );
-}
-
-fn tuple_to_call<'a>(t: (Expression<'a>, Vec<Expression<'a>>)) -> ParseResult<Expression<'a>> {
-    if let Expression::Selector(sl) = t.0 {
+fn tuple_to_call<'a>(t: (Value<'a>, Vec<Expression<'a>>)) -> ParseResult<Expression<'a>> {
+    if let Value::Selector(sl) = t.0 {
         Ok(Expression::Call {
             lambda: sl,
             arglist: t.1,
@@ -582,21 +423,21 @@ fn tuple_to_call<'a>(t: (Expression<'a>, Vec<Expression<'a>>)) -> ParseResult<Ex
     }
 }
 
-fn vec_to_selector_expression<'a>(v: SelectorList<'a>) -> ParseResult<Expression<'a>> {
-    Ok(Expression::Selector(v))
+fn vec_to_selector_value<'a>(v: SelectorList<'a>) -> ParseResult<Value<'a>> {
+    Ok(Value::Selector(v))
 }
 
-named!(selector_expression<Expression>,
+named!(selector_value<Value>,
        map_res!(
            ws!(selector_list),
-           vec_to_selector_expression
+           vec_to_selector_value
        )
 );
 
 named!(call_expression<Expression>,
        map_res!(
            do_parse!(
-               lambda: selector_expression >>
+               lambda: selector_value >>
                    lparen >>
                    args: ws!(separated_list!(ws!(comma), expression)) >>
                    rparen >>
@@ -605,39 +446,6 @@ named!(call_expression<Expression>,
            tuple_to_call
        )
 );
-
-#[test]
-fn test_call_parse() {
-    assert!(call_expression(&b"foo"[..]).is_incomplete() );
-    assert!(call_expression(&b"foo ("[..]).is_incomplete() );
-    assert!(call_expression(&b"foo (1"[..]).is_incomplete() );
-    assert!(call_expression(&b"foo (1,"[..]).is_err() );
-    assert!(call_expression(&b"foo (1,2"[..]).is_incomplete() );
-
-    assert_eq!(call_expression(&b"foo (1, \"foo\")"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Call{
-                                 lambda: vec!["foo"],
-                                 arglist: vec![
-                                     Expression::Simple(Value::Int(1)),
-                                     Expression::Simple(Value::String("foo")),
-                                 ],
-                             }
-               )
-    );
-
-    assert_eq!(call_expression(&b"foo.bar (1, \"foo\")"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Call{
-                                 lambda: vec!["foo","bar"],
-                                 arglist: vec![
-                                     Expression::Simple(Value::Int(1)),
-                                     Expression::Simple(Value::String("foo")),
-                                 ],
-                             }
-               )
-    );
-}
 
 // NOTE(jwall): HERE THERE BE DRAGONS. The order for these matters
 // alot. We need to process alternatives in order of decreasing
@@ -664,92 +472,6 @@ named!(expression<Expression>,
        )
 );
 
-#[test]
-fn test_expression_parse() {
-    assert_eq!(expression(&b"1"[..]),
-               IResult::Done(&b""[..], Expression::Simple(Value::Int(1))));
-    assert_eq!(expression(&b"1 + 1"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Add(Box::new(Value::Int(1)),
-                                             Box::new(Expression::Simple(Value::Int(1))))));
-    assert_eq!(expression(&b"1 - 1"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Sub(Box::new(Value::Int(1)),
-                                             Box::new(Expression::Simple(Value::Int(1))))));
-    assert_eq!(expression(&b"1 * 1"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Mul(Box::new(Value::Int(1)),
-                                             Box::new(Expression::Simple(Value::Int(1))))));
-    assert_eq!(expression(&b"1 / 1"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Div(Box::new(Value::Int(1)),
-                                             Box::new(Expression::Simple(Value::Int(1))))));
-
-    assert_eq!(expression(&b"1+1"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Add(Box::new(Value::Int(1)),
-                                             Box::new(Expression::Simple(Value::Int(1))))));
-    assert_eq!(expression(&b"1-1"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Sub(Box::new(Value::Int(1)),
-                                             Box::new(Expression::Simple(Value::Int(1))))));
-    assert_eq!(expression(&b"1*1"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Mul(Box::new(Value::Int(1)),
-                                             Box::new(Expression::Simple(Value::Int(1))))));
-    assert_eq!(expression(&b"1/1"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Div(Box::new(Value::Int(1)),
-                                             Box::new(Expression::Simple(Value::Int(1))))));
-    assert_eq!(expression(&b"lambda (arg1, arg2) => { foo = arg1 }"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Lambda{
-                                 arglist: vec![
-                                     Value::Symbol("arg1"),
-                                     Value::Symbol("arg2")
-                                 ],
-                                 tuple: vec![
-                                     ("foo", Expression::Simple(Value::Symbol("arg1"))),
-                                 ],
-                             }
-               )
-    );
-    assert_eq!(expression(&b"select foo, 1, { foo = 2 };"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Select{
-                                 val: Box::new(Expression::Simple(Value::Symbol("foo"))),
-                                 default: Box::new(Expression::Simple(Value::Int(1))),
-                                 tuple: vec![
-                                     ("foo", Expression::Simple(Value::Int(2)))
-                                 ]
-                             }
-               )
-    );
-    assert_eq!(expression(&b"foo.bar (1, \"foo\")"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Call{
-                                 lambda: vec!["foo","bar"],
-                                 arglist: vec![
-                                     Expression::Simple(Value::Int(1)),
-                                     Expression::Simple(Value::String("foo")),
-                                 ],
-                             }
-               )
-    );
-    assert_eq!(expression(&b"(1 + 1)"[..]),
-            IResult::Done(&b""[..],
-                          Expression::Grouped(
-                              Box::new(
-                                  Expression::Add(
-                                      Box::new(Value::Int(1)),
-                                      Box::new(Expression::Simple(Value::Int(1)))
-                                  )
-                              )
-                          )
-            )
-    );
-}
-
 fn expression_to_statement(v: Expression) -> ParseResult<Statement> {
     Ok(Statement::Expression(v))
 }
@@ -760,47 +482,6 @@ named!(expression_statement<Statement>,
            expression_to_statement
        )
 );
-
-#[test]
-fn test_expression_statement_parse() {
-    assert!(expression_statement(&b"foo"[..]).is_incomplete() );
-    assert_eq!(expression_statement(&b"1.0;"[..]),
-               IResult::Done(&b""[..],
-                             Statement::Expression(
-                                 Expression::Simple(Value::Float(1.0)))));
-    assert_eq!(expression_statement(&b"1.0 ;"[..]),
-               IResult::Done(&b""[..],
-                             Statement::Expression(
-                                 Expression::Simple(Value::Float(1.0)))));
-    assert_eq!(expression_statement(&b" 1.0;"[..]),
-               IResult::Done(&b""[..],
-                             Statement::Expression(
-                                 Expression::Simple(Value::Float(1.0)))));
-    assert_eq!(expression_statement(&b"foo;"[..]),
-               IResult::Done(&b""[..],
-                             Statement::Expression(
-                                 Expression::Simple(Value::Symbol("foo")))));
-    assert_eq!(expression_statement(&b"foo ;"[..]),
-               IResult::Done(&b""[..],
-                             Statement::Expression(
-                                 Expression::Simple(Value::Symbol("foo")))));
-    assert_eq!(expression_statement(&b" foo;"[..]),
-               IResult::Done(&b""[..],
-                             Statement::Expression(
-                                 Expression::Simple(Value::Symbol("foo")))));
-    assert_eq!(expression_statement(&b"\"foo\";"[..]),
-               IResult::Done(&b""[..],
-                             Statement::Expression(
-                                 Expression::Simple(Value::String("foo")))));
-    assert_eq!(expression_statement(&b"\"foo\" ;"[..]),
-               IResult::Done(&b""[..],
-                             Statement::Expression(
-                                 Expression::Simple(Value::String("foo")))));
-    assert_eq!(expression_statement(&b" \"foo\";"[..]),
-               IResult::Done(&b""[..],
-                             Statement::Expression(
-                                 Expression::Simple(Value::String("foo")))));
-}
 
 fn tuple_to_let<'a>(t: (&'a str, Expression<'a>)) -> ParseResult<Statement<'a>> {
     Ok(Statement::Let {
@@ -822,31 +503,6 @@ named!(let_statement<Statement>,
        )
 );
 
-#[test]
-fn test_let_statement_parse() {
-    assert!(let_statement(&b"foo"[..]).is_err() );
-    assert!(let_statement(&b"let \"foo\""[..]).is_err() );
-    assert!(let_statement(&b"let 1"[..]).is_err() );
-    assert!(let_statement(&b"let"[..]).is_incomplete() );
-    assert!(let_statement(&b"let foo"[..]).is_incomplete() );
-    assert!(let_statement(&b"let foo ="[..]).is_incomplete() );
-    assert!(let_statement(&b"let foo = "[..]).is_incomplete() );
-    assert!(let_statement(&b"let foo = 1"[..]).is_incomplete() );
-
-    assert_eq!(let_statement(&b"let foo = 1.0 ;"[..]),
-               IResult::Done(&b""[..],
-                             Statement::Let{name: "foo",
-                                            value: Expression::Simple(Value::Float(1.0))}));
-    assert_eq!(let_statement(&b"let foo= 1.0;"[..]),
-               IResult::Done(&b""[..],
-                             Statement::Let{name: "foo",
-                                            value: Expression::Simple(Value::Float(1.0))}));
-    assert_eq!(let_statement(&b"let foo =1.0;"[..]),
-               IResult::Done(&b""[..],
-                             Statement::Let{name: "foo",
-                                            value: Expression::Simple(Value::Float(1.0))}));
-}
-
 fn tuple_to_import<'a>(t: (&'a str, &'a str)) -> ParseResult<Statement<'a>> {
     Ok(Statement::Import {
         name: t.0,
@@ -867,23 +523,6 @@ named!(import_statement<Statement>,
        )
 );
 
-#[test]
-fn test_import_parse() {
-    assert!(import_statement(&b"import"[..]).is_incomplete());
-    assert!(import_statement(&b"import \"foo\""[..]).is_incomplete());
-    assert!(import_statement(&b"import \"foo\" as"[..]).is_incomplete());
-    assert!(import_statement(&b"import \"foo\" as foo"[..]).is_incomplete());
-
-    assert_eq!(import_statement(&b"import \"foo\" as foo;"[..]),
-               IResult::Done(&b""[..],
-                             Statement::Import{
-                                 path: "foo",
-                                 name: "foo"
-                             }
-               )
-    );
-}
-
 named!(statement<Statement>,
        alt_complete!(
            import_statement |
@@ -892,9 +531,22 @@ named!(statement<Statement>,
        )
 );
 
-#[test]
-fn test_statement_parse() {
-    assert_eq!(statement(&b"import \"foo\" as foo;"[..]),
+named!(pub parse<Vec<Statement> >, many1!(ws!(statement)));
+
+// TODO(jwall): Full Statement parsing tests.
+
+#[cfg(test)]
+mod test {
+    use std::str::from_utf8;
+    use super::{Statement, Expression, Value};
+    use super::{number, parse, field_value, tuple, grouped_expression, copy_expression};
+    use super::{arglist, lambda_expression, select_expression, call_expression, expression};
+    use super::{expression_statement, let_statement, import_statement, statement};
+    use nom::IResult;
+
+    #[test]
+    fn test_statement_parse() {
+        assert_eq!(statement(&b"import \"foo\" as foo;"[..]),
                IResult::Done(&b""[..],
                              Statement::Import{
                                  path: "foo",
@@ -902,37 +554,404 @@ fn test_statement_parse() {
                              }
                )
     );
-    assert!(statement(&b"import foo"[..]).is_err() );
+        assert!(statement(&b"import foo"[..]).is_err() );
 
-    assert_eq!(statement(&b"let foo = 1.0 ;"[..]),
+        assert_eq!(statement(&b"let foo = 1.0 ;"[..]),
                IResult::Done(&b""[..],
                              Statement::Let{name: "foo",
                                             value: Expression::Simple(Value::Float(1.0))}));
-    assert_eq!(statement(&b"1.0;"[..]),
+        assert_eq!(statement(&b"1.0;"[..]),
                IResult::Done(&b""[..],
                              Statement::Expression(
                                  Expression::Simple(Value::Float(1.0)))));
-}
+    }
 
-named!(pub parse<Vec<Statement> >, many1!(ws!(statement)));
+    #[test]
+    fn test_import_parse() {
+        assert!(import_statement(&b"import"[..]).is_incomplete());
+        assert!(import_statement(&b"import \"foo\""[..]).is_incomplete());
+        assert!(import_statement(&b"import \"foo\" as"[..]).is_incomplete());
+        assert!(import_statement(&b"import \"foo\" as foo"[..]).is_incomplete());
 
-// TODO(jwall): Full Statement parsing tests.
+        assert_eq!(import_statement(&b"import \"foo\" as foo;"[..]),
+               IResult::Done(&b""[..],
+                             Statement::Import{
+                                 path: "foo",
+                                 name: "foo"
+                             }
+               )
+    );
+    }
 
-#[test]
-fn test_parse() {
-    let bad_input = &b"import mylib as lib;"[..];
-    let bad_result = parse(bad_input);
-    assert!(bad_result.is_err() );
+    #[test]
+    fn test_let_statement_parse() {
+        assert!(let_statement(&b"foo"[..]).is_err() );
+        assert!(let_statement(&b"let \"foo\""[..]).is_err() );
+        assert!(let_statement(&b"let 1"[..]).is_err() );
+        assert!(let_statement(&b"let"[..]).is_incomplete() );
+        assert!(let_statement(&b"let foo"[..]).is_incomplete() );
+        assert!(let_statement(&b"let foo ="[..]).is_incomplete() );
+        assert!(let_statement(&b"let foo = "[..]).is_incomplete() );
+        assert!(let_statement(&b"let foo = 1"[..]).is_incomplete() );
 
-    // Valid parsing tree
-    let input = &b"import \"mylib\" as lib;\
+        assert_eq!(let_statement(&b"let foo = 1.0 ;"[..]),
+               IResult::Done(&b""[..],
+                             Statement::Let{name: "foo",
+                                            value: Expression::Simple(Value::Float(1.0))}));
+        assert_eq!(let_statement(&b"let foo= 1.0;"[..]),
+               IResult::Done(&b""[..],
+                             Statement::Let{name: "foo",
+                                            value: Expression::Simple(Value::Float(1.0))}));
+        assert_eq!(let_statement(&b"let foo =1.0;"[..]),
+               IResult::Done(&b""[..],
+                             Statement::Let{name: "foo",
+                                            value: Expression::Simple(Value::Float(1.0))}));
+    }
+
+    #[test]
+    fn test_expression_statement_parse() {
+        assert!(expression_statement(&b"foo"[..]).is_incomplete() );
+        assert_eq!(expression_statement(&b"1.0;"[..]),
+               IResult::Done(&b""[..],
+                             Statement::Expression(
+                                 Expression::Simple(Value::Float(1.0)))));
+        assert_eq!(expression_statement(&b"1.0 ;"[..]),
+               IResult::Done(&b""[..],
+                             Statement::Expression(
+                                 Expression::Simple(Value::Float(1.0)))));
+        assert_eq!(expression_statement(&b" 1.0;"[..]),
+               IResult::Done(&b""[..],
+                             Statement::Expression(
+                                 Expression::Simple(Value::Float(1.0)))));
+        assert_eq!(expression_statement(&b"foo;"[..]),
+               IResult::Done(&b""[..],
+                             Statement::Expression(
+                                 Expression::Simple(Value::Symbol("foo")))));
+        assert_eq!(expression_statement(&b"foo ;"[..]),
+               IResult::Done(&b""[..],
+                             Statement::Expression(
+                                 Expression::Simple(Value::Symbol("foo")))));
+        assert_eq!(expression_statement(&b" foo;"[..]),
+               IResult::Done(&b""[..],
+                             Statement::Expression(
+                                 Expression::Simple(Value::Symbol("foo")))));
+        assert_eq!(expression_statement(&b"\"foo\";"[..]),
+               IResult::Done(&b""[..],
+                             Statement::Expression(
+                                 Expression::Simple(Value::String("foo")))));
+        assert_eq!(expression_statement(&b"\"foo\" ;"[..]),
+               IResult::Done(&b""[..],
+                             Statement::Expression(
+                                 Expression::Simple(Value::String("foo")))));
+        assert_eq!(expression_statement(&b" \"foo\";"[..]),
+               IResult::Done(&b""[..],
+                             Statement::Expression(
+                                 Expression::Simple(Value::String("foo")))));
+    }
+
+    #[test]
+    fn test_expression_parse() {
+        assert_eq!(expression(&b"1"[..]),
+               IResult::Done(&b""[..], Expression::Simple(Value::Int(1))));
+        assert_eq!(expression(&b"1 + 1"[..]),
+               IResult::Done(&b""[..],
+                             Expression::Add(Box::new(Value::Int(1)),
+                                             Box::new(Expression::Simple(Value::Int(1))))));
+        assert_eq!(expression(&b"1 - 1"[..]),
+               IResult::Done(&b""[..],
+                             Expression::Sub(Box::new(Value::Int(1)),
+                                             Box::new(Expression::Simple(Value::Int(1))))));
+        assert_eq!(expression(&b"1 * 1"[..]),
+               IResult::Done(&b""[..],
+                             Expression::Mul(Box::new(Value::Int(1)),
+                                             Box::new(Expression::Simple(Value::Int(1))))));
+        assert_eq!(expression(&b"1 / 1"[..]),
+               IResult::Done(&b""[..],
+                             Expression::Div(Box::new(Value::Int(1)),
+                                             Box::new(Expression::Simple(Value::Int(1))))));
+
+        assert_eq!(expression(&b"1+1"[..]),
+               IResult::Done(&b""[..],
+                             Expression::Add(Box::new(Value::Int(1)),
+                                             Box::new(Expression::Simple(Value::Int(1))))));
+        assert_eq!(expression(&b"1-1"[..]),
+               IResult::Done(&b""[..],
+                             Expression::Sub(Box::new(Value::Int(1)),
+                                             Box::new(Expression::Simple(Value::Int(1))))));
+        assert_eq!(expression(&b"1*1"[..]),
+               IResult::Done(&b""[..],
+                             Expression::Mul(Box::new(Value::Int(1)),
+                                             Box::new(Expression::Simple(Value::Int(1))))));
+        assert_eq!(expression(&b"1/1"[..]),
+               IResult::Done(&b""[..],
+                             Expression::Div(Box::new(Value::Int(1)),
+                                             Box::new(Expression::Simple(Value::Int(1))))));
+        assert_eq!(expression(&b"lambda (arg1, arg2) => { foo = arg1 }"[..]),
+               IResult::Done(&b""[..],
+                             Expression::Lambda{
+                                 arglist: vec![
+                                     Value::Symbol("arg1"),
+                                     Value::Symbol("arg2")
+                                 ],
+                                 tuple: vec![
+                                     ("foo", Expression::Simple(Value::Symbol("arg1"))),
+                                 ],
+                             }
+               )
+    );
+        assert_eq!(expression(&b"select foo, 1, { foo = 2 };"[..]),
+               IResult::Done(&b""[..],
+                             Expression::Select{
+                                 val: Box::new(Expression::Simple(Value::Symbol("foo"))),
+                                 default: Box::new(Expression::Simple(Value::Int(1))),
+                                 tuple: vec![
+                                     ("foo", Expression::Simple(Value::Int(2)))
+                                 ]
+                             }
+               )
+    );
+        assert_eq!(expression(&b"foo.bar (1, \"foo\")"[..]),
+               IResult::Done(&b""[..],
+                             Expression::Call{
+                                 lambda: vec!["foo","bar"],
+                                 arglist: vec![
+                                     Expression::Simple(Value::Int(1)),
+                                     Expression::Simple(Value::String("foo")),
+                                 ],
+                             }
+               )
+    );
+        assert_eq!(expression(&b"(1 + 1)"[..]),
+            IResult::Done(&b""[..],
+                          Expression::Grouped(
+                              Box::new(
+                                  Expression::Add(
+                                      Box::new(Value::Int(1)),
+                                      Box::new(Expression::Simple(Value::Int(1)))
+                                  )
+                              )
+                          )
+            )
+    );
+    }
+
+    #[test]
+    fn test_call_parse() {
+        assert!(call_expression(&b"foo"[..]).is_incomplete() );
+        assert!(call_expression(&b"foo ("[..]).is_incomplete() );
+        assert!(call_expression(&b"foo (1"[..]).is_incomplete() );
+        assert!(call_expression(&b"foo (1,"[..]).is_err() );
+        assert!(call_expression(&b"foo (1,2"[..]).is_incomplete() );
+
+        assert_eq!(call_expression(&b"foo (1, \"foo\")"[..]),
+               IResult::Done(&b""[..],
+                             Expression::Call{
+                                 lambda: vec!["foo"],
+                                 arglist: vec![
+                                     Expression::Simple(Value::Int(1)),
+                                     Expression::Simple(Value::String("foo")),
+                                 ],
+                             }
+               )
+    );
+
+        assert_eq!(call_expression(&b"foo.bar (1, \"foo\")"[..]),
+               IResult::Done(&b""[..],
+                             Expression::Call{
+                                 lambda: vec!["foo","bar"],
+                                 arglist: vec![
+                                     Expression::Simple(Value::Int(1)),
+                                     Expression::Simple(Value::String("foo")),
+                                 ],
+                             }
+               )
+    );
+    }
+
+    #[test]
+    fn test_select_parse() {
+        assert!(select_expression(&b"select"[..]).is_incomplete());
+        assert!(select_expression(&b"select foo"[..]).is_incomplete());
+        assert!(select_expression(&b"select foo, 1"[..]).is_incomplete());
+        assert!(select_expression(&b"select foo, 1, {"[..]).is_incomplete());
+
+        assert_eq!(select_expression(&b"select foo, 1, { foo = 2 };"[..]),
+               IResult::Done(&b""[..],
+                             Expression::Select{
+                                 val: Box::new(Expression::Simple(Value::Symbol("foo"))),
+                                 default: Box::new(Expression::Simple(Value::Int(1))),
+                                 tuple: vec![
+                                     ("foo", Expression::Simple(Value::Int(2)))
+                                 ]
+                             }
+               )
+    );
+    }
+
+    #[test]
+    fn test_lambda_expression_parsing() {
+        assert!(lambda_expression(&b"foo"[..]).is_err() );
+        assert!(lambda_expression(&b"lambda \"foo\""[..]).is_err() );
+        assert!(lambda_expression(&b"lambda 1"[..]).is_err() );
+        assert!(lambda_expression(&b"lambda"[..]).is_incomplete() );
+        assert!(lambda_expression(&b"lambda ("[..]).is_incomplete() );
+        assert!(lambda_expression(&b"lambda (arg"[..]).is_incomplete() );
+        assert!(lambda_expression(&b"lambda (arg, arg2"[..]).is_incomplete() );
+        assert!(lambda_expression(&b"lambda (arg1, arg2) =>"[..]).is_incomplete() );
+        assert!(lambda_expression(&b"lambda (arg1, arg2) => {"[..]).is_incomplete() );
+        assert!(lambda_expression(&b"lambda (arg1, arg2) => { foo"[..]).is_incomplete() );
+        assert!(lambda_expression(&b"lambda (arg1, arg2) => { foo ="[..]).is_incomplete() );
+
+        assert_eq!(lambda_expression(&b"lambda (arg1, arg2) => {foo=1,bar=2}"[..]),
+               IResult::Done(&b""[..],
+                             Expression::Lambda{
+                                 arglist: vec![Value::Symbol("arg1"),
+                                               Value::Symbol("arg2")],
+                                 tuple: vec![("foo", Expression::Simple(Value::Int(1))),
+                                             ("bar", Expression::Simple(Value::Int(2)))
+                                 ]
+                             }
+               )
+    );
+    }
+
+    #[test]
+    fn test_arglist_parse() {
+        assert!(arglist(&b"arg"[..]).is_done());
+        assert!(arglist(&b"arg1, arg2"[..]).is_done());
+        assert_eq!(arglist(&b"arg1, arg2"[..]), IResult::Done(&b""[..],
+                                                  vec![
+                                                      Value::Symbol("arg1"),
+                                                      Value::Symbol("arg2")
+                                                  ]));
+    }
+
+    #[test]
+    fn test_copy_parse() {
+        assert!(copy_expression(&b"{}"[..]).is_err() );
+        assert!(copy_expression(&b"foo"[..]).is_incomplete() );
+        assert!(copy_expression(&b"foo{"[..]).is_incomplete() );
+        assert_eq!(copy_expression(&b"foo{}"[..]),
+               IResult::Done(&b""[..],
+                             Expression::Copy(vec!["foo"],
+                                              Vec::new())
+               )
+    );
+        assert_eq!(copy_expression(&b"foo{bar=1}"[..]),
+               IResult::Done(&b""[..],
+                             Expression::Copy(vec!["foo"],
+                                              vec![("bar", Expression::Simple(Value::Int(1)))])
+               )
+    );
+    }
+
+    #[test]
+    fn test_grouped_expression_parse() {
+        assert!(grouped_expression(&b"foo"[..]).is_err() );
+        assert!(grouped_expression(&b"(foo"[..]).is_incomplete() );
+        assert_eq!(grouped_expression(&b"(foo)"[..]),
+            IResult::Done(&b""[..],
+                          Expression::Grouped(
+                              Box::new(
+                                  Expression::Simple(
+                                      Value::Symbol("foo")))))
+    );
+        assert_eq!(grouped_expression(&b"(1 + 1)"[..]),
+            IResult::Done(&b""[..],
+                          Expression::Grouped(
+                              Box::new(
+                                  Expression::Add(
+                                      Box::new(Value::Int(1)),
+                                      Box::new(Expression::Simple(
+                                          Value::Int(1)))
+                                  )
+                              )
+                          )
+            )
+    );
+    }
+
+    #[test]
+    fn test_tuple_parse() {
+        assert!(tuple(&b"{"[..]).is_incomplete() );
+        assert!(tuple(&b"{ foo"[..]).is_incomplete() );
+        assert!(tuple(&b"{ foo ="[..]).is_incomplete() );
+        assert!(tuple(&b"{ foo = 1"[..]).is_incomplete() );
+        assert!(tuple(&b"{ foo = 1,"[..]).is_err() );
+        assert!(tuple(&b"{ foo = 1, bar ="[..]).is_err() );
+
+        assert_eq!(tuple(&b"{ }"[..]),
+            IResult::Done(&b""[..],
+                          Value::Tuple(
+                              vec![])));
+
+        assert_eq!(tuple(&b"{ foo = 1 }"[..]),
+            IResult::Done(&b""[..],
+                          Value::Tuple(
+                              vec![
+                                  ("foo", Expression::Simple(Value::Int(1)))
+                              ])));
+
+        assert_eq!(tuple(&b"{ foo = 1, bar = \"1\" }"[..]),
+            IResult::Done(&b""[..],
+                          Value::Tuple(
+                              vec![
+                                  ("foo", Expression::Simple(Value::Int(1))),
+                                  ("bar", Expression::Simple(Value::String("1")))
+                              ])));
+        assert_eq!(tuple(&b"{ foo = 1, bar = {} }"[..]),
+            IResult::Done(&b""[..],
+                          Value::Tuple(
+                              vec![
+                                  ("foo", Expression::Simple(Value::Int(1))),
+                                  ("bar", Expression::Simple(Value::Tuple(Vec::new())))
+                              ])));
+    }
+
+    #[test]
+    fn test_field_value_parse() {
+        assert!(field_value(&b"foo"[..]).is_incomplete() );
+        assert!(field_value(&b"foo ="[..]).is_incomplete() );
+
+        assert_eq!(field_value(&b"foo = 1"[..]),
+               IResult::Done(&b""[..], ("foo", Expression::Simple(Value::Int(1)))) );
+        assert_eq!(field_value(&b"foo = \"1\""[..]),
+               IResult::Done(&b""[..], ("foo", Expression::Simple(Value::String("1")))) );
+        assert_eq!(field_value(&b"foo = bar"[..]),
+               IResult::Done(&b""[..], ("foo", Expression::Simple(Value::Symbol("bar")))) );
+        assert_eq!(field_value(&b"foo = bar "[..]),
+               IResult::Done(&b""[..], ("foo", Expression::Simple(Value::Symbol("bar")))) );
+    }
+
+    #[test]
+    fn test_number_parsing() {
+        assert!(number(&b"."[..]).is_err() );
+        assert!(number(&b". "[..]).is_err() );
+        assert_eq!(number(&b"1.0"[..]),
+               IResult::Done(&b""[..], Value::Float(1.0)) );
+        assert_eq!(number(&b"1."[..]),
+               IResult::Done(&b""[..], Value::Float(1.0)) );
+        assert_eq!(number(&b"1"[..]),
+               IResult::Done(&b""[..], Value::Int(1)) );
+        assert_eq!(number(&b".1"[..]),
+               IResult::Done(&b""[..], Value::Float(0.1)) );
+    }
+
+    #[test]
+    fn test_parse() {
+        let bad_input = &b"import mylib as lib;"[..];
+        let bad_result = parse(bad_input);
+        assert!(bad_result.is_err() );
+
+        // Valid parsing tree
+        let input = &b"import \"mylib\" as lib;\
                    let foo = 1;\
                    1+1;"[..];
-    let result = parse(input);
-    assert!(result.is_done() );
-    let tpl = result.unwrap();
-    assert_eq!(from_utf8(tpl.0).unwrap(), "");
-    assert_eq!(tpl.1,
+        let result = parse(input);
+        assert!(result.is_done() );
+        let tpl = result.unwrap();
+        assert_eq!(from_utf8(tpl.0).unwrap(), "");
+        assert_eq!(tpl.1,
                vec![
                    Statement::Import{
                        path: "mylib",
@@ -947,4 +966,5 @@ fn test_parse() {
                                        Box::new(Expression::Simple(Value::Int(1))))
                    )
                ]);
+    }
 }
