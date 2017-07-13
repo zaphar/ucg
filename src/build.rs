@@ -45,6 +45,20 @@ quick_error! {
 /// BuildResult is the result of a build.
 type BuildResult = Result<(), Box<Error>>;
 
+#[derive(PartialEq,Debug,Clone)]
+pub struct MacroDef<'a> {
+    argdefs: Vec<&'a str>,
+    fields: FieldList<'a>,
+}
+
+impl<'a> MacroDef<'a> {
+    fn eval(&'a self, args: Vec<Expression<'a>>) -> Result<Vec<(&'a str, Rc<Val<'a>>)>, Box<Error>> {
+        Err(Box::new(
+            BuildError::TODO(
+                "Macro Calls are not implemented yet".to_string())))
+    }
+}
+
 /// Val is the type of a value for a field in a Tuple.
 #[derive(PartialEq,Debug,Clone)]
 pub enum Val<'a> {
@@ -52,6 +66,7 @@ pub enum Val<'a> {
     Float(f64),
     String(String),
     Tuple(Vec<(&'a str, Rc<Val<'a>>)>),
+    Macro(MacroDef<'a>),
 }
 
 impl<'a> Val<'a> {
@@ -62,6 +77,7 @@ impl<'a> Val<'a> {
             &Val::Float(_) => "Float".to_string(),
             &Val::String(_) => "String".to_string(),
             &Val::Tuple(_) => "Tuple".to_string(),
+            &Val::Macro(_) => "Macro".to_string(),
         }
     }
 
@@ -71,6 +87,7 @@ impl<'a> Val<'a> {
             &Val::Float(_) => if let &Val::Float(_) = target { true } else { false },
             &Val::String(_) => if let &Val::String(_) = target { true } else { false },
             &Val::Tuple(_) => if let &Val::Tuple(_) = target { true } else { false },
+            &Val::Macro(_) => if let &Val::Macro(_) = target { true } else { false },
         }
     }
 
@@ -417,12 +434,12 @@ impl<'a> Builder<'a> {
             Expression::Grouped(expr) => {
                 return self.eval_expr(*expr);
             },
-            Expression::Call{lambda: sel, arglist: args} => {
+            Expression::Call{macroref: sel, arglist: args} => {
                 Err(Box::new(
                     BuildError::TODO(
                         "TODO(jwall): Unimplemented Expression".to_string())))
             },
-            Expression::Lambda{arglist: args, tuple: fields} => {
+            Expression::Macro{arglist: args, tuple: fields} => {
                 Err(Box::new(
                     BuildError::TODO(
                         "TODO(jwall): Unimplemented Expression".to_string())))

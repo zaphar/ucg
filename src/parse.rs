@@ -75,10 +75,10 @@ pub enum Expression<'a> {
     Grouped(Box<Expression<'a>>),
 
     Call {
-        lambda: SelectorList<'a>,
+        macroref: SelectorList<'a>,
         arglist: Vec<Expression<'a>>,
     },
-    Lambda {
+    Macro {
         arglist: Vec<Value<'a>>,
         tuple: FieldList<'a>,
     },
@@ -254,7 +254,7 @@ named!(
 // keywords
 named!(let_word, tag!("let"));
 named!(select_word, tag!("select"));
-named!(lambda_word, tag!("lambda"));
+named!(macro_word, tag!("macro"));
 named!(import_word, tag!("import"));
 named!(as_word, tag!("as"));
 
@@ -363,10 +363,10 @@ named!(copy_expression<Expression>,
        )
 );
 
-fn tuple_to_lambda<'a>(t: (Vec<Value<'a>>, Value<'a>)) -> ParseResult<Expression<'a>> {
+fn tuple_to_macro<'a>(t: (Vec<Value<'a>>, Value<'a>)) -> ParseResult<Expression<'a>> {
     match t.1 {
         Value::Tuple(v) => {
-            Ok(Expression::Lambda {
+            Ok(Expression::Macro {
                 arglist: t.0,
                 tuple: v,
             })
@@ -380,10 +380,10 @@ fn tuple_to_lambda<'a>(t: (Vec<Value<'a>>, Value<'a>)) -> ParseResult<Expression
 
 named!(arglist<Vec<Value> >, separated_list!(ws!(comma), symbol));
 
-named!(lambda_expression<Expression>,
+named!(macro_expression<Expression>,
        map_res!(
            do_parse!(
-               lambda_word >>
+               macro_word >>
                    ws!(lparen) >>
                    arglist: ws!(arglist) >>
                    rparen >>
@@ -391,7 +391,7 @@ named!(lambda_expression<Expression>,
                    map: tuple >>
                    (arglist, map)
            ),
-           tuple_to_lambda
+           tuple_to_macro
        )
 );
 
@@ -428,7 +428,7 @@ named!(select_expression<Expression>,
 fn tuple_to_call<'a>(t: (Value<'a>, Vec<Expression<'a>>)) -> ParseResult<Expression<'a>> {
     if let Value::Selector(sl) = t.0 {
         Ok(Expression::Call {
-            lambda: sl,
+            macroref: sl,
             arglist: t.1,
         })
     } else {
@@ -450,11 +450,11 @@ named!(selector_value<Value>,
 named!(call_expression<Expression>,
        map_res!(
            do_parse!(
-               lambda: selector_value >>
+               macroname: selector_value >>
                    lparen >>
                    args: ws!(separated_list!(ws!(comma), expression)) >>
                    rparen >>
-                   (lambda, args)
+                   (macroname, args)
            ),
            tuple_to_call
        )
@@ -477,7 +477,7 @@ named!(expression<Expression>,
            complete!(mul_expression) |
            complete!(div_expression) |
            complete!(grouped_expression) |
-           complete!(lambda_expression) |
+           complete!(macro_expression) |
            complete!(select_expression) |
            complete!(call_expression) |
            complete!(copy_expression) |
@@ -553,7 +553,7 @@ mod test {
     use std::str::from_utf8;
     use super::{Statement, Expression, Value};
     use super::{number, parse, field_value, tuple, grouped_expression, copy_expression};
-    use super::{arglist, lambda_expression, select_expression, call_expression, expression};
+    use super::{arglist, macro_expression, select_expression, call_expression, expression};
     use super::{expression_statement, let_statement, import_statement, statement};
     use nom::IResult;
 
@@ -699,9 +699,9 @@ mod test {
                IResult::Done(&b""[..],
                              Expression::Div(Box::new(Value::Int(1)),
                                              Box::new(Expression::Simple(Value::Int(1))))));
-        assert_eq!(expression(&b"lambda (arg1, arg2) => { foo = arg1 }"[..]),
+        assert_eq!(expression(&b"macro (arg1, arg2) => { foo = arg1 }"[..]),
                IResult::Done(&b""[..],
-                             Expression::Lambda{
+                             Expression::Macro{
                                  arglist: vec![
                                      Value::Symbol("arg1"),
                                      Value::Symbol("arg2")
@@ -726,7 +726,7 @@ mod test {
         assert_eq!(expression(&b"foo.bar (1, \"foo\")"[..]),
                IResult::Done(&b""[..],
                              Expression::Call{
-                                 lambda: vec!["foo","bar"],
+                                 macroref: vec!["foo","bar"],
                                  arglist: vec![
                                      Expression::Simple(Value::Int(1)),
                                      Expression::Simple(Value::String("foo")),
@@ -759,7 +759,7 @@ mod test {
         assert_eq!(call_expression(&b"foo (1, \"foo\")"[..]),
                IResult::Done(&b""[..],
                              Expression::Call{
-                                 lambda: vec!["foo"],
+                                 macroref: vec!["foo"],
                                  arglist: vec![
                                      Expression::Simple(Value::Int(1)),
                                      Expression::Simple(Value::String("foo")),
@@ -771,7 +771,7 @@ mod test {
         assert_eq!(call_expression(&b"foo.bar (1, \"foo\")"[..]),
                IResult::Done(&b""[..],
                              Expression::Call{
-                                 lambda: vec!["foo","bar"],
+                                 macroref: vec!["foo","bar"],
                                  arglist: vec![
                                      Expression::Simple(Value::Int(1)),
                                      Expression::Simple(Value::String("foo")),
@@ -802,22 +802,22 @@ mod test {
     }
 
     #[test]
-    fn test_lambda_expression_parsing() {
-        assert!(lambda_expression(&b"foo"[..]).is_err() );
-        assert!(lambda_expression(&b"lambda \"foo\""[..]).is_err() );
-        assert!(lambda_expression(&b"lambda 1"[..]).is_err() );
-        assert!(lambda_expression(&b"lambda"[..]).is_incomplete() );
-        assert!(lambda_expression(&b"lambda ("[..]).is_incomplete() );
-        assert!(lambda_expression(&b"lambda (arg"[..]).is_incomplete() );
-        assert!(lambda_expression(&b"lambda (arg, arg2"[..]).is_incomplete() );
-        assert!(lambda_expression(&b"lambda (arg1, arg2) =>"[..]).is_incomplete() );
-        assert!(lambda_expression(&b"lambda (arg1, arg2) => {"[..]).is_incomplete() );
-        assert!(lambda_expression(&b"lambda (arg1, arg2) => { foo"[..]).is_incomplete() );
-        assert!(lambda_expression(&b"lambda (arg1, arg2) => { foo ="[..]).is_incomplete() );
+    fn test_macro_expression_parsing() {
+        assert!(macro_expression(&b"foo"[..]).is_err() );
+        assert!(macro_expression(&b"macro \"foo\""[..]).is_err() );
+        assert!(macro_expression(&b"macro 1"[..]).is_err() );
+        assert!(macro_expression(&b"macro"[..]).is_incomplete() );
+        assert!(macro_expression(&b"macro ("[..]).is_incomplete() );
+        assert!(macro_expression(&b"macro (arg"[..]).is_incomplete() );
+        assert!(macro_expression(&b"macro (arg, arg2"[..]).is_incomplete() );
+        assert!(macro_expression(&b"macro (arg1, arg2) =>"[..]).is_incomplete() );
+        assert!(macro_expression(&b"macro (arg1, arg2) => {"[..]).is_incomplete() );
+        assert!(macro_expression(&b"macro (arg1, arg2) => { foo"[..]).is_incomplete() );
+        assert!(macro_expression(&b"macro (arg1, arg2) => { foo ="[..]).is_incomplete() );
 
-        assert_eq!(lambda_expression(&b"lambda (arg1, arg2) => {foo=1,bar=2}"[..]),
+        assert_eq!(macro_expression(&b"macro (arg1, arg2) => {foo=1,bar=2}"[..]),
                IResult::Done(&b""[..],
-                             Expression::Lambda{
+                             Expression::Macro{
                                  arglist: vec![Value::Symbol("arg1"),
                                                Value::Symbol("arg2")],
                                  tuple: vec![("foo", Expression::Simple(Value::Int(1))),
