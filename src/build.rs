@@ -118,9 +118,9 @@ impl<'a> Display for Val<'a> {
     }
 }
 
-/// Tuple defines a set of fields.
+/// ValueMap defines a set of values in a parsed file.
 #[derive(PartialEq,Debug)]
-pub struct Tuple<'a>(HashMap<&'a str, Val<'a>>);
+pub struct ValueMap<'a>(HashMap<&'a str, Rc<Val<'a>>>);
 
 /// Builder parses one or more statements into a out Tuple.
 pub struct Builder<'a> {
@@ -130,7 +130,7 @@ pub struct Builder<'a> {
     /// are keyed by the normalized import path. This acts as a cache
     /// so multiple imports of the same file don't have to be parsed
     /// multiple times.
-    assets: HashMap<&'a str, Tuple<'a>>,
+    assets: HashMap<&'a str, ValueMap<'a>>,
     /// out is our built output.
     out: HashMap<&'a str, Rc<Val<'a>>>,
 }
