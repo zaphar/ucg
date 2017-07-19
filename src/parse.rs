@@ -29,23 +29,23 @@ use nom::{alpha, is_alphanumeric, digit};
 
 type ParseResult<O> = Result<O, Box<Error>>;
 
-pub type FieldList<'a> = Vec<(&'a str, Expression<'a>)>; // str is expected to be a symbol
-pub type SelectorList<'a> = Vec<&'a str>; // str is expected to always be a symbol.
+pub type FieldList = Vec<(String, Expression)>; // str is expected to be a symbol
+pub type SelectorList = Vec<String>; // str is expected to always be a symbol.
 
 /// Value represents a Value in the UCG parsed AST.
 #[derive(Debug,PartialEq,Clone)]
-pub enum Value<'a> {
+pub enum Value {
     // Constant Values
     Int(i64),
     Float(f64),
-    String(&'a str),
-    Symbol(&'a str),
+    String(String),
+    Symbol(String),
     // Complex Values
-    Tuple(FieldList<'a>),
-    Selector(SelectorList<'a>),
+    Tuple(FieldList),
+    Selector(SelectorList),
 }
 
-impl<'a> Value<'a> {
+impl Value {
     pub fn type_name(&self) -> String {
         match self {
             &Value::Int(_) => "Integer".to_string(),
@@ -56,55 +56,78 @@ impl<'a> Value<'a> {
             &Value::Selector(_) => "Selector".to_string(),
         }
     }
+
+    fn fields_to_string(v: &FieldList) -> String {
+        let mut buf = String::new();
+        buf.push_str("{\n");
+        for ref t in v.iter() {
+            buf.push_str("\t");
+            buf.push_str(&t.0);
+            buf.push_str("\n");
+        }
+        buf.push_str("}");
+        return buf;
+    }
+
+    pub fn to_string(&self) -> String {
+        match self {
+            &Value::Int(ref i) => format!("{}", i),
+            &Value::Float(ref f) => format!("{}", f),
+            &Value::String(ref s) => format!("{}", s),
+            &Value::Symbol(ref s) => format!("{}", s),
+            &Value::Tuple(ref fs) => format!("{}", Self::fields_to_string(fs)),
+            &Value::Selector(ref v) =>  v.join("."),
+        }
+    }
 }
 
 /// Expression encodes an expression. Expressions compute a value from operands.
 #[derive(Debug,PartialEq,Clone)]
-pub enum Expression<'a> {
+pub enum Expression {
     // Base Expression
-    Simple(Value<'a>),
+    Simple(Value),
 
     // Binary Expressions
-    Add(Box<Value<'a>>, Box<Expression<'a>>),
-    Sub(Box<Value<'a>>, Box<Expression<'a>>),
-    Mul(Box<Value<'a>>, Box<Expression<'a>>),
-    Div(Box<Value<'a>>, Box<Expression<'a>>),
+    Add(Box<Value>, Box<Expression>),
+    Sub(Box<Value>, Box<Expression>),
+    Mul(Box<Value>, Box<Expression>),
+    Div(Box<Value>, Box<Expression>),
 
     // Complex Expressions
-    Copy(SelectorList<'a>, FieldList<'a>),
-    Grouped(Box<Expression<'a>>),
+    Copy(SelectorList, FieldList),
+    Grouped(Box<Expression>),
 
     Call {
-        macroref: SelectorList<'a>,
-        arglist: Vec<Expression<'a>>,
+        macroref: SelectorList,
+        arglist: Vec<Expression>,
     },
     Macro {
-        arglist: Vec<Value<'a>>,
-        tuple: FieldList<'a>,
+        arglist: Vec<String>,
+        tuple: FieldList,
     },
     Select {
-        val: Box<Expression<'a>>,
-        default: Box<Expression<'a>>,
-        tuple: FieldList<'a>,
+        val: Box<Expression>,
+        default: Box<Expression>,
+        tuple: FieldList,
     },
 }
 
 /// Statement encodes a parsed Statement in the UCG AST.
 #[derive(Debug,PartialEq)]
-pub enum Statement<'a> {
+pub enum Statement {
     // simple expression
-    Expression(Expression<'a>),
+    Expression(Expression),
 
     // Named bindings
     Let {
-        name: &'a str,
-        value: Expression<'a>,
+        name: String,
+        value: Expression,
     },
 
     // Include a file.
     Import {
-        path: &'a str,
-        name: &'a str,
+        path: String,
+        name: String,
     },
 }
 
@@ -125,12 +148,13 @@ named!(semicolon, tag!(";"));
 named!(fatcomma, tag!("=>"));
 
 // a field is the building block of symbols and tuple field names.
-named!(field<&str>,
+named!(field<String>,
        map_res!(preceded!(peek!(alpha), take_while!(is_alphanumeric)),
-                from_utf8)
+                |s| from_utf8(s).map(|s| s.to_string())
+       )
 );
 
-fn symbol_to_value<'a>(s: &'a str) -> ParseResult<Value<'a>> {
+fn symbol_to_value(s: String) -> ParseResult<Value> {
     Ok(Value::Symbol(s))
 }
 
@@ -138,13 +162,13 @@ fn symbol_to_value<'a>(s: &'a str) -> ParseResult<Value<'a>> {
 named!(symbol<Value>, map_res!(field, symbol_to_value));
 
 // quoted is a quoted string.
-named!(quoted<&str>,
+named!(quoted<String>,
        map_res!(delimited!(doublequote, take_until!("\""), doublequote),
-                from_utf8
+                |s| from_utf8(s).map(|s| s.to_string())
        )
 );
 
-fn str_to_value<'a>(s: &'a str) -> ParseResult<Value<'a>> {
+fn str_to_value(s: String) -> ParseResult<Value> {
     Ok(Value::String(s))
 }
 
@@ -154,8 +178,8 @@ named!(quoted_value<Value>,
 );
 
 // Helper function to make the return types work for down below.
-fn triple_to_number<'a>(v: (Option<&'a [u8]>, Option<&'a [u8]>, Option<&'a [u8]>))
-                        -> ParseResult<Value<'a>> {
+fn triple_to_number(v: (Option<&[u8]>, Option<&[u8]>, Option<&[u8]>))
+                        -> ParseResult<Value> {
     let pref = match v.0 {
         None => "",
         Some(bs) => try!(from_utf8(bs)),
@@ -223,7 +247,7 @@ named!(value<Value>, alt!(number | quoted_value | symbol | tuple));
 
 named!(
     #[doc="Capture a field and value pair composed of `<symbol> = <value>,`"],
-    field_value<(&str, Expression) >,
+    field_value<(String, Expression) >,
     do_parse!(
         field: field >>
             ws!(equal) >>
@@ -233,7 +257,7 @@ named!(
 );
 
 // Helper function to make the return types work for down below.
-fn vec_to_tuple<'a>(v: FieldList<'a>) -> ParseResult<Value<'a>> {
+fn vec_to_tuple(v: FieldList) -> ParseResult<Value> {
     Ok(Value::Tuple(v))
 }
 
@@ -269,7 +293,7 @@ named!(simple_expression<Expression>,
        )
 );
 
-fn tuple_to_add_expression<'a>(tpl: (Value<'a>, Expression<'a>)) -> ParseResult<Expression<'a>> {
+fn tuple_to_add_expression(tpl: (Value, Expression)) -> ParseResult<Expression> {
     Ok(Expression::Add(Box::new(tpl.0), Box::new(tpl.1)))
 }
 
@@ -285,7 +309,7 @@ named!(add_expression<Expression>,
        )
 );
 
-fn tuple_to_sub_expression<'a>(tpl: (Value<'a>, Expression<'a>)) -> ParseResult<Expression<'a>> {
+fn tuple_to_sub_expression(tpl: (Value, Expression)) -> ParseResult<Expression> {
     Ok(Expression::Sub(Box::new(tpl.0), Box::new(tpl.1)))
 }
 
@@ -301,7 +325,7 @@ named!(sub_expression<Expression>,
        )
 );
 
-fn tuple_to_mul_expression<'a>(tpl: (Value<'a>, Expression<'a>)) -> ParseResult<Expression<'a>> {
+fn tuple_to_mul_expression(tpl: (Value, Expression)) -> ParseResult<Expression> {
     Ok(Expression::Mul(Box::new(tpl.0), Box::new(tpl.1)))
 }
 
@@ -317,7 +341,7 @@ named!(mul_expression<Expression>,
        )
 );
 
-fn tuple_to_div_expression<'a>(tpl: (Value<'a>, Expression<'a>)) -> ParseResult<Expression<'a>> {
+fn tuple_to_div_expression(tpl: (Value, Expression)) -> ParseResult<Expression> {
     Ok(Expression::Div(Box::new(tpl.0), Box::new(tpl.1)))
 }
 
@@ -333,7 +357,7 @@ named!(div_expression<Expression>,
        )
 );
 
-fn expression_to_grouped_expression<'a>(e: Expression<'a>) -> ParseResult<Expression<'a>> {
+fn expression_to_grouped_expression(e: Expression) -> ParseResult<Expression> {
     Ok(Expression::Grouped(Box::new(e)))
 }
 
@@ -346,7 +370,7 @@ named!(grouped_expression<Expression>,
 
 named!(selector_list<SelectorList>, separated_nonempty_list!(dot, field));
 
-fn tuple_to_copy<'a>(t: (SelectorList<'a>, FieldList<'a>)) -> ParseResult<Expression<'a>> {
+fn tuple_to_copy(t: (SelectorList, FieldList)) -> ParseResult<Expression> {
     Ok(Expression::Copy(t.0, t.1))
 }
 
@@ -363,11 +387,15 @@ named!(copy_expression<Expression>,
        )
 );
 
-fn tuple_to_macro<'a>(t: (Vec<Value<'a>>, Value<'a>)) -> ParseResult<Expression<'a>> {
+fn value_to_string(v: Value) -> String {
+    v.to_string()
+}
+
+fn tuple_to_macro(mut t: (Vec<Value>, Value)) -> ParseResult<Expression> {
     match t.1 {
         Value::Tuple(v) => {
             Ok(Expression::Macro {
-                arglist: t.0,
+                arglist: t.0.drain(0..).map(|s| s.to_string()).collect(),
                 tuple: v,
             })
         }
@@ -395,8 +423,8 @@ named!(macro_expression<Expression>,
        )
 );
 
-fn tuple_to_select<'a>(t: (Expression<'a>, Expression<'a>, Value<'a>))
-                       -> ParseResult<Expression<'a>> {
+fn tuple_to_select(t: (Expression, Expression, Value))
+                       -> ParseResult<Expression> {
     match t.2 {
         Value::Tuple(v) => {
             Ok(Expression::Select {
@@ -425,7 +453,7 @@ named!(select_expression<Expression>,
        )
 );
 
-fn tuple_to_call<'a>(t: (Value<'a>, Vec<Expression<'a>>)) -> ParseResult<Expression<'a>> {
+fn tuple_to_call(t: (Value, Vec<Expression>)) -> ParseResult<Expression> {
     if let Value::Selector(sl) = t.0 {
         Ok(Expression::Call {
             macroref: sl,
@@ -436,7 +464,7 @@ fn tuple_to_call<'a>(t: (Value<'a>, Vec<Expression<'a>>)) -> ParseResult<Express
     }
 }
 
-fn vec_to_selector_value<'a>(v: SelectorList<'a>) -> ParseResult<Value<'a>> {
+fn vec_to_selector_value(v: SelectorList) -> ParseResult<Value> {
     Ok(Value::Selector(v))
 }
 
@@ -496,9 +524,9 @@ named!(expression_statement<Statement>,
        )
 );
 
-fn tuple_to_let<'a>(t: (&'a str, Expression<'a>)) -> ParseResult<Statement<'a>> {
+fn tuple_to_let(t: (String, Expression)) -> ParseResult<Statement> {
     Ok(Statement::Let {
-        name: t.0,
+        name: t.0.to_string(),
         value: t.1,
     })
 }
@@ -516,10 +544,10 @@ named!(let_statement<Statement>,
        )
 );
 
-fn tuple_to_import<'a>(t: (&'a str, &'a str)) -> ParseResult<Statement<'a>> {
+fn tuple_to_import(t: (String, String)) -> ParseResult<Statement> {
     Ok(Statement::Import {
-        name: t.0,
-        path: t.1,
+        name: t.0.to_string(),
+        path: t.1.to_string(),
     })
 }
 
@@ -552,7 +580,7 @@ named!(pub parse<Vec<Statement> >, many1!(ws!(statement)));
 mod test {
     use std::str::from_utf8;
     use super::{Statement, Expression, Value};
-    use super::{number, parse, field_value, tuple, grouped_expression, copy_expression};
+    use super::{number, symbol, parse, field_value, tuple, grouped_expression, copy_expression};
     use super::{arglist, macro_expression, select_expression, call_expression, expression};
     use super::{expression_statement, let_statement, import_statement, statement};
     use nom::IResult;
@@ -562,8 +590,8 @@ mod test {
         assert_eq!(statement(&b"import \"foo\" as foo;"[..]),
                IResult::Done(&b""[..],
                              Statement::Import{
-                                 path: "foo",
-                                 name: "foo"
+                                 path: "foo".to_string(),
+                                 name: "foo".to_string()
                              }
                )
     );
@@ -571,7 +599,7 @@ mod test {
 
         assert_eq!(statement(&b"let foo = 1.0 ;"[..]),
                IResult::Done(&b""[..],
-                             Statement::Let{name: "foo",
+                             Statement::Let{name: "foo".to_string(),
                                             value: Expression::Simple(Value::Float(1.0))}));
         assert_eq!(statement(&b"1.0;"[..]),
                IResult::Done(&b""[..],
@@ -589,8 +617,8 @@ mod test {
         assert_eq!(import_statement(&b"import \"foo\" as foo;"[..]),
                IResult::Done(&b""[..],
                              Statement::Import{
-                                 path: "foo",
-                                 name: "foo"
+                                 path: "foo".to_string(),
+                                 name: "foo".to_string()
                              }
                )
     );
@@ -609,15 +637,15 @@ mod test {
 
         assert_eq!(let_statement(&b"let foo = 1.0 ;"[..]),
                IResult::Done(&b""[..],
-                             Statement::Let{name: "foo",
+                             Statement::Let{name: "foo".to_string(),
                                             value: Expression::Simple(Value::Float(1.0))}));
         assert_eq!(let_statement(&b"let foo= 1.0;"[..]),
                IResult::Done(&b""[..],
-                             Statement::Let{name: "foo",
+                             Statement::Let{name: "foo".to_string(),
                                             value: Expression::Simple(Value::Float(1.0))}));
         assert_eq!(let_statement(&b"let foo =1.0;"[..]),
                IResult::Done(&b""[..],
-                             Statement::Let{name: "foo",
+                             Statement::Let{name: "foo".to_string(),
                                             value: Expression::Simple(Value::Float(1.0))}));
     }
 
@@ -639,33 +667,35 @@ mod test {
         assert_eq!(expression_statement(&b"foo;"[..]),
                IResult::Done(&b""[..],
                              Statement::Expression(
-                                 Expression::Simple(Value::Symbol("foo")))));
+                                 Expression::Simple(Value::Symbol("foo".to_string())))));
         assert_eq!(expression_statement(&b"foo ;"[..]),
                IResult::Done(&b""[..],
                              Statement::Expression(
-                                 Expression::Simple(Value::Symbol("foo")))));
+                                 Expression::Simple(Value::Symbol("foo".to_string())))));
         assert_eq!(expression_statement(&b" foo;"[..]),
                IResult::Done(&b""[..],
                              Statement::Expression(
-                                 Expression::Simple(Value::Symbol("foo")))));
+                                 Expression::Simple(Value::Symbol("foo".to_string())))));
         assert_eq!(expression_statement(&b"\"foo\";"[..]),
                IResult::Done(&b""[..],
                              Statement::Expression(
-                                 Expression::Simple(Value::String("foo")))));
+                                 Expression::Simple(Value::String("foo".to_string())))));
         assert_eq!(expression_statement(&b"\"foo\" ;"[..]),
                IResult::Done(&b""[..],
                              Statement::Expression(
-                                 Expression::Simple(Value::String("foo")))));
+                                 Expression::Simple(Value::String("foo".to_string())))));
         assert_eq!(expression_statement(&b" \"foo\";"[..]),
                IResult::Done(&b""[..],
                              Statement::Expression(
-                                 Expression::Simple(Value::String("foo")))));
+                                 Expression::Simple(Value::String("foo".to_string())))));
     }
 
     #[test]
     fn test_expression_parse() {
         assert_eq!(expression(&b"1"[..]),
                IResult::Done(&b""[..], Expression::Simple(Value::Int(1))));
+        assert_eq!(expression(&b"foo"[..]),
+               IResult::Done(&b""[..], Expression::Simple(Value::Symbol("foo".to_string()))));
         assert_eq!(expression(&b"1 + 1"[..]),
                IResult::Done(&b""[..],
                              Expression::Add(Box::new(Value::Int(1)),
@@ -703,11 +733,11 @@ mod test {
                IResult::Done(&b""[..],
                              Expression::Macro{
                                  arglist: vec![
-                                     Value::Symbol("arg1"),
-                                     Value::Symbol("arg2")
+                                     "arg1".to_string(),
+                                     "arg2".to_string(),
                                  ],
                                  tuple: vec![
-                                     ("foo", Expression::Simple(Value::Symbol("arg1"))),
+                                     ("foo".to_string(), Expression::Simple(Value::Symbol("arg1".to_string()))),
                                  ],
                              }
                )
@@ -715,10 +745,10 @@ mod test {
         assert_eq!(expression(&b"select foo, 1, { foo = 2 };"[..]),
                IResult::Done(&b""[..],
                              Expression::Select{
-                                 val: Box::new(Expression::Simple(Value::Symbol("foo"))),
+                                 val: Box::new(Expression::Simple(Value::Symbol("foo".to_string()))),
                                  default: Box::new(Expression::Simple(Value::Int(1))),
                                  tuple: vec![
-                                     ("foo", Expression::Simple(Value::Int(2)))
+                                     ("foo".to_string(), Expression::Simple(Value::Int(2)))
                                  ]
                              }
                )
@@ -726,10 +756,10 @@ mod test {
         assert_eq!(expression(&b"foo.bar (1, \"foo\")"[..]),
                IResult::Done(&b""[..],
                              Expression::Call{
-                                 macroref: vec!["foo","bar"],
+                                 macroref: vec!["foo".to_string(),"bar".to_string()],
                                  arglist: vec![
                                      Expression::Simple(Value::Int(1)),
-                                     Expression::Simple(Value::String("foo")),
+                                     Expression::Simple(Value::String("foo".to_string())),
                                  ],
                              }
                )
@@ -759,10 +789,10 @@ mod test {
         assert_eq!(call_expression(&b"foo (1, \"foo\")"[..]),
                IResult::Done(&b""[..],
                              Expression::Call{
-                                 macroref: vec!["foo"],
+                                 macroref: vec!["foo".to_string()],
                                  arglist: vec![
                                      Expression::Simple(Value::Int(1)),
-                                     Expression::Simple(Value::String("foo")),
+                                     Expression::Simple(Value::String("foo".to_string())),
                                  ],
                              }
                )
@@ -771,10 +801,10 @@ mod test {
         assert_eq!(call_expression(&b"foo.bar (1, \"foo\")"[..]),
                IResult::Done(&b""[..],
                              Expression::Call{
-                                 macroref: vec!["foo","bar"],
+                                 macroref: vec!["foo".to_string(),"bar".to_string()],
                                  arglist: vec![
                                      Expression::Simple(Value::Int(1)),
-                                     Expression::Simple(Value::String("foo")),
+                                     Expression::Simple(Value::String("foo".to_string())),
                                  ],
                              }
                )
@@ -791,10 +821,10 @@ mod test {
         assert_eq!(select_expression(&b"select foo, 1, { foo = 2 };"[..]),
                IResult::Done(&b""[..],
                              Expression::Select{
-                                 val: Box::new(Expression::Simple(Value::Symbol("foo"))),
+                                 val: Box::new(Expression::Simple(Value::Symbol("foo".to_string()))),
                                  default: Box::new(Expression::Simple(Value::Int(1))),
                                  tuple: vec![
-                                     ("foo", Expression::Simple(Value::Int(2)))
+                                     ("foo".to_string(), Expression::Simple(Value::Int(2)))
                                  ]
                              }
                )
@@ -818,10 +848,10 @@ mod test {
         assert_eq!(macro_expression(&b"macro (arg1, arg2) => {foo=1,bar=2}"[..]),
                IResult::Done(&b""[..],
                              Expression::Macro{
-                                 arglist: vec![Value::Symbol("arg1"),
-                                               Value::Symbol("arg2")],
-                                 tuple: vec![("foo", Expression::Simple(Value::Int(1))),
-                                             ("bar", Expression::Simple(Value::Int(2)))
+                                 arglist: vec!["arg1".to_string(),
+                                               "arg2".to_string()],
+                                 tuple: vec![("foo".to_string(), Expression::Simple(Value::Int(1))),
+                                             ("bar".to_string(), Expression::Simple(Value::Int(2)))
                                  ]
                              }
                )
@@ -834,8 +864,8 @@ mod test {
         assert!(arglist(&b"arg1, arg2"[..]).is_done());
         assert_eq!(arglist(&b"arg1, arg2"[..]), IResult::Done(&b""[..],
                                                   vec![
-                                                      Value::Symbol("arg1"),
-                                                      Value::Symbol("arg2")
+                                                      Value::Symbol("arg1".to_string()),
+                                                      Value::Symbol("arg2".to_string())
                                                   ]));
     }
 
@@ -846,14 +876,14 @@ mod test {
         assert!(copy_expression(&b"foo{"[..]).is_incomplete() );
         assert_eq!(copy_expression(&b"foo{}"[..]),
                IResult::Done(&b""[..],
-                             Expression::Copy(vec!["foo"],
+                             Expression::Copy(vec!["foo".to_string()],
                                               Vec::new())
                )
     );
         assert_eq!(copy_expression(&b"foo{bar=1}"[..]),
                IResult::Done(&b""[..],
-                             Expression::Copy(vec!["foo"],
-                                              vec![("bar", Expression::Simple(Value::Int(1)))])
+                             Expression::Copy(vec!["foo".to_string()],
+                                              vec![("bar".to_string(), Expression::Simple(Value::Int(1)))])
                )
     );
     }
@@ -867,7 +897,7 @@ mod test {
                           Expression::Grouped(
                               Box::new(
                                   Expression::Simple(
-                                      Value::Symbol("foo")))))
+                                      Value::Symbol("foo".to_string())))))
     );
         assert_eq!(grouped_expression(&b"(1 + 1)"[..]),
             IResult::Done(&b""[..],
@@ -902,22 +932,22 @@ mod test {
             IResult::Done(&b""[..],
                           Value::Tuple(
                               vec![
-                                  ("foo", Expression::Simple(Value::Int(1)))
+                                  ("foo".to_string(), Expression::Simple(Value::Int(1)))
                               ])));
 
         assert_eq!(tuple(&b"{ foo = 1, bar = \"1\" }"[..]),
             IResult::Done(&b""[..],
                           Value::Tuple(
                               vec![
-                                  ("foo", Expression::Simple(Value::Int(1))),
-                                  ("bar", Expression::Simple(Value::String("1")))
+                                  ("foo".to_string(), Expression::Simple(Value::Int(1))),
+                                  ("bar".to_string(), Expression::Simple(Value::String("1".to_string())))
                               ])));
         assert_eq!(tuple(&b"{ foo = 1, bar = {} }"[..]),
             IResult::Done(&b""[..],
                           Value::Tuple(
                               vec![
-                                  ("foo", Expression::Simple(Value::Int(1))),
-                                  ("bar", Expression::Simple(Value::Tuple(Vec::new())))
+                                  ("foo".to_string(), Expression::Simple(Value::Int(1))),
+                                  ("bar".to_string(), Expression::Simple(Value::Tuple(Vec::new())))
                               ])));
     }
 
@@ -927,13 +957,13 @@ mod test {
         assert!(field_value(&b"foo ="[..]).is_incomplete() );
 
         assert_eq!(field_value(&b"foo = 1"[..]),
-               IResult::Done(&b""[..], ("foo", Expression::Simple(Value::Int(1)))) );
+               IResult::Done(&b""[..], ("foo".to_string(), Expression::Simple(Value::Int(1)))) );
         assert_eq!(field_value(&b"foo = \"1\""[..]),
-               IResult::Done(&b""[..], ("foo", Expression::Simple(Value::String("1")))) );
+               IResult::Done(&b""[..], ("foo".to_string(), Expression::Simple(Value::String("1".to_string())))) );
         assert_eq!(field_value(&b"foo = bar"[..]),
-               IResult::Done(&b""[..], ("foo", Expression::Simple(Value::Symbol("bar")))) );
+               IResult::Done(&b""[..], ("foo".to_string(), Expression::Simple(Value::Symbol("bar".to_string())))) );
         assert_eq!(field_value(&b"foo = bar "[..]),
-               IResult::Done(&b""[..], ("foo", Expression::Simple(Value::Symbol("bar")))) );
+               IResult::Done(&b""[..], ("foo".to_string(), Expression::Simple(Value::Symbol("bar".to_string())))) );
     }
 
     #[test]
@@ -948,6 +978,12 @@ mod test {
                IResult::Done(&b""[..], Value::Int(1)) );
         assert_eq!(number(&b".1"[..]),
                IResult::Done(&b""[..], Value::Float(0.1)) );
+    }
+
+    #[test]
+    fn test_symbol_parsing() {
+        assert_eq!(symbol(&b"foo"[..]),
+               IResult::Done(&b""[..], Value::Symbol("foo".to_string())) );
     }
 
     #[test]
@@ -967,11 +1003,11 @@ mod test {
         assert_eq!(tpl.1,
                vec![
                    Statement::Import{
-                       path: "mylib",
-                       name: "lib"
+                       path: "mylib".to_string(),
+                       name: "lib".to_string()
                    },
                    Statement::Let{
-                       name: "foo",
+                       name: "foo".to_string(),
                        value: Expression::Simple(Value::Int(1))
                    },
                    Statement::Expression(
