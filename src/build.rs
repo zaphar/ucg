@@ -11,15 +11,19 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
-use parse::{parse, Statement, Expression, Value, FieldList, SelectorList};
+use parse::{parse,Statement,Expression,Value,FieldList,SelectorList};
 
+use std::fs::File;
+use std::io::Read;
 use std::error::Error;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashSet,HashMap, VecDeque};
 use std::collections::hash_map::Entry;
 use std::fmt;
 use std::fmt::{Display,Formatter};
 use std::ops::Deref;
 use std::rc::Rc;
+
+use nom;
 
 quick_error! {
     #[derive(Debug,PartialEq)]
@@ -27,6 +31,14 @@ quick_error! {
         TypeFail(msg: String) {
             description("Type Error")
             display("Type Error {}", msg)
+        }
+        DuplicateBinding(msg: String) {
+            description("Atttempt to add duplicate binding in file")
+            display("Atttempt to add duplicate binding in file {}", msg)
+        }
+        IncompleteParse(msg: String) {
+            description("Incomplete Parse of file")
+            display("Incomplete Parse of file {}", msg)
         }
         Unsupported(msg: String) {
             description("Unsupported Operation")
@@ -166,20 +178,20 @@ impl Display for Val {
 }
 
 /// ValueMap defines a set of values in a parsed file.
-#[derive(PartialEq,Debug)]
-pub struct ValueMap(HashMap<String, Rc<Val>>);
+type ValueMap = HashMap<String, Rc<Val>>;
 
 /// Builder parses one or more statements into a out Tuple.
 pub struct Builder {
-    /// env is the immutable set of key value pairs provided at build time.
-    env: HashMap<String, String>,
     /// assets are other parsed files from import statements. They
     /// are keyed by the normalized import path. This acts as a cache
     /// so multiple imports of the same file don't have to be parsed
     /// multiple times.
-    assets: HashMap<String, ValueMap>,
+    assets: ValueMap,
+    // List of file paths we have already parsed.
+    files: HashSet<String>,
     /// out is our built output.
-    out: HashMap<String, Rc<Val>>,
+    // TODO Okay Make the out a tuple itself
+    out: ValueMap,
 }
 
 macro_rules! eval_binary_expr {
@@ -224,42 +236,35 @@ impl Builder {
 
     pub fn new() -> Self {
         Builder {
-            env: HashMap::new(),
             assets: HashMap::new(),
+            files: HashSet::new(),
             out: HashMap::new(),
         }
     }
 
     pub fn new_with_scope(scope: HashMap<String, Rc<Val>>) -> Self {
         Builder {
-            env: HashMap::new(),
             assets: HashMap::new(),
+            files: HashSet::new(),
             out: scope,
         }
     }
 
-    pub fn build_dir(&mut self, name: &str) -> BuildResult {
-        Ok(())
-    }
-
-    pub fn build_file(&mut self, name: &str) -> BuildResult {
-        Ok(())
-    }
-
-    pub fn build(&mut self, ast: Vec<Statement>) -> BuildResult {
-        // TODO(jwall):
-        for stmt in ast.iter() {
-            self.build_stmt(stmt);
+    pub fn build(&mut self, mut ast: Vec<Statement>) -> BuildResult {
+        for stmt in ast.drain(0..) {
+            try!(self.build_stmt(stmt));
         }
         Ok(())
     }
 
     fn lookup_sym(&self, sym: &str) -> Option<Rc<Val>> {
         if self.out.contains_key(sym) {
-            Some(self.out[sym].clone())
-        } else {
-            None
+            return Some(self.out[sym].clone());
+        } if self.assets.contains_key(sym) {
+            // TODO(jwall): Unit tests for this.
+            return Some(self.assets[sym].clone());
         }
+        None
     }
 
     fn find_in_fieldlist(target: &str, fs: &Vec<(String, Rc<Val>)>) -> Option<Rc<Val>> {
@@ -272,9 +277,9 @@ impl Builder {
     }
 
     fn lookup_selector(&self, sl: SelectorList) -> Result<Rc<Val>, Box<Error>> {
+        // TODO(jwall): This should also check the assets for imported files?
         let len = sl.len();
         if len > 0 {
-            println!("Looking up symbol {}", sl[0]);
             if let Some(v) = self.lookup_sym(&sl[0]) {
                 let mut it = sl.iter().skip(1).peekable();
                 if it.peek().is_none() {
@@ -525,16 +530,57 @@ impl Builder {
         }
     }
 
-    fn build_stmt(&self, stmt: &Statement) -> BuildResult {
+    pub fn build_file_string(&mut self, name: &str, input: String) -> BuildResult {
+        match parse((&input[..]).as_bytes()) {
+            nom::IResult::Done(_, mut stmts) => {
+                for stmt in stmts.drain(0..) {
+                    try!(self.build_stmt(stmt));
+                }
+                Ok(())
+            },
+            nom::IResult::Error(err) => Err(Box::new(err)),
+            nom::IResult::Incomplete(_) => Err(Box::new(
+                BuildError::IncompleteParse(format!("Could not parse input from file: {}", name)))),
+        }
+    }
+    
+    pub fn build_file(&mut self, name: &str) -> BuildResult {
+        let mut f = try!(File::open(name));
+        let mut s = String::new();
+        // TODO(jwall): It would be nice to be able to do this with streaming
+        try!(f.read_to_string(&mut s));
+        self.build_file_string(name, s)
+    }
+
+    fn build_stmt(&mut self, stmt: Statement) -> BuildResult {
         match stmt {
-            &Statement::Let { name: ref sym, value: ref expr } => {
-                // TODO
+            Statement::Let { name: sym, value: expr } => {
+                let val = try!(self.eval_expr(expr));
+                match self.out.entry(sym) {
+                    Entry::Occupied(e) => {
+                        return Err(Box::new(
+                            BuildError::DuplicateBinding(
+                                format!("Let binding for {} already exists", e.key()))));
+                    },
+                    Entry::Vacant(e) => {
+                        e.insert(val);
+                    },
+                }
             }
-            &Statement::Import { path: ref val, name: ref sym } => {
-                // TODO
+            Statement::Import { path: val, name: sym } => {
+                // TODO(jwall): Unit Tests for this.
+                if !self.files.contains(&val) { // Only parse the file once on import.
+                    if self.assets.get(&sym).is_none() {
+                        let mut b = Self::new();
+                        b.build_file(&val);
+                        let fields: Vec<(String, Rc<Val>)> = b.out.drain().collect();
+                        self.assets.entry(sym).or_insert(Rc::new(Val::Tuple(fields)));
+                        self.files.insert(val);
+                    }
+                }
             }
-            &Statement::Expression(ref expr) => {
-                // TODO
+            Statement::Expression(ref expr) => {
+                // TODO Is this just a noop? Maybe it's completely unnecessary?
             }
         };
         Ok(())
@@ -544,7 +590,7 @@ impl Builder {
 #[cfg(test)]
 mod test {
     use super::{Builder,Val,MacroDef};
-    use parse::{Expression, Value};
+    use parse::{Statement,Expression,Value};
     use std::rc::Rc;
 
     fn test_expr_to_val(mut cases: Vec<(Expression,Val)>, b: Builder) {
@@ -889,5 +935,25 @@ mod test {
              },
              Val::Int(2)),
         ], b);
+    }
+
+    #[test]
+    fn test_let_statement() {
+        let mut b = Builder::new();
+        b.build_stmt(Statement::Let{
+            name:"foo".to_string(),
+            value: Expression::Simple(Value::String("bar".to_string())),
+        });
+        test_expr_to_val(vec![
+            (Expression::Simple(Value::Symbol("foo".to_string())),
+             Val::String("bar".to_string())),
+        ], b);
+    }
+
+    #[test]
+    fn test_build_file_string() {
+        let mut b = Builder::new();
+        b.build_file_string("foo.ucg", "let foo = 1;".to_string());
+        assert!(b.out.contains_key("foo"));
     }
 }
