@@ -190,7 +190,6 @@ pub struct Builder {
     // List of file paths we have already parsed.
     files: HashSet<String>,
     /// out is our built output.
-    // TODO Okay Make the out a tuple itself
     out: ValueMap,
 }
 
@@ -211,7 +210,7 @@ macro_rules! eval_binary_expr {
 
 impl Builder {
     /// new_builder constructs Builder with initialized fields ready to parse.
-    fn from(&self, v: Value) -> Result<Rc<Val>, Box<Error>> {
+    fn value_to_val(&self, v: Value) -> Result<Rc<Val>, Box<Error>> {
         match v {
             Value::Int(i) => Ok(Rc::new(Val::Int(i))),
             Value::Float(f) => Ok(Rc::new(Val::Float(f))),
@@ -220,13 +219,14 @@ impl Builder {
                 self.lookup_sym(&s).ok_or(Box::new(
                     BuildError::NoSuchSymbol(format!("Unable to find {}", s))))
             },
-            Value::Tuple(fields) => {
-                // TODO(jwall): We need to resolve the expressions here.
-                // TODO(jwall): Don't forget we want a stable order for the fields
-                //   in a tuple to make Vec comparisons easier later on.
-                Err(Box::new(
-                    BuildError::TODO(
-                        "Value::Tuple to Val::Tuple is not yet impolemented.".to_string())))
+            Value::Tuple(mut fields) => {
+                let mut new_fields = Vec::new();
+                for (name, expr) in fields.drain(0..) {
+                    let val = try!(self.eval_expr(expr));
+                    new_fields.push((name, val));
+                }
+                new_fields.sort_by(|a, b| a.0.cmp(&b.0));
+                Ok(Rc::new(Val::Tuple(new_fields)))
             },
             Value::Selector(selector_list) => {
                 self.lookup_selector(selector_list)
@@ -338,11 +338,11 @@ impl Builder {
         //   Take a reference instead?
         match expr {
             Expression::Simple(val) => {
-                self.from(val)
+                self.value_to_val(val)
             },
             Expression::Add(v, expr) => {
                 let expr_result = try!(self.eval_expr(*expr));
-                let v = try!(self.from(*v));
+                let v = try!(self.value_to_val(*v));
                 match *v {
                     Val::Int(i) => {
                         eval_binary_expr!(&Val::Int(ii), expr_result,
@@ -374,7 +374,7 @@ impl Builder {
             },
             Expression::Sub(v, expr) => {
                 let expr_result = try!(self.eval_expr(*expr));
-                let v = try!(self.from(*v));
+                let v = try!(self.value_to_val(*v));
                 match *v {
                     Val::Int(i) => {
                         eval_binary_expr!(&Val::Int(ii), expr_result,
@@ -393,7 +393,7 @@ impl Builder {
             },
             Expression::Mul(v, expr) => {
                 let expr_result = try!(self.eval_expr(*expr));
-                let v = try!(self.from(*v));
+                let v = try!(self.value_to_val(*v));
                 match *v {
                     Val::Int(i) => {
                         eval_binary_expr!(&Val::Int(ii), expr_result,
@@ -412,7 +412,7 @@ impl Builder {
             },
             Expression::Div(v, expr) => {
                 let expr_result = try!(self.eval_expr(*expr));
-                let v = try!(self.from(*v));
+                let v = try!(self.value_to_val(*v));
                 match *v {
                     Val::Int(i) => {
                         eval_binary_expr!(&Val::Int(ii), expr_result,
@@ -543,7 +543,7 @@ impl Builder {
                 BuildError::IncompleteParse(format!("Could not parse input from file: {}", name)))),
         }
     }
-    
+
     pub fn build_file(&mut self, name: &str) -> BuildResult {
         let mut f = try!(File::open(name));
         let mut s = String::new();
@@ -580,7 +580,7 @@ impl Builder {
                 }
             }
             Statement::Expression(ref expr) => {
-                // TODO Is this just a noop? Maybe it's completely unnecessary?
+                // TODO(jwall): Is this just a noop? Maybe it's completely unnecessary?
             }
         };
         Ok(())
@@ -698,7 +698,11 @@ mod test {
         test_expr_to_val(vec![
             (Expression::Simple(Value::Int(1)), Val::Int(1)),
             (Expression::Simple(Value::Float(2.0)), Val::Float(2.0)),
-            (Expression::Simple(Value::String("foo".to_string())), Val::String("foo".to_string())),
+            (Expression::Simple(Value::String("foo".to_string())),
+             Val::String("foo".to_string())),
+            (Expression::Simple(Value::Tuple(vec![("bar".to_string(),
+                                                   Expression::Simple(Value::Int(1)))])),
+             Val::Tuple(vec![("bar".to_string(), Rc::new(Val::Int(1)))])),
         ], Builder::new());
     }
 
