@@ -387,10 +387,6 @@ named!(copy_expression<Expression>,
        )
 );
 
-fn value_to_string(v: Value) -> String {
-    v.to_string()
-}
-
 fn tuple_to_macro(mut t: (Vec<Value>, Value)) -> ParseResult<Expression> {
     match t.1 {
         Value::Tuple(v) => {

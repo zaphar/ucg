@@ -287,7 +287,7 @@ impl Builder {
                 if it.peek().is_none() {
                     return Ok(v.clone());
                 }
-                if let &Val::Tuple(ref fs) = v.as_ref() {
+                if let &Val::Tuple(_) = v.as_ref() {
                     let mut stack = VecDeque::new();
                     stack.push_back(v.clone());
                     loop {
@@ -448,7 +448,7 @@ impl Builder {
                     for (key, val) in fields.drain(0..) {
                         let expr_result = try!(self.eval_expr(val));
                         match m.entry(key.clone()) {
-                            Entry::Vacant(mut v) => {
+                            Entry::Vacant(v) => {
                                 v.insert(expr_result);
                             },
                             Entry::Occupied(mut v) => {
@@ -571,7 +571,7 @@ impl Builder {
                 if !self.files.contains(&val) { // Only parse the file once on import.
                     if self.assets.get(&sym).is_none() {
                         let mut b = Self::new();
-                        b.build_file(&val);
+                        try!(b.build_file(&val));
                         let fields: Vec<(String, Rc<Val>)> = b.out.drain().collect();
                         let result = Rc::new(Val::Tuple(fields));
                         self.assets.entry(sym).or_insert(result.clone());
