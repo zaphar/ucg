@@ -191,6 +191,8 @@ pub struct Builder {
     files: HashSet<String>,
     /// out is our built output.
     out: ValueMap,
+    /// last is the result of the last statement.
+    last: Option<Rc<Val>>,
 }
 
 macro_rules! eval_binary_expr {
@@ -239,6 +241,7 @@ impl Builder {
             assets: HashMap::new(),
             files: HashSet::new(),
             out: HashMap::new(),
+            last: None,
         }
     }
 
@@ -247,6 +250,7 @@ impl Builder {
             assets: HashMap::new(),
             files: HashSet::new(),
             out: scope,
+            last: None,
         }
     }
 
@@ -551,6 +555,7 @@ impl Builder {
         match stmt {
             Statement::Let { name: sym, value: expr } => {
                 let val = try!(self.eval_expr(expr));
+                self.last = Some(val.clone());
                 match self.out.entry(sym) {
                     Entry::Occupied(e) => {
                         return Err(Box::new(
@@ -568,13 +573,15 @@ impl Builder {
                         let mut b = Self::new();
                         b.build_file(&val);
                         let fields: Vec<(String, Rc<Val>)> = b.out.drain().collect();
-                        self.assets.entry(sym).or_insert(Rc::new(Val::Tuple(fields)));
+                        let result = Rc::new(Val::Tuple(fields));
+                        self.assets.entry(sym).or_insert(result.clone());
                         self.files.insert(val);
+                        self.last = Some(result);
                     }
                 }
             }
-            Statement::Expression(ref expr) => {
-                // TODO(jwall): Is this just a noop? Maybe it's completely unnecessary?
+            Statement::Expression(expr) => {
+                self.last = Some(try!(self.eval_expr(expr)));
             }
         };
         Ok(())
