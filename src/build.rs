@@ -261,7 +261,6 @@ impl Builder {
         if self.out.contains_key(sym) {
             return Some(self.out[sym].clone());
         } if self.assets.contains_key(sym) {
-            // TODO(jwall): Unit tests for this.
             return Some(self.assets[sym].clone());
         }
         None
@@ -277,7 +276,6 @@ impl Builder {
     }
 
     fn lookup_selector(&self, sl: SelectorList) -> Result<Rc<Val>, Box<Error>> {
-        // TODO(jwall): This should also check the assets for imported files?
         let len = sl.len();
         if len > 0 {
             if let Some(v) = self.lookup_sym(&sl[0]) {
@@ -438,7 +436,6 @@ impl Builder {
                         if let Entry::Vacant(v) = m.entry(key.to_string()) {
                             v.insert(val.clone());
                         } else {
-                            // TODO(jwall): Is this an error?
                             return Err(Box::new(
                                 BuildError::TypeFail(
                                     format!("Duplicate field: {} in tuple", *key))));
@@ -452,8 +449,6 @@ impl Builder {
                             },
                             Entry::Occupied(mut v) => {
                                 // Ensure that the new type matches the old type.
-                                // TODO(jwall): This copy is ugly but I don't think it's possible
-                                // to both compare and replace this at the same time.
                                 let src_val = v.get().clone();
                                 if src_val.type_equal(&expr_result) {
                                     v.insert(expr_result);
@@ -568,7 +563,6 @@ impl Builder {
                 }
             }
             Statement::Import { path: val, name: sym } => {
-                // TODO(jwall): Unit Tests for this.
                 if !self.files.contains(&val) { // Only parse the file once on import.
                     if self.assets.get(&sym).is_none() {
                         let mut b = Self::new();
@@ -959,5 +953,24 @@ mod test {
         let mut b = Builder::new();
         b.build_file_string("foo.ucg", "let foo = 1;".to_string());
         assert!(b.out.contains_key("foo"));
+    }
+
+    #[test]
+    fn test_asset_symbol_lookups() {
+        let mut b = Builder::new();
+        b.assets.entry("foo".to_string()).or_insert(
+            Rc::new(Val::Tuple(vec![
+                ("bar".to_string(), Rc::new(Val::Tuple(vec![
+                    ("quux".to_string(), Rc::new(Val::Int(1))),
+                ]))),
+            ])));
+        test_expr_to_val(vec![
+            (Expression::Simple(Value::Symbol("foo".to_string())),
+             Val::Tuple(vec![
+                ("bar".to_string(), Rc::new(Val::Tuple(vec![
+                    ("quux".to_string(), Rc::new(Val::Int(1))),
+                ]))),
+            ])),
+        ], b);
     }
 }
