@@ -21,6 +21,9 @@ quick_error! {
     }
 }
 
+// TODO(jwall): Convert to tokenizer steps followed by parser steps.
+// TODO(jwall): Error Reporting with Line and Column information.
+
 use std::str::FromStr;
 use std::str::from_utf8;
 use std::error::Error;
@@ -97,14 +100,18 @@ pub enum Expression {
     Copy(SelectorList, FieldList),
     Grouped(Box<Expression>),
 
+    Format(String, Vec<Expression>),
+
     Call {
         macroref: SelectorList,
         arglist: Vec<Expression>,
     },
+
     Macro {
         arglist: Vec<String>,
         tuple: FieldList,
     },
+
     Select {
         val: Box<Expression>,
         default: Box<Expression>,
@@ -449,6 +456,24 @@ named!(select_expression<Expression>,
        )
 );
 
+fn tuple_to_format(t: (String, Vec<Expression>)) -> ParseResult<Expression> {
+    Ok(Expression::Format(t.0, t.1))
+}
+
+named!(format_expression<Expression>,
+       map_res!(
+           do_parse!(
+               tmpl: ws!(quoted) >>
+                   ws!(tag!("%")) >>
+                   lparen >>
+                   args: ws!(separated_list!(ws!(comma), expression)) >>
+                   rparen >>
+                   (tmpl, args)
+           ),
+           tuple_to_format
+       )
+);
+
 fn tuple_to_call(t: (Value, Vec<Expression>)) -> ParseResult<Expression> {
     if let Value::Selector(sl) = t.0 {
         Ok(Expression::Call {
@@ -502,6 +527,7 @@ named!(expression<Expression>,
            complete!(div_expression) |
            complete!(grouped_expression) |
            complete!(macro_expression) |
+           complete!(format_expression) |
            complete!(select_expression) |
            complete!(call_expression) |
            complete!(copy_expression) |
@@ -576,8 +602,9 @@ named!(pub parse<Vec<Statement> >, many1!(ws!(statement)));
 mod test {
     use std::str::from_utf8;
     use super::{Statement, Expression, Value};
-    use super::{number, symbol, parse, field_value, tuple, grouped_expression, copy_expression};
-    use super::{arglist, macro_expression, select_expression, call_expression, expression};
+    use super::{number, symbol, parse, field_value, tuple, grouped_expression};
+    use super::{arglist, copy_expression, macro_expression, select_expression};
+    use super::{format_expression, call_expression, expression};
     use super::{expression_statement, let_statement, import_statement, statement};
     use nom::IResult;
 
@@ -775,6 +802,22 @@ mod test {
     }
 
     #[test]
+    fn test_format_parse() {
+        assert!(format_expression(&b"\"foo"[..]).is_err() );
+        assert!(format_expression(&b"\"foo\""[..]).is_incomplete() );
+        assert!(format_expression(&b"\"foo\" %"[..]).is_incomplete() );
+        assert!(format_expression(&b"\"foo\" % (1, 2"[..]).is_incomplete() );
+
+        assert_eq!(format_expression(&b"\"foo @ @\" % (1, 2)"[..]),
+               IResult::Done(&b""[..],
+                             Expression::Format("foo @ @".to_string(),
+                                                vec![Expression::Simple(Value::Int(1)),
+                                                     Expression::Simple(Value::Int(2))])
+               )
+        );
+    }
+
+    #[test]
     fn test_call_parse() {
         assert!(call_expression(&b"foo"[..]).is_incomplete() );
         assert!(call_expression(&b"foo ("[..]).is_incomplete() );
@@ -792,7 +835,7 @@ mod test {
                                  ],
                              }
                )
-    );
+        );
 
         assert_eq!(call_expression(&b"foo.bar (1, \"foo\")"[..]),
                IResult::Done(&b""[..],

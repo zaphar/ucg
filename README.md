@@ -47,6 +47,15 @@ concatenation using `+`. The expressions enforce the same type between operands.
     
     "foo" + "bar";
 
+### String formatting
+
+UCG supports some string interpolation using format strings. The syntax is
+shamelessly ripped off from python.
+
+    "foo @ @ \@" % (1, "bar")
+
+This gets turned into "foo 1 bar {"
+
 ### Bindings and Tuples.
 
 Let statements introduce a new name in a UCG file. Most configurations

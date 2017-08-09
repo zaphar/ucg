@@ -16,7 +16,7 @@ use parse::{parse,Statement,Expression,Value,FieldList,SelectorList};
 use std::fs::File;
 use std::io::Read;
 use std::error::Error;
-use std::collections::{HashSet,HashMap, VecDeque};
+use std::collections::{HashSet,HashMap,VecDeque};
 use std::collections::hash_map::Entry;
 use std::fmt;
 use std::fmt::{Display,Formatter};
@@ -24,6 +24,8 @@ use std::ops::Deref;
 use std::rc::Rc;
 
 use nom;
+
+use format;
 
 quick_error! {
     #[derive(Debug,PartialEq)]
@@ -51,6 +53,10 @@ quick_error! {
         BadArgLen(msg: String) {
             description("Eval Error")
             display("Bad Argument Length {}", msg)
+        }
+        FormatError(msg: String) {
+            description("String Format Error")
+            display("String format Error {}", msg)
         }
         TODO(msg: String) {
             description("TODO Error")
@@ -112,7 +118,6 @@ pub enum Val {
 }
 
 impl Val {
-
     pub fn type_name(&self) -> String {
         match self {
             &Val::Int(_) => "Integer".to_string(),
@@ -174,6 +179,17 @@ impl Display for Val {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         // TODO(jwall): These should render better than this.
         write!(f, "{}", self.type_name())
+    }
+}
+
+impl From<Val> for String {
+    fn from(v: Val) -> String {
+        match v {
+            Val::Int(ref i) => format!("{}", i),
+            Val::Float(ref f) => format!("{}", f),
+            Val::String(ref s) => s.to_string(),
+            val => format!("<{}>", val),
+        }
     }
 }
 
@@ -479,6 +495,15 @@ impl Builder {
             },
             Expression::Grouped(expr) => {
                 return self.eval_expr(*expr);
+            },
+            Expression::Format(tmpl, mut args) => {
+                let mut vals = Vec::new();
+                for v in args.drain(0..) {
+                    let rcv = try!(self.eval_expr(v));
+                    vals.push(rcv.deref().clone());
+                }
+                let formatter = format::Formatter::new(tmpl, vals);
+                Ok(Rc::new(Val::String(try!(formatter.render()))))
             },
             Expression::Call{macroref: sel, arglist: mut args} => {
                 let v = try!(self.lookup_selector(sel));

@@ -20,6 +20,8 @@ extern crate quick_error;
 pub mod parse;
 pub mod build;
 
+mod format;
+
 pub use parse::Value;
 pub use parse::Expression;
 pub use parse::Statement;
