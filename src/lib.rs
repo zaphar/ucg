@@ -17,14 +17,14 @@ extern crate nom;
 #[macro_use]
 extern crate quick_error;
 
+pub mod ast;
 pub mod parse;
 pub mod build;
-
 mod format;
 
-pub use parse::Value;
-pub use parse::Expression;
-pub use parse::Statement;
+pub use ast::Value;
+pub use ast::Expression;
+pub use ast::Statement;
 
 pub use parse::parse;
 pub use build::Builder;

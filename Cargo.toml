@@ -1,16 +1,17 @@
 [package]
-name = "ucg"
-version = "0.0.1"
-authors = ["Jeremy Wall <jeremy@marzhillstudios.com>"]
+name        = "ucg"
+version     = "0.0.1"
+authors     = ["Jeremy Wall <jeremy@marzhillstudios.com>"]
 description = "Runs a command on user specified triggers."
-repository = "https://github.com/zaphar/ucg"
-readme = "README.md"
-keywords = ["compiler", "config"]
-license = "Apache-2.0"
+repository  = "https://github.com/zaphar/ucg"
+readme      = "README.md"
+keywords    = ["compiler", "config"]
+license     = "Apache-2.0"
 
 [dependencies]
-nom = "^2.2"
+nom         = "^2.2"
 quick-error = "^1.2.0"
+clap        = "~2.26.0"
 
 [lib]
 name = "ucglib"

@@ -11,8 +11,6 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
-use parse::{parse,Statement,Expression,Value,FieldList,SelectorList};
-
 use std::fs::File;
 use std::io::Read;
 use std::error::Error;
@@ -25,7 +23,38 @@ use std::rc::Rc;
 
 use nom;
 
+use ast::*;
 use format;
+use parse::parse;
+
+impl MacroDef {
+    pub fn eval(&self, mut args: Vec<Rc<Val>>) -> Result<Vec<(String, Rc<Val>)>, Box<Error>> {
+        // Error conditions. If the args don't match the length and types of the argdefs then this is
+        // macro call error.
+        if args.len() > self.argdefs.len() {
+            return Err(Box::new(
+                BuildError::BadArgLen(
+                    "Macro called with too many args".to_string())));
+        }
+        // If the args don't match the types required by the expressions then that is a TypeFail.
+        // If the expressions reference Symbols not defined in the MacroDef that is also an error.
+        // TODO(jwall): We should probably enforce that the Expression Symbols must be in argdefs rules
+        // at Macro definition time not evaluation time.
+        let mut scope = HashMap::new();
+        for (i, arg) in args.drain(0..).enumerate() {
+            scope.entry(self.argdefs[i].clone()).or_insert(arg.clone());
+        }
+        let b = Builder::new_with_scope(scope);
+        let mut result: Vec<(String, Rc<Val>)> = Vec::new();
+        for &(ref key, ref expr) in self.fields.iter() {
+            // We clone the expressions here because this macro may be consumed
+            // multiple times in the future.
+            let val = try!(b.eval_expr(expr.clone()));
+            result.push((key.clone(), val.clone()));
+        }
+        Ok(result)
+    }
+}
 
 quick_error! {
     #[derive(Debug,PartialEq)]
@@ -68,46 +97,7 @@ quick_error! {
 /// BuildResult is the result of a build.
 type BuildResult = Result<(), Box<Error>>;
 
-/// MacroDef is a pure function that always returns a Tuple.
-///
-/// MacroDef's are not closures. They can not reference
-/// any values except what is defined in their arguments.
-#[derive(PartialEq,Debug,Clone)]
-pub struct MacroDef {
-    argdefs: Vec<String>,
-    fields: FieldList,
-}
-
-impl MacroDef {
-    fn eval(&self, mut args: Vec<Rc<Val>>) -> Result<Vec<(String, Rc<Val>)>, Box<Error>> {
-        // Error conditions. If the args don't match the length and types of the argdefs then this is
-        // macro call error.
-        if args.len() > self.argdefs.len() {
-            return Err(Box::new(
-                BuildError::BadArgLen(
-                    "Macro called with too many args".to_string())));
-        }
-        // If the args don't match the types required by the expressions then that is a TypeFail.
-        // If the expressions reference Symbols not defined in the MacroDef that is also an error.
-        // TODO(jwall): We should probably enforce that the Expression Symbols must be in argdefs rules
-        // at Macro definition time not evaluation time.
-        let mut scope = HashMap::new();
-        for (i, arg) in args.drain(0..).enumerate() {
-            scope.entry(self.argdefs[i].clone()).or_insert(arg.clone());
-        }
-        let b = Builder::new_with_scope(scope);
-        let mut result: Vec<(String, Rc<Val>)> = Vec::new();
-        for &(ref key, ref expr) in self.fields.iter() {
-            // We clone the expressions here because this macro may be consumed
-            // multiple times in the future.
-            let val = try!(b.eval_expr(expr.clone()));
-            result.push((key.clone(), val.clone()));
-        }
-        Ok(result)
-    }
-}
-
-/// Val is the type of a value for a field in a Tuple.
+/// Val is the Intermediate representation of a compiled UCG AST.
 #[derive(PartialEq,Debug,Clone)]
 pub enum Val {
     Int(i64),
@@ -277,6 +267,64 @@ impl Builder {
         Ok(())
     }
 
+    pub fn build_file_string(&mut self, name: &str, input: String) -> BuildResult {
+        match parse((&input[..]).as_bytes()) {
+            nom::IResult::Done(_, mut stmts) => {
+                for stmt in stmts.drain(0..) {
+                    try!(self.build_stmt(stmt));
+                }
+                Ok(())
+            },
+            nom::IResult::Error(err) => Err(Box::new(err)),
+            nom::IResult::Incomplete(_) => Err(Box::new(
+                BuildError::IncompleteParse(format!("Could not parse input from file: {}", name)))),
+        }
+    }
+
+    pub fn build_file(&mut self, name: &str) -> BuildResult {
+        let mut f = try!(File::open(name));
+        let mut s = String::new();
+        // TODO(jwall): It would be nice to be able to do this with streaming
+        try!(f.read_to_string(&mut s));
+        self.build_file_string(name, s)
+    }
+
+    fn build_stmt(&mut self, stmt: Statement) -> BuildResult {
+        match stmt {
+            Statement::Let { name: sym, value: expr } => {
+                let val = try!(self.eval_expr(expr));
+                self.last = Some(val.clone());
+                match self.out.entry(sym) {
+                    Entry::Occupied(e) => {
+                        return Err(Box::new(
+                            BuildError::DuplicateBinding(
+                                format!("Let binding for {} already exists", e.key()))));
+                    },
+                    Entry::Vacant(e) => {
+                        e.insert(val);
+                    },
+                }
+            }
+            Statement::Import { path: val, name: sym } => {
+                if !self.files.contains(&val) { // Only parse the file once on import.
+                    if self.assets.get(&sym).is_none() {
+                        let mut b = Self::new();
+                        try!(b.build_file(&val));
+                        let fields: Vec<(String, Rc<Val>)> = b.out.drain().collect();
+                        let result = Rc::new(Val::Tuple(fields));
+                        self.assets.entry(sym).or_insert(result.clone());
+                        self.files.insert(val);
+                        self.last = Some(result);
+                    }
+                }
+            }
+            Statement::Expression(expr) => {
+                self.last = Some(try!(self.eval_expr(expr)));
+            }
+        };
+        Ok(())
+    }
+
     fn lookup_sym(&self, sym: &str) -> Option<Rc<Val>> {
         if self.out.contains_key(sym) {
             return Some(self.out[sym].clone());
@@ -358,9 +406,9 @@ impl Builder {
             Expression::Simple(val) => {
                 self.value_to_val(val)
             },
-            Expression::Add(v, expr) => {
+            Expression::Add(BinaryExpression(v, expr)) => {
                 let expr_result = try!(self.eval_expr(*expr));
-                let v = try!(self.value_to_val(*v));
+                let v = try!(self.value_to_val(v));
                 match *v {
                     Val::Int(i) => {
                         eval_binary_expr!(&Val::Int(ii), expr_result,
@@ -390,9 +438,9 @@ impl Builder {
                     }
                 }
             },
-            Expression::Sub(v, expr) => {
+            Expression::Sub(BinaryExpression(v, expr)) => {
                 let expr_result = try!(self.eval_expr(*expr));
-                let v = try!(self.value_to_val(*v));
+                let v = try!(self.value_to_val(v));
                 match *v {
                     Val::Int(i) => {
                         eval_binary_expr!(&Val::Int(ii), expr_result,
@@ -409,9 +457,9 @@ impl Builder {
                     }
                 }
             },
-            Expression::Mul(v, expr) => {
+            Expression::Mul(BinaryExpression(v, expr)) => {
                 let expr_result = try!(self.eval_expr(*expr));
-                let v = try!(self.value_to_val(*v));
+                let v = try!(self.value_to_val(v));
                 match *v {
                     Val::Int(i) => {
                         eval_binary_expr!(&Val::Int(ii), expr_result,
@@ -428,9 +476,9 @@ impl Builder {
                     }
                 }
             },
-            Expression::Div(v, expr) => {
+            Expression::Div(BinaryExpression(v, expr)) => {
                 let expr_result = try!(self.eval_expr(*expr));
-                let v = try!(self.value_to_val(*v));
+                let v = try!(self.value_to_val(v));
                 match *v {
                     Val::Int(i) => {
                         eval_binary_expr!(&Val::Int(ii), expr_result,
@@ -505,7 +553,7 @@ impl Builder {
                 let formatter = format::Formatter::new(tmpl, vals);
                 Ok(Rc::new(Val::String(try!(formatter.render()))))
             },
-            Expression::Call{macroref: sel, arglist: mut args} => {
+            Expression::Call(CallDef{macroref: sel, arglist: mut args}) => {
                 let v = try!(self.lookup_selector(sel));
                 if let &Val::Macro(ref m) = v.deref() {
                     // Congratulations this is actually a macro.
@@ -521,16 +569,12 @@ impl Builder {
                         // We should pretty print the selectors here.
                         format!("{} is not a Macro", v))))
             },
-            Expression::Macro{arglist: args, tuple: fields} => {
+            Expression::Macro(def) => {
                 // TODO(jwall): Walk the AST and verify that the symbols all
                 // exist as names in the arglist.
-                let md = MacroDef{
-                    argdefs: args,
-                    fields: fields,
-                };
-                Ok(Rc::new(Val::Macro(md)))
+                Ok(Rc::new(Val::Macro(def)))
             },
-            Expression::Select{val: target, default: def_expr, tuple: mut fields} => {
+            Expression::Select(SelectDef{val: target, default: def_expr, tuple: mut fields}) => {
                 // First resolve the target expression.
                 let v = try!(self.eval_expr(*target));
                 // Second ensure that the expression resolves to a string.
@@ -554,69 +598,12 @@ impl Builder {
         }
     }
 
-    pub fn build_file_string(&mut self, name: &str, input: String) -> BuildResult {
-        match parse((&input[..]).as_bytes()) {
-            nom::IResult::Done(_, mut stmts) => {
-                for stmt in stmts.drain(0..) {
-                    try!(self.build_stmt(stmt));
-                }
-                Ok(())
-            },
-            nom::IResult::Error(err) => Err(Box::new(err)),
-            nom::IResult::Incomplete(_) => Err(Box::new(
-                BuildError::IncompleteParse(format!("Could not parse input from file: {}", name)))),
-        }
-    }
-
-    pub fn build_file(&mut self, name: &str) -> BuildResult {
-        let mut f = try!(File::open(name));
-        let mut s = String::new();
-        // TODO(jwall): It would be nice to be able to do this with streaming
-        try!(f.read_to_string(&mut s));
-        self.build_file_string(name, s)
-    }
-
-    fn build_stmt(&mut self, stmt: Statement) -> BuildResult {
-        match stmt {
-            Statement::Let { name: sym, value: expr } => {
-                let val = try!(self.eval_expr(expr));
-                self.last = Some(val.clone());
-                match self.out.entry(sym) {
-                    Entry::Occupied(e) => {
-                        return Err(Box::new(
-                            BuildError::DuplicateBinding(
-                                format!("Let binding for {} already exists", e.key()))));
-                    },
-                    Entry::Vacant(e) => {
-                        e.insert(val);
-                    },
-                }
-            }
-            Statement::Import { path: val, name: sym } => {
-                if !self.files.contains(&val) { // Only parse the file once on import.
-                    if self.assets.get(&sym).is_none() {
-                        let mut b = Self::new();
-                        try!(b.build_file(&val));
-                        let fields: Vec<(String, Rc<Val>)> = b.out.drain().collect();
-                        let result = Rc::new(Val::Tuple(fields));
-                        self.assets.entry(sym).or_insert(result.clone());
-                        self.files.insert(val);
-                        self.last = Some(result);
-                    }
-                }
-            }
-            Statement::Expression(expr) => {
-                self.last = Some(try!(self.eval_expr(expr)));
-            }
-        };
-        Ok(())
-    }
 }
 
 #[cfg(test)]
 mod test {
-    use super::{Builder,Val,MacroDef};
-    use parse::{Statement,Expression,Value};
+    use super::{Builder, Val, MacroDef, SelectDef, CallDef};
+    use ast::*;
     use std::rc::Rc;
 
     fn test_expr_to_val(mut cases: Vec<(Expression,Val)>, b: Builder) {
@@ -627,11 +614,11 @@ mod test {
 
     #[test]
     fn test_eval_div_expr() {
-        let mut b = Builder::new();
+        let b = Builder::new();
         test_expr_to_val(vec![
-            (Expression::Div(Box::new(Value::Int(2)), Box::new(Expression::Simple(Value::Int(2)))),
+            (Expression::Div(BinaryExpression(Value::Int(2), Box::new(Expression::Simple(Value::Int(2))))),
              Val::Int(1)),
-            (Expression::Div(Box::new(Value::Float(2.0)), Box::new(Expression::Simple(Value::Float(2.0)))),
+            (Expression::Div(BinaryExpression(Value::Float(2.0), Box::new(Expression::Simple(Value::Float(2.0))))),
              Val::Float(1.0)),
         ], b);
     }
@@ -639,20 +626,20 @@ mod test {
     #[test]
     #[should_panic(expected = "Expected Float")]
     fn test_eval_div_expr_fail() {
-        let mut b = Builder::new();
+        let b = Builder::new();
         test_expr_to_val(vec![
-            (Expression::Div(Box::new(Value::Float(2.0)), Box::new(Expression::Simple(Value::Int(2)))),
+            (Expression::Div(BinaryExpression(Value::Float(2.0), Box::new(Expression::Simple(Value::Int(2))))),
              Val::Float(1.0)),
         ], b);
     }
 
     #[test]
     fn test_eval_mul_expr() {
-        let mut b = Builder::new();
+        let b = Builder::new();
         test_expr_to_val(vec![
-            (Expression::Mul(Box::new(Value::Int(2)), Box::new(Expression::Simple(Value::Int(2)))),
+            (Expression::Mul(BinaryExpression(Value::Int(2), Box::new(Expression::Simple(Value::Int(2))))),
              Val::Int(4)),
-            (Expression::Mul(Box::new(Value::Float(2.0)), Box::new(Expression::Simple(Value::Float(2.0)))),
+            (Expression::Mul(BinaryExpression(Value::Float(2.0), Box::new(Expression::Simple(Value::Float(2.0))))),
              Val::Float(4.0)),
         ], b);
     }
@@ -660,23 +647,20 @@ mod test {
     #[test]
     #[should_panic(expected = "Expected Float")]
     fn test_eval_mul_expr_fail() {
-        let mut b = Builder::new();
+        let b = Builder::new();
         test_expr_to_val(vec![
-            (Expression::Mul(Box::new(Value::Float(2.0)),
-                             Box::new(Expression::Simple(Value::Int(2)))),
+            (Expression::Mul(BinaryExpression(Value::Float(2.0), Box::new(Expression::Simple(Value::Int(2))))),
              Val::Float(1.0)),
         ], b);
     }
 
     #[test]
     fn test_eval_subtract_expr() {
-        let mut b = Builder::new();
+        let b = Builder::new();
         test_expr_to_val(vec![
-            (Expression::Sub(Box::new(Value::Int(2)),
-                             Box::new(Expression::Simple(Value::Int(1)))),
+            (Expression::Sub(BinaryExpression(Value::Int(2), Box::new(Expression::Simple(Value::Int(1))))),
              Val::Int(1)),
-            (Expression::Sub(Box::new(Value::Float(2.0)),
-                             Box::new(Expression::Simple(Value::Float(1.0)))),
+            (Expression::Sub(BinaryExpression(Value::Float(2.0), Box::new(Expression::Simple(Value::Float(1.0))))),
              Val::Float(1.0)),
         ], b);
     }
@@ -684,26 +668,22 @@ mod test {
     #[test]
     #[should_panic(expected = "Expected Float")]
     fn test_eval_subtract_expr_fail() {
-        let mut b = Builder::new();
+        let b = Builder::new();
         test_expr_to_val(vec![
-            (Expression::Sub(Box::new(Value::Float(2.0)),
-                             Box::new(Expression::Simple(Value::Int(2)))),
+            (Expression::Sub(BinaryExpression(Value::Float(2.0), Box::new(Expression::Simple(Value::Int(2))))),
              Val::Float(1.0)),
         ], b);
     }
 
     #[test]
     fn test_eval_add_expr() {
-        let mut b = Builder::new();
+        let b = Builder::new();
         test_expr_to_val(vec![
-            (Expression::Add(Box::new(Value::Int(1)),
-                             Box::new(Expression::Simple(Value::Int(1)))),
+            (Expression::Add(BinaryExpression(Value::Int(1), Box::new(Expression::Simple(Value::Int(1))))),
              Val::Int(2)),
-            (Expression::Add(Box::new(Value::Float(1.0)),
-                             Box::new(Expression::Simple(Value::Float(1.0)))),
+            (Expression::Add(BinaryExpression(Value::Float(1.0), Box::new(Expression::Simple(Value::Float(1.0))))),
              Val::Float(2.0)),
-            (Expression::Add(Box::new(Value::String("foo".to_string())),
-                             Box::new(Expression::Simple(Value::String("bar".to_string())))),
+            (Expression::Add(BinaryExpression(Value::String("foo".to_string()), Box::new(Expression::Simple(Value::String("bar".to_string()))))),
              Val::String("foobar".to_string())),
         ], b);
     }
@@ -711,10 +691,9 @@ mod test {
     #[test]
     #[should_panic(expected = "Expected Float")]
     fn test_eval_add_expr_fail() {
-        let mut b = Builder::new();
+        let b = Builder::new();
         test_expr_to_val(vec![
-            (Expression::Add(Box::new(Value::Float(2.0)),
-                             Box::new(Expression::Simple(Value::Int(2)))),
+            (Expression::Add(BinaryExpression(Value::Float(2.0), Box::new(Expression::Simple(Value::Int(2))))),
              Val::Float(1.0)),
         ], b);
     }
@@ -795,7 +774,7 @@ mod test {
     #[test]
     #[should_panic(expected = "Unable to find Symbol tpl1")]
     fn test_expr_copy_no_such_tuple() {
-        let mut b = Builder::new();
+        let b = Builder::new();
         test_expr_to_val(vec![
             (Expression::Copy(vec!["tpl1".to_string()], Vec::new()),
              Val::Tuple(Vec::new())),
@@ -889,10 +868,10 @@ mod test {
             ],
         })));
         test_expr_to_val(vec![
-            (Expression::Call{
+            (Expression::Call(CallDef{
                 macroref: vec!["tstmac".to_string()],
                 arglist: vec![Expression::Simple(Value::String("bar".to_string()))],
-            },
+            }),
              Val::Tuple(vec![
                  ("foo".to_string(), Rc::new(Val::String("bar".to_string()))),
              ])),
@@ -911,10 +890,10 @@ mod test {
             ],
         })));
         test_expr_to_val(vec![
-            (Expression::Call{
+            (Expression::Call(CallDef{
                 macroref: vec!["tstmac".to_string()],
                 arglist: vec![Expression::Simple(Value::String("bar".to_string()))],
-            },
+            }),
              Val::Tuple(vec![
                  ("foo".to_string(), Rc::new(Val::String("bar".to_string()))),
              ])),
@@ -927,23 +906,23 @@ mod test {
         b.out.entry("foo".to_string()).or_insert(Rc::new(Val::String("bar".to_string())));
         b.out.entry("baz".to_string()).or_insert(Rc::new(Val::String("boo".to_string())));
         test_expr_to_val(vec![
-            (Expression::Select{
+            (Expression::Select(SelectDef{
                 val: Box::new(Expression::Simple(Value::Symbol("foo".to_string()))),
                 default: Box::new(Expression::Simple(Value::Int(1))),
                 tuple: vec![
                     ("bar".to_string(), Expression::Simple(Value::Int(2))),
                     ("quux".to_string(), Expression::Simple(Value::String("2".to_string()))),
                 ],
-             },
+            }),
              Val::Int(2)),
-            (Expression::Select{
+            (Expression::Select(SelectDef{
                 val: Box::new(Expression::Simple(Value::Symbol("baz".to_string()))),
                 default: Box::new(Expression::Simple(Value::Int(1))),
                 tuple: vec![
                     ("bar".to_string(), Expression::Simple(Value::Int(2))),
                     ("quux".to_string(), Expression::Simple(Value::String("2".to_string()))),
                 ],
-            },
+            }),
              // If the field doesn't exist then we get the default.
              Val::Int(1)),
         ], b);
@@ -955,14 +934,14 @@ mod test {
         let mut b = Builder::new();
         b.out.entry("foo".to_string()).or_insert(Rc::new(Val::Int(4)));
         test_expr_to_val(vec![
-            (Expression::Select{
+            (Expression::Select(SelectDef{
                 val: Box::new(Expression::Simple(Value::Symbol("foo".to_string()))),
                 default: Box::new(Expression::Simple(Value::Int(1))),
                 tuple: vec![
                     ("bar".to_string(), Expression::Simple(Value::Int(2))),
                     ("quux".to_string(), Expression::Simple(Value::String("2".to_string()))),
                 ],
-             },
+             }),
              Val::Int(2)),
         ], b);
     }
@@ -973,7 +952,7 @@ mod test {
         b.build_stmt(Statement::Let{
             name:"foo".to_string(),
             value: Expression::Simple(Value::String("bar".to_string())),
-        });
+        }).unwrap();
         test_expr_to_val(vec![
             (Expression::Simple(Value::Symbol("foo".to_string())),
              Val::String("bar".to_string())),
@@ -983,7 +962,7 @@ mod test {
     #[test]
     fn test_build_file_string() {
         let mut b = Builder::new();
-        b.build_file_string("foo.ucg", "let foo = 1;".to_string());
+        b.build_file_string("foo.ucg", "let foo = 1;".to_string()).unwrap();
         assert!(b.out.contains_key("foo"));
     }
 

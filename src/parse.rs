@@ -30,113 +30,9 @@ use std::error::Error;
 
 use nom::{alpha, is_alphanumeric, digit};
 
+use ast::*;
+
 type ParseResult<O> = Result<O, Box<Error>>;
-
-pub type FieldList = Vec<(String, Expression)>; // str is expected to be a symbol
-pub type SelectorList = Vec<String>; // str is expected to always be a symbol.
-
-/// Value represents a Value in the UCG parsed AST.
-#[derive(Debug,PartialEq,Clone)]
-pub enum Value {
-    // Constant Values
-    Int(i64),
-    Float(f64),
-    String(String),
-    Symbol(String),
-    // Complex Values
-    Tuple(FieldList),
-    Selector(SelectorList),
-}
-
-impl Value {
-    pub fn type_name(&self) -> String {
-        match self {
-            &Value::Int(_) => "Integer".to_string(),
-            &Value::Float(_) => "Float".to_string(),
-            &Value::String(_) => "String".to_string(),
-            &Value::Symbol(_) => "Symbol".to_string(),
-            &Value::Tuple(_) => "Tuple".to_string(),
-            &Value::Selector(_) => "Selector".to_string(),
-        }
-    }
-
-    fn fields_to_string(v: &FieldList) -> String {
-        let mut buf = String::new();
-        buf.push_str("{\n");
-        for ref t in v.iter() {
-            buf.push_str("\t");
-            buf.push_str(&t.0);
-            buf.push_str("\n");
-        }
-        buf.push_str("}");
-        return buf;
-    }
-
-    pub fn to_string(&self) -> String {
-        match self {
-            &Value::Int(ref i) => format!("{}", i),
-            &Value::Float(ref f) => format!("{}", f),
-            &Value::String(ref s) => format!("{}", s),
-            &Value::Symbol(ref s) => format!("{}", s),
-            &Value::Tuple(ref fs) => format!("{}", Self::fields_to_string(fs)),
-            &Value::Selector(ref v) =>  v.join("."),
-        }
-    }
-}
-
-/// Expression encodes an expression. Expressions compute a value from operands.
-#[derive(Debug,PartialEq,Clone)]
-pub enum Expression {
-    // Base Expression
-    Simple(Value),
-
-    // Binary Expressions
-    Add(Box<Value>, Box<Expression>),
-    Sub(Box<Value>, Box<Expression>),
-    Mul(Box<Value>, Box<Expression>),
-    Div(Box<Value>, Box<Expression>),
-
-    // Complex Expressions
-    Copy(SelectorList, FieldList),
-    Grouped(Box<Expression>),
-
-    Format(String, Vec<Expression>),
-
-    Call {
-        macroref: SelectorList,
-        arglist: Vec<Expression>,
-    },
-
-    Macro {
-        arglist: Vec<String>,
-        tuple: FieldList,
-    },
-
-    Select {
-        val: Box<Expression>,
-        default: Box<Expression>,
-        tuple: FieldList,
-    },
-}
-
-/// Statement encodes a parsed Statement in the UCG AST.
-#[derive(Debug,PartialEq)]
-pub enum Statement {
-    // simple expression
-    Expression(Expression),
-
-    // Named bindings
-    Let {
-        name: String,
-        value: Expression,
-    },
-
-    // Include a file.
-    Import {
-        path: String,
-        name: String,
-    },
-}
 
 // sentinels and punctuation
 named!(doublequote, tag!("\""));
@@ -305,7 +201,7 @@ named!(simple_expression<Expression>,
 );
 
 fn tuple_to_add_expression(tpl: (Value, Expression)) -> ParseResult<Expression> {
-    Ok(Expression::Add(Box::new(tpl.0), Box::new(tpl.1)))
+    Ok(Expression::Add(BinaryExpression(tpl.0, Box::new(tpl.1))))
 }
 
 named!(add_expression<Expression>,
@@ -321,7 +217,7 @@ named!(add_expression<Expression>,
 );
 
 fn tuple_to_sub_expression(tpl: (Value, Expression)) -> ParseResult<Expression> {
-    Ok(Expression::Sub(Box::new(tpl.0), Box::new(tpl.1)))
+    Ok(Expression::Sub(BinaryExpression(tpl.0, Box::new(tpl.1))))
 }
 
 named!(sub_expression<Expression>,
@@ -337,7 +233,7 @@ named!(sub_expression<Expression>,
 );
 
 fn tuple_to_mul_expression(tpl: (Value, Expression)) -> ParseResult<Expression> {
-    Ok(Expression::Mul(Box::new(tpl.0), Box::new(tpl.1)))
+    Ok(Expression::Mul(BinaryExpression(tpl.0, Box::new(tpl.1))))
 }
 
 named!(mul_expression<Expression>,
@@ -353,7 +249,7 @@ named!(mul_expression<Expression>,
 );
 
 fn tuple_to_div_expression(tpl: (Value, Expression)) -> ParseResult<Expression> {
-    Ok(Expression::Div(Box::new(tpl.0), Box::new(tpl.1)))
+    Ok(Expression::Div(BinaryExpression(tpl.0, Box::new(tpl.1))))
 }
 
 named!(div_expression<Expression>,
@@ -401,10 +297,10 @@ named!(copy_expression<Expression>,
 fn tuple_to_macro(mut t: (Vec<Value>, Value)) -> ParseResult<Expression> {
     match t.1 {
         Value::Tuple(v) => {
-            Ok(Expression::Macro {
-                arglist: t.0.drain(0..).map(|s| s.to_string()).collect(),
-                tuple: v,
-            })
+            Ok(Expression::Macro(MacroDef {
+                argdefs: t.0.drain(0..).map(|s| s.to_string()).collect(),
+                fields: v,
+            }))
         }
         // TODO(jwall): Show a better version of the unexpected parsed value.
         val => {
@@ -434,11 +330,11 @@ fn tuple_to_select(t: (Expression, Expression, Value))
                        -> ParseResult<Expression> {
     match t.2 {
         Value::Tuple(v) => {
-            Ok(Expression::Select {
+            Ok(Expression::Select(SelectDef{
                 val: Box::new(t.0),
                 default: Box::new(t.1),
                 tuple: v,
-            })
+            }))
         }
         // TODO(jwall): Show a better version of the unexpected parsed value.
         val => {
@@ -480,10 +376,10 @@ named!(format_expression<Expression>,
 
 fn tuple_to_call(t: (Value, Vec<Expression>)) -> ParseResult<Expression> {
     if let Value::Selector(sl) = t.0 {
-        Ok(Expression::Call {
+        Ok(Expression::Call(CallDef{
             macroref: sl,
             arglist: t.1,
-        })
+        }))
     } else {
         Err(Box::new(ParseError::UnexpectedToken("Selector".to_string(), format!("{:?}", t.0))))
     }
@@ -605,12 +501,13 @@ named!(pub parse<Vec<Statement> >, many1!(ws!(statement)));
 #[cfg(test)]
 mod test {
     use std::str::from_utf8;
-    use super::{Statement, Expression, Value};
+    use super::{Statement, Expression, Value, MacroDef, SelectDef, CallDef};
     use super::{number, symbol, parse, field_value, tuple, grouped_expression};
     use super::{arglist, copy_expression, macro_expression, select_expression};
     use super::{format_expression, call_expression, expression};
     use super::{expression_statement, let_statement, import_statement, statement};
     use nom::IResult;
+    use ast::*;
 
     #[test]
     fn test_statement_parse() {
@@ -725,70 +622,70 @@ mod test {
                IResult::Done(&b""[..], Expression::Simple(Value::Symbol("foo".to_string()))));
         assert_eq!(expression(&b"1 + 1"[..]),
                IResult::Done(&b""[..],
-                             Expression::Add(Box::new(Value::Int(1)),
-                                             Box::new(Expression::Simple(Value::Int(1))))));
+                             Expression::Add(BinaryExpression(Value::Int(1),
+                                             Box::new(Expression::Simple(Value::Int(1)))))));
         assert_eq!(expression(&b"1 - 1"[..]),
                IResult::Done(&b""[..],
-                             Expression::Sub(Box::new(Value::Int(1)),
-                                             Box::new(Expression::Simple(Value::Int(1))))));
+                             Expression::Sub(BinaryExpression(Value::Int(1),
+                                             Box::new(Expression::Simple(Value::Int(1)))))));
         assert_eq!(expression(&b"1 * 1"[..]),
                IResult::Done(&b""[..],
-                             Expression::Mul(Box::new(Value::Int(1)),
-                                             Box::new(Expression::Simple(Value::Int(1))))));
+                             Expression::Mul(BinaryExpression(Value::Int(1),
+                                             Box::new(Expression::Simple(Value::Int(1)))))));
         assert_eq!(expression(&b"1 / 1"[..]),
                IResult::Done(&b""[..],
-                             Expression::Div(Box::new(Value::Int(1)),
-                                             Box::new(Expression::Simple(Value::Int(1))))));
+                             Expression::Div(BinaryExpression(Value::Int(1),
+                                             Box::new(Expression::Simple(Value::Int(1)))))));
 
         assert_eq!(expression(&b"1+1"[..]),
                IResult::Done(&b""[..],
-                             Expression::Add(Box::new(Value::Int(1)),
-                                             Box::new(Expression::Simple(Value::Int(1))))));
+                             Expression::Add(BinaryExpression(Value::Int(1),
+                                             Box::new(Expression::Simple(Value::Int(1)))))));
         assert_eq!(expression(&b"1-1"[..]),
                IResult::Done(&b""[..],
-                             Expression::Sub(Box::new(Value::Int(1)),
-                                             Box::new(Expression::Simple(Value::Int(1))))));
+                             Expression::Sub(BinaryExpression(Value::Int(1),
+                                             Box::new(Expression::Simple(Value::Int(1)))))));
         assert_eq!(expression(&b"1*1"[..]),
                IResult::Done(&b""[..],
-                             Expression::Mul(Box::new(Value::Int(1)),
-                                             Box::new(Expression::Simple(Value::Int(1))))));
+                             Expression::Mul(BinaryExpression(Value::Int(1),
+                                             Box::new(Expression::Simple(Value::Int(1)))))));
         assert_eq!(expression(&b"1/1"[..]),
                IResult::Done(&b""[..],
-                             Expression::Div(Box::new(Value::Int(1)),
-                                             Box::new(Expression::Simple(Value::Int(1))))));
+                             Expression::Div(BinaryExpression(Value::Int(1),
+                                             Box::new(Expression::Simple(Value::Int(1)))))));
         assert_eq!(expression(&b"macro (arg1, arg2) => { foo = arg1 }"[..]),
                IResult::Done(&b""[..],
-                             Expression::Macro{
-                                 arglist: vec![
+                             Expression::Macro(MacroDef{
+                                 argdefs: vec![
                                      "arg1".to_string(),
                                      "arg2".to_string(),
                                  ],
-                                 tuple: vec![
+                                 fields: vec![
                                      ("foo".to_string(), Expression::Simple(Value::Symbol("arg1".to_string()))),
                                  ],
-                             }
+                             })
                )
     );
         assert_eq!(expression(&b"select foo, 1, { foo = 2 };"[..]),
                IResult::Done(&b""[..],
-                             Expression::Select{
+                             Expression::Select(SelectDef{
                                  val: Box::new(Expression::Simple(Value::Symbol("foo".to_string()))),
                                  default: Box::new(Expression::Simple(Value::Int(1))),
                                  tuple: vec![
                                      ("foo".to_string(), Expression::Simple(Value::Int(2)))
                                  ]
-                             }
+                             })
                )
     );
         assert_eq!(expression(&b"foo.bar (1, \"foo\")"[..]),
                IResult::Done(&b""[..],
-                             Expression::Call{
+                             Expression::Call(CallDef{
                                  macroref: vec!["foo".to_string(),"bar".to_string()],
                                  arglist: vec![
                                      Expression::Simple(Value::Int(1)),
                                      Expression::Simple(Value::String("foo".to_string())),
                                  ],
-                             }
+                             })
                )
     );
         assert_eq!(expression(&b"(1 + 1)"[..]),
@@ -796,8 +693,8 @@ mod test {
                           Expression::Grouped(
                               Box::new(
                                   Expression::Add(
-                                      Box::new(Value::Int(1)),
-                                      Box::new(Expression::Simple(Value::Int(1)))
+                                      BinaryExpression(Value::Int(1),
+                                      Box::new(Expression::Simple(Value::Int(1))))
                                   )
                               )
                           )
@@ -819,6 +716,13 @@ mod test {
                                                      Expression::Simple(Value::Int(2))])
                )
         );
+        assert_eq!(format_expression(&b"\"foo @ @\"%(1, 2)"[..]),
+               IResult::Done(&b""[..],
+                             Expression::Format("foo @ @".to_string(),
+                                                vec![Expression::Simple(Value::Int(1)),
+                                                     Expression::Simple(Value::Int(2))])
+               )
+        );
     }
 
     #[test]
@@ -831,25 +735,25 @@ mod test {
 
         assert_eq!(call_expression(&b"foo (1, \"foo\")"[..]),
                IResult::Done(&b""[..],
-                             Expression::Call{
+                             Expression::Call(CallDef{
                                  macroref: vec!["foo".to_string()],
                                  arglist: vec![
                                      Expression::Simple(Value::Int(1)),
                                      Expression::Simple(Value::String("foo".to_string())),
                                  ],
-                             }
+                             })
                )
         );
 
         assert_eq!(call_expression(&b"foo.bar (1, \"foo\")"[..]),
                IResult::Done(&b""[..],
-                             Expression::Call{
+                             Expression::Call(CallDef{
                                  macroref: vec!["foo".to_string(),"bar".to_string()],
                                  arglist: vec![
                                      Expression::Simple(Value::Int(1)),
                                      Expression::Simple(Value::String("foo".to_string())),
                                  ],
-                             }
+                             })
                )
     );
     }
@@ -863,13 +767,13 @@ mod test {
 
         assert_eq!(select_expression(&b"select foo, 1, { foo = 2 };"[..]),
                IResult::Done(&b""[..],
-                             Expression::Select{
+                             Expression::Select(SelectDef{
                                  val: Box::new(Expression::Simple(Value::Symbol("foo".to_string()))),
                                  default: Box::new(Expression::Simple(Value::Int(1))),
                                  tuple: vec![
                                      ("foo".to_string(), Expression::Simple(Value::Int(2)))
                                  ]
-                             }
+                             })
                )
     );
     }
@@ -890,13 +794,13 @@ mod test {
 
         assert_eq!(macro_expression(&b"macro (arg1, arg2) => {foo=1,bar=2}"[..]),
                IResult::Done(&b""[..],
-                             Expression::Macro{
-                                 arglist: vec!["arg1".to_string(),
+                             Expression::Macro(MacroDef{
+                                 argdefs: vec!["arg1".to_string(),
                                                "arg2".to_string()],
-                                 tuple: vec![("foo".to_string(), Expression::Simple(Value::Int(1))),
+                                 fields: vec![("foo".to_string(), Expression::Simple(Value::Int(1))),
                                              ("bar".to_string(), Expression::Simple(Value::Int(2)))
                                  ]
-                             }
+                             })
                )
     );
     }
@@ -947,9 +851,9 @@ mod test {
                           Expression::Grouped(
                               Box::new(
                                   Expression::Add(
-                                      Box::new(Value::Int(1)),
-                                      Box::new(Expression::Simple(
-                                          Value::Int(1)))
+                                      BinaryExpression(Value::Int(1),
+                                                       Box::new(Expression::Simple(
+                                                           Value::Int(1))))
                                   )
                               )
                           )
@@ -1058,8 +962,8 @@ mod test {
                        value: Expression::Simple(Value::Int(1))
                    },
                    Statement::Expression(
-                       Expression::Add(Box::new(Value::Int(1)),
-                                       Box::new(Expression::Simple(Value::Int(1))))
+                       Expression::Add(BinaryExpression(Value::Int(1),
+                                       Box::new(Expression::Simple(Value::Int(1)))))
                    )
                ]);
     }
