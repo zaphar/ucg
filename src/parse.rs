@@ -154,9 +154,13 @@ named!(equal, tag!("="));
 named!(semicolon, tag!(";"));
 named!(fatcomma, tag!("=>"));
 
+fn is_symbol_char(c: u8) -> bool {
+    is_alphanumeric(c) || c == '-' as u8 || c == '_' as u8
+}
+
 // a field is the building block of symbols and tuple field names.
 named!(field<String>,
-       map_res!(preceded!(peek!(alpha), take_while!(is_alphanumeric)),
+       map_res!(preceded!(peek!(alpha), take_while!(is_symbol_char)),
                 |s| from_utf8(s).map(|s| s.to_string())
        )
 );
@@ -1023,6 +1027,10 @@ mod test {
     fn test_symbol_parsing() {
         assert_eq!(symbol(&b"foo"[..]),
                IResult::Done(&b""[..], Value::Symbol("foo".to_string())) );
+        assert_eq!(symbol(&b"foo-bar"[..]),
+               IResult::Done(&b""[..], Value::Symbol("foo-bar".to_string())) );
+        assert_eq!(symbol(&b"foo_bar"[..]),
+               IResult::Done(&b""[..], Value::Symbol("foo_bar".to_string())) );
     }
 
     #[test]
