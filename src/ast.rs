@@ -11,6 +11,9 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
+use std::collections::HashSet;
+use std::borrow::Borrow;
+
 pub type FieldList = Vec<(String, Expression)>; // str is expected to be a symbol
 pub type SelectorList = Vec<String>; // str is expected to always be a symbol.
 
@@ -90,6 +93,110 @@ pub struct MacroDef {
     pub fields: FieldList,
 }
 
+impl MacroDef {
+    fn validate_value_symbols<'a>(&'a self, stack: &mut Vec<&'a Expression>, val: &'a Value) -> HashSet<String> {
+        let mut bad_symbols = HashSet::new();
+        if let &Value::Symbol(ref name) = val {
+            let mut ok = true;
+            for arg in self.argdefs.iter() {
+                ok &= arg == name
+            }
+            if !ok {
+                bad_symbols.insert(name.clone());
+            }
+        } else if let &Value::Selector(ref list) = val {
+            let mut ok = true;
+            if list.len() > 0 {
+                // We only look to see if the first selector item exists.
+                // This is because only the first one is a symbol all of the
+                // rest of the items in the selector are fields in a tuple.
+                // But we don't know at this time of the value passed into
+                // this macro is a tuple since this isn't a callsite.
+                for arg in self.argdefs.iter() {
+                    ok &= arg == &list[0]
+                }
+                if !ok {
+                    bad_symbols.insert(list[0].clone());
+                }
+            }
+        } else if let &Value::Tuple(ref fields) = val {
+            for &(_, ref expr) in fields.iter() {
+                stack.push(expr);
+            }
+        }
+        return bad_symbols;
+    }
+
+    pub fn validate_symbols(&self) -> Result<(), HashSet<String>> {
+        let mut bad_symbols = HashSet::new();
+        for &(_, ref expr) in self.fields.iter() {
+            let mut stack = Vec::new();
+            stack.push(expr);
+            while stack.len() > 0 {
+                match stack.pop().unwrap() {
+                    &Expression::Add(ref bexpr) => {
+                        let mut syms_set = self.validate_value_symbols(&mut stack, &bexpr.0);
+                        bad_symbols.extend(syms_set.drain());
+                        stack.push(&bexpr.1);
+                    },
+                    &Expression::Sub(ref bexpr) => {
+                        let mut syms_set = self.validate_value_symbols(&mut stack, &bexpr.0);
+                        bad_symbols.extend(syms_set.drain());
+                        stack.push(&bexpr.1);
+                    },
+                    &Expression::Mul(ref bexpr) => {
+                        let mut syms_set = self.validate_value_symbols(&mut stack, &bexpr.0);
+                        bad_symbols.extend(syms_set.drain());
+                        stack.push(&bexpr.1);
+                    },
+                    &Expression::Div(ref bexpr) => {
+                        let mut syms_set = self.validate_value_symbols(&mut stack, &bexpr.0);
+                        bad_symbols.extend(syms_set.drain());
+                        stack.push(&bexpr.1);
+                    },
+                    &Expression::Grouped(ref expr) => {
+                        stack.push(expr);
+                    },
+                    &Expression::Format(_, ref exprs) => {
+                        for arg_expr in exprs.iter() {
+                            stack.push(arg_expr);
+                        }
+                    },
+                    &Expression::Select(ref def) => {
+                        stack.push(def.default.borrow());
+                        stack.push(def.val.borrow());
+                        for &(_, ref expr) in def.tuple.iter() {
+                            stack.push(expr);
+                        }
+                    },
+                    &Expression::Copy(_, ref fields) => {
+                        for &(_, ref expr) in fields.iter() {
+                            stack.push(expr);
+                        }
+                    },
+                    &Expression::Call(ref def) => {
+                        for expr in def.arglist.iter() {
+                            stack.push(expr);
+                        }
+                    }
+                    &Expression::Simple(ref val) => {
+                        let mut syms_set = self.validate_value_symbols(&mut stack, val);
+                        bad_symbols.extend(syms_set.drain());
+                    },
+                    &Expression::Macro(_) => {
+                        // noop
+                        continue;
+                    },
+                }
+            }
+        }
+        if bad_symbols.len() > 0 {
+            return Err(bad_symbols);
+        }
+        return Ok(())
+    }
+}
+
 /// BinaryExpression represents an expression with a left and a right side.
 #[derive(Debug,PartialEq,Clone)]
 pub struct BinaryExpression(pub Value, pub Box<Expression>);
@@ -136,4 +243,73 @@ pub enum Statement {
         path: String,
         name: String,
     },
+}
+
+#[cfg(test)]
+mod ast_test {
+    use super::*;
+
+    #[test]
+    pub fn test_macro_validation_happy_path() {
+        let def = MacroDef{
+            argdefs: vec![
+                "foo".to_string()
+            ],
+            fields: vec![
+                ("f1".to_string(), Expression::Add(BinaryExpression(
+                    Value::Symbol("foo".to_string()),
+                    Box::new(Expression::Simple(Value::Int(1)))))),
+            ],
+        };
+        assert!(def.validate_symbols().unwrap() == ());
+    }
+
+    #[test]
+    pub fn test_macro_validation_fail() {
+        let def = MacroDef{
+            argdefs: vec![
+                "foo".to_string()
+            ],
+            fields: vec![
+                ("f1".to_string(), Expression::Add(BinaryExpression(
+                    Value::Symbol("bar".to_string()),
+                    Box::new(Expression::Simple(Value::Int(1)))))),
+            ],
+        };
+        let mut expected = HashSet::new();
+        expected.insert("bar".to_string());
+        assert_eq!(def.validate_symbols().err().unwrap(), expected);
+    }
+
+    #[test]
+    pub fn test_macro_validation_selector_happy_path() {
+        let def = MacroDef{
+            argdefs: vec![
+                "foo".to_string()
+            ],
+            fields: vec![
+                ("f1".to_string(), Expression::Add(BinaryExpression(
+                    Value::Selector(vec!["foo".to_string(), "quux".to_string()]),
+                    Box::new(Expression::Simple(Value::Int(1)))))),
+            ],
+        };
+        assert!(def.validate_symbols().unwrap() == ());
+    }
+
+    #[test]
+    pub fn test_macro_validation_selector_fail() {
+        let def = MacroDef{
+            argdefs: vec![
+                "foo".to_string()
+            ],
+            fields: vec![
+                ("f1".to_string(), Expression::Add(BinaryExpression(
+                    Value::Selector(vec!["bar".to_string(), "quux".to_string()]),
+                    Box::new(Expression::Simple(Value::Int(1)))))),
+            ],
+        };
+        let mut expected = HashSet::new();
+        expected.insert("bar".to_string());
+        assert_eq!(def.validate_symbols().err().unwrap(), expected);
+    }
 }

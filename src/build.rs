@@ -570,9 +570,12 @@ impl Builder {
                         format!("{} is not a Macro", v))))
             },
             Expression::Macro(def) => {
-                // TODO(jwall): Walk the AST and verify that the symbols all
-                // exist as names in the arglist.
-                Ok(Rc::new(Val::Macro(def)))
+                match def.validate_symbols() {
+                    Ok(()) => Ok(Rc::new(Val::Macro(def))),
+                    Err(set) => Err(Box::new(
+                        BuildError::NoSuchSymbol(
+                            format!("Macro has the following undefined symbols: {:?}", set)))),
+                }
             },
             Expression::Select(SelectDef{val: target, default: def_expr, tuple: mut fields}) => {
                 // First resolve the target expression.
@@ -984,4 +987,5 @@ mod test {
             ])),
         ], b);
     }
+    // TODO(jwall): Unit test for MacroDef Symbol Validation.
 }
