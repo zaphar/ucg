@@ -14,7 +14,19 @@
 use std::collections::HashSet;
 use std::borrow::Borrow;
 
-pub type FieldList = Vec<(String, Expression)>; // str is expected to be a symbol
+#[derive(Debug,PartialEq,Clone)]
+pub struct Position {
+    pub line: usize,
+    pub column: usize,
+}
+
+#[derive(Debug,PartialEq,Clone)]
+pub struct LocatedNode<N> {
+    pub pos: Position,
+    pub node: N,
+}
+
+pub type FieldList = Vec<(String, LocatedNode<Expression>)>; // str is expected to be a symbol
 pub type SelectorList = Vec<String>; // str is expected to always be a symbol.
 
 /// Value represents a Value in the UCG parsed AST.
@@ -71,15 +83,15 @@ impl Value {
 #[derive(PartialEq,Debug,Clone)]
 pub struct CallDef {
     pub macroref: SelectorList,
-    pub arglist: Vec<Expression>,
+    pub arglist: Vec<LocatedNode<Expression>>,
 }
 
 /// SelectDef selects a value from a tuple with a default if the value doesn't
 /// exist.
 #[derive(PartialEq,Debug,Clone)]
 pub struct SelectDef {
-    pub val: Box<Expression>,
-    pub default: Box<Expression>,
+    pub val: Box<LocatedNode<Expression>>,
+    pub default: Box<LocatedNode<Expression>>,
     pub tuple: FieldList,
 }
 
@@ -94,7 +106,7 @@ pub struct MacroDef {
 }
 
 impl MacroDef {
-    fn validate_value_symbols<'a>(&'a self, stack: &mut Vec<&'a Expression>, val: &'a Value) -> HashSet<String> {
+    fn validate_value_symbols<'a>(&'a self, stack: &mut Vec<&'a LocatedNode<Expression>>, val: &'a Value) -> HashSet<String> {
         let mut bad_symbols = HashSet::new();
         if let &Value::Symbol(ref name) = val {
             let mut ok = true;
@@ -134,56 +146,56 @@ impl MacroDef {
             stack.push(expr);
             while stack.len() > 0 {
                 match stack.pop().unwrap() {
-                    &Expression::Add(ref bexpr) => {
+                    &LocatedNode{pos: _, node: Expression::Add(ref bexpr)} => {
                         let mut syms_set = self.validate_value_symbols(&mut stack, &bexpr.0);
                         bad_symbols.extend(syms_set.drain());
                         stack.push(&bexpr.1);
                     },
-                    &Expression::Sub(ref bexpr) => {
+                    &LocatedNode{pos: _, node: Expression::Sub(ref bexpr)} => {
                         let mut syms_set = self.validate_value_symbols(&mut stack, &bexpr.0);
                         bad_symbols.extend(syms_set.drain());
                         stack.push(&bexpr.1);
                     },
-                    &Expression::Mul(ref bexpr) => {
+                    &LocatedNode{pos: _, node: Expression::Mul(ref bexpr)} => {
                         let mut syms_set = self.validate_value_symbols(&mut stack, &bexpr.0);
                         bad_symbols.extend(syms_set.drain());
                         stack.push(&bexpr.1);
                     },
-                    &Expression::Div(ref bexpr) => {
+                    &LocatedNode{pos: _, node: Expression::Div(ref bexpr)} => {
                         let mut syms_set = self.validate_value_symbols(&mut stack, &bexpr.0);
                         bad_symbols.extend(syms_set.drain());
                         stack.push(&bexpr.1);
                     },
-                    &Expression::Grouped(ref expr) => {
+                    &LocatedNode{pos: _, node: Expression::Grouped(ref expr)} => {
                         stack.push(expr);
                     },
-                    &Expression::Format(_, ref exprs) => {
+                    &LocatedNode{pos: _, node: Expression::Format(_, ref exprs)} => {
                         for arg_expr in exprs.iter() {
                             stack.push(arg_expr);
                         }
                     },
-                    &Expression::Select(ref def) => {
+                    &LocatedNode{pos: _, node: Expression::Select(ref def)} => {
                         stack.push(def.default.borrow());
                         stack.push(def.val.borrow());
                         for &(_, ref expr) in def.tuple.iter() {
                             stack.push(expr);
                         }
                     },
-                    &Expression::Copy(_, ref fields) => {
+                    &LocatedNode{pos: _, node: Expression::Copy(_, ref fields)} => {
                         for &(_, ref expr) in fields.iter() {
                             stack.push(expr);
                         }
                     },
-                    &Expression::Call(ref def) => {
+                    &LocatedNode{pos: _, node: Expression::Call(ref def)} => {
                         for expr in def.arglist.iter() {
                             stack.push(expr);
                         }
                     }
-                    &Expression::Simple(ref val) => {
+                    &LocatedNode{pos: _, node: Expression::Simple(ref val)} => {
                         let mut syms_set = self.validate_value_symbols(&mut stack, val);
                         bad_symbols.extend(syms_set.drain());
                     },
-                    &Expression::Macro(_) => {
+                    &LocatedNode{pos: _, node: Expression::Macro(_)} => {
                         // noop
                         continue;
                     },
@@ -199,7 +211,7 @@ impl MacroDef {
 
 /// BinaryExpression represents an expression with a left and a right side.
 #[derive(Debug,PartialEq,Clone)]
-pub struct BinaryExpression(pub Value, pub Box<Expression>);
+pub struct BinaryExpression(pub Value, pub Box<LocatedNode<Expression>>);
 
 /// Expression encodes an expression. Expressions compute a value from operands.
 #[derive(Debug,PartialEq,Clone)]
@@ -216,9 +228,9 @@ pub enum Expression {
 
     // Complex Expressions
     Copy(SelectorList, FieldList),
-    Grouped(Box<Expression>),
+    Grouped(Box<LocatedNode<Expression>>),
 
-    Format(String, Vec<Expression>),
+    Format(String, Vec<LocatedNode<Expression>>),
 
     Call(CallDef),
 
@@ -230,12 +242,12 @@ pub enum Expression {
 #[derive(Debug,PartialEq)]
 pub enum Statement {
     // simple expression
-    Expression(Expression),
+    Expression(LocatedNode<Expression>),
 
     // Named bindings
     Let {
         name: String,
-        value: Expression,
+        value: LocatedNode<Expression>,
     },
 
     // Include a file.
@@ -249,6 +261,16 @@ pub enum Statement {
 mod ast_test {
     use super::*;
 
+    fn wrapNode(expr: Expression) -> LocatedNode<Expression> {
+        LocatedNode{
+            pos: Position{
+                line: 0,
+                column: 0,
+            },
+            node: expr,
+        }
+    }
+
     #[test]
     pub fn test_macro_validation_happy_path() {
         let def = MacroDef{
@@ -256,9 +278,9 @@ mod ast_test {
                 "foo".to_string()
             ],
             fields: vec![
-                ("f1".to_string(), Expression::Add(BinaryExpression(
+                ("f1".to_string(), wrapNode(Expression::Add(BinaryExpression(
                     Value::Symbol("foo".to_string()),
-                    Box::new(Expression::Simple(Value::Int(1)))))),
+                    Box::new(wrapNode(Expression::Simple(Value::Int(1)))))))),
             ],
         };
         assert!(def.validate_symbols().unwrap() == ());
@@ -271,9 +293,9 @@ mod ast_test {
                 "foo".to_string()
             ],
             fields: vec![
-                ("f1".to_string(), Expression::Add(BinaryExpression(
+                ("f1".to_string(), wrapNode(Expression::Add(BinaryExpression(
                     Value::Symbol("bar".to_string()),
-                    Box::new(Expression::Simple(Value::Int(1)))))),
+                    Box::new(wrapNode(Expression::Simple(Value::Int(1)))))))),
             ],
         };
         let mut expected = HashSet::new();
@@ -288,9 +310,9 @@ mod ast_test {
                 "foo".to_string()
             ],
             fields: vec![
-                ("f1".to_string(), Expression::Add(BinaryExpression(
+                ("f1".to_string(), wrapNode(Expression::Add(BinaryExpression(
                     Value::Selector(vec!["foo".to_string(), "quux".to_string()]),
-                    Box::new(Expression::Simple(Value::Int(1)))))),
+                    Box::new(wrapNode(Expression::Simple(Value::Int(1)))))))),
             ],
         };
         assert!(def.validate_symbols().unwrap() == ());
@@ -303,9 +325,9 @@ mod ast_test {
                 "foo".to_string()
             ],
             fields: vec![
-                ("f1".to_string(), Expression::Add(BinaryExpression(
+                ("f1".to_string(), wrapNode(Expression::Add(BinaryExpression(
                     Value::Selector(vec!["bar".to_string(), "quux".to_string()]),
-                    Box::new(Expression::Simple(Value::Int(1)))))),
+                    Box::new(wrapNode(Expression::Simple(Value::Int(1)))))))),
             ],
         };
         let mut expected = HashSet::new();
