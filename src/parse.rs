@@ -154,7 +154,7 @@ named!(value<Value>, alt!(number | quoted_value | symbol | tuple));
 
 named!(
     #[doc="Capture a field and value pair composed of `<symbol> = <value>,`"],
-    field_value<(String, LocatedNode<Expression>) >,
+    field_value<(String, Expression) >,
     do_parse!(
         field: field >>
             ws!(equal) >>
@@ -189,18 +189,18 @@ named!(macro_word, tag!("macro"));
 named!(import_word, tag!("import"));
 named!(as_word, tag!("as"));
 
-fn value_to_expression(v: Value) -> ParseResult<LocatedNode<Expression>> {
+fn value_to_expression(v: Value) -> ParseResult<Expression> {
     Ok(Expression::Simple(v))
 }
 
-named!(simple_expression<LocatedNode<Expression>>,
+named!(simple_expression<Expression>,
        map_res!(
            value,
            value_to_expression
        )
 );
 
-fn tuple_to_add_expression(tpl: (Value, LocatedNode<Expression>)) -> ParseResult<LocatedNode<Expression>> {
+fn tuple_to_add_expression(tpl: (Value, Expression)) -> ParseResult<Expression> {
     Ok(Expression::Add(BinaryExpression(tpl.0, Box::new(tpl.1))))
 }
 
