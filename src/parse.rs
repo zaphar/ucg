@@ -53,7 +53,6 @@ named!(fatcomma, tag!("=>"));
 fn is_symbol_char(c: u8) -> bool {
     is_alphanumeric(c) || c == '-' as u8 || c == '_' as u8
 }
-
 // a field is the building block of symbols and tuple field names.
 named!(field<String>,
        map_res!(preceded!(peek!(alpha), take_while!(is_symbol_char)),
@@ -62,7 +61,7 @@ named!(field<String>,
 );
 
 fn symbol_to_value(s: String) -> ParseResult<Value> {
-    Ok(Value::Symbol(s))
+    Ok(Value::Symbol(make_value_node(s)))
 }
 
 // symbol is a bare unquoted field.
@@ -76,7 +75,7 @@ named!(quoted<String>,
 );
 
 fn str_to_value(s: String) -> ParseResult<Value> {
-    Ok(Value::String(s))
+    Ok(Value::String(make_value_node(s)))
 }
 
 // quoted_value is a quoted string.
@@ -95,7 +94,7 @@ fn triple_to_number(v: (Option<&[u8]>, Option<&[u8]>, Option<&[u8]>))
     let has_dot = v.1.is_some();
 
     if v.0.is_some() && !has_dot && v.2.is_none() {
-        return Ok(Value::Int(try!(FromStr::from_str(pref))));
+        return Ok(Value::Int(make_value_node(try!(FromStr::from_str(pref)))));
     }
 
     let suf = match v.2 {
@@ -105,7 +104,7 @@ fn triple_to_number(v: (Option<&[u8]>, Option<&[u8]>, Option<&[u8]>))
 
     let to_parse = pref.to_string() + "." + suf;
     let f = try!(FromStr::from_str(&to_parse));
-    return Ok(Value::Float(f));
+    return Ok(Value::Float(make_value_node(f)));
 }
 
 // NOTE(jwall): HERE THERE BE DRAGONS. The order for these matters
@@ -165,7 +164,7 @@ named!(
 
 // Helper function to make the return types work for down below.
 fn vec_to_tuple(v: FieldList) -> ParseResult<Value> {
-    Ok(Value::Tuple(v))
+    Ok(Value::Tuple(make_value_node(v)))
 }
 
 named!(field_list<FieldList>,
@@ -299,7 +298,7 @@ fn tuple_to_macro(mut t: (Vec<Value>, Value)) -> ParseResult<Expression> {
         Value::Tuple(v) => {
             Ok(Expression::Macro(MacroDef {
                 argdefs: t.0.drain(0..).map(|s| s.to_string()).collect(),
-                fields: v,
+                fields: v.val,
             }))
         }
         // TODO(jwall): Show a better version of the unexpected parsed value.
@@ -333,7 +332,7 @@ fn tuple_to_select(t: (Expression, Expression, Value))
             Ok(Expression::Select(SelectDef{
                 val: Box::new(t.0),
                 default: Box::new(t.1),
-                tuple: v,
+                tuple: v.val,
             }))
         }
         // TODO(jwall): Show a better version of the unexpected parsed value.
@@ -377,7 +376,7 @@ named!(format_expression<Expression>,
 fn tuple_to_call(t: (Value, Vec<Expression>)) -> ParseResult<Expression> {
     if let Value::Selector(sl) = t.0 {
         Ok(Expression::Call(CallDef{
-            macroref: sl,
+            macroref: sl.val,
             arglist: t.1,
         }))
     } else {
@@ -386,7 +385,7 @@ fn tuple_to_call(t: (Value, Vec<Expression>)) -> ParseResult<Expression> {
 }
 
 fn vec_to_selector_value(v: SelectorList) -> ParseResult<Value> {
-    Ok(Value::Selector(v))
+    Ok(Value::Selector(make_value_node(v)))
 }
 
 named!(selector_value<Value>,
@@ -501,13 +500,15 @@ named!(pub parse<Vec<Statement> >, many1!(ws!(statement)));
 #[cfg(test)]
 mod test {
     use std::str::from_utf8;
+
     use super::{Statement, Expression, Value, MacroDef, SelectDef, CallDef};
     use super::{number, symbol, parse, field_value, tuple, grouped_expression};
     use super::{arglist, copy_expression, macro_expression, select_expression};
     use super::{format_expression, call_expression, expression};
     use super::{expression_statement, let_statement, import_statement, statement};
-    use nom::IResult;
     use ast::*;
+
+    use nom::IResult;
 
     #[test]
     fn test_statement_parse() {
@@ -524,11 +525,11 @@ mod test {
         assert_eq!(statement(&b"let foo = 1.0 ;"[..]),
                IResult::Done(&b""[..],
                              Statement::Let{name: "foo".to_string(),
-                                            value: Expression::Simple(Value::Float(1.0))}));
+                                            value: Expression::Simple(Value::Float(make_value_node(1.0)))}));
         assert_eq!(statement(&b"1.0;"[..]),
                IResult::Done(&b""[..],
                              Statement::Expression(
-                                 Expression::Simple(Value::Float(1.0)))));
+                                 Expression::Simple(Value::Float(make_value_node(1.0))))));
     }
 
     #[test]
@@ -562,15 +563,15 @@ mod test {
         assert_eq!(let_statement(&b"let foo = 1.0 ;"[..]),
                IResult::Done(&b""[..],
                              Statement::Let{name: "foo".to_string(),
-                                            value: Expression::Simple(Value::Float(1.0))}));
+                                            value: Expression::Simple(Value::Float(make_value_node(1.0)))}));
         assert_eq!(let_statement(&b"let foo= 1.0;"[..]),
                IResult::Done(&b""[..],
                              Statement::Let{name: "foo".to_string(),
-                                            value: Expression::Simple(Value::Float(1.0))}));
+                                            value: Expression::Simple(Value::Float(make_value_node(1.0)))}));
         assert_eq!(let_statement(&b"let foo =1.0;"[..]),
                IResult::Done(&b""[..],
                              Statement::Let{name: "foo".to_string(),
-                                            value: Expression::Simple(Value::Float(1.0))}));
+                                            value: Expression::Simple(Value::Float(make_value_node(1.0)))}));
     }
 
     #[test]
@@ -579,80 +580,80 @@ mod test {
         assert_eq!(expression_statement(&b"1.0;"[..]),
                IResult::Done(&b""[..],
                              Statement::Expression(
-                                 Expression::Simple(Value::Float(1.0)))));
+                                 Expression::Simple(Value::Float(make_value_node(1.0))))));
         assert_eq!(expression_statement(&b"1.0 ;"[..]),
                IResult::Done(&b""[..],
                              Statement::Expression(
-                                 Expression::Simple(Value::Float(1.0)))));
+                                 Expression::Simple(Value::Float(make_value_node(1.0))))));
         assert_eq!(expression_statement(&b" 1.0;"[..]),
                IResult::Done(&b""[..],
                              Statement::Expression(
-                                 Expression::Simple(Value::Float(1.0)))));
+                                 Expression::Simple(Value::Float(make_value_node(1.0))))));
         assert_eq!(expression_statement(&b"foo;"[..]),
                IResult::Done(&b""[..],
                              Statement::Expression(
-                                 Expression::Simple(Value::Symbol("foo".to_string())))));
+                                 Expression::Simple(Value::Symbol(make_value_node("foo".to_string()))))));
         assert_eq!(expression_statement(&b"foo ;"[..]),
                IResult::Done(&b""[..],
                              Statement::Expression(
-                                 Expression::Simple(Value::Symbol("foo".to_string())))));
+                                 Expression::Simple(Value::Symbol(make_value_node("foo".to_string()))))));
         assert_eq!(expression_statement(&b" foo;"[..]),
                IResult::Done(&b""[..],
                              Statement::Expression(
-                                 Expression::Simple(Value::Symbol("foo".to_string())))));
+                                 Expression::Simple(Value::Symbol(make_value_node("foo".to_string()))))));
         assert_eq!(expression_statement(&b"\"foo\";"[..]),
                IResult::Done(&b""[..],
                              Statement::Expression(
-                                 Expression::Simple(Value::String("foo".to_string())))));
+                                 Expression::Simple(Value::String(make_value_node("foo".to_string()))))));
         assert_eq!(expression_statement(&b"\"foo\" ;"[..]),
                IResult::Done(&b""[..],
                              Statement::Expression(
-                                 Expression::Simple(Value::String("foo".to_string())))));
+                                 Expression::Simple(Value::String(make_value_node("foo".to_string()))))));
         assert_eq!(expression_statement(&b" \"foo\";"[..]),
                IResult::Done(&b""[..],
                              Statement::Expression(
-                                 Expression::Simple(Value::String("foo".to_string())))));
+                                 Expression::Simple(Value::String(make_value_node("foo".to_string()))))));
     }
 
     #[test]
     fn test_expression_parse() {
         assert_eq!(expression(&b"1"[..]),
-               IResult::Done(&b""[..], Expression::Simple(Value::Int(1))));
+               IResult::Done(&b""[..], Expression::Simple(Value::Int(make_value_node(1)))));
         assert_eq!(expression(&b"foo"[..]),
-               IResult::Done(&b""[..], Expression::Simple(Value::Symbol("foo".to_string()))));
+               IResult::Done(&b""[..], Expression::Simple(Value::Symbol(make_value_node("foo".to_string())))));
         assert_eq!(expression(&b"1 + 1"[..]),
                IResult::Done(&b""[..],
-                             Expression::Add(BinaryExpression(Value::Int(1),
-                                             Box::new(Expression::Simple(Value::Int(1)))))));
+                             Expression::Add(BinaryExpression(Value::Int(make_value_node(1)),
+                                             Box::new(Expression::Simple(Value::Int(make_value_node(1))))))));
         assert_eq!(expression(&b"1 - 1"[..]),
                IResult::Done(&b""[..],
-                             Expression::Sub(BinaryExpression(Value::Int(1),
-                                             Box::new(Expression::Simple(Value::Int(1)))))));
+                             Expression::Sub(BinaryExpression(Value::Int(make_value_node(1)),
+                                             Box::new(Expression::Simple(Value::Int(make_value_node(1))))))));
         assert_eq!(expression(&b"1 * 1"[..]),
                IResult::Done(&b""[..],
-                             Expression::Mul(BinaryExpression(Value::Int(1),
-                                             Box::new(Expression::Simple(Value::Int(1)))))));
+                             Expression::Mul(BinaryExpression(Value::Int(make_value_node(1)),
+                                             Box::new(Expression::Simple(Value::Int(make_value_node(1))))))));
         assert_eq!(expression(&b"1 / 1"[..]),
                IResult::Done(&b""[..],
-                             Expression::Div(BinaryExpression(Value::Int(1),
-                                             Box::new(Expression::Simple(Value::Int(1)))))));
+                             Expression::Div(BinaryExpression(Value::Int(make_value_node(1)),
+                                             Box::new(Expression::Simple(Value::Int(make_value_node(1))))))));
 
         assert_eq!(expression(&b"1+1"[..]),
                IResult::Done(&b""[..],
-                             Expression::Add(BinaryExpression(Value::Int(1),
-                                             Box::new(Expression::Simple(Value::Int(1)))))));
+                             Expression::Add(BinaryExpression(Value::Int(make_value_node(1)),
+                                             Box::new(Expression::Simple(Value::Int(make_value_node(1))))))));
         assert_eq!(expression(&b"1-1"[..]),
                IResult::Done(&b""[..],
-                             Expression::Sub(BinaryExpression(Value::Int(1),
-                                             Box::new(Expression::Simple(Value::Int(1)))))));
+                             Expression::Sub(BinaryExpression(Value::Int(make_value_node(1)),
+                                             Box::new(Expression::Simple(Value::Int(make_value_node(1))))))));
         assert_eq!(expression(&b"1*1"[..]),
                IResult::Done(&b""[..],
-                             Expression::Mul(BinaryExpression(Value::Int(1),
-                                             Box::new(Expression::Simple(Value::Int(1)))))));
+                             Expression::Mul(BinaryExpression(Value::Int(make_value_node(1)),
+                                             Box::new(Expression::Simple(Value::Int(make_value_node(1))))))));
         assert_eq!(expression(&b"1/1"[..]),
                IResult::Done(&b""[..],
-                             Expression::Div(BinaryExpression(Value::Int(1),
-                                             Box::new(Expression::Simple(Value::Int(1)))))));
+                             Expression::Div(BinaryExpression(Value::Int(make_value_node(1)),
+                                             Box::new(Expression::Simple(Value::Int(make_value_node(1))))))));
         assert_eq!(expression(&b"macro (arg1, arg2) => { foo = arg1 }"[..]),
                IResult::Done(&b""[..],
                              Expression::Macro(MacroDef{
@@ -661,7 +662,7 @@ mod test {
                                      "arg2".to_string(),
                                  ],
                                  fields: vec![
-                                     ("foo".to_string(), Expression::Simple(Value::Symbol("arg1".to_string()))),
+                                     ("foo".to_string(), Expression::Simple(Value::Symbol(make_value_node("arg1".to_string())))),
                                  ],
                              })
                )
@@ -669,10 +670,10 @@ mod test {
         assert_eq!(expression(&b"select foo, 1, { foo = 2 };"[..]),
                IResult::Done(&b""[..],
                              Expression::Select(SelectDef{
-                                 val: Box::new(Expression::Simple(Value::Symbol("foo".to_string()))),
-                                 default: Box::new(Expression::Simple(Value::Int(1))),
+                                 val: Box::new(Expression::Simple(Value::Symbol(make_value_node("foo".to_string())))),
+                                 default: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
                                  tuple: vec![
-                                     ("foo".to_string(), Expression::Simple(Value::Int(2)))
+                                     ("foo".to_string(), Expression::Simple(Value::Int(make_value_node(2))))
                                  ]
                              })
                )
@@ -682,8 +683,8 @@ mod test {
                              Expression::Call(CallDef{
                                  macroref: vec!["foo".to_string(),"bar".to_string()],
                                  arglist: vec![
-                                     Expression::Simple(Value::Int(1)),
-                                     Expression::Simple(Value::String("foo".to_string())),
+                                     Expression::Simple(Value::Int(make_value_node(1))),
+                                     Expression::Simple(Value::String(make_value_node("foo".to_string()))),
                                  ],
                              })
                )
@@ -693,8 +694,8 @@ mod test {
                           Expression::Grouped(
                               Box::new(
                                   Expression::Add(
-                                      BinaryExpression(Value::Int(1),
-                                      Box::new(Expression::Simple(Value::Int(1))))
+                                      BinaryExpression(Value::Int(make_value_node(1)),
+                                      Box::new(Expression::Simple(Value::Int(make_value_node(1)))))
                                   )
                               )
                           )
@@ -712,15 +713,15 @@ mod test {
         assert_eq!(format_expression(&b"\"foo @ @\" % (1, 2)"[..]),
                IResult::Done(&b""[..],
                              Expression::Format("foo @ @".to_string(),
-                                                vec![Expression::Simple(Value::Int(1)),
-                                                     Expression::Simple(Value::Int(2))])
+                                                vec![Expression::Simple(Value::Int(make_value_node(1))),
+                                                     Expression::Simple(Value::Int(make_value_node(2)))])
                )
         );
         assert_eq!(format_expression(&b"\"foo @ @\"%(1, 2)"[..]),
                IResult::Done(&b""[..],
                              Expression::Format("foo @ @".to_string(),
-                                                vec![Expression::Simple(Value::Int(1)),
-                                                     Expression::Simple(Value::Int(2))])
+                                                vec![Expression::Simple(Value::Int(make_value_node(1))),
+                                                     Expression::Simple(Value::Int(make_value_node(2)))])
                )
         );
     }
@@ -738,8 +739,8 @@ mod test {
                              Expression::Call(CallDef{
                                  macroref: vec!["foo".to_string()],
                                  arglist: vec![
-                                     Expression::Simple(Value::Int(1)),
-                                     Expression::Simple(Value::String("foo".to_string())),
+                                     Expression::Simple(Value::Int(make_value_node(1))),
+                                     Expression::Simple(Value::String(make_value_node("foo".to_string()))),
                                  ],
                              })
                )
@@ -750,8 +751,8 @@ mod test {
                              Expression::Call(CallDef{
                                  macroref: vec!["foo".to_string(),"bar".to_string()],
                                  arglist: vec![
-                                     Expression::Simple(Value::Int(1)),
-                                     Expression::Simple(Value::String("foo".to_string())),
+                                     Expression::Simple(Value::Int(make_value_node(1))),
+                                     Expression::Simple(Value::String(make_value_node("foo".to_string()))),
                                  ],
                              })
                )
@@ -768,10 +769,10 @@ mod test {
         assert_eq!(select_expression(&b"select foo, 1, { foo = 2 };"[..]),
                IResult::Done(&b""[..],
                              Expression::Select(SelectDef{
-                                 val: Box::new(Expression::Simple(Value::Symbol("foo".to_string()))),
-                                 default: Box::new(Expression::Simple(Value::Int(1))),
+                                 val: Box::new(Expression::Simple(Value::Symbol(make_value_node("foo".to_string())))),
+                                 default: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
                                  tuple: vec![
-                                     ("foo".to_string(), Expression::Simple(Value::Int(2)))
+                                     ("foo".to_string(), Expression::Simple(Value::Int(make_value_node(2))))
                                  ]
                              })
                )
@@ -797,8 +798,8 @@ mod test {
                              Expression::Macro(MacroDef{
                                  argdefs: vec!["arg1".to_string(),
                                                "arg2".to_string()],
-                                 fields: vec![("foo".to_string(), Expression::Simple(Value::Int(1))),
-                                             ("bar".to_string(), Expression::Simple(Value::Int(2)))
+                                 fields: vec![("foo".to_string(), Expression::Simple(Value::Int(make_value_node(1)))),
+                                             ("bar".to_string(), Expression::Simple(Value::Int(make_value_node(2))))
                                  ]
                              })
                )
@@ -811,8 +812,8 @@ mod test {
         assert!(arglist(&b"arg1, arg2"[..]).is_done());
         assert_eq!(arglist(&b"arg1, arg2"[..]), IResult::Done(&b""[..],
                                                   vec![
-                                                      Value::Symbol("arg1".to_string()),
-                                                      Value::Symbol("arg2".to_string())
+                                                      Value::Symbol(make_value_node("arg1".to_string())),
+                                                      Value::Symbol(make_value_node("arg2".to_string()))
                                                   ]));
     }
 
@@ -830,7 +831,7 @@ mod test {
         assert_eq!(copy_expression(&b"foo{bar=1}"[..]),
                IResult::Done(&b""[..],
                              Expression::Copy(vec!["foo".to_string()],
-                                              vec![("bar".to_string(), Expression::Simple(Value::Int(1)))])
+                                              vec![("bar".to_string(), Expression::Simple(Value::Int(make_value_node(1))))])
                )
     );
     }
@@ -844,16 +845,16 @@ mod test {
                           Expression::Grouped(
                               Box::new(
                                   Expression::Simple(
-                                      Value::Symbol("foo".to_string())))))
+                                      Value::Symbol(make_value_node("foo".to_string()))))))
     );
         assert_eq!(grouped_expression(&b"(1 + 1)"[..]),
             IResult::Done(&b""[..],
                           Expression::Grouped(
                               Box::new(
                                   Expression::Add(
-                                      BinaryExpression(Value::Int(1),
+                                      BinaryExpression(Value::Int(make_value_node(1)),
                                                        Box::new(Expression::Simple(
-                                                           Value::Int(1))))
+                                                           Value::Int(make_value_node(1)))))
                                   )
                               )
                           )
@@ -873,29 +874,29 @@ mod test {
         assert_eq!(tuple(&b"{ }"[..]),
             IResult::Done(&b""[..],
                           Value::Tuple(
-                              vec![])));
+                              make_value_node(vec![]))));
 
         assert_eq!(tuple(&b"{ foo = 1 }"[..]),
             IResult::Done(&b""[..],
                           Value::Tuple(
-                              vec![
-                                  ("foo".to_string(), Expression::Simple(Value::Int(1)))
-                              ])));
+                              make_value_node(vec![
+                                  ("foo".to_string(), Expression::Simple(Value::Int(make_value_node(1))))
+                              ]))));
 
         assert_eq!(tuple(&b"{ foo = 1, bar = \"1\" }"[..]),
             IResult::Done(&b""[..],
                           Value::Tuple(
-                              vec![
-                                  ("foo".to_string(), Expression::Simple(Value::Int(1))),
-                                  ("bar".to_string(), Expression::Simple(Value::String("1".to_string())))
-                              ])));
+                              make_value_node(vec![
+                                  ("foo".to_string(), Expression::Simple(Value::Int(make_value_node(1)))),
+                                  ("bar".to_string(), Expression::Simple(Value::String(make_value_node("1".to_string()))))
+                              ]))));
         assert_eq!(tuple(&b"{ foo = 1, bar = {} }"[..]),
             IResult::Done(&b""[..],
                           Value::Tuple(
-                              vec![
-                                  ("foo".to_string(), Expression::Simple(Value::Int(1))),
-                                  ("bar".to_string(), Expression::Simple(Value::Tuple(Vec::new())))
-                              ])));
+                              make_value_node(vec![
+                                  ("foo".to_string(), Expression::Simple(Value::Int(make_value_node(1)))),
+                                  ("bar".to_string(), Expression::Simple(Value::Tuple(make_value_node(Vec::new()))))
+                              ]))));
     }
 
     #[test]
@@ -904,13 +905,13 @@ mod test {
         assert!(field_value(&b"foo ="[..]).is_incomplete() );
 
         assert_eq!(field_value(&b"foo = 1"[..]),
-               IResult::Done(&b""[..], ("foo".to_string(), Expression::Simple(Value::Int(1)))) );
+               IResult::Done(&b""[..], ("foo".to_string(), Expression::Simple(Value::Int(make_value_node(1))))) );
         assert_eq!(field_value(&b"foo = \"1\""[..]),
-               IResult::Done(&b""[..], ("foo".to_string(), Expression::Simple(Value::String("1".to_string())))) );
+               IResult::Done(&b""[..], ("foo".to_string(), Expression::Simple(Value::String(make_value_node("1".to_string()))))) );
         assert_eq!(field_value(&b"foo = bar"[..]),
-               IResult::Done(&b""[..], ("foo".to_string(), Expression::Simple(Value::Symbol("bar".to_string())))) );
+               IResult::Done(&b""[..], ("foo".to_string(), Expression::Simple(Value::Symbol(make_value_node("bar".to_string()))))) );
         assert_eq!(field_value(&b"foo = bar "[..]),
-               IResult::Done(&b""[..], ("foo".to_string(), Expression::Simple(Value::Symbol("bar".to_string())))) );
+               IResult::Done(&b""[..], ("foo".to_string(), Expression::Simple(Value::Symbol(make_value_node("bar".to_string()))))) );
     }
 
     #[test]
@@ -918,23 +919,23 @@ mod test {
         assert!(number(&b"."[..]).is_err() );
         assert!(number(&b". "[..]).is_err() );
         assert_eq!(number(&b"1.0"[..]),
-               IResult::Done(&b""[..], Value::Float(1.0)) );
+               IResult::Done(&b""[..], Value::Float(make_value_node(1.0))) );
         assert_eq!(number(&b"1."[..]),
-               IResult::Done(&b""[..], Value::Float(1.0)) );
+               IResult::Done(&b""[..], Value::Float(make_value_node(1.0))) );
         assert_eq!(number(&b"1"[..]),
-               IResult::Done(&b""[..], Value::Int(1)) );
+               IResult::Done(&b""[..], Value::Int(make_value_node(1))) );
         assert_eq!(number(&b".1"[..]),
-               IResult::Done(&b""[..], Value::Float(0.1)) );
+               IResult::Done(&b""[..], Value::Float(make_value_node(0.1))) );
     }
 
     #[test]
     fn test_symbol_parsing() {
         assert_eq!(symbol(&b"foo"[..]),
-               IResult::Done(&b""[..], Value::Symbol("foo".to_string())) );
+               IResult::Done(&b""[..], Value::Symbol(make_value_node("foo".to_string()))) );
         assert_eq!(symbol(&b"foo-bar"[..]),
-               IResult::Done(&b""[..], Value::Symbol("foo-bar".to_string())) );
+               IResult::Done(&b""[..], Value::Symbol(make_value_node("foo-bar".to_string()))) );
         assert_eq!(symbol(&b"foo_bar"[..]),
-               IResult::Done(&b""[..], Value::Symbol("foo_bar".to_string())) );
+               IResult::Done(&b""[..], Value::Symbol(make_value_node("foo_bar".to_string()))) );
     }
 
     #[test]
@@ -959,11 +960,11 @@ mod test {
                    },
                    Statement::Let{
                        name: "foo".to_string(),
-                       value: Expression::Simple(Value::Int(1))
+                       value: Expression::Simple(Value::Int(make_value_node(1)))
                    },
                    Statement::Expression(
-                       Expression::Add(BinaryExpression(Value::Int(1),
-                                       Box::new(Expression::Simple(Value::Int(1)))))
+                       Expression::Add(BinaryExpression(Value::Int(make_value_node(1)),
+                                       Box::new(Expression::Simple(Value::Int(make_value_node(1))))))
                    )
                ]);
     }

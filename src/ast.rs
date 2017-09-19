@@ -14,20 +14,53 @@
 use std::collections::HashSet;
 use std::borrow::Borrow;
 
+#[derive(Debug,PartialEq,Clone)]
+pub struct Position {
+    pub line: usize,
+    pub column: usize,
+}
+
 pub type FieldList = Vec<(String, Expression)>; // str is expected to be a symbol
 pub type SelectorList = Vec<String>; // str is expected to always be a symbol.
+
+#[derive(Debug,PartialEq,Clone)]
+pub struct LocatedNode<T> {
+    pub pos: Option<Position>,
+    pub val: T,
+}
+
+impl<T> LocatedNode<T> {
+    pub fn new(v: T) -> Self {
+        Self {
+            pos: None,
+            val: v,
+        }
+    }
+
+    pub fn new_with_pos(v: T, pos: Position) -> Self {
+        Self {
+            pos: Some(pos),
+            val: v,
+        }
+    }
+}
+
+
+pub fn make_value_node<T>(v: T) -> LocatedNode<T> {
+    LocatedNode::new(v)
+}
 
 /// Value represents a Value in the UCG parsed AST.
 #[derive(Debug,PartialEq,Clone)]
 pub enum Value {
     // Constant Values
-    Int(i64),
-    Float(f64),
-    String(String),
-    Symbol(String),
+    Int(LocatedNode<i64>),
+    Float(LocatedNode<f64>),
+    String(LocatedNode<String>),
+    Symbol(LocatedNode<String>),
     // Complex Values
-    Tuple(FieldList),
-    Selector(SelectorList),
+    Tuple(LocatedNode<FieldList>),
+    Selector(LocatedNode<SelectorList>),
 }
 
 impl Value {
@@ -56,12 +89,12 @@ impl Value {
 
     pub fn to_string(&self) -> String {
         match self {
-            &Value::Int(ref i) => format!("{}", i),
-            &Value::Float(ref f) => format!("{}", f),
-            &Value::String(ref s) => format!("{}", s),
-            &Value::Symbol(ref s) => format!("{}", s),
-            &Value::Tuple(ref fs) => format!("{}", Self::fields_to_string(fs)),
-            &Value::Selector(ref v) =>  v.join("."),
+            &Value::Int(ref i) => format!("{}", i.val),
+            &Value::Float(ref f) => format!("{}", f.val),
+            &Value::String(ref s) => format!("{}", s.val),
+            &Value::Symbol(ref s) => format!("{}", s.val),
+            &Value::Tuple(ref fs) => format!("{}", Self::fields_to_string(&fs.val)),
+            &Value::Selector(ref v) =>  v.val.join("."),
         }
     }
 }
@@ -99,12 +132,13 @@ impl MacroDef {
         if let &Value::Symbol(ref name) = val {
             let mut ok = true;
             for arg in self.argdefs.iter() {
-                ok &= arg == name
+                ok &= arg == &name.val
             }
             if !ok {
-                bad_symbols.insert(name.clone());
+                bad_symbols.insert(name.val.clone());
             }
-        } else if let &Value::Selector(ref list) = val {
+        } else if let &Value::Selector(ref sel_node) = val {
+            let list = &sel_node.val;
             let mut ok = true;
             if list.len() > 0 {
                 // We only look to see if the first selector item exists.
@@ -119,7 +153,8 @@ impl MacroDef {
                     bad_symbols.insert(list[0].clone());
                 }
             }
-        } else if let &Value::Tuple(ref fields) = val {
+        } else if let &Value::Tuple(ref tuple_node) = val {
+            let fields = &tuple_node.val;
             for &(_, ref expr) in fields.iter() {
                 stack.push(expr);
             }
@@ -257,8 +292,8 @@ mod ast_test {
             ],
             fields: vec![
                 ("f1".to_string(), Expression::Add(BinaryExpression(
-                    Value::Symbol("foo".to_string()),
-                    Box::new(Expression::Simple(Value::Int(1)))))),
+                    Value::Symbol(make_value_node("foo".to_string())),
+                    Box::new(Expression::Simple(Value::Int(make_value_node(1))))))),
             ],
         };
         assert!(def.validate_symbols().unwrap() == ());
@@ -272,9 +307,10 @@ mod ast_test {
             ],
             fields: vec![
                 ("f1".to_string(), Expression::Add(BinaryExpression(
-                    Value::Symbol("bar".to_string()),
-                    Box::new(Expression::Simple(Value::Int(1)))))),
+                    Value::Symbol(make_value_node("bar".to_string())),
+                    Box::new(Expression::Simple(Value::Int(make_value_node(1))))))),
             ],
+
         };
         let mut expected = HashSet::new();
         expected.insert("bar".to_string());
@@ -289,8 +325,8 @@ mod ast_test {
             ],
             fields: vec![
                 ("f1".to_string(), Expression::Add(BinaryExpression(
-                    Value::Selector(vec!["foo".to_string(), "quux".to_string()]),
-                    Box::new(Expression::Simple(Value::Int(1)))))),
+                    Value::Selector(make_value_node(vec!["foo".to_string(), "quux".to_string()])),
+                    Box::new(Expression::Simple(Value::Int(make_value_node(1))))))),
             ],
         };
         assert!(def.validate_symbols().unwrap() == ());
@@ -304,8 +340,8 @@ mod ast_test {
             ],
             fields: vec![
                 ("f1".to_string(), Expression::Add(BinaryExpression(
-                    Value::Selector(vec!["bar".to_string(), "quux".to_string()]),
-                    Box::new(Expression::Simple(Value::Int(1)))))),
+                    Value::Selector(make_value_node(vec!["bar".to_string(), "quux".to_string()])),
+                    Box::new(Expression::Simple(Value::Int(make_value_node(1))))))),
             ],
         };
         let mut expected = HashSet::new();
