@@ -629,7 +629,7 @@ mod test {
         let b = Builder::new();
         test_expr_to_val(vec![
             (Expression::Binary(
-                BinaryExpression{
+                BinaryOpDef{
                     kind: BinaryExprType::Div,
                     left: Value::Int(make_value_node(2)),
                     right: Box::new(Expression::Simple(Value::Int(make_value_node(2)))),
@@ -637,7 +637,7 @@ mod test {
                 }),
              Val::Int(1)),
             (Expression::Binary(
-                BinaryExpression{
+                BinaryOpDef{
                     kind: BinaryExprType::Div,
                     left: Value::Float(make_value_node(2.0)),
                     right: Box::new(Expression::Simple(Value::Float(make_value_node(2.0)))),
@@ -653,7 +653,7 @@ mod test {
         let b = Builder::new();
         test_expr_to_val(vec![
             (Expression::Binary(
-                BinaryExpression{
+                BinaryOpDef{
                     kind: BinaryExprType::Div,
                     left: Value::Float(make_value_node(2.0)),
                     right: Box::new(Expression::Simple(Value::Int(make_value_node(2)))),
@@ -668,7 +668,7 @@ mod test {
         let b = Builder::new();
         test_expr_to_val(vec![
             (Expression::Binary(
-                BinaryExpression{
+                BinaryOpDef{
                     kind: BinaryExprType::Mul,
                     left: Value::Int(make_value_node(2)),
                     right: Box::new(Expression::Simple(Value::Int(make_value_node(2)))),
@@ -676,7 +676,7 @@ mod test {
                 }),
              Val::Int(4)),
             (Expression::Binary(
-                BinaryExpression{
+                BinaryOpDef{
                     kind: BinaryExprType::Mul,
                     left: Value::Float(make_value_node(2.0)),
                     right: Box::new(Expression::Simple(Value::Float(make_value_node(2.0)))),
@@ -692,7 +692,7 @@ mod test {
         let b = Builder::new();
         test_expr_to_val(vec![
             (Expression::Binary(
-                BinaryExpression{
+                BinaryOpDef{
                     kind: BinaryExprType::Mul,
                     left: Value::Float(make_value_node(2.0)),
                     right: Box::new(Expression::Simple(Value::Int(make_value_node(20)))),
@@ -707,7 +707,7 @@ mod test {
         let b = Builder::new();
         test_expr_to_val(vec![
             (Expression::Binary(
-                BinaryExpression{
+                BinaryOpDef{
                     kind: BinaryExprType::Sub,
                     left: Value::Int(make_value_node(2)),
                     right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
@@ -715,7 +715,7 @@ mod test {
                 }),
              Val::Int(1)),
             (Expression::Binary(
-                BinaryExpression{
+                BinaryOpDef{
                     kind: BinaryExprType::Sub,
                     left: Value::Float(make_value_node(2.0)),
                     right: Box::new(Expression::Simple(Value::Float(make_value_node(1.0)))),
@@ -731,7 +731,7 @@ mod test {
         let b = Builder::new();
         test_expr_to_val(vec![
             (Expression::Binary(
-                BinaryExpression{
+                BinaryOpDef{
                     kind: BinaryExprType::Sub,
                     left: Value::Float(make_value_node(2.0)),
                     right: Box::new(Expression::Simple(Value::Int(make_value_node(2)))),
@@ -746,7 +746,7 @@ mod test {
         let b = Builder::new();
         test_expr_to_val(vec![
             (Expression::Binary(
-                BinaryExpression{
+                BinaryOpDef{
                     kind: BinaryExprType::Add,
                     left: Value::Int(make_value_node(1)),
                     right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
@@ -754,7 +754,7 @@ mod test {
                 }),
              Val::Int(2)),
             (Expression::Binary(
-                BinaryExpression{
+                BinaryOpDef{
                     kind: BinaryExprType::Add,
                     left: Value::Float(make_value_node(1.0)),
                     right: Box::new(Expression::Simple(Value::Float(make_value_node(1.0)))),
@@ -762,7 +762,7 @@ mod test {
                 }),
              Val::Float(2.0)),
             (Expression::Binary(
-                BinaryExpression{
+                BinaryOpDef{
                     kind: BinaryExprType::Add,
                     left: Value::String(make_value_node("foo".to_string())),
                     right: Box::new(Expression::Simple(Value::String(make_value_node("bar".to_string())))),
@@ -778,7 +778,7 @@ mod test {
         let b = Builder::new();
         test_expr_to_val(vec![
             (Expression::Binary(
-                BinaryExpression{
+                BinaryOpDef{
                     kind: BinaryExprType::Add,
                     left: Value::Float(make_value_node(2.0)),
                     right: Box::new(Expression::Simple(Value::Int(make_value_node(2)))),

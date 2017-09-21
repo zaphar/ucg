@@ -200,7 +200,7 @@ named!(simple_expression<Expression>,
 );
 
 fn tuple_to_binary_expression(tpl: (BinaryExprType, Value, Expression)) -> ParseResult<Expression> {
-    Ok(Expression::Binary(BinaryExpression{
+    Ok(Expression::Binary(BinaryOpDef{
         kind: tpl.0,
         left: tpl.1,
         right: Box::new(tpl.2),
@@ -619,7 +619,7 @@ mod test {
                IResult::Done(&b""[..], Expression::Simple(Value::Symbol(make_value_node("foo".to_string())))));
         assert_eq!(expression(&b"1 + 1"[..]),
                IResult::Done(&b""[..],
-                             Expression::Binary(BinaryExpression{
+                             Expression::Binary(BinaryOpDef{
                                  kind: BinaryExprType::Add,
                                  left: Value::Int(make_value_node(1)),
                                  right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
@@ -627,7 +627,7 @@ mod test {
                              })));
         assert_eq!(expression(&b"1 - 1"[..]),
                IResult::Done(&b""[..],
-                             Expression::Binary(BinaryExpression{
+                             Expression::Binary(BinaryOpDef{
                                  kind: BinaryExprType::Sub,
                                  left: Value::Int(make_value_node(1)),
                                  right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
@@ -635,7 +635,7 @@ mod test {
                              })));
         assert_eq!(expression(&b"1 * 1"[..]),
                IResult::Done(&b""[..],
-                             Expression::Binary(BinaryExpression{
+                             Expression::Binary(BinaryOpDef{
                                  kind: BinaryExprType::Mul,
                                  left: Value::Int(make_value_node(1)),
                                  right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
@@ -643,7 +643,7 @@ mod test {
                              })));
         assert_eq!(expression(&b"1 / 1"[..]),
                IResult::Done(&b""[..],
-                             Expression::Binary(BinaryExpression{
+                             Expression::Binary(BinaryOpDef{
                                  kind: BinaryExprType::Div,
                                  left: Value::Int(make_value_node(1)),
                                  right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
@@ -652,7 +652,7 @@ mod test {
 
         assert_eq!(expression(&b"1+1"[..]),
                IResult::Done(&b""[..],
-                             Expression::Binary(BinaryExpression{
+                             Expression::Binary(BinaryOpDef{
                                  kind: BinaryExprType::Add,
                                  left: Value::Int(make_value_node(1)),
                                  right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
@@ -660,7 +660,7 @@ mod test {
                              })));
         assert_eq!(expression(&b"1-1"[..]),
                IResult::Done(&b""[..],
-                             Expression::Binary(BinaryExpression{
+                             Expression::Binary(BinaryOpDef{
                                  kind: BinaryExprType::Sub,
                                  left: Value::Int(make_value_node(1)),
                                  right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
@@ -668,7 +668,7 @@ mod test {
                              })));
         assert_eq!(expression(&b"1*1"[..]),
                IResult::Done(&b""[..],
-                             Expression::Binary(BinaryExpression{
+                             Expression::Binary(BinaryOpDef{
                                  kind: BinaryExprType::Mul,
                                  left: Value::Int(make_value_node(1)),
                                  right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
@@ -676,7 +676,7 @@ mod test {
                              })));
         assert_eq!(expression(&b"1/1"[..]),
                IResult::Done(&b""[..],
-                             Expression::Binary(BinaryExpression{
+                             Expression::Binary(BinaryOpDef{
                                  kind: BinaryExprType::Div,
                                  left: Value::Int(make_value_node(1)),
                                  right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
@@ -725,7 +725,7 @@ mod test {
                           Expression::Grouped(
                               Box::new(
                                   Expression::Binary(
-                                      BinaryExpression{
+                                      BinaryOpDef{
                                           kind: BinaryExprType::Add,
                                           left: Value::Int(make_value_node(1)),
                                           right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
@@ -906,7 +906,7 @@ mod test {
                           Expression::Grouped(
                               Box::new(
                                   Expression::Binary(
-                                      BinaryExpression{
+                                      BinaryOpDef{
                                           kind: BinaryExprType::Add,
                                           left: Value::Int(make_value_node(1)),
                                           right: Box::new(Expression::Simple(
@@ -1022,7 +1022,7 @@ mod test {
                    },
                    Statement::Expression(
                        Expression::Binary(
-                           BinaryExpression{
+                           BinaryOpDef{
                                kind: BinaryExprType::Add,
                                left: Value::Int(make_value_node(1)),
                                right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),

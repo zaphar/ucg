@@ -230,9 +230,9 @@ pub enum BinaryExprType {
     Div,
 }
 
-/// BinaryExpression represents an expression with a left and a right side.
+/// BinaryOpDef represents an expression with a left and a right side.
 #[derive(Debug,PartialEq,Clone)]
-pub struct BinaryExpression {
+pub struct BinaryOpDef {
     pub kind: BinaryExprType,
     pub left: Value,
     pub right: Box<Expression>,
@@ -259,7 +259,7 @@ pub enum Expression {
     // Base Expression
     Simple(Value),
 
-    Binary(BinaryExpression),
+    Binary(BinaryOpDef),
 
     // Complex Expressions
     Copy(CopyDef),
@@ -303,7 +303,7 @@ mod ast_test {
                 "foo".to_string()
             ],
             fields: vec![
-                ("f1".to_string(), Expression::Binary(BinaryExpression{
+                ("f1".to_string(), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
                     left: Value::Symbol(make_value_node("foo".to_string())),
                     right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
@@ -322,7 +322,7 @@ mod ast_test {
                 "foo".to_string()
             ],
             fields: vec![
-                ("f1".to_string(), Expression::Binary(BinaryExpression{
+                ("f1".to_string(), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
                     left: Value::Symbol(make_value_node("bar".to_string())),
                     right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
@@ -344,7 +344,7 @@ mod ast_test {
                 "foo".to_string()
             ],
             fields: vec![
-                ("f1".to_string(), Expression::Binary(BinaryExpression{
+                ("f1".to_string(), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
                     left: Value::Selector(make_value_node(vec!["foo".to_string(), "quux".to_string()])),
                     right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
@@ -363,7 +363,7 @@ mod ast_test {
                 "foo".to_string()
             ],
             fields: vec![
-                ("f1".to_string(), Expression::Binary(BinaryExpression{
+                ("f1".to_string(), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
                     left: Value::Selector(make_value_node(vec!["bar".to_string(), "quux".to_string()])),
                     right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
