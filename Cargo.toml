@@ -9,7 +9,8 @@ keywords    = ["compiler", "config"]
 license     = "Apache-2.0"
 
 [dependencies]
-nom         = "^2.2"
+nom         = "^3.2"
+nom_locate  = "^0.1.1"
 quick-error = "^1.2.0"
 clap        = "~2.26.0"
 

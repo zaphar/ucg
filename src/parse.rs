@@ -499,7 +499,7 @@ mod test {
 
     use super::{Statement, Expression, Value, MacroDef, SelectDef, CallDef};
     use super::{number, symbol, parse, field_value, tuple, grouped_expression};
-    use super::{arglist, copy_expression, macro_expression, select_expression};
+    use super::{copy_expression, macro_expression, select_expression};
     use super::{format_expression, call_expression, expression};
     use super::{expression_statement, let_statement, import_statement, statement};
     use ast::*;
@@ -774,7 +774,7 @@ mod test {
         assert!(call_expression(&b"foo"[..]).is_incomplete() );
         assert!(call_expression(&b"foo ("[..]).is_incomplete() );
         assert!(call_expression(&b"foo (1"[..]).is_incomplete() );
-        assert!(call_expression(&b"foo (1,"[..]).is_err() );
+        assert!(call_expression(&b"foo (1,"[..]).is_incomplete() );
         assert!(call_expression(&b"foo (1,2"[..]).is_incomplete() );
 
         assert_eq!(call_expression(&b"foo (1, \"foo\")"[..]),
@@ -854,17 +854,6 @@ mod test {
     }
 
     #[test]
-    fn test_arglist_parse() {
-        assert!(arglist(&b"arg"[..]).is_done());
-        assert!(arglist(&b"arg1, arg2"[..]).is_done());
-        assert_eq!(arglist(&b"arg1, arg2"[..]), IResult::Done(&b""[..],
-                                                  vec![
-                                                      Value::Symbol(make_value_node("arg1".to_string())),
-                                                      Value::Symbol(make_value_node("arg2".to_string()))
-                                                  ]));
-    }
-
-    #[test]
     fn test_copy_parse() {
         assert!(copy_expression(&b"{}"[..]).is_err() );
         assert!(copy_expression(&b"foo"[..]).is_incomplete() );
@@ -926,8 +915,8 @@ mod test {
         assert!(tuple(&b"{ foo"[..]).is_incomplete() );
         assert!(tuple(&b"{ foo ="[..]).is_incomplete() );
         assert!(tuple(&b"{ foo = 1"[..]).is_incomplete() );
-        assert!(tuple(&b"{ foo = 1,"[..]).is_err() );
-        assert!(tuple(&b"{ foo = 1, bar ="[..]).is_err() );
+        assert!(tuple(&b"{ foo = 1,"[..]).is_incomplete() );
+        assert!(tuple(&b"{ foo = 1, bar ="[..]).is_incomplete() );
 
         assert_eq!(tuple(&b"{ }"[..]),
             IResult::Done(&b""[..],
