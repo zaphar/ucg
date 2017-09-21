@@ -545,7 +545,9 @@ impl Builder {
             Expression::Grouped(expr) => {
                 return self.eval_expr(*expr);
             },
-            Expression::Format(tmpl, mut args) => {
+            Expression::Format(def) => {
+                let tmpl = def.template;
+                let mut args = def.args;
                 let mut vals = Vec::new();
                 for v in args.drain(0..) {
                     let rcv = try!(self.eval_expr(v));

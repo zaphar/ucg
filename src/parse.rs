@@ -356,7 +356,7 @@ named!(select_expression<Expression>,
 );
 
 fn tuple_to_format(t: (String, Vec<Expression>)) -> ParseResult<Expression> {
-    Ok(Expression::Format(t.0, t.1))
+    Ok(Expression::Format(FormatDef{template: t.0, args: t.1}))
 }
 
 named!(format_expression<Expression>,
@@ -712,16 +712,16 @@ mod test {
 
         assert_eq!(format_expression(&b"\"foo @ @\" % (1, 2)"[..]),
                IResult::Done(&b""[..],
-                             Expression::Format("foo @ @".to_string(),
-                                                vec![Expression::Simple(Value::Int(make_value_node(1))),
-                                                     Expression::Simple(Value::Int(make_value_node(2)))])
+                             Expression::Format(FormatDef{template: "foo @ @".to_string(),
+                                                args: vec![Expression::Simple(Value::Int(make_value_node(1))),
+                                                           Expression::Simple(Value::Int(make_value_node(2)))]})
                )
         );
         assert_eq!(format_expression(&b"\"foo @ @\"%(1, 2)"[..]),
                IResult::Done(&b""[..],
-                             Expression::Format("foo @ @".to_string(),
-                                                vec![Expression::Simple(Value::Int(make_value_node(1))),
-                                                     Expression::Simple(Value::Int(make_value_node(2)))])
+                             Expression::Format(FormatDef{template: "foo @ @".to_string(),
+                                                args: vec![Expression::Simple(Value::Int(make_value_node(1))),
+                                                           Expression::Simple(Value::Int(make_value_node(2)))]})
                )
         );
     }

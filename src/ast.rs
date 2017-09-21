@@ -192,7 +192,8 @@ impl MacroDef {
                     &Expression::Grouped(ref expr) => {
                         stack.push(expr);
                     },
-                    &Expression::Format(_, ref exprs) => {
+                    &Expression::Format(ref def) => {
+                        let exprs = &def.args;
                         for arg_expr in exprs.iter() {
                             stack.push(arg_expr);
                         }
@@ -243,6 +244,12 @@ pub struct CopyDef {
     pub fields: FieldList
 }
 
+#[derive(Debug,PartialEq,Clone)]
+pub struct FormatDef {
+    pub template: String,
+    pub args: Vec<Expression>
+}
+
 /// Expression encodes an expression. Expressions compute a value from operands.
 #[derive(Debug,PartialEq,Clone)]
 pub enum Expression {
@@ -260,7 +267,7 @@ pub enum Expression {
     Copy(CopyDef),
     Grouped(Box<Expression>),
 
-    Format(String, Vec<Expression>),
+    Format(FormatDef),
 
     Call(CallDef),
 
