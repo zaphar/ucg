@@ -204,6 +204,7 @@ fn tuple_to_binary_expression(tpl: (BinaryExprType, Value, Expression)) -> Parse
         kind: tpl.0,
         left: tpl.1,
         right: Box::new(tpl.2),
+        pos: None,
     }))
 }
 
@@ -269,7 +270,7 @@ named!(grouped_expression<Expression>,
 named!(selector_list<SelectorList>, separated_nonempty_list!(dot, field));
 
 fn tuple_to_copy(t: (SelectorList, FieldList)) -> ParseResult<Expression> {
-    Ok(Expression::Copy(CopyDef{selector: t.0, fields: t.1}))
+    Ok(Expression::Copy(CopyDef{selector: t.0, fields: t.1, pos: None}))
 }
 
 named!(copy_expression<Expression>,
@@ -291,6 +292,7 @@ fn tuple_to_macro(mut t: (Vec<Value>, Value)) -> ParseResult<Expression> {
             Ok(Expression::Macro(MacroDef {
                 argdefs: t.0.drain(0..).map(|s| s.to_string()).collect(),
                 fields: v.val,
+                pos: None,
             }))
         }
         // TODO(jwall): Show a better version of the unexpected parsed value.
@@ -325,6 +327,7 @@ fn tuple_to_select(t: (Expression, Expression, Value))
                 val: Box::new(t.0),
                 default: Box::new(t.1),
                 tuple: v.val,
+                pos: None,
             }))
         }
         // TODO(jwall): Show a better version of the unexpected parsed value.
@@ -348,7 +351,7 @@ named!(select_expression<Expression>,
 );
 
 fn tuple_to_format(t: (String, Vec<Expression>)) -> ParseResult<Expression> {
-    Ok(Expression::Format(FormatDef{template: t.0, args: t.1}))
+    Ok(Expression::Format(FormatDef{template: t.0, args: t.1, pos: None}))
 }
 
 named!(format_expression<Expression>,
@@ -370,6 +373,7 @@ fn tuple_to_call(t: (Value, Vec<Expression>)) -> ParseResult<Expression> {
         Ok(Expression::Call(CallDef{
             macroref: sl.val,
             arglist: t.1,
+            pos: None,
         }))
     } else {
         Err(Box::new(ParseError::UnexpectedToken("Selector".to_string(), format!("{:?}", t.0))))
@@ -619,6 +623,7 @@ mod test {
                                  kind: BinaryExprType::Add,
                                  left: Value::Int(make_value_node(1)),
                                  right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
+                                 pos: None,
                              })));
         assert_eq!(expression(&b"1 - 1"[..]),
                IResult::Done(&b""[..],
@@ -626,6 +631,7 @@ mod test {
                                  kind: BinaryExprType::Sub,
                                  left: Value::Int(make_value_node(1)),
                                  right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
+                                 pos: None,
                              })));
         assert_eq!(expression(&b"1 * 1"[..]),
                IResult::Done(&b""[..],
@@ -633,6 +639,7 @@ mod test {
                                  kind: BinaryExprType::Mul,
                                  left: Value::Int(make_value_node(1)),
                                  right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
+                                 pos: None,
                              })));
         assert_eq!(expression(&b"1 / 1"[..]),
                IResult::Done(&b""[..],
@@ -640,6 +647,7 @@ mod test {
                                  kind: BinaryExprType::Div,
                                  left: Value::Int(make_value_node(1)),
                                  right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
+                                 pos: None,
                              })));
 
         assert_eq!(expression(&b"1+1"[..]),
@@ -648,6 +656,7 @@ mod test {
                                  kind: BinaryExprType::Add,
                                  left: Value::Int(make_value_node(1)),
                                  right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
+                                 pos: None,
                              })));
         assert_eq!(expression(&b"1-1"[..]),
                IResult::Done(&b""[..],
@@ -655,6 +664,7 @@ mod test {
                                  kind: BinaryExprType::Sub,
                                  left: Value::Int(make_value_node(1)),
                                  right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
+                                 pos: None,
                              })));
         assert_eq!(expression(&b"1*1"[..]),
                IResult::Done(&b""[..],
@@ -662,6 +672,7 @@ mod test {
                                  kind: BinaryExprType::Mul,
                                  left: Value::Int(make_value_node(1)),
                                  right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
+                                 pos: None,
                              })));
         assert_eq!(expression(&b"1/1"[..]),
                IResult::Done(&b""[..],
@@ -669,6 +680,7 @@ mod test {
                                  kind: BinaryExprType::Div,
                                  left: Value::Int(make_value_node(1)),
                                  right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
+                                 pos: None,
                              })));
         assert_eq!(expression(&b"macro (arg1, arg2) => { foo = arg1 }"[..]),
                IResult::Done(&b""[..],
@@ -680,6 +692,7 @@ mod test {
                                  fields: vec![
                                      ("foo".to_string(), Expression::Simple(Value::Symbol(make_value_node("arg1".to_string())))),
                                  ],
+                                 pos: None,
                              })
                )
     );
@@ -690,7 +703,8 @@ mod test {
                                  default: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
                                  tuple: vec![
                                      ("foo".to_string(), Expression::Simple(Value::Int(make_value_node(2))))
-                                 ]
+                                 ],
+                                 pos: None,
                              })
                )
     );
@@ -702,6 +716,7 @@ mod test {
                                      Expression::Simple(Value::Int(make_value_node(1))),
                                      Expression::Simple(Value::String(make_value_node("foo".to_string()))),
                                  ],
+                                 pos: None,
                              })
                )
     );
@@ -714,6 +729,7 @@ mod test {
                                           kind: BinaryExprType::Add,
                                           left: Value::Int(make_value_node(1)),
                                           right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
+                                          pos: None,
                                       }
                                   )
                               )
@@ -731,16 +747,24 @@ mod test {
 
         assert_eq!(format_expression(&b"\"foo @ @\" % (1, 2)"[..]),
                IResult::Done(&b""[..],
-                             Expression::Format(FormatDef{template: "foo @ @".to_string(),
-                                                args: vec![Expression::Simple(Value::Int(make_value_node(1))),
-                                                           Expression::Simple(Value::Int(make_value_node(2)))]})
+                             Expression::Format(
+                                 FormatDef{
+                                     template: "foo @ @".to_string(),
+                                     args: vec![Expression::Simple(Value::Int(make_value_node(1))),
+                                                Expression::Simple(Value::Int(make_value_node(2)))],
+                                     pos: None,
+                                 })
                )
         );
         assert_eq!(format_expression(&b"\"foo @ @\"%(1, 2)"[..]),
                IResult::Done(&b""[..],
-                             Expression::Format(FormatDef{template: "foo @ @".to_string(),
-                                                args: vec![Expression::Simple(Value::Int(make_value_node(1))),
-                                                           Expression::Simple(Value::Int(make_value_node(2)))]})
+                             Expression::Format(
+                                 FormatDef{
+                                     template: "foo @ @".to_string(),
+                                     args: vec![Expression::Simple(Value::Int(make_value_node(1))),
+                                                Expression::Simple(Value::Int(make_value_node(2)))],
+                                     pos: None,
+                                 })
                )
         );
     }
@@ -761,6 +785,7 @@ mod test {
                                      Expression::Simple(Value::Int(make_value_node(1))),
                                      Expression::Simple(Value::String(make_value_node("foo".to_string()))),
                                  ],
+                                 pos: None,
                              })
                )
         );
@@ -773,6 +798,7 @@ mod test {
                                      Expression::Simple(Value::Int(make_value_node(1))),
                                      Expression::Simple(Value::String(make_value_node("foo".to_string()))),
                                  ],
+                                 pos: None,
                              })
                )
     );
@@ -792,7 +818,8 @@ mod test {
                                  default: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
                                  tuple: vec![
                                      ("foo".to_string(), Expression::Simple(Value::Int(make_value_node(2))))
-                                 ]
+                                 ],
+                                 pos: None,
                              })
                )
     );
@@ -819,7 +846,8 @@ mod test {
                                                "arg2".to_string()],
                                  fields: vec![("foo".to_string(), Expression::Simple(Value::Int(make_value_node(1)))),
                                              ("bar".to_string(), Expression::Simple(Value::Int(make_value_node(2))))
-                                 ]
+                                 ],
+                                 pos: None,
                              })
                )
     );
@@ -843,14 +871,21 @@ mod test {
         assert!(copy_expression(&b"foo{"[..]).is_incomplete() );
         assert_eq!(copy_expression(&b"foo{}"[..]),
                IResult::Done(&b""[..],
-                             Expression::Copy(CopyDef{selector: vec!["foo".to_string()],
-                                                      fields: Vec::new()})
+                             Expression::Copy(CopyDef{
+                                 selector: vec!["foo".to_string()],
+                                 fields: Vec::new(),
+                                 pos: None,
+                             })
                )
     );
         assert_eq!(copy_expression(&b"foo{bar=1}"[..]),
                IResult::Done(&b""[..],
-                             Expression::Copy(CopyDef{selector: vec!["foo".to_string()],
-                                                      fields: vec![("bar".to_string(), Expression::Simple(Value::Int(make_value_node(1))))]})
+                             Expression::Copy(CopyDef{
+                                 selector: vec!["foo".to_string()],
+                                 fields: vec![("bar".to_string(),
+                                               Expression::Simple(Value::Int(make_value_node(1))))],
+                                 pos: None,
+                             })
                )
     );
     }
@@ -876,6 +911,7 @@ mod test {
                                           left: Value::Int(make_value_node(1)),
                                           right: Box::new(Expression::Simple(
                                               Value::Int(make_value_node(1)))),
+                                          pos: None,
                                       }
                                   )
                               )
@@ -990,6 +1026,7 @@ mod test {
                                kind: BinaryExprType::Add,
                                left: Value::Int(make_value_node(1)),
                                right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
+                               pos: None,
                            })
                    )
                ]);

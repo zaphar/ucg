@@ -105,6 +105,7 @@ impl Value {
 pub struct CallDef {
     pub macroref: SelectorList,
     pub arglist: Vec<Expression>,
+    pub pos: Option<Position>,
 }
 
 /// SelectDef selects a value from a tuple with a default if the value doesn't
@@ -114,6 +115,7 @@ pub struct SelectDef {
     pub val: Box<Expression>,
     pub default: Box<Expression>,
     pub tuple: FieldList,
+    pub pos: Option<Position>,
 }
 
 /// MacroDef is a pure function that always returns a Tuple.
@@ -124,6 +126,7 @@ pub struct SelectDef {
 pub struct MacroDef {
     pub argdefs: Vec<String>,
     pub fields: FieldList,
+    pub pos: Option<Position>,
 }
 
 impl MacroDef {
@@ -232,19 +235,22 @@ pub enum BinaryExprType {
 pub struct BinaryExpression {
     pub kind: BinaryExprType,
     pub left: Value,
-    pub right: Box<Expression>
+    pub right: Box<Expression>,
+    pub pos: Option<Position>,
 }
 
 #[derive(Debug,PartialEq,Clone)]
 pub struct CopyDef {
     pub selector: SelectorList,
-    pub fields: FieldList
+    pub fields: FieldList,
+    pub pos: Option<Position>,
 }
 
 #[derive(Debug,PartialEq,Clone)]
 pub struct FormatDef {
     pub template: String,
-    pub args: Vec<Expression>
+    pub args: Vec<Expression>,
+    pub pos: Option<Position>,
 }
 
 /// Expression encodes an expression. Expressions compute a value from operands.
@@ -300,8 +306,11 @@ mod ast_test {
                 ("f1".to_string(), Expression::Binary(BinaryExpression{
                     kind: BinaryExprType::Add,
                     left: Value::Symbol(make_value_node("foo".to_string())),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1))))})),
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
+                    pos: None,
+                })),
             ],
+            pos: None,
         };
         assert!(def.validate_symbols().unwrap() == ());
     }
@@ -316,8 +325,11 @@ mod ast_test {
                 ("f1".to_string(), Expression::Binary(BinaryExpression{
                     kind: BinaryExprType::Add,
                     left: Value::Symbol(make_value_node("bar".to_string())),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1))))})),
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
+                    pos: None,
+                })),
             ],
+            pos: None,
 
         };
         let mut expected = HashSet::new();
@@ -335,8 +347,11 @@ mod ast_test {
                 ("f1".to_string(), Expression::Binary(BinaryExpression{
                     kind: BinaryExprType::Add,
                     left: Value::Selector(make_value_node(vec!["foo".to_string(), "quux".to_string()])),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1))))})),
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
+                    pos: None,
+                })),
             ],
+            pos: None,
         };
         assert!(def.validate_symbols().unwrap() == ());
     }
@@ -351,8 +366,11 @@ mod ast_test {
                 ("f1".to_string(), Expression::Binary(BinaryExpression{
                     kind: BinaryExprType::Add,
                     left: Value::Selector(make_value_node(vec!["bar".to_string(), "quux".to_string()])),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1))))})),
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
+                    pos: None,
+                })),
             ],
+            pos: None,
         };
         let mut expected = HashSet::new();
         expected.insert("bar".to_string());

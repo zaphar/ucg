@@ -407,7 +407,10 @@ impl Builder {
             Expression::Simple(val) => {
                 self.value_to_val(val)
             },
-            Expression::Binary(BinaryExpression{kind, left: v, right: expr}) => {
+            Expression::Binary(def) => {
+                let kind = def.kind;
+                let v = def.left;
+                let expr = def.right;
                 let expr_result = try!(self.eval_expr(*expr));
                 let v = try!(self.value_to_val(v));
                 match kind {
@@ -554,7 +557,9 @@ impl Builder {
                 let formatter = format::Formatter::new(tmpl, vals);
                 Ok(Rc::new(Val::String(try!(formatter.render()))))
             },
-            Expression::Call(CallDef{macroref: sel, arglist: mut args}) => {
+            Expression::Call(def) => {
+                let sel = def.macroref;
+                let mut args = def.arglist;
                 let v = try!(self.lookup_selector(sel));
                 if let &Val::Macro(ref m) = v.deref() {
                     // Congratulations this is actually a macro.
@@ -578,7 +583,10 @@ impl Builder {
                             format!("Macro has the following undefined symbols: {:?}", set)))),
                 }
             },
-            Expression::Select(SelectDef{val: target, default: def_expr, tuple: mut fields}) => {
+            Expression::Select(def) => {
+                let target = def.val;
+                let def_expr = def.default;
+                let mut fields = def.tuple;
                 // First resolve the target expression.
                 let v = try!(self.eval_expr(*target));
                 // Second ensure that the expression resolves to a string.
@@ -625,6 +633,7 @@ mod test {
                     kind: BinaryExprType::Div,
                     left: Value::Int(make_value_node(2)),
                     right: Box::new(Expression::Simple(Value::Int(make_value_node(2)))),
+                    pos: None,
                 }),
              Val::Int(1)),
             (Expression::Binary(
@@ -632,6 +641,7 @@ mod test {
                     kind: BinaryExprType::Div,
                     left: Value::Float(make_value_node(2.0)),
                     right: Box::new(Expression::Simple(Value::Float(make_value_node(2.0)))),
+                    pos: None,
                 }),
              Val::Float(1.0)),
         ], b);
@@ -646,7 +656,8 @@ mod test {
                 BinaryExpression{
                     kind: BinaryExprType::Div,
                     left: Value::Float(make_value_node(2.0)),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(2))))
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(2)))),
+                    pos: None,
                 }),
              Val::Float(1.0)),
         ], b);
@@ -660,14 +671,16 @@ mod test {
                 BinaryExpression{
                     kind: BinaryExprType::Mul,
                     left: Value::Int(make_value_node(2)),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(2))))
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(2)))),
+                    pos: None,
                 }),
              Val::Int(4)),
             (Expression::Binary(
                 BinaryExpression{
                     kind: BinaryExprType::Mul,
                     left: Value::Float(make_value_node(2.0)),
-                    right: Box::new(Expression::Simple(Value::Float(make_value_node(2.0))))
+                    right: Box::new(Expression::Simple(Value::Float(make_value_node(2.0)))),
+                    pos: None,
                 }),
              Val::Float(4.0)),
         ], b);
@@ -682,7 +695,8 @@ mod test {
                 BinaryExpression{
                     kind: BinaryExprType::Mul,
                     left: Value::Float(make_value_node(2.0)),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(20))))
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(20)))),
+                    pos: None,
                 }),
              Val::Float(1.0)),
         ], b);
@@ -697,13 +711,15 @@ mod test {
                     kind: BinaryExprType::Sub,
                     left: Value::Int(make_value_node(2)),
                     right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
+                    pos: None,
                 }),
              Val::Int(1)),
             (Expression::Binary(
                 BinaryExpression{
                     kind: BinaryExprType::Sub,
                     left: Value::Float(make_value_node(2.0)),
-                    right: Box::new(Expression::Simple(Value::Float(make_value_node(1.0))))
+                    right: Box::new(Expression::Simple(Value::Float(make_value_node(1.0)))),
+                    pos: None,
                 }),
              Val::Float(1.0)),
         ], b);
@@ -718,7 +734,8 @@ mod test {
                 BinaryExpression{
                     kind: BinaryExprType::Sub,
                     left: Value::Float(make_value_node(2.0)),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(2))))
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(2)))),
+                    pos: None,
                 }),
              Val::Float(1.0)),
         ], b);
@@ -732,7 +749,8 @@ mod test {
                 BinaryExpression{
                     kind: BinaryExprType::Add,
                     left: Value::Int(make_value_node(1)),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1))))
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
+                    pos: None,
                 }),
              Val::Int(2)),
             (Expression::Binary(
@@ -740,6 +758,7 @@ mod test {
                     kind: BinaryExprType::Add,
                     left: Value::Float(make_value_node(1.0)),
                     right: Box::new(Expression::Simple(Value::Float(make_value_node(1.0)))),
+                    pos: None,
                 }),
              Val::Float(2.0)),
             (Expression::Binary(
@@ -747,6 +766,7 @@ mod test {
                     kind: BinaryExprType::Add,
                     left: Value::String(make_value_node("foo".to_string())),
                     right: Box::new(Expression::Simple(Value::String(make_value_node("bar".to_string())))),
+                    pos: None,
                 }),
              Val::String("foobar".to_string())),
         ], b);
@@ -762,6 +782,7 @@ mod test {
                     kind: BinaryExprType::Add,
                     left: Value::Float(make_value_node(2.0)),
                     right: Box::new(Expression::Simple(Value::Int(make_value_node(2)))),
+                    pos: None,
                 }),
              Val::Float(1.0)),
         ], b);
@@ -845,7 +866,7 @@ mod test {
     fn test_expr_copy_no_such_tuple() {
         let b = Builder::new();
         test_expr_to_val(vec![
-            (Expression::Copy(CopyDef{selector: vec!["tpl1".to_string()], fields: Vec::new()}),
+            (Expression::Copy(CopyDef{selector: vec!["tpl1".to_string()], fields: Vec::new(), pos: None}),
              Val::Tuple(Vec::new())),
         ], b);
     }
@@ -856,7 +877,7 @@ mod test {
         let mut b = Builder::new();
         b.out.entry("tpl1".to_string()).or_insert(Rc::new(Val::Int(1)));
         test_expr_to_val(vec![
-            (Expression::Copy(CopyDef{selector: vec!["tpl1".to_string()], fields: Vec::new()}),
+            (Expression::Copy(CopyDef{selector: vec!["tpl1".to_string()], fields: Vec::new(), pos: None}),
              Val::Tuple(Vec::new())),
         ], b);
     }
@@ -869,9 +890,12 @@ mod test {
             ("fld1".to_string(), Rc::new(Val::Int(1))),
         ])));
         test_expr_to_val(vec![
-            (Expression::Copy(CopyDef{selector: vec!["tpl1".to_string()],
-                              fields: vec![("fld1".to_string(),
-                                            Expression::Simple(Value::String(make_value_node("2".to_string()))))]}),
+            (Expression::Copy(
+                CopyDef{
+                    selector: vec!["tpl1".to_string()],
+                    fields: vec![("fld1".to_string(),
+                                  Expression::Simple(Value::String(make_value_node("2".to_string()))))],
+                    pos: None}),
              Val::Tuple(
                 vec![
                     ("fld1".to_string(), Rc::new(Val::String("2".to_string()))),
@@ -890,9 +914,13 @@ mod test {
             ("fld1".to_string(), Rc::new(Val::Int(1))),
         ])));
         test_expr_to_val(vec![
-            (Expression::Copy(CopyDef{selector: vec!["tpl1".to_string()],
-                              fields: vec![("fld2".to_string(),
-                                            Expression::Simple(Value::String(make_value_node("2".to_string()))))]}),
+            (Expression::Copy(
+                CopyDef{
+                    selector: vec!["tpl1".to_string()],
+                    fields: vec![("fld2".to_string(),
+                                  Expression::Simple(Value::String(make_value_node("2".to_string()))))],
+                    pos: None,
+                }),
              // Add a new field to the copy
              Val::Tuple(
                  // NOTE(jwall): The order of these is important in order to ensure
@@ -904,13 +932,17 @@ mod test {
                 ],
             )),
              // Overwrite a field in the copy
-            (Expression::Copy(CopyDef{selector: vec!["tpl1".to_string()],
-                              fields: vec![
-                                  ("fld1".to_string(),
-                                   Expression::Simple(Value::Int(make_value_node(3)))),
-                                  ("fld2".to_string(),
-                                   Expression::Simple(Value::String(make_value_node("2".to_string())))),
-                              ]}),
+            (Expression::Copy(
+                CopyDef{
+                    selector: vec!["tpl1".to_string()],
+                    fields: vec![
+                        ("fld1".to_string(),
+                         Expression::Simple(Value::Int(make_value_node(3)))),
+                        ("fld2".to_string(),
+                         Expression::Simple(Value::String(make_value_node("2".to_string())))),
+                    ],
+                    pos: None,
+                }),
              Val::Tuple(
                 vec![
                     ("fld1".to_string(), Rc::new(Val::Int(3))),
@@ -935,11 +967,13 @@ mod test {
             fields: vec![
                 ("foo".to_string(), Expression::Simple(Value::Symbol(make_value_node("arg1".to_string())))),
             ],
+            pos: None,
         })));
         test_expr_to_val(vec![
             (Expression::Call(CallDef{
                 macroref: vec!["tstmac".to_string()],
                 arglist: vec![Expression::Simple(Value::String(make_value_node("bar".to_string())))],
+                pos: None,
             }),
              Val::Tuple(vec![
                  ("foo".to_string(), Rc::new(Val::String("bar".to_string()))),
@@ -957,11 +991,13 @@ mod test {
             fields: vec![
                 ("foo".to_string(), Expression::Simple(Value::Symbol(make_value_node("arg1".to_string())))),
             ],
+            pos: None,
         })));
         test_expr_to_val(vec![
             (Expression::Call(CallDef{
                 macroref: vec!["tstmac".to_string()],
                 arglist: vec![Expression::Simple(Value::String(make_value_node("bar".to_string())))],
+                pos: None,
             }),
              Val::Tuple(vec![
                  ("foo".to_string(), Rc::new(Val::String("bar".to_string()))),
@@ -982,6 +1018,7 @@ mod test {
                     ("bar".to_string(), Expression::Simple(Value::Int(make_value_node(2)))),
                     ("quux".to_string(), Expression::Simple(Value::String(make_value_node("2".to_string())))),
                 ],
+                pos: None,
             }),
              Val::Int(2)),
             (Expression::Select(SelectDef{
@@ -991,6 +1028,7 @@ mod test {
                     ("bar".to_string(), Expression::Simple(Value::Int(make_value_node(2)))),
                     ("quux".to_string(), Expression::Simple(Value::String(make_value_node("2".to_string())))),
                 ],
+                pos: None,
             }),
              // If the field doesn't exist then we get the default.
              Val::Int(1)),
@@ -1010,6 +1048,7 @@ mod test {
                     ("bar".to_string(), Expression::Simple(Value::Int(make_value_node(2)))),
                     ("quux".to_string(), Expression::Simple(Value::String(make_value_node("2".to_string())))),
                 ],
+                pos: None,
              }),
              Val::Int(2)),
         ], b);
