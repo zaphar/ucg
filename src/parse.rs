@@ -277,7 +277,7 @@ named!(grouped_expression<Expression>,
 named!(selector_list<SelectorList>, separated_nonempty_list!(dot, field));
 
 fn tuple_to_copy(t: (SelectorList, FieldList)) -> ParseResult<Expression> {
-    Ok(Expression::Copy(t.0, t.1))
+    Ok(Expression::Copy(CopyDef{selector: t.0, fields: t.1}))
 }
 
 named!(copy_expression<Expression>,
@@ -824,14 +824,14 @@ mod test {
         assert!(copy_expression(&b"foo{"[..]).is_incomplete() );
         assert_eq!(copy_expression(&b"foo{}"[..]),
                IResult::Done(&b""[..],
-                             Expression::Copy(vec!["foo".to_string()],
-                                              Vec::new())
+                             Expression::Copy(CopyDef{selector: vec!["foo".to_string()],
+                                                      fields: Vec::new()})
                )
     );
         assert_eq!(copy_expression(&b"foo{bar=1}"[..]),
                IResult::Done(&b""[..],
-                             Expression::Copy(vec!["foo".to_string()],
-                                              vec![("bar".to_string(), Expression::Simple(Value::Int(make_value_node(1))))])
+                             Expression::Copy(CopyDef{selector: vec!["foo".to_string()],
+                                                      fields: vec![("bar".to_string(), Expression::Simple(Value::Int(make_value_node(1))))]})
                )
     );
     }

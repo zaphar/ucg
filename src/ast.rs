@@ -204,7 +204,8 @@ impl MacroDef {
                             stack.push(expr);
                         }
                     },
-                    &Expression::Copy(_, ref fields) => {
+                    &Expression::Copy(ref def) => {
+                        let fields = &def.fields;
                         for &(_, ref expr) in fields.iter() {
                             stack.push(expr);
                         }
@@ -236,6 +237,12 @@ impl MacroDef {
 #[derive(Debug,PartialEq,Clone)]
 pub struct BinaryExpression(pub Value, pub Box<Expression>);
 
+#[derive(Debug,PartialEq,Clone)]
+pub struct CopyDef {
+    pub selector: SelectorList,
+    pub fields: FieldList
+}
+
 /// Expression encodes an expression. Expressions compute a value from operands.
 #[derive(Debug,PartialEq,Clone)]
 pub enum Expression {
@@ -250,7 +257,7 @@ pub enum Expression {
     Div(BinaryExpression),
 
     // Complex Expressions
-    Copy(SelectorList, FieldList),
+    Copy(CopyDef),
     Grouped(Box<Expression>),
 
     Format(String, Vec<Expression>),

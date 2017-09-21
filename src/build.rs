@@ -496,8 +496,8 @@ impl Builder {
                     }
                 }
             },
-            Expression::Copy(sel, mut fields) => {
-                let v = try!(self.lookup_selector(sel));
+            Expression::Copy(mut def) => {
+                let v = try!(self.lookup_selector(def.selector));
                 if let Val::Tuple(ref src_fields) = *v {
                     let mut m = HashMap::<String, Rc<Val>>::new();
                     // loop through fields and build  up a hasmap
@@ -510,7 +510,7 @@ impl Builder {
                                     format!("Duplicate field: {} in tuple", *key))));
                         }
                     }
-                    for (key, val) in fields.drain(0..) {
+                    for (key, val) in def.fields.drain(0..) {
                         let expr_result = try!(self.eval_expr(val));
                         match m.entry(key.clone()) {
                             Entry::Vacant(v) => {
@@ -793,7 +793,7 @@ mod test {
     fn test_expr_copy_no_such_tuple() {
         let b = Builder::new();
         test_expr_to_val(vec![
-            (Expression::Copy(vec!["tpl1".to_string()], Vec::new()),
+            (Expression::Copy(CopyDef{selector: vec!["tpl1".to_string()], fields: Vec::new()}),
              Val::Tuple(Vec::new())),
         ], b);
     }
@@ -804,7 +804,7 @@ mod test {
         let mut b = Builder::new();
         b.out.entry("tpl1".to_string()).or_insert(Rc::new(Val::Int(1)));
         test_expr_to_val(vec![
-            (Expression::Copy(vec!["tpl1".to_string()], Vec::new()),
+            (Expression::Copy(CopyDef{selector: vec!["tpl1".to_string()], fields: Vec::new()}),
              Val::Tuple(Vec::new())),
         ], b);
     }
@@ -817,9 +817,9 @@ mod test {
             ("fld1".to_string(), Rc::new(Val::Int(1))),
         ])));
         test_expr_to_val(vec![
-            (Expression::Copy(vec!["tpl1".to_string()],
-                              vec![("fld1".to_string(),
-                                    Expression::Simple(Value::String(make_value_node("2".to_string()))))]),
+            (Expression::Copy(CopyDef{selector: vec!["tpl1".to_string()],
+                              fields: vec![("fld1".to_string(),
+                                            Expression::Simple(Value::String(make_value_node("2".to_string()))))]}),
              Val::Tuple(
                 vec![
                     ("fld1".to_string(), Rc::new(Val::String("2".to_string()))),
@@ -838,9 +838,9 @@ mod test {
             ("fld1".to_string(), Rc::new(Val::Int(1))),
         ])));
         test_expr_to_val(vec![
-            (Expression::Copy(vec!["tpl1".to_string()],
-                              vec![("fld2".to_string(),
-                                    Expression::Simple(Value::String(make_value_node("2".to_string()))))]),
+            (Expression::Copy(CopyDef{selector: vec!["tpl1".to_string()],
+                              fields: vec![("fld2".to_string(),
+                                            Expression::Simple(Value::String(make_value_node("2".to_string()))))]}),
              // Add a new field to the copy
              Val::Tuple(
                  // NOTE(jwall): The order of these is important in order to ensure
@@ -852,13 +852,13 @@ mod test {
                 ],
             )),
              // Overwrite a field in the copy
-            (Expression::Copy(vec!["tpl1".to_string()],
-                              vec![
+            (Expression::Copy(CopyDef{selector: vec!["tpl1".to_string()],
+                              fields: vec![
                                   ("fld1".to_string(),
                                    Expression::Simple(Value::Int(make_value_node(3)))),
                                   ("fld2".to_string(),
                                    Expression::Simple(Value::String(make_value_node("2".to_string())))),
-                              ]),
+                              ]}),
              Val::Tuple(
                 vec![
                     ("fld1".to_string(), Rc::new(Val::Int(3))),
