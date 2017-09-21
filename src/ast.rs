@@ -169,25 +169,10 @@ impl MacroDef {
             stack.push(expr);
             while stack.len() > 0 {
                 match stack.pop().unwrap() {
-                    &Expression::Add(ref bexpr) => {
-                        let mut syms_set = self.validate_value_symbols(&mut stack, &bexpr.0);
+                    &Expression::Binary(ref bexpr) => {
+                        let mut syms_set = self.validate_value_symbols(&mut stack, &bexpr.left);
                         bad_symbols.extend(syms_set.drain());
-                        stack.push(&bexpr.1);
-                    },
-                    &Expression::Sub(ref bexpr) => {
-                        let mut syms_set = self.validate_value_symbols(&mut stack, &bexpr.0);
-                        bad_symbols.extend(syms_set.drain());
-                        stack.push(&bexpr.1);
-                    },
-                    &Expression::Mul(ref bexpr) => {
-                        let mut syms_set = self.validate_value_symbols(&mut stack, &bexpr.0);
-                        bad_symbols.extend(syms_set.drain());
-                        stack.push(&bexpr.1);
-                    },
-                    &Expression::Div(ref bexpr) => {
-                        let mut syms_set = self.validate_value_symbols(&mut stack, &bexpr.0);
-                        bad_symbols.extend(syms_set.drain());
-                        stack.push(&bexpr.1);
+                        stack.push(&bexpr.right);
                     },
                     &Expression::Grouped(ref expr) => {
                         stack.push(expr);
@@ -234,9 +219,21 @@ impl MacroDef {
     }
 }
 
+#[derive(Debug,PartialEq,Clone)]
+pub enum BinaryExprType {
+    Add,
+    Sub,
+    Mul,
+    Div,
+}
+
 /// BinaryExpression represents an expression with a left and a right side.
 #[derive(Debug,PartialEq,Clone)]
-pub struct BinaryExpression(pub Value, pub Box<Expression>);
+pub struct BinaryExpression {
+    pub kind: BinaryExprType,
+    pub left: Value,
+    pub right: Box<Expression>
+}
 
 #[derive(Debug,PartialEq,Clone)]
 pub struct CopyDef {
@@ -256,12 +253,7 @@ pub enum Expression {
     // Base Expression
     Simple(Value),
 
-    // TODO(jwall): This should probably be all one type :-p
-    // Binary Expressions
-    Add(BinaryExpression),
-    Sub(BinaryExpression),
-    Mul(BinaryExpression),
-    Div(BinaryExpression),
+    Binary(BinaryExpression),
 
     // Complex Expressions
     Copy(CopyDef),
@@ -305,9 +297,10 @@ mod ast_test {
                 "foo".to_string()
             ],
             fields: vec![
-                ("f1".to_string(), Expression::Add(BinaryExpression(
-                    Value::Symbol(make_value_node("foo".to_string())),
-                    Box::new(Expression::Simple(Value::Int(make_value_node(1))))))),
+                ("f1".to_string(), Expression::Binary(BinaryExpression{
+                    kind: BinaryExprType::Add,
+                    left: Value::Symbol(make_value_node("foo".to_string())),
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1))))})),
             ],
         };
         assert!(def.validate_symbols().unwrap() == ());
@@ -320,9 +313,10 @@ mod ast_test {
                 "foo".to_string()
             ],
             fields: vec![
-                ("f1".to_string(), Expression::Add(BinaryExpression(
-                    Value::Symbol(make_value_node("bar".to_string())),
-                    Box::new(Expression::Simple(Value::Int(make_value_node(1))))))),
+                ("f1".to_string(), Expression::Binary(BinaryExpression{
+                    kind: BinaryExprType::Add,
+                    left: Value::Symbol(make_value_node("bar".to_string())),
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1))))})),
             ],
 
         };
@@ -338,9 +332,10 @@ mod ast_test {
                 "foo".to_string()
             ],
             fields: vec![
-                ("f1".to_string(), Expression::Add(BinaryExpression(
-                    Value::Selector(make_value_node(vec!["foo".to_string(), "quux".to_string()])),
-                    Box::new(Expression::Simple(Value::Int(make_value_node(1))))))),
+                ("f1".to_string(), Expression::Binary(BinaryExpression{
+                    kind: BinaryExprType::Add,
+                    left: Value::Selector(make_value_node(vec!["foo".to_string(), "quux".to_string()])),
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1))))})),
             ],
         };
         assert!(def.validate_symbols().unwrap() == ());
@@ -353,9 +348,10 @@ mod ast_test {
                 "foo".to_string()
             ],
             fields: vec![
-                ("f1".to_string(), Expression::Add(BinaryExpression(
-                    Value::Selector(make_value_node(vec!["bar".to_string(), "quux".to_string()])),
-                    Box::new(Expression::Simple(Value::Int(make_value_node(1))))))),
+                ("f1".to_string(), Expression::Binary(BinaryExpression{
+                    kind: BinaryExprType::Add,
+                    left: Value::Selector(make_value_node(vec!["bar".to_string(), "quux".to_string()])),
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1))))})),
             ],
         };
         let mut expected = HashSet::new();

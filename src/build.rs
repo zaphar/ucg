@@ -407,93 +407,91 @@ impl Builder {
             Expression::Simple(val) => {
                 self.value_to_val(val)
             },
-            Expression::Add(BinaryExpression(v, expr)) => {
+            Expression::Binary(BinaryExpression{kind, left: v, right: expr}) => {
                 let expr_result = try!(self.eval_expr(*expr));
                 let v = try!(self.value_to_val(v));
-                match *v {
-                    Val::Int(i) => {
-                        eval_binary_expr!(&Val::Int(ii), expr_result,
-                                          Val::Int(i + ii), "Integer")
-                    },
-                    Val::Float(f) => {
-                        eval_binary_expr!(&Val::Float(ff), expr_result,
-                                          Val::Float(f + ff), "Float")
-                    },
-                    Val::String(ref s) => {
-                        match expr_result.as_ref() {
-                            &Val::String(ref ss) => {
-                                return Ok(Rc::new(
-                                    Val::String([s.to_string(), ss.clone()].concat())))
+                match kind {
+                    BinaryExprType::Add => {
+                        match *v {
+                            Val::Int(i) => {
+                                eval_binary_expr!(&Val::Int(ii), expr_result,
+                                                  Val::Int(i + ii), "Integer")
                             },
-                            val => {
+                            Val::Float(f) => {
+                                eval_binary_expr!(&Val::Float(ff), expr_result,
+                                                  Val::Float(f + ff), "Float")
+                            },
+                            Val::String(ref s) => {
+                                match expr_result.as_ref() {
+                                    &Val::String(ref ss) => {
+                                        return Ok(Rc::new(
+                                            Val::String([s.to_string(), ss.clone()].concat())))
+                                    },
+                                    val => {
+                                        return Err(Box::new(
+                                            BuildError::TypeFail(
+                                                format!("Expected String but got {:?}", val))))
+                                    }
+                                }
+                            },
+                            ref expr => {
                                 return Err(Box::new(
-                                    BuildError::TypeFail(
-                                        format!("Expected String but got {:?}", val))))
+                                    BuildError::Unsupported(
+                                        format!("{} does not support the '+' operation", expr.type_name()))))
                             }
                         }
                     },
-                    ref expr => {
-                        return Err(Box::new(
-                            BuildError::Unsupported(
-                                format!("{} does not support the '+' operation", expr.type_name()))))
-                    }
-                }
-            },
-            Expression::Sub(BinaryExpression(v, expr)) => {
-                let expr_result = try!(self.eval_expr(*expr));
-                let v = try!(self.value_to_val(v));
-                match *v {
-                    Val::Int(i) => {
-                        eval_binary_expr!(&Val::Int(ii), expr_result,
-                                          Val::Int(i - ii), "Integer")
+                    BinaryExprType::Sub => {
+                        match *v {
+                            Val::Int(i) => {
+                                eval_binary_expr!(&Val::Int(ii), expr_result,
+                                                  Val::Int(i - ii), "Integer")
+                            },
+                            Val::Float(f) => {
+                                eval_binary_expr!(&Val::Float(ff), expr_result,
+                                                  Val::Float(f - ff), "Float")
+                            },
+                            ref expr => {
+                                return Err(Box::new(
+                                    BuildError::Unsupported(
+                                        format!("{} does not support the '-' operation", expr.type_name()))))
+                            }
+                        }
                     },
-                    Val::Float(f) => {
-                        eval_binary_expr!(&Val::Float(ff), expr_result,
-                                          Val::Float(f - ff), "Float")
+                    BinaryExprType::Mul => {
+                        match *v {
+                            Val::Int(i) => {
+                                eval_binary_expr!(&Val::Int(ii), expr_result,
+                                                  Val::Int(i * ii), "Integer")
+                            },
+                            Val::Float(f) => {
+                                eval_binary_expr!(&Val::Float(ff), expr_result,
+                                                  Val::Float(f * ff), "Float")
+                            },
+                            ref expr => {
+                                return Err(Box::new(
+                                    BuildError::Unsupported(
+                                        format!("{} does not support the '*' operation", expr.type_name()))))
+                            }
+                        }
                     },
-                    ref expr => {
-                        return Err(Box::new(
-                            BuildError::Unsupported(
-                                format!("{} does not support the '-' operation", expr.type_name()))))
-                    }
-                }
-            },
-            Expression::Mul(BinaryExpression(v, expr)) => {
-                let expr_result = try!(self.eval_expr(*expr));
-                let v = try!(self.value_to_val(v));
-                match *v {
-                    Val::Int(i) => {
-                        eval_binary_expr!(&Val::Int(ii), expr_result,
-                                          Val::Int(i * ii), "Integer")
+                    BinaryExprType::Div => {
+                        match *v {
+                            Val::Int(i) => {
+                                eval_binary_expr!(&Val::Int(ii), expr_result,
+                                                  Val::Int(i / ii), "Integer")
+                            },
+                            Val::Float(f) => {
+                                eval_binary_expr!(&Val::Float(ff), expr_result,
+                                                  Val::Float(f / ff), "Float")
+                            },
+                            ref expr => {
+                                return Err(Box::new(
+                                    BuildError::Unsupported(
+                                        format!("{} does not support the '*' operation", expr.type_name()))))
+                            }
+                        }
                     },
-                    Val::Float(f) => {
-                        eval_binary_expr!(&Val::Float(ff), expr_result,
-                                          Val::Float(f * ff), "Float")
-                    },
-                    ref expr => {
-                        return Err(Box::new(
-                            BuildError::Unsupported(
-                                format!("{} does not support the '*' operation", expr.type_name()))))
-                    }
-                }
-            },
-            Expression::Div(BinaryExpression(v, expr)) => {
-                let expr_result = try!(self.eval_expr(*expr));
-                let v = try!(self.value_to_val(v));
-                match *v {
-                    Val::Int(i) => {
-                        eval_binary_expr!(&Val::Int(ii), expr_result,
-                                          Val::Int(i / ii), "Integer")
-                    },
-                    Val::Float(f) => {
-                        eval_binary_expr!(&Val::Float(ff), expr_result,
-                                          Val::Float(f / ff), "Float")
-                    },
-                    ref expr => {
-                        return Err(Box::new(
-                            BuildError::Unsupported(
-                                format!("{} does not support the '*' operation", expr.type_name()))))
-                    }
                 }
             },
             Expression::Copy(mut def) => {
@@ -622,11 +620,19 @@ mod test {
     fn test_eval_div_expr() {
         let b = Builder::new();
         test_expr_to_val(vec![
-            (Expression::Div(BinaryExpression(Value::Int(make_value_node(2)),
-                                              Box::new(Expression::Simple(Value::Int(make_value_node(2)))))),
+            (Expression::Binary(
+                BinaryExpression{
+                    kind: BinaryExprType::Div,
+                    left: Value::Int(make_value_node(2)),
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(2)))),
+                }),
              Val::Int(1)),
-            (Expression::Div(BinaryExpression(Value::Float(make_value_node(2.0)),
-                                              Box::new(Expression::Simple(Value::Float(make_value_node(2.0)))))),
+            (Expression::Binary(
+                BinaryExpression{
+                    kind: BinaryExprType::Div,
+                    left: Value::Float(make_value_node(2.0)),
+                    right: Box::new(Expression::Simple(Value::Float(make_value_node(2.0)))),
+                }),
              Val::Float(1.0)),
         ], b);
     }
@@ -636,8 +642,12 @@ mod test {
     fn test_eval_div_expr_fail() {
         let b = Builder::new();
         test_expr_to_val(vec![
-            (Expression::Div(BinaryExpression(Value::Float(make_value_node(2.0)),
-                                              Box::new(Expression::Simple(Value::Int(make_value_node(2)))))),
+            (Expression::Binary(
+                BinaryExpression{
+                    kind: BinaryExprType::Div,
+                    left: Value::Float(make_value_node(2.0)),
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(2))))
+                }),
              Val::Float(1.0)),
         ], b);
     }
@@ -646,11 +656,19 @@ mod test {
     fn test_eval_mul_expr() {
         let b = Builder::new();
         test_expr_to_val(vec![
-            (Expression::Mul(BinaryExpression(Value::Int(make_value_node(2)),
-                                              Box::new(Expression::Simple(Value::Int(make_value_node(2)))))),
+            (Expression::Binary(
+                BinaryExpression{
+                    kind: BinaryExprType::Mul,
+                    left: Value::Int(make_value_node(2)),
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(2))))
+                }),
              Val::Int(4)),
-            (Expression::Mul(BinaryExpression(Value::Float(make_value_node(2.0)),
-                                              Box::new(Expression::Simple(Value::Float(make_value_node(2.0)))))),
+            (Expression::Binary(
+                BinaryExpression{
+                    kind: BinaryExprType::Mul,
+                    left: Value::Float(make_value_node(2.0)),
+                    right: Box::new(Expression::Simple(Value::Float(make_value_node(2.0))))
+                }),
              Val::Float(4.0)),
         ], b);
     }
@@ -660,8 +678,12 @@ mod test {
     fn test_eval_mul_expr_fail() {
         let b = Builder::new();
         test_expr_to_val(vec![
-            (Expression::Mul(BinaryExpression(Value::Float(make_value_node(2.0)),
-                                              Box::new(Expression::Simple(Value::Int(make_value_node(20)))))),
+            (Expression::Binary(
+                BinaryExpression{
+                    kind: BinaryExprType::Mul,
+                    left: Value::Float(make_value_node(2.0)),
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(20))))
+                }),
              Val::Float(1.0)),
         ], b);
     }
@@ -670,11 +692,19 @@ mod test {
     fn test_eval_subtract_expr() {
         let b = Builder::new();
         test_expr_to_val(vec![
-            (Expression::Sub(BinaryExpression(Value::Int(make_value_node(2)),
-                                              Box::new(Expression::Simple(Value::Int(make_value_node(1)))))),
+            (Expression::Binary(
+                BinaryExpression{
+                    kind: BinaryExprType::Sub,
+                    left: Value::Int(make_value_node(2)),
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
+                }),
              Val::Int(1)),
-            (Expression::Sub(BinaryExpression(Value::Float(make_value_node(2.0)),
-                                              Box::new(Expression::Simple(Value::Float(make_value_node(1.0)))))),
+            (Expression::Binary(
+                BinaryExpression{
+                    kind: BinaryExprType::Sub,
+                    left: Value::Float(make_value_node(2.0)),
+                    right: Box::new(Expression::Simple(Value::Float(make_value_node(1.0))))
+                }),
              Val::Float(1.0)),
         ], b);
     }
@@ -684,8 +714,12 @@ mod test {
     fn test_eval_subtract_expr_fail() {
         let b = Builder::new();
         test_expr_to_val(vec![
-            (Expression::Sub(BinaryExpression(Value::Float(make_value_node(2.0)),
-                                              Box::new(Expression::Simple(Value::Int(make_value_node(2)))))),
+            (Expression::Binary(
+                BinaryExpression{
+                    kind: BinaryExprType::Sub,
+                    left: Value::Float(make_value_node(2.0)),
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(2))))
+                }),
              Val::Float(1.0)),
         ], b);
     }
@@ -694,14 +728,26 @@ mod test {
     fn test_eval_add_expr() {
         let b = Builder::new();
         test_expr_to_val(vec![
-            (Expression::Add(BinaryExpression(Value::Int(make_value_node(1)),
-                                              Box::new(Expression::Simple(Value::Int(make_value_node(1)))))),
+            (Expression::Binary(
+                BinaryExpression{
+                    kind: BinaryExprType::Add,
+                    left: Value::Int(make_value_node(1)),
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1))))
+                }),
              Val::Int(2)),
-            (Expression::Add(BinaryExpression(Value::Float(make_value_node(1.0)),
-                                              Box::new(Expression::Simple(Value::Float(make_value_node(1.0)))))),
+            (Expression::Binary(
+                BinaryExpression{
+                    kind: BinaryExprType::Add,
+                    left: Value::Float(make_value_node(1.0)),
+                    right: Box::new(Expression::Simple(Value::Float(make_value_node(1.0)))),
+                }),
              Val::Float(2.0)),
-            (Expression::Add(BinaryExpression(Value::String(make_value_node("foo".to_string())),
-                                              Box::new(Expression::Simple(Value::String(make_value_node("bar".to_string())))))),
+            (Expression::Binary(
+                BinaryExpression{
+                    kind: BinaryExprType::Add,
+                    left: Value::String(make_value_node("foo".to_string())),
+                    right: Box::new(Expression::Simple(Value::String(make_value_node("bar".to_string())))),
+                }),
              Val::String("foobar".to_string())),
         ], b);
     }
@@ -711,8 +757,12 @@ mod test {
     fn test_eval_add_expr_fail() {
         let b = Builder::new();
         test_expr_to_val(vec![
-            (Expression::Add(BinaryExpression(Value::Float(make_value_node(2.0)),
-                                              Box::new(Expression::Simple(Value::Int(make_value_node(2)))))),
+            (Expression::Binary(
+                BinaryExpression{
+                    kind: BinaryExprType::Add,
+                    left: Value::Float(make_value_node(2.0)),
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(2)))),
+                }),
              Val::Float(1.0)),
         ], b);
     }
