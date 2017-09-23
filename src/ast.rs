@@ -13,11 +13,21 @@
 //  limitations under the License.
 use std::collections::HashSet;
 use std::borrow::Borrow;
+use std::convert::Into;
 
 #[derive(Debug,PartialEq,Clone)]
 pub struct Position {
     pub line: usize,
     pub column: usize,
+}
+
+macro_rules! value_node {
+    ($v:expr) => {
+        LocatedNode::new($v)
+    };
+    ($v:expr, $p:expr) => {
+        LocatedNode::new_with_pos($v, $p)
+    };
 }
 
 pub type FieldList = Vec<(String, Expression)>; // str is expected to be a symbol
@@ -37,9 +47,9 @@ impl<T> LocatedNode<T> {
         }
     }
 
-    pub fn new_with_pos(v: T, pos: Position) -> Self {
+    pub fn new_with_pos<P: Into<Position>>(v: T, pos: P) -> Self {
         Self {
-            pos: Some(pos),
+            pos: Some(pos.into()),
             val: v,
         }
     }

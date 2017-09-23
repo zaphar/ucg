@@ -13,10 +13,13 @@
 //  limitations under the License.
 #[macro_use]
 extern crate nom;
+#[macro_use]
+extern crate nom_locate;
 
 #[macro_use]
 extern crate quick_error;
 
+#[macro_use]
 pub mod ast;
 pub mod parse;
 pub mod build;
