@@ -11,7 +11,15 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
+use std::str::FromStr;
+use std::str::from_utf8;
+use std::error::Error;
+
 use nom_locate::LocatedSpan;
+use nom::{alpha, is_alphanumeric, digit};
+
+use ast::*;
+
 
 quick_error! {
     #[derive(Debug,PartialEq)]
@@ -25,26 +33,9 @@ quick_error! {
 
 type Span<'a> = LocatedSpan<&'a str>;
 
-impl<'a> From<Span<'a>> for Position {
-    fn from(s: Span) -> Position {
-        Position {
-            line: s.line as usize,
-            column: s.get_column() as usize,
-        }
-    }
-}
 
 // TODO(jwall): Convert to tokenizer steps followed by parser steps.
 // TODO(jwall): Error Reporting with Line and Column information.
-
-use std::str::FromStr;
-use std::str::from_utf8;
-use std::error::Error;
-use std::convert::From;
-
-use nom::{alpha, is_alphanumeric, digit};
-
-use ast::*;
 
 type ParseResult<O> = Result<O, Box<Error>>;
 

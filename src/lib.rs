@@ -21,6 +21,7 @@ extern crate quick_error;
 
 #[macro_use]
 pub mod ast;
+pub mod tokenizer;
 pub mod parse;
 pub mod build;
 mod format;
