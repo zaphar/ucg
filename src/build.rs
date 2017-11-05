@@ -14,43 +14,46 @@
 use std::fs::File;
 use std::io::Read;
 use std::error::Error;
-use std::collections::{HashSet,HashMap,VecDeque};
+use std::collections::{HashSet, HashMap, VecDeque};
 use std::collections::hash_map::Entry;
 use std::fmt;
-use std::fmt::{Display,Formatter};
+use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use std::rc::Rc;
+use std::convert::From;
 
 use nom;
 
+use tokenizer::Span;
 use ast::*;
 use format;
 use parse::parse;
 
 impl MacroDef {
-    pub fn eval(&self, mut args: Vec<Rc<Val>>) -> Result<Vec<(String, Rc<Val>)>, Box<Error>> {
+    pub fn eval(&self,
+                mut args: Vec<Rc<Val>>)
+                -> Result<Vec<(Positioned<String>, Rc<Val>)>, Box<Error>> {
         // Error conditions. If the args don't match the length and types of the argdefs then this is
         // macro call error.
         if args.len() > self.argdefs.len() {
-            return Err(Box::new(
-                BuildError::BadArgLen(
-                    "Macro called with too many args".to_string())));
+            return Err(Box::new(BuildError::BadArgLen("Macro called with too many args"
+                .to_string())));
         }
         // If the args don't match the types required by the expressions then that is a TypeFail.
         // If the expressions reference Symbols not defined in the MacroDef that is also an error.
         // TODO(jwall): We should probably enforce that the Expression Symbols must be in argdefs rules
         // at Macro definition time not evaluation time.
-        let mut scope = HashMap::new();
+        let mut scope = HashMap::<String, Rc<Val>>::new();
         for (i, arg) in args.drain(0..).enumerate() {
-            scope.entry(self.argdefs[i].clone()).or_insert(arg.clone());
+            scope.entry(self.argdefs[i].val.clone()).or_insert(arg.clone());
         }
         let b = Builder::new_with_scope(scope);
-        let mut result: Vec<(String, Rc<Val>)> = Vec::new();
+        let mut result: Vec<(Positioned<String>, Rc<Val>)> = Vec::new();
         for &(ref key, ref expr) in self.fields.iter() {
             // We clone the expressions here because this macro may be consumed
             // multiple times in the future.
-            let val = try!(b.eval_expr(expr.clone()));
-            result.push((key.clone(), val.clone()));
+            let val = try!(b.eval_expr(expr));
+            result.push((key.into(), val.clone()));
         }
         Ok(result)
     }
@@ -103,7 +106,7 @@ pub enum Val {
     Int(i64),
     Float(f64),
     String(String),
-    Tuple(Vec<(String, Rc<Val>)>),
+    Tuple(Vec<(Positioned<String>, Rc<Val>)>),
     Macro(MacroDef),
 }
 
@@ -120,15 +123,45 @@ impl Val {
 
     pub fn type_equal(&self, target: &Self) -> bool {
         match self {
-            &Val::Int(_) => if let &Val::Int(_) = target { true } else { false },
-            &Val::Float(_) => if let &Val::Float(_) = target { true } else { false },
-            &Val::String(_) => if let &Val::String(_) = target { true } else { false },
-            &Val::Tuple(_) => if let &Val::Tuple(_) = target { true } else { false },
-            &Val::Macro(_) => if let &Val::Macro(_) = target { true } else { false },
+            &Val::Int(_) => {
+                if let &Val::Int(_) = target {
+                    true
+                } else {
+                    false
+                }
+            }
+            &Val::Float(_) => {
+                if let &Val::Float(_) = target {
+                    true
+                } else {
+                    false
+                }
+            }
+            &Val::String(_) => {
+                if let &Val::String(_) = target {
+                    true
+                } else {
+                    false
+                }
+            }
+            &Val::Tuple(_) => {
+                if let &Val::Tuple(_) = target {
+                    true
+                } else {
+                    false
+                }
+            }
+            &Val::Macro(_) => {
+                if let &Val::Macro(_) = target {
+                    true
+                } else {
+                    false
+                }
+            }
         }
     }
 
-    pub fn get_fields(&self) -> Option<&Vec<(String, Rc<Val>)>> {
+    pub fn get_fields(&self) -> Option<&Vec<(Positioned<String>, Rc<Val>)>> {
         if let &Val::Tuple(ref fs) = self {
             Some(fs)
         } else {
@@ -218,28 +251,28 @@ macro_rules! eval_binary_expr {
 
 impl Builder {
     /// new_builder constructs Builder with initialized fields ready to parse.
-    fn value_to_val(&self, v: Value) -> Result<Rc<Val>, Box<Error>> {
+    fn value_to_val(&self, v: &Value) -> Result<Rc<Val>, Box<Error>> {
         match v {
-            Value::Int(i) => Ok(Rc::new(Val::Int(i.val))),
-            Value::Float(f) => Ok(Rc::new(Val::Float(f.val))),
-            Value::String(s) => Ok(Rc::new(Val::String(s.val.to_string()))),
-            Value::Symbol(s) => {
-                self.lookup_sym(&s.val).ok_or(Box::new(
-                    BuildError::NoSuchSymbol(format!("Unable to find {}", s.val))))
-            },
-            Value::Tuple(mut tuple_node) => {
-                let fields = &mut tuple_node.val;
-                let mut new_fields = Vec::new();
-                for (name, expr) in fields.drain(0..) {
+            &Value::Int(ref i) => Ok(Rc::new(Val::Int(i.val))),
+            &Value::Float(ref f) => Ok(Rc::new(Val::Float(f.val))),
+            &Value::String(ref s) => Ok(Rc::new(Val::String(s.val.to_string()))),
+            &Value::Symbol(ref s) => {
+                self.lookup_sym(&(s.into()))
+                    .ok_or(Box::new(BuildError::NoSuchSymbol(format!("Unable to find {}", s.val))))
+            }
+            &Value::Tuple(ref tuple_node) => {
+                let fields = tuple_node.val();
+                let mut new_fields = Vec::<(Positioned<String>, Rc<Val>)>::new();
+                for &(ref name, ref expr) in fields.iter() {
                     let val = try!(self.eval_expr(expr));
-                    new_fields.push((name, val));
+                    new_fields.push((name.into(), val));
                 }
                 new_fields.sort_by(|a, b| a.0.cmp(&b.0));
                 Ok(Rc::new(Val::Tuple(new_fields)))
-            },
-            Value::Selector(selector_list_node) => {
-                self.lookup_selector(selector_list_node.val)
-            },
+            }
+            &Value::Selector(ref selector_list_node) => {
+                self.lookup_selector(&selector_list_node.val)
+            }
         }
     }
 
@@ -261,24 +294,27 @@ impl Builder {
         }
     }
 
-    pub fn build(&mut self, mut ast: Vec<Statement>) -> BuildResult {
-        for stmt in ast.drain(0..) {
+    pub fn build(&mut self, ast: &Vec<Statement>) -> BuildResult {
+        for stmt in ast.iter() {
             try!(self.build_stmt(stmt));
         }
         Ok(())
     }
 
     pub fn build_file_string(&mut self, name: &str, input: String) -> BuildResult {
-        match parse((&input[..]).as_bytes()) {
-            nom::IResult::Done(_, mut stmts) => {
-                for stmt in stmts.drain(0..) {
+        match parse(Span::new(&input)) {
+            nom::IResult::Done(_, stmts) => {
+                for stmt in stmts.iter() {
                     try!(self.build_stmt(stmt));
                 }
                 Ok(())
-            },
+            }
             nom::IResult::Error(err) => Err(Box::new(err)),
-            nom::IResult::Incomplete(_) => Err(Box::new(
-                BuildError::IncompleteParse(format!("Could not parse input from file: {}", name)))),
+            nom::IResult::Incomplete(_) => {
+                Err(Box::new(BuildError::IncompleteParse(format!("Could not parse input from \
+                                                                  file: {}",
+                                                                 name))))
+            }
         }
     }
 
@@ -290,64 +326,70 @@ impl Builder {
         self.build_file_string(name, s)
     }
 
-    fn build_stmt(&mut self, stmt: Statement) -> BuildResult {
+    fn build_stmt(&mut self, stmt: &Statement) -> BuildResult {
         match stmt {
-            Statement::Let { name: sym, value: expr } => {
+            &Statement::Let { name: ref sym, value: ref expr } => {
                 let val = try!(self.eval_expr(expr));
                 self.last = Some(val.clone());
-                match self.out.entry(sym) {
+                match self.out.entry(sym.fragment.clone()) {
                     Entry::Occupied(e) => {
-                        return Err(Box::new(
-                            BuildError::DuplicateBinding(
-                                format!("Let binding for {} already exists", e.key()))));
-                    },
+                        return Err(Box::new(BuildError::DuplicateBinding(format!("Let binding \
+                                                                                  for {:?} already \
+                                                                                  exists",
+                                                                                 e.key()))));
+                    }
                     Entry::Vacant(e) => {
                         e.insert(val);
-                    },
+                    }
                 }
             }
-            Statement::Import { path: val, name: sym } => {
-                if !self.files.contains(&val) { // Only parse the file once on import.
-                    if self.assets.get(&sym).is_none() {
+            &Statement::Import { path: ref val, name: ref sym } => {
+                if !self.files.contains(val) {
+                    // Only parse the file once on import.
+                    if self.assets.get(&sym.fragment).is_none() {
                         let mut b = Self::new();
                         try!(b.build_file(&val));
-                        let fields: Vec<(String, Rc<Val>)> = b.out.drain().collect();
+                        let fields: Vec<(Positioned<String>, Rc<Val>)> =
+                            b.out.drain().map(|t| (Positioned::new(t.0), t.1))
+                              .collect();
                         let result = Rc::new(Val::Tuple(fields));
-                        self.assets.entry(sym).or_insert(result.clone());
-                        self.files.insert(val);
+                        self.assets.entry(sym.fragment.clone()).or_insert(result.clone());
+                        self.files.insert(val.clone());
                         self.last = Some(result);
                     }
                 }
             }
-            Statement::Expression(expr) => {
+            &Statement::Expression(ref expr) => {
                 self.last = Some(try!(self.eval_expr(expr)));
             }
         };
         Ok(())
     }
 
-    fn lookup_sym(&self, sym: &str) -> Option<Rc<Val>> {
-        if self.out.contains_key(sym) {
-            return Some(self.out[sym].clone());
-        } if self.assets.contains_key(sym) {
-            return Some(self.assets[sym].clone());
+    fn lookup_sym(&self, sym: &Positioned<String>) -> Option<Rc<Val>> {
+        if self.out.contains_key(&sym.val) {
+            return Some(self.out[&sym.val].clone());
+        }
+        if self.assets.contains_key(&sym.val) {
+            return Some(self.assets[&sym.val].clone());
         }
         None
     }
 
-    fn find_in_fieldlist(target: &str, fs: &Vec<(String, Rc<Val>)>) -> Option<Rc<Val>> {
+    fn find_in_fieldlist(target: &str, fs: &Vec<(Positioned<String>, Rc<Val>)>) -> Option<Rc<Val>> {
         for (key, val) in fs.iter().cloned() {
-            if target == key {
-                return Some(val.clone())
+            if target == &key.val {
+                return Some(val.clone());
             }
         }
-        return None
+        return None;
     }
 
-    fn lookup_selector(&self, sl: SelectorList) -> Result<Rc<Val>, Box<Error>> {
+    fn lookup_selector(&self, sl: &SelectorList) -> Result<Rc<Val>, Box<Error>> {
         let len = sl.len();
         if len > 0 {
-            if let Some(v) = self.lookup_sym(&sl[0]) {
+            let pos_sl = (&sl[0]).into();
+            if let Some(v) = self.lookup_sym(&pos_sl) {
                 let mut it = sl.iter().skip(1).peekable();
                 if it.peek().is_none() {
                     return Ok(v.clone());
@@ -364,159 +406,187 @@ impl Builder {
                         // None above.
                         let k = it.next().unwrap();
                         if !vref.is_tuple() {
-                            return Err(Box::new(BuildError::NoSuchSymbol(
-                                format!("Attempted to dereference non-tuple {:?} at field {}.", sl, k))));
+                            // TODO(jeremy) BuildErrors should take a token so they can
+                            // render the location of the error.
+                            return Err(Box::new(BuildError::NoSuchSymbol(format!("Attempted \
+                                                                                  to dereference \
+                                                                                  non-tuple \
+                                                                                  {:?} at field \
+                                                                                  {}.",
+                                                                                 sl,
+                                                                                 k.fragment))));
                         }
                         // This unwrap is safe because we already checked for
                         // Tuple above.
                         let fs = vref.get_fields().unwrap();
-                        if let Some(vv) = Self::find_in_fieldlist(k, fs) {
+                        if let Some(vv) = Self::find_in_fieldlist(&k.fragment, fs) {
                             if vv.is_tuple() {
                                 stack.push_back(vv.clone());
                                 continue;
                             }
                             if it.peek().is_some() {
-                                return Err(Box::new(BuildError::NoSuchSymbol(
-                                    format!("Unable to match selector path {:?}", sl))));
+                                return Err(Box::new(BuildError::NoSuchSymbol(format!("Unable to \
+                                                                                      match selector \
+                                                                                      path {:?}",
+                                                                                     sl))));
                             } else {
                                 return Ok(vv.clone());
                             }
                         } else {
                             // TODO(jwall): A better error for this would be nice.
-                            return Err(Box::new(BuildError::NoSuchSymbol(
-                                format!("Unable to match selector path {:?}", sl))));
+                            return Err(Box::new(BuildError::NoSuchSymbol(format!("Unable to \
+                                                                                  match selector \
+                                                                                  path {:?}",
+                                                                                 sl))));
                         }
-                    };
+                    }
                 }
-                return Err(Box::new(BuildError::TypeFail(
-                    format!("{} is not a Tuple", sl[0]))));
+                return Err(Box::new(BuildError::TypeFail(format!("{} is not a Tuple",
+                                                                 sl[0].fragment))));
             }
-            return Err(Box::new(BuildError::NoSuchSymbol(
-                format!("Unable to find Symbol {}", sl[0]))));
+            return Err(Box::new(BuildError::NoSuchSymbol(format!("Unable to find Symbol {}",
+                                                                 sl[0].fragment))));
         }
-        return Err(Box::new(BuildError::NoSuchSymbol(
-            "Attempted to lookup an empty selector".to_string())));
+        return Err(Box::new(BuildError::NoSuchSymbol("Attempted to lookup an empty selector"
+            .to_string())));
     }
 
     // eval_expr evals a single Expression in the context of a running Builder.
     // It does not mutate the builders collected state at all.
-    pub fn eval_expr(&self, expr: Expression) -> Result<Rc<Val>, Box<Error>> {
+    pub fn eval_expr(&self, expr: &Expression) -> Result<Rc<Val>, Box<Error>> {
         // TODO(jwall): We probably don't want to consume these expressions.
         //   Take a reference instead?
         match expr {
-            Expression::Simple(val) => {
-                self.value_to_val(val)
-            },
-            Expression::Binary(def) => {
-                let kind = def.kind;
-                let v = def.left;
-                let expr = def.right;
-                let expr_result = try!(self.eval_expr(*expr));
+            &Expression::Simple(ref val) => self.value_to_val(val),
+            &Expression::Binary(ref def) => {
+                let kind = &def.kind;
+                let v = &def.left;
+                let expr = &def.right;
+                let expr_result = try!(self.eval_expr(expr));
                 let v = try!(self.value_to_val(v));
                 match kind {
-                    BinaryExprType::Add => {
+                    &BinaryExprType::Add => {
                         match *v {
                             Val::Int(i) => {
-                                eval_binary_expr!(&Val::Int(ii), expr_result,
-                                                  Val::Int(i + ii), "Integer")
-                            },
+                                eval_binary_expr!(&Val::Int(ii),
+                                                  expr_result,
+                                                  Val::Int(i + ii),
+                                                  "Integer")
+                            }
                             Val::Float(f) => {
-                                eval_binary_expr!(&Val::Float(ff), expr_result,
-                                                  Val::Float(f + ff), "Float")
-                            },
+                                eval_binary_expr!(&Val::Float(ff),
+                                                  expr_result,
+                                                  Val::Float(f + ff),
+                                                  "Float")
+                            }
                             Val::String(ref s) => {
                                 match expr_result.as_ref() {
                                     &Val::String(ref ss) => {
-                                        return Ok(Rc::new(
-                                            Val::String([s.to_string(), ss.clone()].concat())))
-                                    },
+                                        return Ok(Rc::new(Val::String([s.to_string(), ss.clone()]
+                                            .concat())))
+                                    }
                                     val => {
-                                        return Err(Box::new(
-                                            BuildError::TypeFail(
-                                                format!("Expected String but got {:?}", val))))
+                                        return Err(Box::new(BuildError::TypeFail(format!("Expected \
+                                                                                          String \
+                                                                                          but got \
+                                                                                          {:?}",
+                                                                                         val))))
                                     }
                                 }
-                            },
+                            }
                             ref expr => {
                                 return Err(Box::new(
                                     BuildError::Unsupported(
                                         format!("{} does not support the '+' operation", expr.type_name()))))
                             }
                         }
-                    },
-                    BinaryExprType::Sub => {
+                    }
+                    &BinaryExprType::Sub => {
                         match *v {
                             Val::Int(i) => {
-                                eval_binary_expr!(&Val::Int(ii), expr_result,
-                                                  Val::Int(i - ii), "Integer")
-                            },
+                                eval_binary_expr!(&Val::Int(ii),
+                                                  expr_result,
+                                                  Val::Int(i - ii),
+                                                  "Integer")
+                            }
                             Val::Float(f) => {
-                                eval_binary_expr!(&Val::Float(ff), expr_result,
-                                                  Val::Float(f - ff), "Float")
-                            },
+                                eval_binary_expr!(&Val::Float(ff),
+                                                  expr_result,
+                                                  Val::Float(f - ff),
+                                                  "Float")
+                            }
                             ref expr => {
                                 return Err(Box::new(
                                     BuildError::Unsupported(
                                         format!("{} does not support the '-' operation", expr.type_name()))))
                             }
                         }
-                    },
-                    BinaryExprType::Mul => {
+                    }
+                    &BinaryExprType::Mul => {
                         match *v {
                             Val::Int(i) => {
-                                eval_binary_expr!(&Val::Int(ii), expr_result,
-                                                  Val::Int(i * ii), "Integer")
-                            },
+                                eval_binary_expr!(&Val::Int(ii),
+                                                  expr_result,
+                                                  Val::Int(i * ii),
+                                                  "Integer")
+                            }
                             Val::Float(f) => {
-                                eval_binary_expr!(&Val::Float(ff), expr_result,
-                                                  Val::Float(f * ff), "Float")
-                            },
+                                eval_binary_expr!(&Val::Float(ff),
+                                                  expr_result,
+                                                  Val::Float(f * ff),
+                                                  "Float")
+                            }
                             ref expr => {
                                 return Err(Box::new(
                                     BuildError::Unsupported(
                                         format!("{} does not support the '*' operation", expr.type_name()))))
                             }
-                        }
-                    },
-                    BinaryExprType::Div => {
-                        match *v {
-                            Val::Int(i) => {
-                                eval_binary_expr!(&Val::Int(ii), expr_result,
-                                                  Val::Int(i / ii), "Integer")
-                            },
-                            Val::Float(f) => {
-                                eval_binary_expr!(&Val::Float(ff), expr_result,
-                                                  Val::Float(f / ff), "Float")
-                            },
-                            ref expr => {
-                                return Err(Box::new(
-                                    BuildError::Unsupported(
-                                        format!("{} does not support the '*' operation", expr.type_name()))))
-                            }
-                        }
-                    },
-                }
-            },
-            Expression::Copy(mut def) => {
-                let v = try!(self.lookup_selector(def.selector));
-                if let Val::Tuple(ref src_fields) = *v {
-                    let mut m = HashMap::<String, Rc<Val>>::new();
-                    // loop through fields and build  up a hasmap
-                    for &(ref key, ref val) in src_fields.iter() {
-                        if let Entry::Vacant(v) = m.entry(key.to_string()) {
-                            v.insert(val.clone());
-                        } else {
-                            return Err(Box::new(
-                                BuildError::TypeFail(
-                                    format!("Duplicate field: {} in tuple", *key))));
                         }
                     }
-                    for (key, val) in def.fields.drain(0..) {
+                    &BinaryExprType::Div => {
+                        match *v {
+                            Val::Int(i) => {
+                                eval_binary_expr!(&Val::Int(ii),
+                                                  expr_result,
+                                                  Val::Int(i / ii),
+                                                  "Integer")
+                            }
+                            Val::Float(f) => {
+                                eval_binary_expr!(&Val::Float(ff),
+                                                  expr_result,
+                                                  Val::Float(f / ff),
+                                                  "Float")
+                            }
+                            ref expr => {
+                                return Err(Box::new(
+                                    BuildError::Unsupported(
+                                        format!("{} does not support the '*' operation", expr.type_name()))))
+                            }
+                        }
+                    }
+                }
+            }
+            &Expression::Copy(ref def) => {
+                let v = try!(self.lookup_selector(&def.selector));
+                if let Val::Tuple(ref src_fields) = *v {
+                    let mut m = HashMap::<&String, Rc<Val>>::new();
+                    // loop through fields and build  up a hasmap
+                    for &(ref key, ref val) in src_fields.iter() {
+                        if let Entry::Vacant(v) = m.entry(&key.val) {
+                            v.insert(val.clone());
+                        } else {
+                            return Err(Box::new(BuildError::TypeFail(format!("Duplicate \
+                                                                              field: {} in \
+                                                                              tuple",
+                                                                             key.val))));
+                        }
+                    }
+                    for &(ref key, ref val) in def.fields.iter() {
                         let expr_result = try!(self.eval_expr(val));
-                        match m.entry(key.clone()) {
+                        match m.entry(&key.fragment) {
                             Entry::Vacant(v) => {
                                 v.insert(expr_result);
-                            },
+                            }
                             Entry::Occupied(mut v) => {
                                 // Ensure that the new type matches the old type.
                                 let src_val = v.get().clone();
@@ -526,90 +596,86 @@ impl Builder {
                                     return Err(Box::new(
                                         BuildError::TypeFail(
                                             format!("Expected type {} for field {} but got {}",
-                                                    src_val.type_name(), key, expr_result.type_name()))));
+                                                    src_val.type_name(), key.fragment, expr_result.type_name()))));
                                 }
-                            },
+                            }
                         };
                     }
-                    let mut new_fields: Vec<(String, Rc<Val>)> = m.drain()
-                        .map(|(s, v)| (s.to_string(), v))
+                    let mut new_fields: Vec<(Positioned<String>, Rc<Val>)> = m.drain()
+                        .map(|(s, v)| (Positioned::new(s.to_string()), v))
                         .collect();
                     // We want a stable order for the fields to make comparing tuples
                     // easier in later code. So we sort by the field name before constructing a new tuple.
                     new_fields.sort_by(|a, b| a.0.cmp(&b.0));
                     return Ok(Rc::new(Val::Tuple(new_fields)));
                 }
-                Err(Box::new(
-                    BuildError::TypeFail(
-                        format!("Expected Tuple got {}", v))))
-            },
-            Expression::Grouped(expr) => {
-                return self.eval_expr(*expr);
-            },
-            Expression::Format(def) => {
-                let tmpl = def.template;
-                let mut args = def.args;
+                Err(Box::new(BuildError::TypeFail(format!("Expected Tuple got {}", v))))
+            }
+            &Expression::Grouped(ref expr) => {
+                return self.eval_expr(expr);
+            }
+            &Expression::Format(ref def) => {
+                let tmpl = &def.template;
+                let args = &def.args;
                 let mut vals = Vec::new();
-                for v in args.drain(0..) {
+                for v in args.iter() {
                     let rcv = try!(self.eval_expr(v));
                     vals.push(rcv.deref().clone());
                 }
-                let formatter = format::Formatter::new(tmpl, vals);
+                let formatter = format::Formatter::new(tmpl.clone(), vals);
                 Ok(Rc::new(Val::String(try!(formatter.render()))))
-            },
-            Expression::Call(def) => {
-                let sel = def.macroref;
-                let mut args = def.arglist;
+            }
+            &Expression::Call(ref def) => {
+                let sel = &def.macroref;
+                let args = &def.arglist;
                 let v = try!(self.lookup_selector(sel));
                 if let &Val::Macro(ref m) = v.deref() {
                     // Congratulations this is actually a macro.
                     let mut argvals: Vec<Rc<Val>> = Vec::new();
-                    for arg in args.drain(0..) {
+                    for arg in args.iter() {
                         argvals.push(try!(self.eval_expr(arg)));
                     }
                     let fields = try!(m.eval(argvals));
                     return Ok(Rc::new(Val::Tuple(fields)));
                 }
-                Err(Box::new(
-                    BuildError::TypeFail(
-                        // We should pretty print the selectors here.
-                        format!("{} is not a Macro", v))))
-            },
-            Expression::Macro(def) => {
+                Err(Box::new(BuildError::TypeFail(// We should pretty print the selectors here.
+                                                  format!("{} is not a Macro", v))))
+            }
+            &Expression::Macro(ref def) => {
                 match def.validate_symbols() {
-                    Ok(()) => Ok(Rc::new(Val::Macro(def))),
-                    Err(set) => Err(Box::new(
-                        BuildError::NoSuchSymbol(
-                            format!("Macro has the following undefined symbols: {:?}", set)))),
+                    Ok(()) => Ok(Rc::new(Val::Macro(def.clone()))),
+                    Err(set) => {
+                        Err(Box::new(BuildError::NoSuchSymbol(format!("Macro has the following \
+                                                                       undefined symbols: {:?}",
+                                                                      set))))
+                    }
                 }
-            },
-            Expression::Select(def) => {
-                let target = def.val;
-                let def_expr = def.default;
-                let mut fields = def.tuple;
+            }
+            &Expression::Select(ref def) => {
+                let target = &def.val;
+                let def_expr = &def.default;
+                let fields = &def.tuple;
                 // First resolve the target expression.
-                let v = try!(self.eval_expr(*target));
+                let v = try!(self.eval_expr(target));
                 // Second ensure that the expression resolves to a string.
                 if let &Val::String(ref name) = v.deref() {
                     // Third find the field with that name in the tuple.
-                    for (fname, val_expr) in fields.drain(0..) {
-                        if &fname == name {
+                    for &(ref fname, ref val_expr) in fields.iter() {
+                        if &fname.fragment == name {
                             // Fourth return the result of evaluating that field.
                             return self.eval_expr(val_expr);
                         }
                     }
                     // Otherwise return the default
-                    return self.eval_expr(*def_expr);
+                    return self.eval_expr(def_expr);
                 } else {
-                    return Err(Box::new(
-                        BuildError::TypeFail(
-                            format!("Expected String but got {} in Select expression",
-                                    v.type_name()))));
+                    return Err(Box::new(BuildError::TypeFail(format!("Expected String but got \
+                                                                      {} in Select expression",
+                                                                     v.type_name()))));
                 }
-            },
+            }
         }
     }
-
 }
 
 #[cfg(test)]
@@ -618,9 +684,9 @@ mod test {
     use ast::*;
     use std::rc::Rc;
 
-    fn test_expr_to_val(mut cases: Vec<(Expression,Val)>, b: Builder) {
+    fn test_expr_to_val(mut cases: Vec<(Expression, Val)>, b: Builder) {
         for tpl in cases.drain(0..) {
-            assert_eq!(b.eval_expr(tpl.0).unwrap(), Rc::new(tpl.1));
+            assert_eq!(b.eval_expr(&tpl.0).unwrap(), Rc::new(tpl.1));
         }
     }
 
@@ -644,7 +710,8 @@ mod test {
                     pos: None,
                 }),
              Val::Float(1.0)),
-        ], b);
+        ],
+                         b);
     }
 
     #[test]
@@ -660,7 +727,8 @@ mod test {
                     pos: None,
                 }),
              Val::Float(1.0)),
-        ], b);
+        ],
+                         b);
     }
 
     #[test]
@@ -683,7 +751,8 @@ mod test {
                     pos: None,
                 }),
              Val::Float(4.0)),
-        ], b);
+        ],
+                         b);
     }
 
     #[test]
@@ -699,7 +768,8 @@ mod test {
                     pos: None,
                 }),
              Val::Float(1.0)),
-        ], b);
+        ],
+                         b);
     }
 
     #[test]
@@ -722,7 +792,8 @@ mod test {
                     pos: None,
                 }),
              Val::Float(1.0)),
-        ], b);
+        ],
+                         b);
     }
 
     #[test]
@@ -738,7 +809,8 @@ mod test {
                     pos: None,
                 }),
              Val::Float(1.0)),
-        ], b);
+        ],
+                         b);
     }
 
     #[test]
@@ -785,7 +857,8 @@ mod test {
                     pos: None,
                 }),
              Val::Float(1.0)),
-        ], b);
+        ],
+                         b);
     }
 
     #[test]
@@ -795,10 +868,13 @@ mod test {
             (Expression::Simple(Value::Float(make_value_node(2.0))), Val::Float(2.0)),
             (Expression::Simple(Value::String(make_value_node("foo".to_string()))),
              Val::String("foo".to_string())),
-            (Expression::Simple(Value::Tuple(make_value_node(vec![("bar".to_string(),
-                                                   Expression::Simple(Value::Int(make_value_node(1))))]))),
-             Val::Tuple(vec![("bar".to_string(), Rc::new(Val::Int(1)))])),
-        ], Builder::new());
+            (Expression::Simple(Value::Tuple(make_value_node(vec![
+                (Token::new("bar"), Expression::Simple(Value::Int(make_value_node(1))))
+                ]))),
+             Val::Tuple(vec![(Positioned::new_with_pos("bar".to_string(), Position{line: 0, column: 0}),
+                              Rc::new(Val::Int(1)))])),
+        ],
+                         Builder::new());
     }
 
     #[test]
@@ -807,14 +883,16 @@ mod test {
         b.out.entry("var1".to_string()).or_insert(Rc::new(Val::Int(1)));
         test_expr_to_val(vec![
             (Expression::Simple(Value::Symbol(make_value_node("var1".to_string()))), Val::Int(1)),
-        ], b);
+        ],
+                         b);
     }
 
     #[test]
     fn test_eval_simple_lookup_error() {
         let mut b = Builder::new();
         b.out.entry("var1".to_string()).or_insert(Rc::new(Val::Int(1)));
-        assert!(b.eval_expr(Expression::Simple(Value::Symbol(make_value_node("var".to_string())))).is_err());
+        let expr = Expression::Simple(Value::Symbol(make_value_node("var".to_string())));
+        assert!(b.eval_expr(&expr).is_err());
     }
 
     #[test]
@@ -822,41 +900,42 @@ mod test {
         // TODO(jwall): Tests for this expression.
         let mut b = Builder::new();
         b.out.entry("var1".to_string()).or_insert(Rc::new(Val::Tuple(vec![
-            ("lvl1".to_string(), Rc::new(Val::Tuple(
+            (Positioned::new("lvl1".to_string()), Rc::new(Val::Tuple(
                 vec![
-                    ("lvl2".to_string(), Rc::new(Val::Int(3))),
+                    (Positioned::new("lvl2".to_string()), Rc::new(Val::Int(3))),
                 ]
             ))),
         ])));
         b.out.entry("var2".to_string()).or_insert(Rc::new(Val::Int(2)));
-        b.out.entry("var3".to_string()).or_insert(Rc::new(Val::Tuple(vec![
-            ("lvl1".to_string(), Rc::new(Val::Int(4)))
-        ])));
+        b.out
+            .entry("var3".to_string())
+            .or_insert(Rc::new(Val::Tuple(vec![(Positioned::new("lvl1".to_string()),
+                                                Rc::new(Val::Int(4)))])));
         test_expr_to_val(vec![
-            (Expression::Simple(Value::Selector(make_value_node(vec!["var1".to_string()]))), Val::Tuple(
+            (Expression::Simple(Value::Selector(make_value_node(vec![Token::new("var1")]))), Val::Tuple(
                 vec![
-                    ("lvl1".to_string(), Rc::new(Val::Tuple(
+                    (Positioned::new("lvl1".to_string()), Rc::new(Val::Tuple(
                         vec![
-                            ("lvl2".to_string(), Rc::new(Val::Int(3))),
+                            (Positioned::new("lvl2".to_string()), Rc::new(Val::Int(3))),
                         ]
                     ))),
                 ]
             )),
-            (Expression::Simple(Value::Selector(make_value_node(vec!["var1".to_string(),
-                                                     "lvl1".to_string()]))),
+            (Expression::Simple(Value::Selector(make_value_node(vec![Token::new("var1"),
+                                                     Token::new("lvl1")]))),
              Val::Tuple(
                 vec![
-                    ("lvl2".to_string(), Rc::new(Val::Int(3))),
+                    (Positioned::new("lvl2".to_string()), Rc::new(Val::Int(3))),
                 ]
             )),
-            (Expression::Simple(Value::Selector(make_value_node(vec!["var1".to_string(),
-                                                     "lvl1".to_string(),
-                                                     "lvl2".to_string()]))),
+            (Expression::Simple(Value::Selector(make_value_node(vec![Token::new("var1"),
+                                                     Token::new("lvl1"),
+                                                     Token::new("lvl2")]))),
              Val::Int(3)),
-            (Expression::Simple(Value::Selector(make_value_node(vec!["var2".to_string()]))),
+            (Expression::Simple(Value::Selector(make_value_node(vec![Token::new("var2")]))),
              Val::Int(2)),
-            (Expression::Simple(Value::Selector(make_value_node(vec!["var3".to_string(),
-                                                     "lvl1".to_string()]))),
+            (Expression::Simple(Value::Selector(make_value_node(vec![Token::new("var3"),
+                                                     Token::new("lvl1")]))),
              Val::Int(4)),
         ], b);
     }
@@ -866,7 +945,7 @@ mod test {
     fn test_expr_copy_no_such_tuple() {
         let b = Builder::new();
         test_expr_to_val(vec![
-            (Expression::Copy(CopyDef{selector: vec!["tpl1".to_string()], fields: Vec::new(), pos: None}),
+            (Expression::Copy(CopyDef{selector: vec![Token::new("tpl1")], fields: Vec::new(), pos: None}),
              Val::Tuple(Vec::new())),
         ], b);
     }
@@ -877,7 +956,7 @@ mod test {
         let mut b = Builder::new();
         b.out.entry("tpl1".to_string()).or_insert(Rc::new(Val::Int(1)));
         test_expr_to_val(vec![
-            (Expression::Copy(CopyDef{selector: vec!["tpl1".to_string()], fields: Vec::new(), pos: None}),
+            (Expression::Copy(CopyDef{selector: vec![Token::new("tpl1")], fields: Vec::new(), pos: None}),
              Val::Tuple(Vec::new())),
         ], b);
     }
@@ -887,18 +966,18 @@ mod test {
     fn test_expr_copy_field_type_error() {
         let mut b = Builder::new();
         b.out.entry("tpl1".to_string()).or_insert(Rc::new(Val::Tuple(vec![
-            ("fld1".to_string(), Rc::new(Val::Int(1))),
+            (Positioned::new("fld1".to_string()), Rc::new(Val::Int(1))),
         ])));
         test_expr_to_val(vec![
             (Expression::Copy(
                 CopyDef{
-                    selector: vec!["tpl1".to_string()],
-                    fields: vec![("fld1".to_string(),
+                    selector: vec![Token::new("tpl1")],
+                    fields: vec![(Token::new("fld1"),
                                   Expression::Simple(Value::String(make_value_node("2".to_string()))))],
                     pos: None}),
              Val::Tuple(
                 vec![
-                    ("fld1".to_string(), Rc::new(Val::String("2".to_string()))),
+                    (Positioned::new("fld1".to_string()), Rc::new(Val::String("2".to_string()))),
                 ],
             )),
         ], b);
@@ -911,13 +990,13 @@ mod test {
         // TODO(jwall): Tests for this expression.
         let mut b = Builder::new();
         b.out.entry("tpl1".to_string()).or_insert(Rc::new(Val::Tuple(vec![
-            ("fld1".to_string(), Rc::new(Val::Int(1))),
+            (Positioned::new("fld1".to_string()), Rc::new(Val::Int(1))),
         ])));
         test_expr_to_val(vec![
             (Expression::Copy(
                 CopyDef{
-                    selector: vec!["tpl1".to_string()],
-                    fields: vec![("fld2".to_string(),
+                    selector: vec![Token::new("tpl1")],
+                    fields: vec![(Token::new("fld2"),
                                   Expression::Simple(Value::String(make_value_node("2".to_string()))))],
                     pos: None,
                 }),
@@ -927,33 +1006,33 @@ mod test {
                  // that the compare assertion is correct. The ordering has no
                  // semantics though so at some point we should probably be less restrictive.
                 vec![
-                    ("fld1".to_string(), Rc::new(Val::Int(1))),
-                    ("fld2".to_string(), Rc::new(Val::String("2".to_string()))),
+                    (Positioned::new("fld1".to_string()), Rc::new(Val::Int(1))),
+                    (Positioned::new("fld2".to_string()), Rc::new(Val::String("2".to_string()))),
                 ],
             )),
              // Overwrite a field in the copy
             (Expression::Copy(
                 CopyDef{
-                    selector: vec!["tpl1".to_string()],
+                    selector: vec![Token::new("tpl1")],
                     fields: vec![
-                        ("fld1".to_string(),
+                        (Token::new("fld1"),
                          Expression::Simple(Value::Int(make_value_node(3)))),
-                        ("fld2".to_string(),
+                        (Token::new("fld2"),
                          Expression::Simple(Value::String(make_value_node("2".to_string())))),
                     ],
                     pos: None,
                 }),
              Val::Tuple(
                 vec![
-                    ("fld1".to_string(), Rc::new(Val::Int(3))),
-                    ("fld2".to_string(), Rc::new(Val::String("2".to_string()))),
+                    (Positioned::new("fld1".to_string()), Rc::new(Val::Int(3))),
+                    (Positioned::new("fld2".to_string()), Rc::new(Val::String("2".to_string()))),
                 ],
              )),
             // The source tuple is still unmodified.
-            (Expression::Simple(Value::Selector(make_value_node(vec!["tpl1".to_string()]))),
+            (Expression::Simple(Value::Selector(make_value_node(vec![Token::new("tpl1")]))),
              Val::Tuple(
                 vec![
-                    ("fld1".to_string(), Rc::new(Val::Int(1))),
+                    (Positioned::new("fld1".to_string()), Rc::new(Val::Int(1))),
                 ],
             )),
         ], b);
@@ -963,20 +1042,21 @@ mod test {
     fn test_macro_call() {
         let mut b = Builder::new();
         b.out.entry("tstmac".to_string()).or_insert(Rc::new(Val::Macro(MacroDef{
-            argdefs: vec!["arg1".to_string()],
+            argdefs: vec![Positioned::new("arg1".to_string())],
             fields: vec![
-                ("foo".to_string(), Expression::Simple(Value::Symbol(make_value_node("arg1".to_string())))),
+                (Token::new("foo"), Expression::Simple(Value::Symbol(make_value_node("arg1".to_string())))),
             ],
             pos: None,
         })));
         test_expr_to_val(vec![
             (Expression::Call(CallDef{
-                macroref: vec!["tstmac".to_string()],
+                macroref: vec![Token::new("tstmac")],
                 arglist: vec![Expression::Simple(Value::String(make_value_node("bar".to_string())))],
                 pos: None,
             }),
              Val::Tuple(vec![
-                 ("foo".to_string(), Rc::new(Val::String("bar".to_string()))),
+                 (Positioned::new_with_pos("foo".to_string(), Position{line: 0, column: 0}),
+                  Rc::new(Val::String("bar".to_string()))),
              ])),
         ], b);
     }
@@ -985,22 +1065,24 @@ mod test {
     #[should_panic(expected = "Unable to find arg1")]
     fn test_macro_hermetic() {
         let mut b = Builder::new();
-        b.out.entry("arg1".to_string()).or_insert(Rc::new(Val::String("bar".to_string())));
+        b.out
+            .entry("arg1".to_string())
+            .or_insert(Rc::new(Val::String("bar".to_string())));
         b.out.entry("tstmac".to_string()).or_insert(Rc::new(Val::Macro(MacroDef{
-            argdefs: vec!["arg2".to_string()],
+            argdefs: vec![Positioned::new("arg2".to_string())],
             fields: vec![
-                ("foo".to_string(), Expression::Simple(Value::Symbol(make_value_node("arg1".to_string())))),
+                (Token::new("foo"), Expression::Simple(Value::Symbol(make_value_node("arg1".to_string())))),
             ],
             pos: None,
         })));
         test_expr_to_val(vec![
             (Expression::Call(CallDef{
-                macroref: vec!["tstmac".to_string()],
+                macroref: vec![Token::new("tstmac")],
                 arglist: vec![Expression::Simple(Value::String(make_value_node("bar".to_string())))],
                 pos: None,
             }),
              Val::Tuple(vec![
-                 ("foo".to_string(), Rc::new(Val::String("bar".to_string()))),
+                 (Positioned::new("foo".to_string()), Rc::new(Val::String("bar".to_string()))),
              ])),
         ], b);
     }
@@ -1008,15 +1090,19 @@ mod test {
     #[test]
     fn test_select_expr() {
         let mut b = Builder::new();
-        b.out.entry("foo".to_string()).or_insert(Rc::new(Val::String("bar".to_string())));
-        b.out.entry("baz".to_string()).or_insert(Rc::new(Val::String("boo".to_string())));
+        b.out
+            .entry("foo".to_string())
+            .or_insert(Rc::new(Val::String("bar".to_string())));
+        b.out
+            .entry("baz".to_string())
+            .or_insert(Rc::new(Val::String("boo".to_string())));
         test_expr_to_val(vec![
             (Expression::Select(SelectDef{
                 val: Box::new(Expression::Simple(Value::Symbol(make_value_node("foo".to_string())))),
                 default: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
                 tuple: vec![
-                    ("bar".to_string(), Expression::Simple(Value::Int(make_value_node(2)))),
-                    ("quux".to_string(), Expression::Simple(Value::String(make_value_node("2".to_string())))),
+                    (Token::new("foo"), Expression::Simple(Value::String(make_value_node("2".to_string())))),
+                    (Token::new("bar"), Expression::Simple(Value::Int(make_value_node(2)))),
                 ],
                 pos: None,
             }),
@@ -1025,8 +1111,8 @@ mod test {
                 val: Box::new(Expression::Simple(Value::Symbol(make_value_node("baz".to_string())))),
                 default: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
                 tuple: vec![
-                    ("bar".to_string(), Expression::Simple(Value::Int(make_value_node(2)))),
-                    ("quux".to_string(), Expression::Simple(Value::String(make_value_node("2".to_string())))),
+                    (Token::new("bar"), Expression::Simple(Value::Int(make_value_node(2)))),
+                    (Token::new("quux"), Expression::Simple(Value::String(make_value_node("2".to_string())))),
                 ],
                 pos: None,
             }),
@@ -1045,8 +1131,8 @@ mod test {
                 val: Box::new(Expression::Simple(Value::Symbol(make_value_node("foo".to_string())))),
                 default: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
                 tuple: vec![
-                    ("bar".to_string(), Expression::Simple(Value::Int(make_value_node(2)))),
-                    ("quux".to_string(), Expression::Simple(Value::String(make_value_node("2".to_string())))),
+                    (Token::new("bar"), Expression::Simple(Value::Int(make_value_node(2)))),
+                    (Token::new("quux"), Expression::Simple(Value::String(make_value_node("2".to_string())))),
                 ],
                 pos: None,
              }),
@@ -1057,40 +1143,43 @@ mod test {
     #[test]
     fn test_let_statement() {
         let mut b = Builder::new();
-        b.build_stmt(Statement::Let{
-            name:"foo".to_string(),
+        let stmt = Statement::Let {
+            name: Token::new("foo"),
             value: Expression::Simple(Value::String(make_value_node("bar".to_string()))),
-        }).unwrap();
+        };
+        b.build_stmt(&stmt).unwrap();
         test_expr_to_val(vec![
             (Expression::Simple(Value::Symbol(make_value_node("foo".to_string()))),
              Val::String("bar".to_string())),
-        ], b);
+        ],
+                         b);
     }
 
     #[test]
     fn test_build_file_string() {
         let mut b = Builder::new();
         b.build_file_string("foo.ucg", "let foo = 1;".to_string()).unwrap();
-        assert!(b.out.contains_key("foo"));
+        let key = "foo";
+        assert!(b.out.contains_key(key));
     }
 
     #[test]
     fn test_asset_symbol_lookups() {
         let mut b = Builder::new();
-        b.assets.entry("foo".to_string()).or_insert(
-            Rc::new(Val::Tuple(vec![
-                ("bar".to_string(), Rc::new(Val::Tuple(vec![
-                    ("quux".to_string(), Rc::new(Val::Int(1))),
+        b.assets.entry("foo".to_string()).or_insert(Rc::new(Val::Tuple(vec![
+                (Positioned::new("bar".to_string()), Rc::new(Val::Tuple(vec![
+                    (Positioned::new("quux".to_string()), Rc::new(Val::Int(1))),
                 ]))),
             ])));
         test_expr_to_val(vec![
             (Expression::Simple(Value::Symbol(make_value_node("foo".to_string()))),
              Val::Tuple(vec![
-                ("bar".to_string(), Rc::new(Val::Tuple(vec![
-                    ("quux".to_string(), Rc::new(Val::Int(1))),
+                (Positioned::new("bar".to_string()), Rc::new(Val::Tuple(vec![
+                    (Positioned::new("quux".to_string()), Rc::new(Val::Int(1))),
                 ]))),
             ])),
-        ], b);
+        ],
+                         b);
     }
     // TODO(jwall): Unit test for MacroDef Symbol Validation.
 }

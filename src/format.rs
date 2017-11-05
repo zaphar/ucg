@@ -24,7 +24,7 @@ pub struct Formatter<V: Into<String> + Clone> {
 
 impl<V: Into<String> + Clone> Formatter<V> {
     pub fn new<S: Into<String>>(tmpl: S, args: Vec<V>) -> Self {
-        Formatter{
+        Formatter {
             tmpl: tmpl.into(),
             args: args,
         }
@@ -37,9 +37,9 @@ impl<V: Into<String> + Clone> Formatter<V> {
         for c in self.tmpl.chars() {
             if c == '@' && !should_escape {
                 if count == self.args.len() {
-                    return Err(Box::new(
-                        BuildError::FormatError(
-                            "Too few arguments to string formatter.".to_string())))
+                    return Err(Box::new(BuildError::FormatError("Too few arguments to string \
+                                                                 formatter."
+                        .to_string())));
                 }
                 let arg = self.args[count].clone();
                 let strval = arg.into();
@@ -52,9 +52,8 @@ impl<V: Into<String> + Clone> Formatter<V> {
             }
         }
         if self.args.len() != count {
-            return Err(Box::new(
-                BuildError::FormatError(
-                    "Too many arguments to string formatter.".to_string())))
+            return Err(Box::new(BuildError::FormatError("Too many arguments to string formatter."
+                .to_string())));
         }
         return Ok(buf);
     }

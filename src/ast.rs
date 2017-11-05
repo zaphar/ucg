@@ -15,10 +15,39 @@ use std::collections::HashSet;
 use std::borrow::Borrow;
 use std::convert::Into;
 
-#[derive(Debug,PartialEq,Clone)]
+#[derive(Debug,PartialEq,Eq,Clone,PartialOrd,Ord,Hash)]
 pub struct Position {
     pub line: usize,
     pub column: usize,
+}
+
+#[derive(Debug,PartialEq,Eq,Clone,PartialOrd,Ord,Hash)]
+pub struct Token {
+    pub fragment: String,
+    pub pos: Position,
+}
+
+impl Token {
+    pub fn new(f: &str) -> Self {
+        Self::new_with_pos(f,
+            Position {
+                    line: 0,
+                    column: 0,
+            })
+    }
+
+    pub fn new_with_pos(f: &str, pos: Position) -> Self {
+        Token {
+            fragment: f.to_string(),
+            pos: pos,
+        }
+    }
+}
+
+impl Borrow<str> for Token {
+    fn borrow(&self) -> &str {
+        &self.fragment
+    }
 }
 
 macro_rules! value_node {
@@ -30,8 +59,8 @@ macro_rules! value_node {
     };
 }
 
-pub type FieldList = Vec<(String, Expression)>; // str is expected to be a symbol
-pub type SelectorList = Vec<String>; // str is expected to always be a symbol.
+pub type FieldList = Vec<(Token, Expression)>; // str is expected to be a symbol
+pub type SelectorList = Vec<Token>; // str is expected to always be a symbol.
 
 #[derive(Debug,PartialEq,Clone)]
 pub struct LocatedNode<T> {
@@ -52,6 +81,10 @@ impl<T> LocatedNode<T> {
             pos: Some(pos.into()),
             val: v,
         }
+    }
+
+    pub fn val(&self) -> &T {
+        return &self.val;
     }
 }
 
@@ -90,7 +123,7 @@ impl Value {
         buf.push_str("{\n");
         for ref t in v.iter() {
             buf.push_str("\t");
-            buf.push_str(&t.0);
+            buf.push_str(&t.0.fragment);
             buf.push_str("\n");
         }
         buf.push_str("}");
@@ -104,7 +137,18 @@ impl Value {
             &Value::String(ref s) => format!("{}", s.val),
             &Value::Symbol(ref s) => format!("{}", s.val),
             &Value::Tuple(ref fs) => format!("{}", Self::fields_to_string(&fs.val)),
-            &Value::Selector(ref v) =>  v.val.join("."),
+            &Value::Selector(ref v) => v.val.join("."),
+        }
+    }
+
+    pub fn pos(&self) -> &Option<Position> {
+        match self {
+            &Value::Int(ref i) => &i.pos,
+            &Value::Float(ref f) => &f.pos,
+            &Value::String(ref s) => &s.pos,
+            &Value::Symbol(ref s) => &s.pos,
+            &Value::Tuple(ref fs) => &fs.pos,
+            &Value::Selector(ref v) => &v.pos,
         }
     }
 }
@@ -128,24 +172,68 @@ pub struct SelectDef {
     pub pos: Option<Position>,
 }
 
+// TODO(jwall): This should have a way of rendering with position information.
+#[derive(PartialEq,Debug,Eq,PartialOrd,Ord,Clone,Hash)]
+pub struct Positioned<T> {
+    pub pos: Option<Position>,
+    pub val: T,
+}
+
+impl<T> Positioned<T> {
+    pub fn new(v: T) -> Self {
+        Positioned {
+            pos: None,
+            val: v,
+        }
+    }
+
+    pub fn new_with_pos(v: T, pos: Position) -> Self {
+        Positioned {
+            pos: Some(pos),
+            val: v,
+        }
+    }
+}
+
+impl<'a> From<&'a Token> for Positioned<String> {
+    fn from(t: &'a Token) -> Positioned<String> {
+        Positioned {
+            pos: Some(t.pos.clone()),
+            val: t.fragment.to_string(),
+        }
+    }
+}
+
+impl<'a> From<&'a LocatedNode<String>> for Positioned<String> {
+    fn from(t: &LocatedNode<String>) -> Positioned<String> {
+        Positioned {
+            pos: t.pos.clone(),
+            val: t.val.clone(),
+        }
+    }
+}
+
 /// MacroDef is a pure function that always returns a Tuple.
 ///
 /// MacroDef's are not closures. They can not reference
 /// any values except what is defined in their arguments.
 #[derive(PartialEq,Debug,Clone)]
 pub struct MacroDef {
-    pub argdefs: Vec<String>,
+    pub argdefs: Vec<Positioned<String>>,
     pub fields: FieldList,
     pub pos: Option<Position>,
 }
 
 impl MacroDef {
-    fn validate_value_symbols<'a>(&'a self, stack: &mut Vec<&'a Expression>, val: &'a Value) -> HashSet<String> {
+    fn validate_value_symbols<'a>(&self,
+                                  stack: &mut Vec<&'a Expression>,
+                                  val: &'a Value)
+                                  -> HashSet<String> {
         let mut bad_symbols = HashSet::new();
         if let &Value::Symbol(ref name) = val {
             let mut ok = true;
             for arg in self.argdefs.iter() {
-                ok &= arg == &name.val
+                ok &= arg.val == name.val
             }
             if !ok {
                 bad_symbols.insert(name.val.clone());
@@ -160,10 +248,10 @@ impl MacroDef {
                 // But we don't know at this time of the value passed into
                 // this macro is a tuple since this isn't a callsite.
                 for arg in self.argdefs.iter() {
-                    ok &= arg == &list[0]
+                    ok &= arg.val == list[0].fragment
                 }
                 if !ok {
-                    bad_symbols.insert(list[0].clone());
+                    bad_symbols.insert(list[0].fragment.to_string());
                 }
             }
         } else if let &Value::Tuple(ref tuple_node) = val {
@@ -186,29 +274,29 @@ impl MacroDef {
                         let mut syms_set = self.validate_value_symbols(&mut stack, &bexpr.left);
                         bad_symbols.extend(syms_set.drain());
                         stack.push(&bexpr.right);
-                    },
+                    }
                     &Expression::Grouped(ref expr) => {
                         stack.push(expr);
-                    },
+                    }
                     &Expression::Format(ref def) => {
                         let exprs = &def.args;
                         for arg_expr in exprs.iter() {
                             stack.push(arg_expr);
                         }
-                    },
+                    }
                     &Expression::Select(ref def) => {
                         stack.push(def.default.borrow());
                         stack.push(def.val.borrow());
                         for &(_, ref expr) in def.tuple.iter() {
                             stack.push(expr);
                         }
-                    },
+                    }
                     &Expression::Copy(ref def) => {
                         let fields = &def.fields;
                         for &(_, ref expr) in fields.iter() {
                             stack.push(expr);
                         }
-                    },
+                    }
                     &Expression::Call(ref def) => {
                         for expr in def.arglist.iter() {
                             stack.push(expr);
@@ -217,18 +305,18 @@ impl MacroDef {
                     &Expression::Simple(ref val) => {
                         let mut syms_set = self.validate_value_symbols(&mut stack, val);
                         bad_symbols.extend(syms_set.drain());
-                    },
+                    }
                     &Expression::Macro(_) => {
                         // noop
                         continue;
-                    },
+                    }
                 }
             }
         }
         if bad_symbols.len() > 0 {
             return Err(bad_symbols);
         }
-        return Ok(())
+        return Ok(());
     }
 }
 
@@ -291,14 +379,14 @@ pub enum Statement {
 
     // Named bindings
     Let {
-        name: String,
+        name: Token,
         value: Expression,
     },
 
     // Include a file.
     Import {
         path: String,
-        name: String,
+        name: Token,
     },
 }
 
@@ -308,12 +396,12 @@ mod ast_test {
 
     #[test]
     pub fn test_macro_validation_happy_path() {
-        let def = MacroDef{
+        let def = MacroDef {
             argdefs: vec![
-                "foo".to_string()
+                Positioned::new("foo".to_string())
             ],
             fields: vec![
-                ("f1".to_string(), Expression::Binary(BinaryOpDef{
+                (Token::new("f1"), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
                     left: Value::Symbol(make_value_node("foo".to_string())),
                     right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
@@ -327,12 +415,12 @@ mod ast_test {
 
     #[test]
     pub fn test_macro_validation_fail() {
-        let def = MacroDef{
+        let def = MacroDef {
             argdefs: vec![
-                "foo".to_string()
+                Positioned::new("foo".to_string())
             ],
             fields: vec![
-                ("f1".to_string(), Expression::Binary(BinaryOpDef{
+                (Token::new("f1"), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
                     left: Value::Symbol(make_value_node("bar".to_string())),
                     right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
@@ -340,7 +428,6 @@ mod ast_test {
                 })),
             ],
             pos: None,
-
         };
         let mut expected = HashSet::new();
         expected.insert("bar".to_string());
@@ -351,12 +438,12 @@ mod ast_test {
     pub fn test_macro_validation_selector_happy_path() {
         let def = MacroDef{
             argdefs: vec![
-                "foo".to_string()
+                Positioned::new("foo".to_string())
             ],
             fields: vec![
-                ("f1".to_string(), Expression::Binary(BinaryOpDef{
+                (Token::new("f1"), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
-                    left: Value::Selector(make_value_node(vec!["foo".to_string(), "quux".to_string()])),
+                    left: Value::Selector(make_value_node(vec![Token::new("foo"), Token::new("quux")])),
                     right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
                     pos: None,
                 })),
@@ -368,14 +455,14 @@ mod ast_test {
 
     #[test]
     pub fn test_macro_validation_selector_fail() {
-        let def = MacroDef{
+        let def = MacroDef {
             argdefs: vec![
-                "foo".to_string()
+                Positioned::new("foo".to_string()),
             ],
             fields: vec![
-                ("f1".to_string(), Expression::Binary(BinaryOpDef{
+                (Token::new("f1"), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
-                    left: Value::Selector(make_value_node(vec!["bar".to_string(), "quux".to_string()])),
+                    left: Value::Selector(make_value_node(vec![Token::new("bar"), Token::new("quux")])),
                     right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
                     pos: None,
                 })),
@@ -384,6 +471,6 @@ mod ast_test {
         };
         let mut expected = HashSet::new();
         expected.insert("bar".to_string());
-        assert_eq!(def.validate_symbols().err().unwrap(), expected);
+        assert_eq!(def.validate_symbols(), Err(expected));
     }
 }

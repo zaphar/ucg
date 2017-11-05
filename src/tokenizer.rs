@@ -16,7 +16,7 @@ use nom::{alpha, is_alphanumeric, digit};
 
 use ast::*;
 
-type Span<'a> = LocatedSpan<&'a str>;
+pub type Span<'a> = LocatedSpan<&'a str>;
 
 impl<'a> From<Span<'a>> for Position {
     fn from(s: Span) -> Position {
@@ -26,12 +26,6 @@ impl<'a> From<Span<'a>> for Position {
         }
     }
 }
-
-pub struct Token<'a> {
-    pub pos: Position,
-    pub fragment: &'a str,
-}
-
 
 fn is_symbol_char(c: char) -> bool {
     is_alphanumeric(c as u8) || c == '-' as char || c == '_' as char
@@ -45,7 +39,7 @@ named!(pub strtok( Span ) -> Token,
                tag!("\"") >>
            (Token{
                pos: Position::from(span),
-               fragment: frag.fragment,
+               fragment: frag.fragment.to_string(),
            })
        )
 );
@@ -56,7 +50,7 @@ named!(pub barewordtok( Span ) -> Token,
            frag: preceded!(peek!(alpha), take_while!(is_symbol_char)) >>
            (Token{
                pos: Position::from(span),
-               fragment: frag.fragment,
+               fragment: frag.fragment.to_string(),
            })
        )
 );
@@ -67,7 +61,7 @@ named!(pub digittok( Span ) -> Token,
                digits: digit >>
                (Token{
                    pos: Position::from(span),
-                   fragment: digits.fragment,
+                   fragment: digits.fragment.to_string(),
                })
        )
 );
@@ -85,7 +79,7 @@ macro_rules! do_tag_tok {
            frag: tag!($tag) >>
            (Token{
                pos: Position::from(span),
-               fragment: frag.fragment,
+               fragment: frag.fragment.to_string(),
            })
        )
     }
@@ -129,6 +123,10 @@ named!(pub startok( Span ) -> Token,
 
 named!(pub slashtok( Span ) -> Token,
        do_tag_tok!("/")
+);
+
+named!(pub pcttok( Span ) -> Token,
+       do_tag_tok!("%")
 );
 
 named!(pub equaltok( Span ) -> Token,

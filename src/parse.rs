@@ -12,14 +12,10 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 use std::str::FromStr;
-use std::str::from_utf8;
 use std::error::Error;
 
-use nom_locate::LocatedSpan;
-use nom::{alpha, is_alphanumeric, digit};
-
 use ast::*;
-
+use tokenizer::*;
 
 quick_error! {
     #[derive(Debug,PartialEq)]
@@ -28,10 +24,12 @@ quick_error! {
             description("Unexpected Token")
             display("Unexpected Token Expected {} Got {}", expected, actual)
         }
+        EmptyExpression(msg: String ) {
+            description("EmptyExpression")
+            display("Unexpected EmptyExpression {}", msg)
+        }
     }
 }
-
-type Span<'a> = LocatedSpan<&'a str>;
 
 
 // TODO(jwall): Convert to tokenizer steps followed by parser steps.
@@ -39,61 +37,27 @@ type Span<'a> = LocatedSpan<&'a str>;
 
 type ParseResult<O> = Result<O, Box<Error>>;
 
-// sentinels and punctuation
-named!(doublequote, tag!("\""));
-named!(comma, tag!(","));
-named!(lbrace, tag!("{"));
-named!(rbrace, tag!("}"));
-named!(lparen, tag!("("));
-named!(rparen, tag!(")"));
-named!(dot, tag!("."));
-named!(plus, tag!("+"));
-named!(minus, tag!("-"));
-named!(mul, tag!("*"));
-named!(div, tag!("/"));
-named!(equal, tag!("="));
-named!(semicolon, tag!(";"));
-named!(fatcomma, tag!("=>"));
-
-fn is_symbol_char(c: u8) -> bool {
-    is_alphanumeric(c) || c == '-' as u8 || c == '_' as u8
-}
-// a field is the building block of symbols and tuple field names.
-named!(field<String>,
-       map_res!(preceded!(peek!(alpha), take_while!(is_symbol_char)),
-                |s| from_utf8(s).map(|s| s.to_string())
-       )
-);
-
-fn symbol_to_value(s: String) -> ParseResult<Value> {
-    Ok(Value::Symbol(value_node!(s)))
+fn symbol_to_value(s: Token) -> ParseResult<Value> {
+    Ok(Value::Symbol(value_node!(s.fragment.to_string())))
 }
 
 // symbol is a bare unquoted field.
-named!(symbol<Value>, map_res!(field, symbol_to_value));
+named!(symbol( Span ) -> Value, map_res!(barewordtok, symbol_to_value));
 
-// quoted is a quoted string.
-named!(quoted<String>,
-       map_res!(delimited!(doublequote, take_until!("\""), doublequote),
-                |s| from_utf8(s).map(|s| s.to_string())
-       )
-);
-
-fn str_to_value(s: String) -> ParseResult<Value> {
-    Ok(Value::String(value_node!(s)))
+fn str_to_value(s: Token) -> ParseResult<Value> {
+    Ok(Value::String(value_node!(s.fragment.to_string())))
 }
 
 // quoted_value is a quoted string.
-named!(quoted_value<Value>,
-       map_res!(quoted, str_to_value)
+named!(quoted_value( Span ) -> Value,
+       map_res!(strtok, str_to_value)
 );
 
 // Helper function to make the return types work for down below.
-fn triple_to_number(v: (Option<&[u8]>, Option<&[u8]>, Option<&[u8]>))
-                        -> ParseResult<Value> {
+fn triple_to_number(v: (Option<Token>, Option<Token>, Option<Token>)) -> ParseResult<Value> {
     let pref = match v.0 {
         None => "",
-        Some(bs) => try!(from_utf8(bs)),
+        Some(ref bs) => &bs.fragment,
     };
 
     let has_dot = v.1.is_some();
@@ -104,7 +68,7 @@ fn triple_to_number(v: (Option<&[u8]>, Option<&[u8]>, Option<&[u8]>))
 
     let suf = match v.2 {
         None => "",
-        Some(bs) => try!(from_utf8(bs)),
+        Some(ref bs) => &bs.fragment,
     };
 
     let to_parse = pref.to_string() + "." + suf;
@@ -122,46 +86,44 @@ fn triple_to_number(v: (Option<&[u8]>, Option<&[u8]>, Option<&[u8]>))
 // *IMPORTANT*
 // It also means this combinator is risky when used with partial
 // inputs. So handle with care.
-named!(number<Value>,
+named!(number( Span ) -> Value,
        map_res!(alt!(
            complete!(do_parse!( // 1.0
-               prefix: digit >>
-               has_dot: dot >>
-               suffix: digit >>
-               peek!(not!(digit)) >>
+               prefix: digittok >>
+               has_dot: dottok >>
+               suffix: digittok >>
+               peek!(not!(digittok)) >>
                (Some(prefix), Some(has_dot), Some(suffix))
            )) |
            complete!(do_parse!( // 1.
-               prefix: digit >>
-               has_dot: dot >>
-               peek!(not!(digit)) >>
+               prefix: digittok >>
+               has_dot: dottok >>
+               peek!(not!(digittok)) >>
                (Some(prefix), Some(has_dot), None)
            )) |
            complete!(do_parse!( // .1
-               has_dot: dot >>
-               suffix: digit >>
-               peek!(not!(digit)) >>
+               has_dot: dottok >>
+               suffix: digittok >>
+               peek!(not!(digittok)) >>
                (None, Some(has_dot), Some(suffix))
            )) |
            do_parse!( // 1
-               prefix: digit >>
+               prefix: digittok >>
 // The peek!(not!(..)) make this whole combinator slightly
 // safer for partial inputs.
-               peek!(not!(digit)) >>
+               peek!(not!(digittok)) >>
                (Some(prefix), None, None)
            )),
            triple_to_number
        )
 );
 
-named!(value<Value>, alt!(number | quoted_value | symbol | tuple));
-
 named!(
     #[doc="Capture a field and value pair composed of `<symbol> = <value>,`"],
-    field_value<(String, Expression) >,
+    field_value( Span ) -> (Token, Expression),
     do_parse!(
-        field: field >>
-            ws!(equal) >>
+        field: barewordtok >>
+            ws!(equaltok) >>
             value: expression >>
             (field, value)
     )
@@ -172,32 +134,27 @@ fn vec_to_tuple(v: FieldList) -> ParseResult<Value> {
     Ok(Value::Tuple(value_node!(v)))
 }
 
-named!(field_list<FieldList>,
-       separated_list!(comma, ws!(field_value)));
+named!(field_list( Span ) -> FieldList,
+       separated_list!(commatok, ws!(field_value)));
 
 named!(
     #[doc="Capture a tuple of named fields with values. {<field>=<value>,...}"],
-    tuple<Value>,
+    tuple( Span ) -> Value,
     map_res!(
-        delimited!(lbrace,
+        delimited!(lbracetok,
                    ws!(field_list),
-                   rbrace),
+                   rbracetok),
         vec_to_tuple
     )
 );
 
-// keywords
-named!(let_word, tag!("let"));
-named!(select_word, tag!("select"));
-named!(macro_word, tag!("macro"));
-named!(import_word, tag!("import"));
-named!(as_word, tag!("as"));
+named!(value( Span ) -> Value, alt!(number | quoted_value | symbol | tuple));
 
 fn value_to_expression(v: Value) -> ParseResult<Expression> {
     Ok(Expression::Simple(v))
 }
 
-named!(simple_expression<Expression>,
+named!(simple_expression( Span ) -> Expression,
        map_res!(
            value,
            value_to_expression
@@ -205,7 +162,7 @@ named!(simple_expression<Expression>,
 );
 
 fn tuple_to_binary_expression(tpl: (BinaryExprType, Value, Expression)) -> ParseResult<Expression> {
-    Ok(Expression::Binary(BinaryOpDef{
+    Ok(Expression::Binary(BinaryOpDef {
         kind: tpl.0,
         left: tpl.1,
         right: Box::new(tpl.2),
@@ -213,78 +170,81 @@ fn tuple_to_binary_expression(tpl: (BinaryExprType, Value, Expression)) -> Parse
     }))
 }
 
-named!(add_expression<Expression>,
-       map_res!(
-           do_parse!(
-               left: value >>
-                   ws!(plus) >>
-                   right: expression >>
-                   (BinaryExprType::Add, left, right)
-           ),
-           tuple_to_binary_expression
-       )
+macro_rules! do_binary_expr {
+    ($i:expr, $fn:expr, $typ:expr) => {
+        // NOTE(jwall): Nom macros do magic with their inputs. They in fact
+        // rewrite your macro argumets for you. Which means we require this $i
+        // paramater even though we don't explicitely pass it below. I don't
+        // particularly like this but I'm living with it for now.
+        map_res!(
+            $i, do_parse!(
+                left: value >>
+                    ws!($fn) >>
+                    right: expression >>
+                    ($typ, left, right)
+            ),
+            tuple_to_binary_expression
+        )
+    }
+}
+
+named!(add_expression( Span ) -> Expression,
+       do_binary_expr!(plustok, BinaryExprType::Add)
 );
 
-named!(sub_expression<Expression>,
-       map_res!(
-           do_parse!(
-               left: value >>
-                   ws!(minus) >>
-                   right: expression >>
-                   (BinaryExprType::Sub, left, right)
-           ),
-           tuple_to_binary_expression
-       )
+named!(sub_expression( Span ) -> Expression,
+       do_binary_expr!(dashtok, BinaryExprType::Sub)
 );
 
-named!(mul_expression<Expression>,
-       map_res!(
-           do_parse!(
-               left: value >>
-                   ws!(mul) >>
-                   right: expression >>
-                   (BinaryExprType::Mul, left, right)
-           ),
-           tuple_to_binary_expression
-       )
+named!(mul_expression( Span ) -> Expression,
+       do_binary_expr!(startok, BinaryExprType::Mul)
 );
 
-named!(div_expression<Expression>,
-       map_res!(
-           do_parse!(
-               left: value >>
-                   ws!(div) >>
-                   right: expression >>
-                   (BinaryExprType::Div, left, right)
-           ),
-           tuple_to_binary_expression
-       )
+named!(div_expression( Span ) -> Expression,
+       do_binary_expr!(slashtok, BinaryExprType::Div)
 );
 
 fn expression_to_grouped_expression(e: Expression) -> ParseResult<Expression> {
     Ok(Expression::Grouped(Box::new(e)))
 }
 
-named!(grouped_expression<Expression>,
+named!(grouped_expression( Span ) -> Expression,
        map_res!(
-           preceded!(lparen, terminated!(expression, rparen)),
+           preceded!(lparentok, terminated!(expression, rparentok)),
            expression_to_grouped_expression
        )
 );
 
-named!(selector_list<SelectorList>, separated_nonempty_list!(dot, field));
-
-fn tuple_to_copy(t: (SelectorList, FieldList)) -> ParseResult<Expression> {
-    Ok(Expression::Copy(CopyDef{selector: t.0, fields: t.1, pos: None}))
+fn assert_nonempty_list<T>(v: Vec<T>) -> ParseResult<Vec<T>> {
+    if v.is_empty() {
+        return Err(Box::new(ParseError::EmptyExpression("Selectors can't be empty.".to_string())))
+    }
+    return Ok(v);
 }
 
-named!(copy_expression<Expression>,
+// TODO(jwall): We should assert that this is a nonempty list that comes out of here.
+named!(selector_list( Span ) -> SelectorList,
+    map_res!(
+        separated_list!(dottok, barewordtok),
+        assert_nonempty_list
+    )
+);
+
+fn tuple_to_copy(t: (SelectorList, FieldList)) -> ParseResult<Expression> {
+    Ok(Expression::Copy(CopyDef {
+        selector: t.0,
+        fields: t.1,
+        pos: None,
+    }))
+}
+
+named!(copy_expression( Span ) -> Expression,
        map_res!(
            do_parse!(
                selector: selector_list >>
-                   lbrace >>
+                   lbracetok >>
                    fields: ws!(field_list) >>
-                   rbrace >>
+                   rbracetok >>
                    (selector, fields)
            ),
            tuple_to_copy
@@ -295,9 +255,18 @@ fn tuple_to_macro(mut t: (Vec<Value>, Value)) -> ParseResult<Expression> {
     match t.1 {
         Value::Tuple(v) => {
             Ok(Expression::Macro(MacroDef {
-                argdefs: t.0.drain(0..).map(|s| s.to_string()).collect(),
+                // TODO(jwall): The position information here is not as accurate as we might want.
+                argdefs: t.0
+                    .drain(0..)
+                    .map(|s| {
+                        Positioned {
+                            pos: v.pos.clone(),
+                            val: s.to_string(),
+                        }
+                    })
+                    .collect(),
                 fields: v.val,
-                pos: None,
+                pos: v.pos,
             }))
         }
         // TODO(jwall): Show a better version of the unexpected parsed value.
@@ -307,16 +276,16 @@ fn tuple_to_macro(mut t: (Vec<Value>, Value)) -> ParseResult<Expression> {
     }
 }
 
-named!(arglist<Vec<Value> >, separated_list!(ws!(comma), symbol));
+named!(arglist( Span ) -> Vec<Value>, separated_list!(ws!(commatok), symbol));
 
-named!(macro_expression<Expression>,
+named!(macro_expression( Span ) -> Expression,
        map_res!(
            do_parse!(
-               macro_word >>
-                   ws!(lparen) >>
+               macrotok >>
+                   ws!(lparentok) >>
                    arglist: ws!(arglist) >>
-                   rparen >>
-                   ws!(fatcomma) >>
+                   rparentok >>
+                   ws!(fatcommatok) >>
                    map: tuple >>
                    (arglist, map)
            ),
@@ -324,11 +293,10 @@ named!(macro_expression<Expression>,
        )
 );
 
-fn tuple_to_select(t: (Expression, Expression, Value))
-                       -> ParseResult<Expression> {
+fn tuple_to_select(t: (Expression, Expression, Value)) -> ParseResult<Expression> {
     match t.2 {
         Value::Tuple(v) => {
-            Ok(Expression::Select(SelectDef{
+            Ok(Expression::Select(SelectDef {
                 val: Box::new(t.0),
                 default: Box::new(t.1),
                 tuple: v.val,
@@ -342,31 +310,35 @@ fn tuple_to_select(t: (Expression, Expression, Value))
     }
 }
 
-named!(select_expression<Expression>,
+named!(select_expression( Span ) -> Expression,
        map_res!(
-           terminated!(do_parse!(
-               select_word >>
-                   val: ws!(terminated!(expression, comma)) >>
-                   default: ws!(terminated!(expression, comma)) >>
+           do_parse!(
+               selecttok >>
+                   val: ws!(terminated!(expression, commatok)) >>
+                   default: ws!(terminated!(expression, commatok)) >>
                    map: ws!(tuple) >>
                    (val, default, map)
-           ), semicolon),
+           ),
            tuple_to_select
        )
 );
 
-fn tuple_to_format(t: (String, Vec<Expression>)) -> ParseResult<Expression> {
-    Ok(Expression::Format(FormatDef{template: t.0, args: t.1, pos: None}))
+fn tuple_to_format(t: (Token, Vec<Expression>)) -> ParseResult<Expression> {
+    Ok(Expression::Format(FormatDef {
+        template: t.0.fragment.to_string(),
+        args: t.1,
+        pos: Some(t.0.pos),
+    }))
 }
 
-named!(format_expression<Expression>,
+named!(format_expression( Span ) -> Expression,
        map_res!(
            do_parse!(
-               tmpl: ws!(quoted) >>
-                   ws!(tag!("%")) >>
-                   lparen >>
-                   args: ws!(separated_list!(ws!(comma), expression)) >>
-                   rparen >>
+               tmpl: ws!(strtok) >>
+                   ws!(pcttok) >>
+                   lparentok >>
+                   args: ws!(separated_list!(ws!(commatok), expression)) >>
+                   rparentok >>
                    (tmpl, args)
            ),
            tuple_to_format
@@ -375,7 +347,7 @@ named!(format_expression<Expression>,
 
 fn tuple_to_call(t: (Value, Vec<Expression>)) -> ParseResult<Expression> {
     if let Value::Selector(sl) = t.0 {
-        Ok(Expression::Call(CallDef{
+        Ok(Expression::Call(CallDef {
             macroref: sl.val,
             arglist: t.1,
             pos: None,
@@ -389,20 +361,20 @@ fn vec_to_selector_value(v: SelectorList) -> ParseResult<Value> {
     Ok(Value::Selector(value_node!(v)))
 }
 
-named!(selector_value<Value>,
+named!(selector_value( Span ) -> Value,
        map_res!(
            ws!(selector_list),
            vec_to_selector_value
        )
 );
 
-named!(call_expression<Expression>,
+named!(call_expression( Span ) -> Expression,
        map_res!(
            do_parse!(
                macroname: selector_value >>
-                   lparen >>
-                   args: ws!(separated_list!(ws!(comma), expression)) >>
-                   rparen >>
+                   lparentok >>
+                   args: ws!(separated_list!(ws!(commatok), expression)) >>
+                   rparentok >>
                    (macroname, args)
            ),
            tuple_to_call
@@ -419,7 +391,7 @@ named!(call_expression<Expression>,
 // *IMPORTANT*
 // It also means this combinator is risky when used with partial
 // inputs. So handle with care.
-named!(expression<Expression>,
+named!(expression( Span ) -> Expression,
        alt!(
            complete!(add_expression) |
            complete!(sub_expression) |
@@ -439,54 +411,54 @@ fn expression_to_statement(v: Expression) -> ParseResult<Statement> {
     Ok(Statement::Expression(v))
 }
 
-named!(expression_statement<Statement>,
+named!(expression_statement( Span ) -> Statement,
        map_res!(
-           terminated!(ws!(expression), semicolon),
+           terminated!(ws!(expression), semicolontok),
            expression_to_statement
        )
 );
 
-fn tuple_to_let(t: (String, Expression)) -> ParseResult<Statement> {
+fn tuple_to_let(t: (Token, Expression)) -> ParseResult<Statement> {
     Ok(Statement::Let {
-        name: t.0.to_string(),
+        name: t.0,
         value: t.1,
     })
 }
 
-named!(let_statement<Statement>,
+named!(let_statement( Span ) -> Statement,
        map_res!(
            terminated!(do_parse!(
-               let_word >>
-                   name: ws!(field) >>
-                   equal >>
+               lettok >>
+                   name: ws!(barewordtok) >>
+                   equaltok >>
                    val: ws!(expression) >>
                    (name, val)
-           ), semicolon),
+           ), semicolontok),
            tuple_to_let
        )
 );
 
-fn tuple_to_import(t: (String, String)) -> ParseResult<Statement> {
+fn tuple_to_import(t: (Token, Token)) -> ParseResult<Statement> {
     Ok(Statement::Import {
-        name: t.0.to_string(),
-        path: t.1.to_string(),
+        name: t.0,
+        path: t.1.fragment.to_string(),
     })
 }
 
-named!(import_statement<Statement>,
+named!(import_statement( Span ) -> Statement,
        map_res!(
            terminated!(do_parse!(
-               import_word >>
-                   path: ws!(quoted) >>
-                   as_word >>
-                   name: ws!(field) >>
+               importtok >>
+                   path: ws!(strtok) >>
+                   astok >>
+                   name: ws!(barewordtok) >>
                    (name, path)
-           ), semicolon),
+           ), semicolontok),
            tuple_to_import
        )
 );
 
-named!(statement<Statement>,
+named!(statement( Span ) -> Statement,
        alt_complete!(
            import_statement |
            let_statement |
@@ -494,160 +466,303 @@ named!(statement<Statement>,
        )
 );
 
-named!(pub parse<Vec<Statement> >, many1!(ws!(statement)));
+named!(pub parse( Span ) -> Vec<Statement>, many1!(ws!(statement)));
 
 // TODO(jwall): Full Statement parsing tests.
 
 #[cfg(test)]
 mod test {
-    use std::str::from_utf8;
-
     use super::{Statement, Expression, Value, MacroDef, SelectDef, CallDef};
     use super::{number, symbol, parse, field_value, tuple, grouped_expression};
     use super::{copy_expression, macro_expression, select_expression};
     use super::{format_expression, call_expression, expression};
     use super::{expression_statement, let_statement, import_statement, statement};
     use ast::*;
+    use nom_locate::LocatedSpan;
 
     use nom::IResult;
 
     #[test]
     fn test_statement_parse() {
-        assert_eq!(statement(&b"import \"foo\" as foo;"[..]),
-               IResult::Done(&b""[..],
-                             Statement::Import{
-                                 path: "foo".to_string(),
-                                 name: "foo".to_string()
-                             }
+        let mut stmt = "import \"foo\" as foo;";
+        let input = LocatedSpan::new(stmt);
+        assert_eq!(statement(input),
+               IResult::Done(
+                   LocatedSpan{
+                       offset: stmt.len(),
+                       line: 1,
+                       fragment: "",
+                   },
+                   Statement::Import{
+                       path: "foo".to_string(),
+                       name: Token{
+                          fragment: "foo".to_string(),
+                          pos: Position{
+                              line: 1,
+                              column: 17,
+                          },
+                      }
+                   }
                )
-    );
-        assert!(statement(&b"import foo"[..]).is_err() );
+        );
 
-        assert_eq!(statement(&b"let foo = 1.0 ;"[..]),
-               IResult::Done(&b""[..],
-                             Statement::Let{name: "foo".to_string(),
-                                            value: Expression::Simple(Value::Float(value_node!(1.0)))}));
-        assert_eq!(statement(&b"1.0;"[..]),
-               IResult::Done(&b""[..],
-                             Statement::Expression(
-                                 Expression::Simple(Value::Float(value_node!(1.0))))));
+        assert!(statement(LocatedSpan::new("import foo")).is_err() );
+
+        stmt = "let foo = 1.0 ;";
+        let input = LocatedSpan::new(stmt);
+        assert_eq!(statement(input),
+                IResult::Done(
+                    LocatedSpan{
+                        offset: stmt.len(),
+                        line: 1,
+                        fragment: "",
+                    },
+                    Statement::Let{
+                        name: Token{
+                            fragment: "foo".to_string(),
+                            pos: Position {
+                                line: 1,
+                                column: 5,
+                           },
+                       },
+                       value: Expression::Simple(Value::Float(value_node!(1.0)))
+        }));
+        stmt = "1.0;";
+        let input = LocatedSpan::new(stmt);
+        assert_eq!(statement(input),
+                IResult::Done(
+                    LocatedSpan{
+                        offset: stmt.len(),
+                        line: 1,
+                        fragment: "",
+                    },
+                Statement::Expression(
+                    Expression::Simple(Value::Float(value_node!(1.0))))));
     }
 
     #[test]
     fn test_import_parse() {
-        assert!(import_statement(&b"import"[..]).is_incomplete());
-        assert!(import_statement(&b"import \"foo\""[..]).is_incomplete());
-        assert!(import_statement(&b"import \"foo\" as"[..]).is_incomplete());
-        assert!(import_statement(&b"import \"foo\" as foo"[..]).is_incomplete());
+        assert!(import_statement(LocatedSpan::new("import")).is_incomplete());
+        assert!(import_statement(LocatedSpan::new("import \"foo\"")).is_incomplete());
+        assert!(import_statement(LocatedSpan::new("import \"foo\" as")).is_incomplete());
+        assert!(import_statement(LocatedSpan::new("import \"foo\" as foo")).is_incomplete());
 
-        assert_eq!(import_statement(&b"import \"foo\" as foo;"[..]),
-               IResult::Done(&b""[..],
-                             Statement::Import{
-                                 path: "foo".to_string(),
-                                 name: "foo".to_string()
-                             }
+        let import_stmt = "import \"foo\" as foo;";
+        assert_eq!(import_statement(LocatedSpan::new(import_stmt)),
+               IResult::Done(LocatedSpan{
+                        fragment: "",
+                        line: 1,
+                        offset: import_stmt.len(),
+                    },
+                    Statement::Import{
+                        path: "foo".to_string(),
+                        name: Token{
+                                fragment: "foo".to_string(),
+                                pos: Position{
+                                    line: 1,
+                                    column: 17,
+                                },
+                            }
+                    }
                )
     );
     }
 
     #[test]
     fn test_let_statement_parse() {
-        assert!(let_statement(&b"foo"[..]).is_err() );
-        assert!(let_statement(&b"let \"foo\""[..]).is_err() );
-        assert!(let_statement(&b"let 1"[..]).is_err() );
-        assert!(let_statement(&b"let"[..]).is_incomplete() );
-        assert!(let_statement(&b"let foo"[..]).is_incomplete() );
-        assert!(let_statement(&b"let foo ="[..]).is_incomplete() );
-        assert!(let_statement(&b"let foo = "[..]).is_incomplete() );
-        assert!(let_statement(&b"let foo = 1"[..]).is_incomplete() );
+        assert!(let_statement(LocatedSpan::new("foo")).is_err() );
+        assert!(let_statement(LocatedSpan::new("let \"foo\"")).is_err() );
+        assert!(let_statement(LocatedSpan::new("let 1")).is_err() );
+        assert!(let_statement(LocatedSpan::new("let")).is_incomplete() );
+        assert!(let_statement(LocatedSpan::new("let foo")).is_incomplete() );
+        assert!(let_statement(LocatedSpan::new("let foo =")).is_incomplete() );
+        assert!(let_statement(LocatedSpan::new("let foo = ")).is_incomplete() );
+        assert!(let_statement(LocatedSpan::new("let foo = 1")).is_incomplete() );
 
-        assert_eq!(let_statement(&b"let foo = 1.0 ;"[..]),
-               IResult::Done(&b""[..],
-                             Statement::Let{name: "foo".to_string(),
-                                            value: Expression::Simple(Value::Float(value_node!(1.0)))}));
-        assert_eq!(let_statement(&b"let foo= 1.0;"[..]),
-               IResult::Done(&b""[..],
-                             Statement::Let{name: "foo".to_string(),
-                                            value: Expression::Simple(Value::Float(value_node!(1.0)))}));
-        assert_eq!(let_statement(&b"let foo =1.0;"[..]),
-               IResult::Done(&b""[..],
-                             Statement::Let{name: "foo".to_string(),
-                                            value: Expression::Simple(Value::Float(value_node!(1.0)))}));
+        let mut let_stmt = "let foo = 1.0 ;";
+        assert_eq!(let_statement(LocatedSpan::new(let_stmt)),
+               IResult::Done(LocatedSpan{
+                    fragment: "",
+                    offset: let_stmt.len(),
+                    line: 1,
+                },
+                Statement::Let{name: Token{
+                    fragment: "foo".to_string(),
+                    pos: Position{
+                            line: 1,
+                            column: 5,
+                         },
+                    },
+                    value: Expression::Simple(Value::Float(value_node!(1.0)))
+                }));
+        
+        let_stmt = "let foo= 1.0;";
+        assert_eq!(let_statement(LocatedSpan::new(let_stmt)),
+               IResult::Done(LocatedSpan{
+                    fragment: "",
+                    offset: let_stmt.len(),
+                    line: 1,
+                },
+                Statement::Let{name: Token{
+                    fragment: "foo".to_string(),
+                    pos: Position{
+                        line: 1,
+                        column: 5,
+                    }
+                },
+                value: Expression::Simple(Value::Float(value_node!(1.0)))}));
+        let_stmt = "let foo =1.0;";
+        assert_eq!(let_statement(LocatedSpan::new(let_stmt)),
+               IResult::Done(LocatedSpan{
+                    fragment: "",
+                    offset: let_stmt.len(),
+                    line: 1,
+                },
+                Statement::Let{name: Token{
+                    fragment: "foo".to_string(),
+                    pos: Position{
+                        line: 1,
+                        column: 5,
+                    }
+                },
+                value: Expression::Simple(Value::Float(value_node!(1.0)))}));
     }
 
     #[test]
     fn test_expression_statement_parse() {
-        assert!(expression_statement(&b"foo"[..]).is_incomplete() );
-        assert_eq!(expression_statement(&b"1.0;"[..]),
-               IResult::Done(&b""[..],
+        assert!(expression_statement(LocatedSpan::new("foo")).is_incomplete() );
+        assert_eq!(expression_statement(LocatedSpan::new("1.0;")),
+               IResult::Done(LocatedSpan{
+                   fragment: "",
+                   offset: 4,
+                   line: 1,
+               },
                              Statement::Expression(
                                  Expression::Simple(Value::Float(value_node!(1.0))))));
-        assert_eq!(expression_statement(&b"1.0 ;"[..]),
-               IResult::Done(&b""[..],
+        assert_eq!(expression_statement(LocatedSpan::new("1.0 ;")),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: 5,
+                  line: 1,
+                  },
                              Statement::Expression(
                                  Expression::Simple(Value::Float(value_node!(1.0))))));
-        assert_eq!(expression_statement(&b" 1.0;"[..]),
-               IResult::Done(&b""[..],
+        assert_eq!(expression_statement(LocatedSpan::new(" 1.0;")),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: 5,
+                  line: 1,
+                  },
                              Statement::Expression(
                                  Expression::Simple(Value::Float(value_node!(1.0))))));
-        assert_eq!(expression_statement(&b"foo;"[..]),
-               IResult::Done(&b""[..],
+        assert_eq!(expression_statement(LocatedSpan::new("foo;")),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: 4,
+                  line: 1,
+                  },
                              Statement::Expression(
                                  Expression::Simple(Value::Symbol(value_node!("foo".to_string()))))));
-        assert_eq!(expression_statement(&b"foo ;"[..]),
-               IResult::Done(&b""[..],
+        assert_eq!(expression_statement(LocatedSpan::new("foo ;")),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: 5,
+                  line: 1,
+                  },
                              Statement::Expression(
                                  Expression::Simple(Value::Symbol(value_node!("foo".to_string()))))));
-        assert_eq!(expression_statement(&b" foo;"[..]),
-               IResult::Done(&b""[..],
+        assert_eq!(expression_statement(LocatedSpan::new(" foo;")),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: 5,
+                  line: 1,
+                  },
                              Statement::Expression(
                                  Expression::Simple(Value::Symbol(value_node!("foo".to_string()))))));
-        assert_eq!(expression_statement(&b"\"foo\";"[..]),
-               IResult::Done(&b""[..],
+        assert_eq!(expression_statement(LocatedSpan::new("\"foo\";")),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: 6,
+                  line: 1,
+                  },
                              Statement::Expression(
                                  Expression::Simple(Value::String(value_node!("foo".to_string()))))));
-        assert_eq!(expression_statement(&b"\"foo\" ;"[..]),
-               IResult::Done(&b""[..],
+        assert_eq!(expression_statement(LocatedSpan::new("\"foo\" ;")),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: 7,
+                  line: 1,
+                  },
                              Statement::Expression(
                                  Expression::Simple(Value::String(value_node!("foo".to_string()))))));
-        assert_eq!(expression_statement(&b" \"foo\";"[..]),
-               IResult::Done(&b""[..],
+        assert_eq!(expression_statement(LocatedSpan::new(" \"foo\";")),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: 7,
+                  line: 1,
+                  },
                              Statement::Expression(
                                  Expression::Simple(Value::String(value_node!("foo".to_string()))))));
     }
 
     #[test]
     fn test_expression_parse() {
-        assert_eq!(expression(&b"1"[..]),
-               IResult::Done(&b""[..], Expression::Simple(Value::Int(value_node!(1)))));
-        assert_eq!(expression(&b"foo"[..]),
-               IResult::Done(&b""[..], Expression::Simple(Value::Symbol(value_node!("foo".to_string())))));
-        assert_eq!(expression(&b"1 + 1"[..]),
-               IResult::Done(&b""[..],
+        assert_eq!(expression(LocatedSpan::new("1")),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: 1,
+                  line: 1,
+                  },
+               Expression::Simple(Value::Int(value_node!(1)))));
+        assert_eq!(expression(LocatedSpan::new("foo")),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: 3,
+                  line: 1,
+                  },
+               Expression::Simple(Value::Symbol(value_node!("foo".to_string())))));
+        assert_eq!(expression(LocatedSpan::new("1 + 1")),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: 5,
+                  line: 1,
+                  },
                              Expression::Binary(BinaryOpDef{
                                  kind: BinaryExprType::Add,
                                  left: Value::Int(value_node!(1)),
                                  right: Box::new(Expression::Simple(Value::Int(value_node!(1)))),
                                  pos: None,
                              })));
-        assert_eq!(expression(&b"1 - 1"[..]),
-               IResult::Done(&b""[..],
+        assert_eq!(expression(LocatedSpan::new("1 - 1")),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: 5,
+                  line: 1,
+                  },
                              Expression::Binary(BinaryOpDef{
                                  kind: BinaryExprType::Sub,
                                  left: Value::Int(value_node!(1)),
                                  right: Box::new(Expression::Simple(Value::Int(value_node!(1)))),
                                  pos: None,
                              })));
-        assert_eq!(expression(&b"1 * 1"[..]),
-               IResult::Done(&b""[..],
+        assert_eq!(expression(LocatedSpan::new("1 * 1")),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: 5,
+                  line: 1,
+                  },
                              Expression::Binary(BinaryOpDef{
                                  kind: BinaryExprType::Mul,
                                  left: Value::Int(value_node!(1)),
                                  right: Box::new(Expression::Simple(Value::Int(value_node!(1)))),
                                  pos: None,
                              })));
-        assert_eq!(expression(&b"1 / 1"[..]),
-               IResult::Done(&b""[..],
+        assert_eq!(expression(LocatedSpan::new("1 / 1")),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: 5,
+                  line: 1,
+                  },
                              Expression::Binary(BinaryOpDef{
                                  kind: BinaryExprType::Div,
                                  left: Value::Int(value_node!(1)),
@@ -655,68 +770,102 @@ mod test {
                                  pos: None,
                              })));
 
-        assert_eq!(expression(&b"1+1"[..]),
-               IResult::Done(&b""[..],
+        assert_eq!(expression(LocatedSpan::new("1+1")),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: 3,
+                  line: 1,
+                  },
                              Expression::Binary(BinaryOpDef{
                                  kind: BinaryExprType::Add,
                                  left: Value::Int(value_node!(1)),
                                  right: Box::new(Expression::Simple(Value::Int(value_node!(1)))),
                                  pos: None,
                              })));
-        assert_eq!(expression(&b"1-1"[..]),
-               IResult::Done(&b""[..],
+        assert_eq!(expression(LocatedSpan::new("1-1")),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: 3,
+                  line: 1,
+                  },
                              Expression::Binary(BinaryOpDef{
                                  kind: BinaryExprType::Sub,
                                  left: Value::Int(value_node!(1)),
                                  right: Box::new(Expression::Simple(Value::Int(value_node!(1)))),
                                  pos: None,
                              })));
-        assert_eq!(expression(&b"1*1"[..]),
-               IResult::Done(&b""[..],
+        assert_eq!(expression(LocatedSpan::new("1*1")),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: 3,
+                  line: 1,
+                  },
                              Expression::Binary(BinaryOpDef{
                                  kind: BinaryExprType::Mul,
                                  left: Value::Int(value_node!(1)),
                                  right: Box::new(Expression::Simple(Value::Int(value_node!(1)))),
                                  pos: None,
                              })));
-        assert_eq!(expression(&b"1/1"[..]),
-               IResult::Done(&b""[..],
+        assert_eq!(expression(LocatedSpan::new("1/1")),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: 3,
+                  line: 1,
+                  },
                              Expression::Binary(BinaryOpDef{
                                  kind: BinaryExprType::Div,
                                  left: Value::Int(value_node!(1)),
                                  right: Box::new(Expression::Simple(Value::Int(value_node!(1)))),
                                  pos: None,
                              })));
-        assert_eq!(expression(&b"macro (arg1, arg2) => { foo = arg1 }"[..]),
-               IResult::Done(&b""[..],
+        let macro_expr = "macro (arg1, arg2) => { foo = arg1 }";
+        assert_eq!(expression(LocatedSpan::new(macro_expr)),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: macro_expr.len(),
+                  line: 1,
+                  },
                              Expression::Macro(MacroDef{
                                  argdefs: vec![
-                                     "arg1".to_string(),
-                                     "arg2".to_string(),
+                                     Positioned::new("arg1".to_string()),
+                                     Positioned::new("arg2".to_string()),
                                  ],
                                  fields: vec![
-                                     ("foo".to_string(), Expression::Simple(Value::Symbol(value_node!("arg1".to_string())))),
+                                     (Token::new_with_pos("foo", Position{line: 1, column: 25}),
+                                      Expression::Simple(Value::Symbol(value_node!("arg1".to_string())))),
                                  ],
                                  pos: None,
                              })
                )
     );
-        assert_eq!(expression(&b"select foo, 1, { foo = 2 };"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Select(SelectDef{
-                                 val: Box::new(Expression::Simple(Value::Symbol(value_node!("foo".to_string())))),
-                                 default: Box::new(Expression::Simple(Value::Int(value_node!(1)))),
-                                 tuple: vec![
-                                     ("foo".to_string(), Expression::Simple(Value::Int(value_node!(2))))
-                                 ],
-                                 pos: None,
-                             })
-               )
+    let select_expr = "select foo, 1, { foo = 2 }";
+    assert_eq!(expression(LocatedSpan::new(select_expr)),
+           IResult::Done(LocatedSpan {
+              fragment: "",
+              offset: select_expr.len(),
+              line: 1,
+              },
+                         Expression::Select(SelectDef{
+                             val: Box::new(Expression::Simple(Value::Symbol(value_node!("foo".to_string())))),
+                             default: Box::new(Expression::Simple(Value::Int(value_node!(1)))),
+                             tuple: vec![
+                                 (Token::new_with_pos("foo", Position{line: 1, column: 18}),
+                                  Expression::Simple(Value::Int(value_node!(2))))
+                             ],
+                             pos: None,
+                         })
+           )
     );
-        assert_eq!(expression(&b"foo.bar (1, \"foo\")"[..]),
-               IResult::Done(&b""[..],
+        let call_expr = "foo.bar (1, \"foo\")";
+        assert_eq!(expression(LocatedSpan::new(call_expr)),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: call_expr.len(),
+                  line: 1,
+                  },
                              Expression::Call(CallDef{
-                                 macroref: vec!["foo".to_string(),"bar".to_string()],
+                                 macroref: vec![Token::new_with_pos("foo", Position{line:1,column: 1}),
+                                                Token::new_with_pos("bar", Position{line:1,column: 5})],
                                  arglist: vec![
                                      Expression::Simple(Value::Int(value_node!(1))),
                                      Expression::Simple(Value::String(value_node!("foo".to_string()))),
@@ -725,8 +874,12 @@ mod test {
                              })
                )
     );
-        assert_eq!(expression(&b"(1 + 1)"[..]),
-            IResult::Done(&b""[..],
+        assert_eq!(expression(LocatedSpan::new("(1 + 1)")),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: 7,
+                  line: 1,
+                  },
                           Expression::Grouped(
                               Box::new(
                                   Expression::Binary(
@@ -745,84 +898,115 @@ mod test {
 
     #[test]
     fn test_format_parse() {
-        assert!(format_expression(&b"\"foo"[..]).is_err() );
-        assert!(format_expression(&b"\"foo\""[..]).is_incomplete() );
-        assert!(format_expression(&b"\"foo\" %"[..]).is_incomplete() );
-        assert!(format_expression(&b"\"foo\" % (1, 2"[..]).is_incomplete() );
+        assert!(format_expression(LocatedSpan::new("\"foo")).is_err() );
+        assert!(format_expression(LocatedSpan::new("\"foo\"")).is_incomplete() );
+        assert!(format_expression(LocatedSpan::new("\"foo\" %")).is_incomplete() );
+        assert!(format_expression(LocatedSpan::new("\"foo\" % (1, 2")).is_incomplete() );
 
-        assert_eq!(format_expression(&b"\"foo @ @\" % (1, 2)"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Format(
-                                 FormatDef{
-                                     template: "foo @ @".to_string(),
-                                     args: vec![Expression::Simple(Value::Int(value_node!(1))),
-                                                Expression::Simple(Value::Int(value_node!(2)))],
-                                     pos: None,
-                                 })
+        let mut fmt_expr = "\"foo @ @\" % (1, 2)";
+        assert_eq!(format_expression(LocatedSpan::new(fmt_expr)),
+               IResult::Done(LocatedSpan{
+                        fragment: "",
+                        offset: fmt_expr.len(),
+                        line: 1
+                    },
+                    Expression::Format(
+                        FormatDef{
+                            template: "foo @ @".to_string(),
+                            args: vec![Expression::Simple(Value::Int(value_node!(1))),
+                                       Expression::Simple(Value::Int(value_node!(2)))],
+                            pos: Some(Position{line: 1, column: 1}),
+                        }
+                    )
                )
         );
-        assert_eq!(format_expression(&b"\"foo @ @\"%(1, 2)"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Format(
-                                 FormatDef{
-                                     template: "foo @ @".to_string(),
-                                     args: vec![Expression::Simple(Value::Int(value_node!(1))),
-                                                Expression::Simple(Value::Int(value_node!(2)))],
-                                     pos: None,
-                                 })
-               )
+
+        fmt_expr = "\"foo @ @\"%(1, 2)";
+        assert_eq!(format_expression(LocatedSpan::new(fmt_expr)),
+            IResult::Done(LocatedSpan{
+                     fragment: "",
+                     offset: fmt_expr.len(),
+                     line: 1,
+                },
+                Expression::Format(
+                    FormatDef{
+                        template: "foo @ @".to_string(),
+                        args: vec![Expression::Simple(Value::Int(value_node!(1))),
+                                   Expression::Simple(Value::Int(value_node!(2)))],
+                        pos: Some(Position { line: 1, column: 1 }),
+                    }
+                )
+            )
         );
     }
 
     #[test]
     fn test_call_parse() {
-        assert!(call_expression(&b"foo"[..]).is_incomplete() );
-        assert!(call_expression(&b"foo ("[..]).is_incomplete() );
-        assert!(call_expression(&b"foo (1"[..]).is_incomplete() );
-        assert!(call_expression(&b"foo (1,"[..]).is_incomplete() );
-        assert!(call_expression(&b"foo (1,2"[..]).is_incomplete() );
+        assert!(call_expression(LocatedSpan::new("foo")).is_incomplete() );
+        assert!(call_expression(LocatedSpan::new("foo (")).is_incomplete() );
+        assert!(call_expression(LocatedSpan::new("foo (1")).is_incomplete() );
+        assert!(call_expression(LocatedSpan::new("foo (1,")).is_incomplete() );
+        assert!(call_expression(LocatedSpan::new("foo (1,2")).is_incomplete() );
 
-        assert_eq!(call_expression(&b"foo (1, \"foo\")"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Call(CallDef{
-                                 macroref: vec!["foo".to_string()],
-                                 arglist: vec![
-                                     Expression::Simple(Value::Int(value_node!(1))),
-                                     Expression::Simple(Value::String(value_node!("foo".to_string()))),
-                                 ],
-                                 pos: None,
-                             })
+        let mut copy_expr = "foo (1, \"foo\")";
+        assert_eq!(call_expression(LocatedSpan::new(copy_expr)),
+               IResult::Done(
+                    LocatedSpan{
+                        fragment: "",
+                        line: 1,
+                        offset: copy_expr.len(),
+                    },
+                    Expression::Call(CallDef{
+                        macroref: vec![Token::new_with_pos("foo", Position{line:1, column: 1})],
+                        arglist: vec![
+                            Expression::Simple(Value::Int(value_node!(1))),
+                            Expression::Simple(Value::String(value_node!("foo".to_string()))),
+                        ],
+                        pos: None,
+                    })
                )
         );
 
-        assert_eq!(call_expression(&b"foo.bar (1, \"foo\")"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Call(CallDef{
-                                 macroref: vec!["foo".to_string(),"bar".to_string()],
-                                 arglist: vec![
-                                     Expression::Simple(Value::Int(value_node!(1))),
-                                     Expression::Simple(Value::String(value_node!("foo".to_string()))),
-                                 ],
-                                 pos: None,
-                             })
+        copy_expr = "foo.bar (1, \"foo\")";
+        assert_eq!(call_expression(LocatedSpan::new(copy_expr)),
+               IResult::Done(
+                    LocatedSpan{
+                        fragment: "",
+                        line: 1,
+                        offset: copy_expr.len(),
+                    },
+                    Expression::Call(CallDef{
+                        macroref: vec![Token::new_with_pos("foo", Position{line: 1, column: 1}),
+                                       Token::new_with_pos("bar", Position{line: 1, column: 5})],
+                        arglist: vec![
+                            Expression::Simple(Value::Int(value_node!(1))),
+                            Expression::Simple(Value::String(value_node!("foo".to_string()))),
+                        ],
+                        pos: None,
+                    })
                )
     );
     }
 
     #[test]
     fn test_select_parse() {
-        assert!(select_expression(&b"select"[..]).is_incomplete());
-        assert!(select_expression(&b"select foo"[..]).is_incomplete());
-        assert!(select_expression(&b"select foo, 1"[..]).is_incomplete());
-        assert!(select_expression(&b"select foo, 1, {"[..]).is_incomplete());
+        assert!(select_expression(LocatedSpan::new("select")).is_incomplete());
+        assert!(select_expression(LocatedSpan::new("select foo")).is_incomplete());
+        assert!(select_expression(LocatedSpan::new("select foo, 1")).is_incomplete());
+        assert!(select_expression(LocatedSpan::new("select foo, 1, {")).is_incomplete());
 
-        assert_eq!(select_expression(&b"select foo, 1, { foo = 2 };"[..]),
-               IResult::Done(&b""[..],
+        let select_expr = "select foo, 1, { foo = 2 }";
+        assert_eq!(select_expression(LocatedSpan::new(select_expr)),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: select_expr.len(),
+                  line: 1,
+                  },
                              Expression::Select(SelectDef{
                                  val: Box::new(Expression::Simple(Value::Symbol(value_node!("foo".to_string())))),
                                  default: Box::new(Expression::Simple(Value::Int(value_node!(1)))),
                                  tuple: vec![
-                                     ("foo".to_string(), Expression::Simple(Value::Int(value_node!(2))))
+                                     (Token::new_with_pos("foo", Position{line: 1, column: 18}), Expression::Simple(Value::Int(value_node!(2))))
                                  ],
                                  pos: None,
                              })
@@ -832,71 +1016,91 @@ mod test {
 
     #[test]
     fn test_macro_expression_parsing() {
-        assert!(macro_expression(&b"foo"[..]).is_err() );
-        assert!(macro_expression(&b"macro \"foo\""[..]).is_err() );
-        assert!(macro_expression(&b"macro 1"[..]).is_err() );
-        assert!(macro_expression(&b"macro"[..]).is_incomplete() );
-        assert!(macro_expression(&b"macro ("[..]).is_incomplete() );
-        assert!(macro_expression(&b"macro (arg"[..]).is_incomplete() );
-        assert!(macro_expression(&b"macro (arg, arg2"[..]).is_incomplete() );
-        assert!(macro_expression(&b"macro (arg1, arg2) =>"[..]).is_incomplete() );
-        assert!(macro_expression(&b"macro (arg1, arg2) => {"[..]).is_incomplete() );
-        assert!(macro_expression(&b"macro (arg1, arg2) => { foo"[..]).is_incomplete() );
-        assert!(macro_expression(&b"macro (arg1, arg2) => { foo ="[..]).is_incomplete() );
+        assert!(macro_expression(LocatedSpan::new("foo")).is_err() );
+        assert!(macro_expression(LocatedSpan::new("macro \"foo\"")).is_err() );
+        assert!(macro_expression(LocatedSpan::new("macro 1")).is_err() );
+        assert!(macro_expression(LocatedSpan::new("macro")).is_incomplete() );
+        assert!(macro_expression(LocatedSpan::new("macro (")).is_incomplete() );
+        assert!(macro_expression(LocatedSpan::new("macro (arg")).is_incomplete() );
+        assert!(macro_expression(LocatedSpan::new("macro (arg, arg2")).is_incomplete() );
+        assert!(macro_expression(LocatedSpan::new("macro (arg1, arg2) =>")).is_incomplete() );
+        assert!(macro_expression(LocatedSpan::new("macro (arg1, arg2) => {")).is_incomplete() );
+        assert!(macro_expression(LocatedSpan::new("macro (arg1, arg2) => { foo")).is_incomplete() );
+        assert!(macro_expression(LocatedSpan::new("macro (arg1, arg2) => { foo =")).is_incomplete() );
 
-        assert_eq!(macro_expression(&b"macro (arg1, arg2) => {foo=1,bar=2}"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Macro(MacroDef{
-                                 argdefs: vec!["arg1".to_string(),
-                                               "arg2".to_string()],
-                                 fields: vec![("foo".to_string(), Expression::Simple(Value::Int(value_node!(1)))),
-                                             ("bar".to_string(), Expression::Simple(Value::Int(value_node!(2))))
-                                 ],
-                                 pos: None,
-                             })
+        let macro_expr = "macro (arg1, arg2) => {foo=1,bar=2}";
+        assert_eq!(macro_expression(LocatedSpan::new(macro_expr)),
+               IResult::Done(
+                    LocatedSpan{
+                        fragment: "",
+                        offset: macro_expr.len(),
+                        line: 1
+                    },
+                    Expression::Macro(MacroDef{
+                        argdefs: vec![Positioned::new("arg1".to_string()),
+                                      Positioned::new("arg2".to_string())],
+                        fields: vec![(Token::new_with_pos("foo", Position{line: 1, column: 24}), Expression::Simple(Value::Int(value_node!(1)))),
+                                     (Token::new_with_pos("bar", Position{line: 1, column: 30}), Expression::Simple(Value::Int(value_node!(2))))
+                        ],
+                        pos: None,
+                    })
                )
     );
     }
 
     #[test]
     fn test_copy_parse() {
-        assert!(copy_expression(&b"{}"[..]).is_err() );
-        assert!(copy_expression(&b"foo"[..]).is_incomplete() );
-        assert!(copy_expression(&b"foo{"[..]).is_incomplete() );
-        assert_eq!(copy_expression(&b"foo{}"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Copy(CopyDef{
-                                 selector: vec!["foo".to_string()],
-                                 fields: Vec::new(),
-                                 pos: None,
-                             })
+        assert!(copy_expression(LocatedSpan::new("{}")).is_err() );
+        assert!(copy_expression(LocatedSpan::new("foo")).is_incomplete() );
+        assert!(copy_expression(LocatedSpan::new("foo{")).is_incomplete() );
+
+        let mut copy_expr = "foo{}";
+        assert_eq!(copy_expression(LocatedSpan::new(copy_expr)),
+               IResult::Done(
+                    LocatedSpan{
+                        fragment: "",
+                        offset: copy_expr.len(),
+                        line: 1
+                    },
+                    Expression::Copy(CopyDef{
+                        selector: vec![Token::new_with_pos("foo", Position{line: 1, column: 1})],
+                        fields: Vec::new(),
+                        pos: None,
+                    })
                )
-    );
-        assert_eq!(copy_expression(&b"foo{bar=1}"[..]),
-               IResult::Done(&b""[..],
-                             Expression::Copy(CopyDef{
-                                 selector: vec!["foo".to_string()],
-                                 fields: vec![("bar".to_string(),
-                                               Expression::Simple(Value::Int(value_node!(1))))],
-                                 pos: None,
-                             })
-               )
-    );
+        );
+
+        copy_expr = "foo{bar=1}";
+        assert_eq!(copy_expression(LocatedSpan::new(copy_expr)),
+            IResult::Done(
+                LocatedSpan{
+                    fragment: "",
+                    offset: copy_expr.len(),
+                    line: 1
+                },
+                Expression::Copy(CopyDef{
+                    selector: vec![Token::new_with_pos("foo", Position{line: 1, column: 1})],
+                    fields: vec![(Token::new_with_pos("bar", Position{line: 1, column: 5}),
+                                  Expression::Simple(Value::Int(value_node!(1))))],
+                    pos: None,
+                })
+            )
+        );
     }
 
     #[test]
     fn test_grouped_expression_parse() {
-        assert!(grouped_expression(&b"foo"[..]).is_err() );
-        assert!(grouped_expression(&b"(foo"[..]).is_incomplete() );
-        assert_eq!(grouped_expression(&b"(foo)"[..]),
-            IResult::Done(&b""[..],
+        assert!(grouped_expression(LocatedSpan::new("foo")).is_err() );
+        assert!(grouped_expression(LocatedSpan::new("(foo")).is_incomplete() );
+        assert_eq!(grouped_expression(LocatedSpan::new("(foo)")),
+            IResult::Done(LocatedSpan{fragment: "", offset: 5, line: 1},
                           Expression::Grouped(
                               Box::new(
                                   Expression::Simple(
                                       Value::Symbol(value_node!("foo".to_string()))))))
     );
-        assert_eq!(grouped_expression(&b"(1 + 1)"[..]),
-            IResult::Done(&b""[..],
+        assert_eq!(grouped_expression(LocatedSpan::new("(1 + 1)")),
+            IResult::Done(LocatedSpan{fragment: "", offset: 7, line: 1},
                           Expression::Grouped(
                               Box::new(
                                   Expression::Binary(
@@ -916,102 +1120,153 @@ mod test {
 
     #[test]
     fn test_tuple_parse() {
-        assert!(tuple(&b"{"[..]).is_incomplete() );
-        assert!(tuple(&b"{ foo"[..]).is_incomplete() );
-        assert!(tuple(&b"{ foo ="[..]).is_incomplete() );
-        assert!(tuple(&b"{ foo = 1"[..]).is_incomplete() );
-        assert!(tuple(&b"{ foo = 1,"[..]).is_incomplete() );
-        assert!(tuple(&b"{ foo = 1, bar ="[..]).is_incomplete() );
+        assert!(tuple(LocatedSpan::new("{")).is_incomplete() );
+        assert!(tuple(LocatedSpan::new("{ foo")).is_incomplete() );
+        assert!(tuple(LocatedSpan::new("{ foo =")).is_incomplete() );
+        assert!(tuple(LocatedSpan::new("{ foo = 1")).is_incomplete() );
+        assert!(tuple(LocatedSpan::new("{ foo = 1,")).is_incomplete() );
+        assert!(tuple(LocatedSpan::new("{ foo = 1, bar =")).is_incomplete() );
 
-        assert_eq!(tuple(&b"{ }"[..]),
-            IResult::Done(&b""[..],
+        let mut tuple_expr = "{ }";
+        assert_eq!(tuple(LocatedSpan::new(tuple_expr)),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: tuple_expr.len(),
+                  line: 1,
+                  },
                           Value::Tuple(
                               value_node!(vec![]))));
 
-        assert_eq!(tuple(&b"{ foo = 1 }"[..]),
-            IResult::Done(&b""[..],
+        tuple_expr = "{ foo = 1 }";
+        assert_eq!(tuple(LocatedSpan::new(tuple_expr)),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: tuple_expr.len(),
+                  line: 1,
+                  },
                           Value::Tuple(
                               value_node!(vec![
-                                  ("foo".to_string(), Expression::Simple(Value::Int(value_node!(1))))
+                                  (Token::new_with_pos("foo", Position{line:1, column: 3}),
+                                   Expression::Simple(Value::Int(value_node!(1))))
                               ]))));
 
-        assert_eq!(tuple(&b"{ foo = 1, bar = \"1\" }"[..]),
-            IResult::Done(&b""[..],
+        tuple_expr = "{ foo = 1, bar = \"1\" }";
+        assert_eq!(tuple(LocatedSpan::new(tuple_expr)),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: tuple_expr.len(),
+                  line: 1,
+                  },
                           Value::Tuple(
                               value_node!(vec![
-                                  ("foo".to_string(), Expression::Simple(Value::Int(value_node!(1)))),
-                                  ("bar".to_string(), Expression::Simple(Value::String(value_node!("1".to_string()))))
+                                  (Token::new_with_pos("foo", Position{line: 1, column: 3}),
+                                   Expression::Simple(Value::Int(value_node!(1)))),
+                                  (Token::new_with_pos("bar", Position{line: 1, column: 12}),
+                                   Expression::Simple(Value::String(value_node!("1".to_string()))))
                               ]))));
-        assert_eq!(tuple(&b"{ foo = 1, bar = {} }"[..]),
-            IResult::Done(&b""[..],
+        tuple_expr = "{ foo = 1, bar = {} }";
+        assert_eq!(tuple(LocatedSpan::new(tuple_expr)),
+               IResult::Done(LocatedSpan {
+                  fragment: "",
+                  offset: tuple_expr.len(),
+                  line: 1,
+                  },
                           Value::Tuple(
                               value_node!(vec![
-                                  ("foo".to_string(), Expression::Simple(Value::Int(value_node!(1)))),
-                                  ("bar".to_string(), Expression::Simple(Value::Tuple(value_node!(Vec::new()))))
+                                  (Token::new_with_pos("foo", Position{line: 1, column: 3}),
+                                   Expression::Simple(Value::Int(value_node!(1)))),
+                                  (Token::new_with_pos("bar", Position{line: 1, column: 12}),
+                                   Expression::Simple(Value::Tuple(value_node!(Vec::new()))))
                               ]))));
     }
 
     #[test]
     fn test_field_value_parse() {
-        assert!(field_value(&b"foo"[..]).is_incomplete() );
-        assert!(field_value(&b"foo ="[..]).is_incomplete() );
+        assert!(field_value(LocatedSpan::new("foo")).is_incomplete() );
+        assert!(field_value(LocatedSpan::new("foo =")).is_incomplete() );
 
-        assert_eq!(field_value(&b"foo = 1"[..]),
-               IResult::Done(&b""[..], ("foo".to_string(), Expression::Simple(Value::Int(value_node!(1))))) );
-        assert_eq!(field_value(&b"foo = \"1\""[..]),
-               IResult::Done(&b""[..], ("foo".to_string(), Expression::Simple(Value::String(value_node!("1".to_string()))))) );
-        assert_eq!(field_value(&b"foo = bar"[..]),
-               IResult::Done(&b""[..], ("foo".to_string(), Expression::Simple(Value::Symbol(value_node!("bar".to_string()))))) );
-        assert_eq!(field_value(&b"foo = bar "[..]),
-               IResult::Done(&b""[..], ("foo".to_string(), Expression::Simple(Value::Symbol(value_node!("bar".to_string()))))) );
+        assert_eq!(field_value(LocatedSpan::new("foo = 1")),
+               IResult::Done(LocatedSpan { offset: 7, line: 1, fragment: "" },
+               (Token::new_with_pos("foo", Position{line: 1, column: 1}),
+                Expression::Simple(Value::Int(value_node!(1))))) );
+        assert_eq!(field_value(LocatedSpan::new("foo = \"1\"")),
+               IResult::Done(LocatedSpan { offset: 9, line: 1, fragment: "" },
+               (Token::new_with_pos("foo", Position{line: 1, column: 1}),
+                Expression::Simple(Value::String(value_node!("1".to_string()))))) );
+        assert_eq!(field_value(LocatedSpan::new("foo = bar")),
+               IResult::Done(LocatedSpan { offset: 9, line: 1, fragment: "" },
+               (Token::new_with_pos("foo", Position{line: 1, column: 1}),
+                Expression::Simple(Value::Symbol(value_node!("bar".to_string()))))) );
+        assert_eq!(field_value(LocatedSpan::new("foo = bar ")),
+               IResult::Done(LocatedSpan { offset: 10, line: 1, fragment: "" },
+               (Token::new_with_pos("foo", Position{line: 1, column: 1}),
+                Expression::Simple(Value::Symbol(value_node!("bar".to_string()))))) );
     }
 
     #[test]
     fn test_number_parsing() {
-        assert!(number(&b"."[..]).is_err() );
-        assert!(number(&b". "[..]).is_err() );
-        assert_eq!(number(&b"1.0"[..]),
-               IResult::Done(&b""[..], Value::Float(value_node!(1.0))) );
-        assert_eq!(number(&b"1."[..]),
-               IResult::Done(&b""[..], Value::Float(value_node!(1.0))) );
-        assert_eq!(number(&b"1"[..]),
-               IResult::Done(&b""[..], Value::Int(value_node!(1))) );
-        assert_eq!(number(&b".1"[..]),
-               IResult::Done(&b""[..], Value::Float(value_node!(0.1))) );
+        assert!(number(LocatedSpan::new(".")).is_err() );
+        assert!(number(LocatedSpan::new(". ")).is_err() );
+        assert_eq!(number(LocatedSpan::new("1.0")),
+               IResult::Done(LocatedSpan{fragment: "", offset: 3, line: 1},
+               Value::Float(value_node!(1.0))) );
+        assert_eq!(number(LocatedSpan::new("1.")),
+               IResult::Done(LocatedSpan{fragment: "", offset: 2, line: 1},
+               Value::Float(value_node!(1.0))) );
+        assert_eq!(number(LocatedSpan::new("1")),
+               IResult::Done(LocatedSpan{fragment: "", offset: 1, line: 1},
+               Value::Int(value_node!(1))) );
+        assert_eq!(number(LocatedSpan::new(".1")),
+               IResult::Done(LocatedSpan{fragment: "", offset: 2, line: 1},
+               Value::Float(value_node!(0.1))) );
     }
 
     #[test]
     fn test_symbol_parsing() {
-        assert_eq!(symbol(&b"foo"[..]),
-               IResult::Done(&b""[..], Value::Symbol(value_node!("foo".to_string()))) );
-        assert_eq!(symbol(&b"foo-bar"[..]),
-               IResult::Done(&b""[..], Value::Symbol(value_node!("foo-bar".to_string()))) );
-        assert_eq!(symbol(&b"foo_bar"[..]),
-               IResult::Done(&b""[..], Value::Symbol(value_node!("foo_bar".to_string()))) );
+        assert_eq!(symbol(LocatedSpan::new("foo")),
+               IResult::Done(LocatedSpan{fragment: "", offset: 3, line: 1},
+               Value::Symbol(value_node!("foo".to_string()))) );
+        assert_eq!(symbol(LocatedSpan::new("foo-bar")),
+               IResult::Done(LocatedSpan{fragment: "", offset: 7, line: 1},
+               Value::Symbol(value_node!("foo-bar".to_string()))) );
+        assert_eq!(symbol(LocatedSpan::new("foo_bar")),
+               IResult::Done(LocatedSpan{fragment: "", offset: 7, line: 1},
+               Value::Symbol(value_node!("foo_bar".to_string()))) );
     }
 
     #[test]
     fn test_parse() {
-        let bad_input = &b"import mylib as lib;"[..];
+        let bad_input = LocatedSpan::new("import mylib as lib;");
         let bad_result = parse(bad_input);
         assert!(bad_result.is_err() );
 
         // Valid parsing tree
-        let input = &b"import \"mylib\" as lib;\
-                   let foo = 1;\
-                   1+1;"[..];
+        let input =
+            LocatedSpan::new("import \"mylib\" as lib;let foo = 1;1+1;");
         let result = parse(input);
         assert!(result.is_done() );
         let tpl = result.unwrap();
-        assert_eq!(from_utf8(tpl.0).unwrap(), "");
+        assert_eq!(tpl.0.fragment, "");
         assert_eq!(tpl.1,
                vec![
                    Statement::Import{
                        path: "mylib".to_string(),
-                       name: "lib".to_string()
+                       name: Token{
+                           fragment: "lib".to_string(),
+                           pos: Position{
+                               line: 1,
+                               column: 19,
+                           }
+                       }
                    },
                    Statement::Let{
-                       name: "foo".to_string(),
+                       name: Token{
+                           fragment: "foo".to_string(),
+                           pos: Position{
+                               line: 1,
+                               column: 27,
+                           }
+                       },
                        value: Expression::Simple(Value::Int(value_node!(1)))
                    },
                    Statement::Expression(
