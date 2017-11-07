@@ -14,6 +14,12 @@
 use std::collections::HashSet;
 use std::borrow::Borrow;
 use std::convert::Into;
+use std::cmp::Ordering;
+use std::cmp::PartialOrd;
+use std::cmp::Eq;
+use std::cmp::PartialEq;
+use std::hash::Hasher;
+use std::hash::Hash;
 
 #[derive(Debug,PartialEq,Eq,Clone,PartialOrd,Ord,Hash)]
 pub struct Position {
@@ -28,15 +34,7 @@ pub struct Token {
 }
 
 impl Token {
-    pub fn new(f: &str) -> Self {
-        Self::new_with_pos(f,
-            Position {
-                    line: 0,
-                    column: 0,
-            })
-    }
-
-    pub fn new_with_pos(f: &str, pos: Position) -> Self {
+    pub fn new(f: &str, pos: Position) -> Self {
         Token {
             fragment: f.to_string(),
             pos: pos,
@@ -51,11 +49,8 @@ impl Borrow<str> for Token {
 }
 
 macro_rules! value_node {
-    ($v:expr) => {
-        LocatedNode::new($v)
-    };
     ($v:expr, $p:expr) => {
-        LocatedNode::new_with_pos($v, $p)
+        LocatedNode::new($v, $p)
     };
 }
 
@@ -64,21 +59,15 @@ pub type SelectorList = Vec<Token>; // str is expected to always be a symbol.
 
 #[derive(Debug,PartialEq,Clone)]
 pub struct LocatedNode<T> {
-    pub pos: Option<Position>,
+    // TODO(jwall): Make this non-optional, Should we just use positioned instead?
+    pub pos: Position,
     pub val: T,
 }
 
 impl<T> LocatedNode<T> {
-    pub fn new(v: T) -> Self {
+    pub fn new<P: Into<Position>>(v: T, pos: P) -> Self {
         Self {
-            pos: None,
-            val: v,
-        }
-    }
-
-    pub fn new_with_pos<P: Into<Position>>(v: T, pos: P) -> Self {
-        Self {
-            pos: Some(pos.into()),
+            pos: pos.into(),
             val: v,
         }
     }
@@ -89,8 +78,9 @@ impl<T> LocatedNode<T> {
 }
 
 
-pub fn make_value_node<T>(v: T) -> LocatedNode<T> {
-    LocatedNode::new(v)
+// TODO(jwall): This should take a line and a column as argumentsn now.
+pub fn make_value_node<T>(v: T, line: usize, column: usize) -> LocatedNode<T> {
+    LocatedNode::new(v, Position{line: line, column: column})
 }
 
 /// Value represents a Value in the UCG parsed AST.
@@ -141,7 +131,7 @@ impl Value {
         }
     }
 
-    pub fn pos(&self) -> &Option<Position> {
+    pub fn pos(&self) -> &Position {
         match self {
             &Value::Int(ref i) => &i.pos,
             &Value::Float(ref f) => &f.pos,
@@ -173,7 +163,7 @@ pub struct SelectDef {
 }
 
 // TODO(jwall): This should have a way of rendering with position information.
-#[derive(PartialEq,Debug,Eq,PartialOrd,Ord,Clone,Hash)]
+#[derive(Debug,Clone)]
 pub struct Positioned<T> {
     pub pos: Option<Position>,
     pub val: T,
@@ -195,6 +185,33 @@ impl<T> Positioned<T> {
     }
 }
 
+impl<T: PartialEq> PartialEq for Positioned<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.val == other.val
+    }
+}
+
+impl<T: Eq> Eq for Positioned<T> {
+}
+
+impl<T: Ord> Ord for Positioned<T> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.val.cmp(&other.val)
+    }
+}
+
+impl<T: PartialOrd> PartialOrd for Positioned<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.val.partial_cmp(&other.val)
+    }
+}
+
+impl<T: Hash> Hash for Positioned<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.val.hash(state);
+    }
+}
+
 impl<'a> From<&'a Token> for Positioned<String> {
     fn from(t: &'a Token) -> Positioned<String> {
         Positioned {
@@ -207,7 +224,7 @@ impl<'a> From<&'a Token> for Positioned<String> {
 impl<'a> From<&'a LocatedNode<String>> for Positioned<String> {
     fn from(t: &LocatedNode<String>) -> Positioned<String> {
         Positioned {
-            pos: t.pos.clone(),
+            pos: Some(t.pos.clone()),
             val: t.val.clone(),
         }
     }
@@ -401,10 +418,10 @@ mod ast_test {
                 Positioned::new("foo".to_string())
             ],
             fields: vec![
-                (Token::new("f1"), Expression::Binary(BinaryOpDef{
+                (Token::new("f1", Position { line: 1, column: 1}), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
-                    left: Value::Symbol(make_value_node("foo".to_string())),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
+                    left: Value::Symbol(make_value_node("foo".to_string(), 1, 1)),
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1, 1, 1)))),
                     pos: None,
                 })),
             ],
@@ -420,10 +437,10 @@ mod ast_test {
                 Positioned::new("foo".to_string())
             ],
             fields: vec![
-                (Token::new("f1"), Expression::Binary(BinaryOpDef{
+                (Token::new("f1", Position{line: 1, column: 1}), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
-                    left: Value::Symbol(make_value_node("bar".to_string())),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
+                    left: Value::Symbol(make_value_node("bar".to_string(), 1, 1)),
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1, 1, 1)))),
                     pos: None,
                 })),
             ],
@@ -441,10 +458,12 @@ mod ast_test {
                 Positioned::new("foo".to_string())
             ],
             fields: vec![
-                (Token::new("f1"), Expression::Binary(BinaryOpDef{
+                (Token::new("f1", Position{line: 1, column: 1}), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
-                    left: Value::Selector(make_value_node(vec![Token::new("foo"), Token::new("quux")])),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
+                    left: Value::Selector(make_value_node(vec![
+                        Token::new("foo", Position{line: 1, column: 1}),
+                        Token::new("quux", Position{line: 1, column: 1})], 1, 1)),
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1, 1, 1)))),
                     pos: None,
                 })),
             ],
@@ -460,10 +479,12 @@ mod ast_test {
                 Positioned::new("foo".to_string()),
             ],
             fields: vec![
-                (Token::new("f1"), Expression::Binary(BinaryOpDef{
+                (Token::new("f1", Position{line: 1, column: 1}), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
-                    left: Value::Selector(make_value_node(vec![Token::new("bar"), Token::new("quux")])),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1)))),
+                    left: Value::Selector(make_value_node(vec![
+                        Token::new("bar", Position{line: 1, column: 1}),
+                        Token::new("quux", Position{line: 1, column: 1})], 1, 1)),
+                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1, 1, 1)))),
                     pos: None,
                 })),
             ],

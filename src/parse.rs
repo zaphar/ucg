@@ -13,6 +13,7 @@
 //  limitations under the License.
 use std::str::FromStr;
 use std::error::Error;
+use std::borrow::Borrow;
 
 use ast::*;
 use tokenizer::*;
@@ -32,20 +33,19 @@ quick_error! {
 }
 
 
-// TODO(jwall): Convert to tokenizer steps followed by parser steps.
 // TODO(jwall): Error Reporting with Line and Column information.
 
 type ParseResult<O> = Result<O, Box<Error>>;
 
 fn symbol_to_value(s: Token) -> ParseResult<Value> {
-    Ok(Value::Symbol(value_node!(s.fragment.to_string())))
+    Ok(Value::Symbol(value_node!(s.fragment.to_string(), s.pos)))
 }
 
 // symbol is a bare unquoted field.
 named!(symbol( Span ) -> Value, map_res!(barewordtok, symbol_to_value));
 
 fn str_to_value(s: Token) -> ParseResult<Value> {
-    Ok(Value::String(value_node!(s.fragment.to_string())))
+    Ok(Value::String(value_node!(s.fragment.to_string(), s.pos)))
 }
 
 // quoted_value is a quoted string.
@@ -55,25 +55,30 @@ named!(quoted_value( Span ) -> Value,
 
 // Helper function to make the return types work for down below.
 fn triple_to_number(v: (Option<Token>, Option<Token>, Option<Token>)) -> ParseResult<Value> {
-    let pref = match v.0 {
-        None => "",
-        Some(ref bs) => &bs.fragment,
+    let (pref, mut pref_pos) = match v.0 {
+        None => ("", Position{line: 0, column: 0}),
+        Some(ref bs) => (bs.fragment.borrow(), bs.pos.clone()),
     };
 
     let has_dot = v.1.is_some();
 
     if v.0.is_some() && !has_dot && v.2.is_none() {
-        return Ok(Value::Int(value_node!(try!(FromStr::from_str(pref)))));
+        return Ok(Value::Int(value_node!(try!(FromStr::from_str(pref)), pref_pos)));
     }
 
+    if v.0.is_none() && has_dot {
+        pref_pos = v.1.unwrap().pos;
+    }
+    
     let suf = match v.2 {
         None => "",
         Some(ref bs) => &bs.fragment,
     };
 
     let to_parse = pref.to_string() + "." + suf;
+    // TODO(jwall): if there is an error we should report where that error occured.
     let f = try!(FromStr::from_str(&to_parse));
-    return Ok(Value::Float(value_node!(f)));
+    return Ok(Value::Float(value_node!(f, pref_pos)));
 }
 
 // NOTE(jwall): HERE THERE BE DRAGONS. The order for these matters
@@ -130,8 +135,8 @@ named!(
 );
 
 // Helper function to make the return types work for down below.
-fn vec_to_tuple(v: FieldList) -> ParseResult<Value> {
-    Ok(Value::Tuple(value_node!(v)))
+fn vec_to_tuple(t: (Span, FieldList)) -> ParseResult<Value> {
+    Ok(Value::Tuple(value_node!(t.1, Position{line: t.0.line as usize, column: t.0.offset as usize})))
 }
 
 named!(field_list( Span ) -> FieldList,
@@ -141,9 +146,13 @@ named!(
     #[doc="Capture a tuple of named fields with values. {<field>=<value>,...}"],
     tuple( Span ) -> Value,
     map_res!(
-        delimited!(lbracetok,
+        do_parse!(
+            pos: position!() >>
+            v: delimited!(lbracetok,
                    ws!(field_list),
-                   rbracetok),
+                   rbracetok) >>
+                   (pos, v)
+        ),
         vec_to_tuple
     )
 );
@@ -161,12 +170,12 @@ named!(simple_expression( Span ) -> Expression,
        )
 );
 
-fn tuple_to_binary_expression(tpl: (BinaryExprType, Value, Expression)) -> ParseResult<Expression> {
+fn tuple_to_binary_expression(tpl: (Span, BinaryExprType, Value, Expression)) -> ParseResult<Expression> {
     Ok(Expression::Binary(BinaryOpDef {
-        kind: tpl.0,
-        left: tpl.1,
-        right: Box::new(tpl.2),
-        pos: None,
+        kind: tpl.1,
+        left: tpl.2,
+        right: Box::new(tpl.3),
+        pos: Some(Position{line: tpl.0.line as usize, column: tpl.0.offset as usize}),
     }))
 }
 
@@ -178,10 +187,11 @@ macro_rules! do_binary_expr {
         // particularly like this but I'm living with it for now.
         map_res!(
             $i, do_parse!(
+                pos: position!() >>
                 left: value >>
                     ws!($fn) >>
                     right: expression >>
-                    ($typ, left, right)
+                    (pos, $typ, left, right)
             ),
             tuple_to_binary_expression
         )
@@ -222,7 +232,6 @@ fn assert_nonempty_list<T>(v: Vec<T>) -> ParseResult<Vec<T>> {
     return Ok(v);
 }
 
-// TODO(jwall): We should assert that this is a nonempty list that comes out of here.
 named!(selector_list( Span ) -> SelectorList,
     map_res!(
         separated_list!(dottok, barewordtok),
@@ -230,43 +239,43 @@ named!(selector_list( Span ) -> SelectorList,
     )
 );
 
-fn tuple_to_copy(t: (SelectorList, FieldList)) -> ParseResult<Expression> {
+fn tuple_to_copy(t: (Span, SelectorList, FieldList)) -> ParseResult<Expression> {
     Ok(Expression::Copy(CopyDef {
-        selector: t.0,
-        fields: t.1,
-        pos: None,
+        selector: t.1,
+        fields: t.2,
+        pos: Some(Position{line: t.0.line as usize, column: t.0.offset as usize}),
     }))
 }
 
 named!(copy_expression( Span ) -> Expression,
        map_res!(
            do_parse!(
+               pos: position!() >>
                selector: selector_list >>
-                   lbracetok >>
-                   fields: ws!(field_list) >>
-                   rbracetok >>
-                   (selector, fields)
+               lbracetok >>
+               fields: ws!(field_list) >>
+               rbracetok >>
+               (pos, selector, fields)
            ),
            tuple_to_copy
        )
 );
 
-fn tuple_to_macro(mut t: (Vec<Value>, Value)) -> ParseResult<Expression> {
-    match t.1 {
+fn tuple_to_macro(mut t: (Span, Vec<Value>, Value)) -> ParseResult<Expression> {
+    match t.2 {
         Value::Tuple(v) => {
             Ok(Expression::Macro(MacroDef {
-                // TODO(jwall): The position information here is not as accurate as we might want.
-                argdefs: t.0
+                argdefs: t.1
                     .drain(0..)
                     .map(|s| {
                         Positioned {
-                            pos: v.pos.clone(),
+                            pos: Some(s.pos().clone()),
                             val: s.to_string(),
                         }
                     })
                     .collect(),
                 fields: v.val,
-                pos: v.pos,
+                pos: Some(Position{line: t.0.line as usize, column: t.0.offset as usize}),
             }))
         }
         // TODO(jwall): Show a better version of the unexpected parsed value.
@@ -281,26 +290,27 @@ named!(arglist( Span ) -> Vec<Value>, separated_list!(ws!(commatok), symbol));
 named!(macro_expression( Span ) -> Expression,
        map_res!(
            do_parse!(
-               macrotok >>
-                   ws!(lparentok) >>
-                   arglist: ws!(arglist) >>
-                   rparentok >>
-                   ws!(fatcommatok) >>
-                   map: tuple >>
-                   (arglist, map)
+                pos: position!() >>
+                macrotok >>
+                ws!(lparentok) >>
+                arglist: ws!(arglist) >>
+                rparentok >>
+                ws!(fatcommatok) >>
+                map: tuple >>
+                (pos, arglist, map)
            ),
            tuple_to_macro
        )
 );
 
-fn tuple_to_select(t: (Expression, Expression, Value)) -> ParseResult<Expression> {
-    match t.2 {
+fn tuple_to_select(t: (Span, Expression, Expression, Value)) -> ParseResult<Expression> {
+    match t.3 {
         Value::Tuple(v) => {
             Ok(Expression::Select(SelectDef {
-                val: Box::new(t.0),
-                default: Box::new(t.1),
+                val: Box::new(t.1),
+                default: Box::new(t.2),
                 tuple: v.val,
-                pos: None,
+                pos: Some(Position{line: t.0.line as usize, column: t.0.offset as usize}),
             }))
         }
         // TODO(jwall): Show a better version of the unexpected parsed value.
@@ -313,11 +323,12 @@ fn tuple_to_select(t: (Expression, Expression, Value)) -> ParseResult<Expression
 named!(select_expression( Span ) -> Expression,
        map_res!(
            do_parse!(
+               pos: position!() >>
                selecttok >>
-                   val: ws!(terminated!(expression, commatok)) >>
-                   default: ws!(terminated!(expression, commatok)) >>
-                   map: ws!(tuple) >>
-                   (val, default, map)
+               val: ws!(terminated!(expression, commatok)) >>
+               default: ws!(terminated!(expression, commatok)) >>
+               map: ws!(tuple) >>
+               (pos, val, default, map)
            ),
            tuple_to_select
        )
@@ -345,25 +356,29 @@ named!(format_expression( Span ) -> Expression,
        )
 );
 
-fn tuple_to_call(t: (Value, Vec<Expression>)) -> ParseResult<Expression> {
-    if let Value::Selector(sl) = t.0 {
+fn tuple_to_call(t: (Span, Value, Vec<Expression>)) -> ParseResult<Expression> {
+    if let Value::Selector(sl) = t.1 {
         Ok(Expression::Call(CallDef {
             macroref: sl.val,
-            arglist: t.1,
-            pos: None,
+            arglist: t.2,
+            pos: Some(Position{line: t.0.line as usize, column: t.0.offset as usize}),
         }))
     } else {
         Err(Box::new(ParseError::UnexpectedToken("Selector".to_string(), format!("{:?}", t.0))))
     }
 }
 
-fn vec_to_selector_value(v: SelectorList) -> ParseResult<Value> {
-    Ok(Value::Selector(value_node!(v)))
+fn vec_to_selector_value(t: (Span, SelectorList)) -> ParseResult<Value> {
+    Ok(Value::Selector(value_node!(t.1, Position{line: t.0.line as usize, column: t.0.offset as usize})))
 }
 
 named!(selector_value( Span ) -> Value,
        map_res!(
-           ws!(selector_list),
+           do_parse!(
+               pos: position!() >>
+               sl: ws!(selector_list) >>
+               (pos, sl)
+           ),
            vec_to_selector_value
        )
 );
@@ -371,11 +386,12 @@ named!(selector_value( Span ) -> Value,
 named!(call_expression( Span ) -> Expression,
        map_res!(
            do_parse!(
+               pos: position!() >>
                macroname: selector_value >>
-                   lparentok >>
-                   args: ws!(separated_list!(ws!(commatok), expression)) >>
-                   rparentok >>
-                   (macroname, args)
+               lparentok >>
+               args: ws!(separated_list!(ws!(commatok), expression)) >>
+               rparentok >>
+               (pos, macroname, args)
            ),
            tuple_to_call
        )
@@ -468,8 +484,6 @@ named!(statement( Span ) -> Statement,
 
 named!(pub parse( Span ) -> Vec<Statement>, many1!(ws!(statement)));
 
-// TODO(jwall): Full Statement parsing tests.
-
 #[cfg(test)]
 mod test {
     use super::{Statement, Expression, Value, MacroDef, SelectDef, CallDef};
@@ -525,7 +539,7 @@ mod test {
                                 column: 5,
                            },
                        },
-                       value: Expression::Simple(Value::Float(value_node!(1.0)))
+                       value: Expression::Simple(Value::Float(value_node!(1.0, Position{line: 1, column: 11})))
         }));
         stmt = "1.0;";
         let input = LocatedSpan::new(stmt);
@@ -537,7 +551,7 @@ mod test {
                         fragment: "",
                     },
                 Statement::Expression(
-                    Expression::Simple(Value::Float(value_node!(1.0))))));
+                    Expression::Simple(Value::Float(value_node!(1.0, Position{line: 1, column: 1}))))));
     }
 
     #[test]
@@ -593,7 +607,7 @@ mod test {
                             column: 5,
                          },
                     },
-                    value: Expression::Simple(Value::Float(value_node!(1.0)))
+                    value: Expression::Simple(Value::Float(value_node!(1.0, Position{line: 1, column: 11})))
                 }));
         
         let_stmt = "let foo= 1.0;";
@@ -610,7 +624,7 @@ mod test {
                         column: 5,
                     }
                 },
-                value: Expression::Simple(Value::Float(value_node!(1.0)))}));
+                value: Expression::Simple(Value::Float(value_node!(1.0, Position{line: 1, column: 10})))}));
         let_stmt = "let foo =1.0;";
         assert_eq!(let_statement(LocatedSpan::new(let_stmt)),
                IResult::Done(LocatedSpan{
@@ -625,7 +639,7 @@ mod test {
                         column: 5,
                     }
                 },
-                value: Expression::Simple(Value::Float(value_node!(1.0)))}));
+                value: Expression::Simple(Value::Float(value_node!(1.0, Position{line: 1, column: 10})))}));
     }
 
     #[test]
@@ -638,7 +652,7 @@ mod test {
                    line: 1,
                },
                              Statement::Expression(
-                                 Expression::Simple(Value::Float(value_node!(1.0))))));
+                                 Expression::Simple(Value::Float(value_node!(1.0, Position{line: 1, column: 1}))))));
         assert_eq!(expression_statement(LocatedSpan::new("1.0 ;")),
                IResult::Done(LocatedSpan {
                   fragment: "",
@@ -646,7 +660,7 @@ mod test {
                   line: 1,
                   },
                              Statement::Expression(
-                                 Expression::Simple(Value::Float(value_node!(1.0))))));
+                                 Expression::Simple(Value::Float(value_node!(1.0, Position{line: 1, column: 1}))))));
         assert_eq!(expression_statement(LocatedSpan::new(" 1.0;")),
                IResult::Done(LocatedSpan {
                   fragment: "",
@@ -654,7 +668,7 @@ mod test {
                   line: 1,
                   },
                              Statement::Expression(
-                                 Expression::Simple(Value::Float(value_node!(1.0))))));
+                                 Expression::Simple(Value::Float(value_node!(1.0, Position{line: 1, column: 2}))))));
         assert_eq!(expression_statement(LocatedSpan::new("foo;")),
                IResult::Done(LocatedSpan {
                   fragment: "",
@@ -662,7 +676,7 @@ mod test {
                   line: 1,
                   },
                              Statement::Expression(
-                                 Expression::Simple(Value::Symbol(value_node!("foo".to_string()))))));
+                                 Expression::Simple(Value::Symbol(value_node!("foo".to_string(), Position{line: 1, column: 1}))))));
         assert_eq!(expression_statement(LocatedSpan::new("foo ;")),
                IResult::Done(LocatedSpan {
                   fragment: "",
@@ -670,7 +684,7 @@ mod test {
                   line: 1,
                   },
                              Statement::Expression(
-                                 Expression::Simple(Value::Symbol(value_node!("foo".to_string()))))));
+                                 Expression::Simple(Value::Symbol(value_node!("foo".to_string(), Position{line: 1, column: 1}))))));
         assert_eq!(expression_statement(LocatedSpan::new(" foo;")),
                IResult::Done(LocatedSpan {
                   fragment: "",
@@ -678,7 +692,7 @@ mod test {
                   line: 1,
                   },
                              Statement::Expression(
-                                 Expression::Simple(Value::Symbol(value_node!("foo".to_string()))))));
+                                 Expression::Simple(Value::Symbol(value_node!("foo".to_string(), Position{line: 1, column: 2}))))));
         assert_eq!(expression_statement(LocatedSpan::new("\"foo\";")),
                IResult::Done(LocatedSpan {
                   fragment: "",
@@ -686,7 +700,7 @@ mod test {
                   line: 1,
                   },
                              Statement::Expression(
-                                 Expression::Simple(Value::String(value_node!("foo".to_string()))))));
+                                 Expression::Simple(Value::String(value_node!("foo".to_string(), Position{line: 1, column: 1}))))));
         assert_eq!(expression_statement(LocatedSpan::new("\"foo\" ;")),
                IResult::Done(LocatedSpan {
                   fragment: "",
@@ -694,7 +708,7 @@ mod test {
                   line: 1,
                   },
                              Statement::Expression(
-                                 Expression::Simple(Value::String(value_node!("foo".to_string()))))));
+                                 Expression::Simple(Value::String(value_node!("foo".to_string(), Position{line: 1, column: 1}))))));
         assert_eq!(expression_statement(LocatedSpan::new(" \"foo\";")),
                IResult::Done(LocatedSpan {
                   fragment: "",
@@ -702,7 +716,7 @@ mod test {
                   line: 1,
                   },
                              Statement::Expression(
-                                 Expression::Simple(Value::String(value_node!("foo".to_string()))))));
+                                 Expression::Simple(Value::String(value_node!("foo".to_string(), Position{line: 1, column: 2}))))));
     }
 
     #[test]
@@ -713,186 +727,187 @@ mod test {
                   offset: 1,
                   line: 1,
                   },
-               Expression::Simple(Value::Int(value_node!(1)))));
+               Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 1})))));
         assert_eq!(expression(LocatedSpan::new("foo")),
                IResult::Done(LocatedSpan {
                   fragment: "",
                   offset: 3,
                   line: 1,
                   },
-               Expression::Simple(Value::Symbol(value_node!("foo".to_string())))));
+               Expression::Simple(Value::Symbol(value_node!("foo".to_string(), Position{line: 1, column: 1})))));
         assert_eq!(expression(LocatedSpan::new("1 + 1")),
                IResult::Done(LocatedSpan {
                   fragment: "",
                   offset: 5,
                   line: 1,
                   },
-                             Expression::Binary(BinaryOpDef{
-                                 kind: BinaryExprType::Add,
-                                 left: Value::Int(value_node!(1)),
-                                 right: Box::new(Expression::Simple(Value::Int(value_node!(1)))),
-                                 pos: None,
-                             })));
+                Expression::Binary(BinaryOpDef{
+                    kind: BinaryExprType::Add,
+                    left: Value::Int(value_node!(1, Position{line: 1, column: 1})),
+                    right: Box::new(Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 5})))),
+                    pos: Some(Position { line: 1, column: 0 }),
+                })));
         assert_eq!(expression(LocatedSpan::new("1 - 1")),
                IResult::Done(LocatedSpan {
                   fragment: "",
                   offset: 5,
                   line: 1,
                   },
-                             Expression::Binary(BinaryOpDef{
-                                 kind: BinaryExprType::Sub,
-                                 left: Value::Int(value_node!(1)),
-                                 right: Box::new(Expression::Simple(Value::Int(value_node!(1)))),
-                                 pos: None,
-                             })));
+                Expression::Binary(BinaryOpDef{
+                    kind: BinaryExprType::Sub,
+                    left: Value::Int(value_node!(1, Position{line: 1, column: 1})),
+                    right: Box::new(Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 5})))),
+                    pos: Some(Position { line: 1, column: 0 }),
+                })));
         assert_eq!(expression(LocatedSpan::new("1 * 1")),
-               IResult::Done(LocatedSpan {
+                IResult::Done(LocatedSpan {
                   fragment: "",
                   offset: 5,
                   line: 1,
                   },
-                             Expression::Binary(BinaryOpDef{
-                                 kind: BinaryExprType::Mul,
-                                 left: Value::Int(value_node!(1)),
-                                 right: Box::new(Expression::Simple(Value::Int(value_node!(1)))),
-                                 pos: None,
-                             })));
+                Expression::Binary(BinaryOpDef{
+                    kind: BinaryExprType::Mul,
+                    left: Value::Int(value_node!(1, Position{line: 1, column: 1})),
+                    right: Box::new(Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 5})))),
+                    pos: Some(Position { line: 1, column: 0 }),
+                })));
         assert_eq!(expression(LocatedSpan::new("1 / 1")),
-               IResult::Done(LocatedSpan {
+                IResult::Done(LocatedSpan {
                   fragment: "",
                   offset: 5,
                   line: 1,
                   },
-                             Expression::Binary(BinaryOpDef{
-                                 kind: BinaryExprType::Div,
-                                 left: Value::Int(value_node!(1)),
-                                 right: Box::new(Expression::Simple(Value::Int(value_node!(1)))),
-                                 pos: None,
-                             })));
+                Expression::Binary(BinaryOpDef{
+                    kind: BinaryExprType::Div,
+                    left: Value::Int(value_node!(1, Position{line: 1, column: 1})),
+                    right: Box::new(Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 5})))),
+                    pos: Some(Position { line: 1, column: 0 }),
+                })));
 
         assert_eq!(expression(LocatedSpan::new("1+1")),
-               IResult::Done(LocatedSpan {
+                IResult::Done(LocatedSpan {
                   fragment: "",
                   offset: 3,
                   line: 1,
                   },
-                             Expression::Binary(BinaryOpDef{
-                                 kind: BinaryExprType::Add,
-                                 left: Value::Int(value_node!(1)),
-                                 right: Box::new(Expression::Simple(Value::Int(value_node!(1)))),
-                                 pos: None,
-                             })));
+                Expression::Binary(BinaryOpDef{
+                    kind: BinaryExprType::Add,
+                    left: Value::Int(value_node!(1, Position{line: 1, column: 1})),
+                    right: Box::new(Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 3})))),
+                    pos: Some(Position { line: 1, column: 0 }),
+                })));
         assert_eq!(expression(LocatedSpan::new("1-1")),
-               IResult::Done(LocatedSpan {
+                IResult::Done(LocatedSpan {
                   fragment: "",
                   offset: 3,
                   line: 1,
                   },
-                             Expression::Binary(BinaryOpDef{
-                                 kind: BinaryExprType::Sub,
-                                 left: Value::Int(value_node!(1)),
-                                 right: Box::new(Expression::Simple(Value::Int(value_node!(1)))),
-                                 pos: None,
-                             })));
+                Expression::Binary(BinaryOpDef{
+                    kind: BinaryExprType::Sub,
+                    left: Value::Int(value_node!(1, Position{line: 1, column: 1})),
+                    right: Box::new(Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 3})))),
+                    pos: Some(Position { line: 1, column: 0 }),
+                })));
         assert_eq!(expression(LocatedSpan::new("1*1")),
-               IResult::Done(LocatedSpan {
+                IResult::Done(LocatedSpan {
                   fragment: "",
                   offset: 3,
                   line: 1,
                   },
-                             Expression::Binary(BinaryOpDef{
-                                 kind: BinaryExprType::Mul,
-                                 left: Value::Int(value_node!(1)),
-                                 right: Box::new(Expression::Simple(Value::Int(value_node!(1)))),
-                                 pos: None,
-                             })));
+                Expression::Binary(BinaryOpDef{
+                    kind: BinaryExprType::Mul,
+                    left: Value::Int(value_node!(1, Position{line: 1, column: 1})),
+                    right: Box::new(Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 3})))),
+                    pos: Some(Position { line: 1, column: 0 }),
+                })));
         assert_eq!(expression(LocatedSpan::new("1/1")),
-               IResult::Done(LocatedSpan {
+                IResult::Done(LocatedSpan {
                   fragment: "",
                   offset: 3,
                   line: 1,
                   },
-                             Expression::Binary(BinaryOpDef{
-                                 kind: BinaryExprType::Div,
-                                 left: Value::Int(value_node!(1)),
-                                 right: Box::new(Expression::Simple(Value::Int(value_node!(1)))),
-                                 pos: None,
-                             })));
+                Expression::Binary(BinaryOpDef{
+                    kind: BinaryExprType::Div,
+                    left: Value::Int(value_node!(1, Position{line: 1, column: 1})),
+                    right: Box::new(Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 3})))),
+                    pos: Some(Position { line: 1, column: 0 }),
+                })));
         let macro_expr = "macro (arg1, arg2) => { foo = arg1 }";
         assert_eq!(expression(LocatedSpan::new(macro_expr)),
-               IResult::Done(LocatedSpan {
+                IResult::Done(LocatedSpan {
                   fragment: "",
                   offset: macro_expr.len(),
                   line: 1,
                   },
-                             Expression::Macro(MacroDef{
-                                 argdefs: vec![
-                                     Positioned::new("arg1".to_string()),
-                                     Positioned::new("arg2".to_string()),
-                                 ],
-                                 fields: vec![
-                                     (Token::new_with_pos("foo", Position{line: 1, column: 25}),
-                                      Expression::Simple(Value::Symbol(value_node!("arg1".to_string())))),
-                                 ],
-                                 pos: None,
-                             })
+                Expression::Macro(MacroDef{
+                    argdefs: vec![
+                        Positioned::new_with_pos("arg1".to_string(), Position{line: 1, column: 8}),
+                        Positioned::new_with_pos("arg2".to_string(), Position{line: 1, column: 14}),
+                    ],
+                    fields: vec![
+                        (Token::new("foo", Position{line: 1, column: 25}),
+                         Expression::Simple(Value::Symbol(value_node!("arg1".to_string(), Position{line: 1, column: 31})))),
+                    ],
+                    // FIXME(jwall): I think this is incorrect.
+                    pos: Some(Position{line: 1, column: 0}),
+                })
                )
     );
     let select_expr = "select foo, 1, { foo = 2 }";
     assert_eq!(expression(LocatedSpan::new(select_expr)),
-           IResult::Done(LocatedSpan {
+            IResult::Done(LocatedSpan {
               fragment: "",
               offset: select_expr.len(),
               line: 1,
               },
-                         Expression::Select(SelectDef{
-                             val: Box::new(Expression::Simple(Value::Symbol(value_node!("foo".to_string())))),
-                             default: Box::new(Expression::Simple(Value::Int(value_node!(1)))),
-                             tuple: vec![
-                                 (Token::new_with_pos("foo", Position{line: 1, column: 18}),
-                                  Expression::Simple(Value::Int(value_node!(2))))
-                             ],
-                             pos: None,
-                         })
+            Expression::Select(SelectDef{
+                val: Box::new(Expression::Simple(Value::Symbol(value_node!("foo".to_string(), Position{line: 1, column: 8})))),
+                default: Box::new(Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 13})))),
+                tuple: vec![
+                    (Token::new("foo", Position{line: 1, column: 18}),
+                     Expression::Simple(Value::Int(value_node!(2, Position{line: 1, column: 24}))))
+                ],
+                pos: Some(Position{line: 1, column: 0}),
+            })
            )
     );
-        let call_expr = "foo.bar (1, \"foo\")";
-        assert_eq!(expression(LocatedSpan::new(call_expr)),
-               IResult::Done(LocatedSpan {
-                  fragment: "",
-                  offset: call_expr.len(),
-                  line: 1,
-                  },
-                             Expression::Call(CallDef{
-                                 macroref: vec![Token::new_with_pos("foo", Position{line:1,column: 1}),
-                                                Token::new_with_pos("bar", Position{line:1,column: 5})],
-                                 arglist: vec![
-                                     Expression::Simple(Value::Int(value_node!(1))),
-                                     Expression::Simple(Value::String(value_node!("foo".to_string()))),
-                                 ],
-                                 pos: None,
-                             })
-               )
+     let call_expr = "foo.bar (1, \"foo\")";
+     assert_eq!(expression(LocatedSpan::new(call_expr)),
+            IResult::Done(LocatedSpan {
+               fragment: "",
+               offset: call_expr.len(),
+               line: 1,
+               },
+            Expression::Call(CallDef{
+                macroref: vec![Token::new("foo", Position{line:1,column: 1}),
+                               Token::new("bar", Position{line:1,column: 5})],
+                arglist: vec![
+                    Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 10}))),
+                    Expression::Simple(Value::String(value_node!("foo".to_string(), Position{line: 1, column: 13}))),
+                ],
+                pos: Some(Position{line: 1, column: 0}),
+            })
+           )
     );
-        assert_eq!(expression(LocatedSpan::new("(1 + 1)")),
-               IResult::Done(LocatedSpan {
-                  fragment: "",
-                  offset: 7,
-                  line: 1,
-                  },
-                          Expression::Grouped(
-                              Box::new(
-                                  Expression::Binary(
-                                      BinaryOpDef{
-                                          kind: BinaryExprType::Add,
-                                          left: Value::Int(value_node!(1)),
-                                          right: Box::new(Expression::Simple(Value::Int(value_node!(1)))),
-                                          pos: None,
-                                      }
-                                  )
-                              )
-                          )
+    assert_eq!(expression(LocatedSpan::new("(1 + 1)")),
+            IResult::Done(LocatedSpan {
+              fragment: "",
+              offset: 7,
+              line: 1,
+              },
+            Expression::Grouped(
+                Box::new(
+                    Expression::Binary(
+                        BinaryOpDef{
+                            kind: BinaryExprType::Add,
+                            left: Value::Int(value_node!(1, Position{line: 1, column: 2})),
+                            right: Box::new(Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 6})))),
+                            pos: Some(Position { line: 1, column: 1 }),
+                        }
+                    )
+                )
             )
+        )
     );
     }
 
@@ -913,8 +928,8 @@ mod test {
                     Expression::Format(
                         FormatDef{
                             template: "foo @ @".to_string(),
-                            args: vec![Expression::Simple(Value::Int(value_node!(1))),
-                                       Expression::Simple(Value::Int(value_node!(2)))],
+                            args: vec![Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 14}))),
+                                       Expression::Simple(Value::Int(value_node!(2, Position{line: 1, column: 17})))],
                             pos: Some(Position{line: 1, column: 1}),
                         }
                     )
@@ -931,8 +946,8 @@ mod test {
                 Expression::Format(
                     FormatDef{
                         template: "foo @ @".to_string(),
-                        args: vec![Expression::Simple(Value::Int(value_node!(1))),
-                                   Expression::Simple(Value::Int(value_node!(2)))],
+                        args: vec![Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 12}))),
+                                   Expression::Simple(Value::Int(value_node!(2, Position{line: 1, column: 15})))],
                         pos: Some(Position { line: 1, column: 1 }),
                     }
                 )
@@ -957,12 +972,12 @@ mod test {
                         offset: copy_expr.len(),
                     },
                     Expression::Call(CallDef{
-                        macroref: vec![Token::new_with_pos("foo", Position{line:1, column: 1})],
+                        macroref: vec![Token::new("foo", Position{line:1, column: 1})],
                         arglist: vec![
-                            Expression::Simple(Value::Int(value_node!(1))),
-                            Expression::Simple(Value::String(value_node!("foo".to_string()))),
+                            Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 6}))),
+                            Expression::Simple(Value::String(value_node!("foo".to_string(), Position{line: 1, column: 9}))),
                         ],
-                        pos: None,
+                        pos: Some(Position{line: 1, column: 0}),
                     })
                )
         );
@@ -976,13 +991,13 @@ mod test {
                         offset: copy_expr.len(),
                     },
                     Expression::Call(CallDef{
-                        macroref: vec![Token::new_with_pos("foo", Position{line: 1, column: 1}),
-                                       Token::new_with_pos("bar", Position{line: 1, column: 5})],
+                        macroref: vec![Token::new("foo", Position{line: 1, column: 1}),
+                                       Token::new("bar", Position{line: 1, column: 5})],
                         arglist: vec![
-                            Expression::Simple(Value::Int(value_node!(1))),
-                            Expression::Simple(Value::String(value_node!("foo".to_string()))),
+                            Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 10}))),
+                            Expression::Simple(Value::String(value_node!("foo".to_string(), Position{line: 1, column: 13}))),
                         ],
-                        pos: None,
+                        pos: Some(Position{line: 1, column: 0}),
                     })
                )
     );
@@ -997,19 +1012,19 @@ mod test {
 
         let select_expr = "select foo, 1, { foo = 2 }";
         assert_eq!(select_expression(LocatedSpan::new(select_expr)),
-               IResult::Done(LocatedSpan {
+                IResult::Done(LocatedSpan {
                   fragment: "",
                   offset: select_expr.len(),
                   line: 1,
                   },
-                             Expression::Select(SelectDef{
-                                 val: Box::new(Expression::Simple(Value::Symbol(value_node!("foo".to_string())))),
-                                 default: Box::new(Expression::Simple(Value::Int(value_node!(1)))),
-                                 tuple: vec![
-                                     (Token::new_with_pos("foo", Position{line: 1, column: 18}), Expression::Simple(Value::Int(value_node!(2))))
-                                 ],
-                                 pos: None,
-                             })
+                Expression::Select(SelectDef{
+                    val: Box::new(Expression::Simple(Value::Symbol(value_node!("foo".to_string(), Position{line: 1, column: 8})))),
+                    default: Box::new(Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 13})))),
+                    tuple: vec![
+                        (Token::new("foo", Position{line: 1, column: 18}), Expression::Simple(Value::Int(value_node!(2, Position{line: 1, column: 24}))))
+                    ],
+                    pos: Some(Position{line: 1, column: 0}),
+                })
                )
     );
     }
@@ -1037,12 +1052,12 @@ mod test {
                         line: 1
                     },
                     Expression::Macro(MacroDef{
-                        argdefs: vec![Positioned::new("arg1".to_string()),
-                                      Positioned::new("arg2".to_string())],
-                        fields: vec![(Token::new_with_pos("foo", Position{line: 1, column: 24}), Expression::Simple(Value::Int(value_node!(1)))),
-                                     (Token::new_with_pos("bar", Position{line: 1, column: 30}), Expression::Simple(Value::Int(value_node!(2))))
+                        argdefs: vec![Positioned::new_with_pos("arg1".to_string(), Position{line: 1, column: 8}),
+                                      Positioned::new_with_pos("arg2".to_string(), Position{line: 1, column: 14})],
+                        fields: vec![(Token::new("foo", Position{line: 1, column: 24}), Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 28})))),
+                                     (Token::new("bar", Position{line: 1, column: 30}), Expression::Simple(Value::Int(value_node!(2, Position{line: 1, column: 34}))))
                         ],
-                        pos: None,
+                        pos: Some(Position{line: 1, column: 0}),
                     })
                )
     );
@@ -1063,9 +1078,9 @@ mod test {
                         line: 1
                     },
                     Expression::Copy(CopyDef{
-                        selector: vec![Token::new_with_pos("foo", Position{line: 1, column: 1})],
+                        selector: vec![Token::new("foo", Position{line: 1, column: 1})],
                         fields: Vec::new(),
-                        pos: None,
+                        pos: Some(Position{line: 1, column: 0}),
                     })
                )
         );
@@ -1079,10 +1094,10 @@ mod test {
                     line: 1
                 },
                 Expression::Copy(CopyDef{
-                    selector: vec![Token::new_with_pos("foo", Position{line: 1, column: 1})],
-                    fields: vec![(Token::new_with_pos("bar", Position{line: 1, column: 5}),
-                                  Expression::Simple(Value::Int(value_node!(1))))],
-                    pos: None,
+                    selector: vec![Token::new("foo", Position{line: 1, column: 1})],
+                    fields: vec![(Token::new("bar", Position{line: 1, column: 5}),
+                                  Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 9}))))],
+                    pos: Some(Position{line: 1, column: 0}),
                 })
             )
         );
@@ -1097,7 +1112,7 @@ mod test {
                           Expression::Grouped(
                               Box::new(
                                   Expression::Simple(
-                                      Value::Symbol(value_node!("foo".to_string()))))))
+                                      Value::Symbol(value_node!("foo".to_string(), Position{line: 1, column: 2}))))))
     );
         assert_eq!(grouped_expression(LocatedSpan::new("(1 + 1)")),
             IResult::Done(LocatedSpan{fragment: "", offset: 7, line: 1},
@@ -1106,10 +1121,10 @@ mod test {
                                   Expression::Binary(
                                       BinaryOpDef{
                                           kind: BinaryExprType::Add,
-                                          left: Value::Int(value_node!(1)),
+                                          left: Value::Int(value_node!(1, Position{line: 1, column: 2})),
                                           right: Box::new(Expression::Simple(
-                                              Value::Int(value_node!(1)))),
-                                          pos: None,
+                                              Value::Int(value_node!(1, Position{line: 1, column: 6})))),
+                                          pos: Some(Position { line: 1, column: 1 }),
                                       }
                                   )
                               )
@@ -1135,7 +1150,7 @@ mod test {
                   line: 1,
                   },
                           Value::Tuple(
-                              value_node!(vec![]))));
+                              value_node!(vec![], Position{line: 1, column: 0}))));
 
         tuple_expr = "{ foo = 1 }";
         assert_eq!(tuple(LocatedSpan::new(tuple_expr)),
@@ -1146,9 +1161,9 @@ mod test {
                   },
                           Value::Tuple(
                               value_node!(vec![
-                                  (Token::new_with_pos("foo", Position{line:1, column: 3}),
-                                   Expression::Simple(Value::Int(value_node!(1))))
-                              ]))));
+                                  (Token::new("foo", Position{line:1, column: 3}),
+                                   Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 9}))))
+                              ], Position{line: 1, column: 0}))));
 
         tuple_expr = "{ foo = 1, bar = \"1\" }";
         assert_eq!(tuple(LocatedSpan::new(tuple_expr)),
@@ -1159,13 +1174,13 @@ mod test {
                   },
                           Value::Tuple(
                               value_node!(vec![
-                                  (Token::new_with_pos("foo", Position{line: 1, column: 3}),
-                                   Expression::Simple(Value::Int(value_node!(1)))),
-                                  (Token::new_with_pos("bar", Position{line: 1, column: 12}),
-                                   Expression::Simple(Value::String(value_node!("1".to_string()))))
-                              ]))));
+                                  (Token::new("foo", Position{line: 1, column: 3}),
+                                   Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 9})))),
+                                  (Token::new("bar", Position{line: 1, column: 12}),
+                                   Expression::Simple(Value::String(value_node!("1".to_string(), Position{line: 1, column: 18}))))
+                              ], Position{line: 1, column: 0}))));
         tuple_expr = "{ foo = 1, bar = {} }";
-        assert_eq!(tuple(LocatedSpan::new(tuple_expr)),
+       assert_eq!(tuple(LocatedSpan::new(tuple_expr)),
                IResult::Done(LocatedSpan {
                   fragment: "",
                   offset: tuple_expr.len(),
@@ -1173,11 +1188,11 @@ mod test {
                   },
                           Value::Tuple(
                               value_node!(vec![
-                                  (Token::new_with_pos("foo", Position{line: 1, column: 3}),
-                                   Expression::Simple(Value::Int(value_node!(1)))),
-                                  (Token::new_with_pos("bar", Position{line: 1, column: 12}),
-                                   Expression::Simple(Value::Tuple(value_node!(Vec::new()))))
-                              ]))));
+                                  (Token::new("foo", Position{line: 1, column: 3}),
+                                   Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 9})))),
+                                  (Token::new("bar", Position{line: 1, column: 12}),
+                                   Expression::Simple(Value::Tuple(value_node!(Vec::new(), Position{line: 1, column: 17}))))
+                              ], Position{line: 1, column: 0}))));
     }
 
     #[test]
@@ -1187,20 +1202,20 @@ mod test {
 
         assert_eq!(field_value(LocatedSpan::new("foo = 1")),
                IResult::Done(LocatedSpan { offset: 7, line: 1, fragment: "" },
-               (Token::new_with_pos("foo", Position{line: 1, column: 1}),
-                Expression::Simple(Value::Int(value_node!(1))))) );
+               (Token::new("foo", Position{line: 1, column: 1}),
+                Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 7}))))) );
         assert_eq!(field_value(LocatedSpan::new("foo = \"1\"")),
                IResult::Done(LocatedSpan { offset: 9, line: 1, fragment: "" },
-               (Token::new_with_pos("foo", Position{line: 1, column: 1}),
-                Expression::Simple(Value::String(value_node!("1".to_string()))))) );
+               (Token::new("foo", Position{line: 1, column: 1}),
+                Expression::Simple(Value::String(value_node!("1".to_string(), Position{line: 1, column: 7}))))) );
         assert_eq!(field_value(LocatedSpan::new("foo = bar")),
                IResult::Done(LocatedSpan { offset: 9, line: 1, fragment: "" },
-               (Token::new_with_pos("foo", Position{line: 1, column: 1}),
-                Expression::Simple(Value::Symbol(value_node!("bar".to_string()))))) );
+               (Token::new("foo", Position{line: 1, column: 1}),
+                Expression::Simple(Value::Symbol(value_node!("bar".to_string(), Position{line: 1, column: 7}))))) );
         assert_eq!(field_value(LocatedSpan::new("foo = bar ")),
                IResult::Done(LocatedSpan { offset: 10, line: 1, fragment: "" },
-               (Token::new_with_pos("foo", Position{line: 1, column: 1}),
-                Expression::Simple(Value::Symbol(value_node!("bar".to_string()))))) );
+               (Token::new("foo", Position{line: 1, column: 1}),
+                Expression::Simple(Value::Symbol(value_node!("bar".to_string(), Position{line: 1, column: 7}))))) );
     }
 
     #[test]
@@ -1209,29 +1224,29 @@ mod test {
         assert!(number(LocatedSpan::new(". ")).is_err() );
         assert_eq!(number(LocatedSpan::new("1.0")),
                IResult::Done(LocatedSpan{fragment: "", offset: 3, line: 1},
-               Value::Float(value_node!(1.0))) );
+               Value::Float(value_node!(1.0, Position{line: 1, column: 1}))) );
         assert_eq!(number(LocatedSpan::new("1.")),
                IResult::Done(LocatedSpan{fragment: "", offset: 2, line: 1},
-               Value::Float(value_node!(1.0))) );
+               Value::Float(value_node!(1.0, Position{line: 1, column: 1}))) );
         assert_eq!(number(LocatedSpan::new("1")),
                IResult::Done(LocatedSpan{fragment: "", offset: 1, line: 1},
-               Value::Int(value_node!(1))) );
+               Value::Int(value_node!(1, Position{line: 1, column: 1}))) );
         assert_eq!(number(LocatedSpan::new(".1")),
                IResult::Done(LocatedSpan{fragment: "", offset: 2, line: 1},
-               Value::Float(value_node!(0.1))) );
+               Value::Float(value_node!(0.1, Position{line: 1, column: 1}))) );
     }
 
     #[test]
     fn test_symbol_parsing() {
         assert_eq!(symbol(LocatedSpan::new("foo")),
                IResult::Done(LocatedSpan{fragment: "", offset: 3, line: 1},
-               Value::Symbol(value_node!("foo".to_string()))) );
+               Value::Symbol(value_node!("foo".to_string(), Position{line: 1, column: 1}))) );
         assert_eq!(symbol(LocatedSpan::new("foo-bar")),
                IResult::Done(LocatedSpan{fragment: "", offset: 7, line: 1},
-               Value::Symbol(value_node!("foo-bar".to_string()))) );
+               Value::Symbol(value_node!("foo-bar".to_string(), Position{line: 1, column: 1}))) );
         assert_eq!(symbol(LocatedSpan::new("foo_bar")),
                IResult::Done(LocatedSpan{fragment: "", offset: 7, line: 1},
-               Value::Symbol(value_node!("foo_bar".to_string()))) );
+               Value::Symbol(value_node!("foo_bar".to_string(), Position{line: 1, column: 1}))) );
     }
 
     #[test]
@@ -1267,15 +1282,15 @@ mod test {
                                column: 27,
                            }
                        },
-                       value: Expression::Simple(Value::Int(value_node!(1)))
+                       value: Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 33})))
                    },
                    Statement::Expression(
                        Expression::Binary(
                            BinaryOpDef{
                                kind: BinaryExprType::Add,
-                               left: Value::Int(value_node!(1)),
-                               right: Box::new(Expression::Simple(Value::Int(value_node!(1)))),
-                               pos: None,
+                               left: Value::Int(value_node!(1, Position{line: 1, column: 35})),
+                               right: Box::new(Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 37})))),
+                               pos: Some(Position { line: 1, column: 34 }),
                            })
                    )
                ]);
