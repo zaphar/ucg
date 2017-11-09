@@ -80,7 +80,11 @@ impl<T> LocatedNode<T> {
 
 // TODO(jwall): This should take a line and a column as argumentsn now.
 pub fn make_value_node<T>(v: T, line: usize, column: usize) -> LocatedNode<T> {
-    LocatedNode::new(v, Position{line: line, column: column})
+    LocatedNode::new(v,
+                     Position {
+                         line: line,
+                         column: column,
+                     })
 }
 
 /// Value represents a Value in the UCG parsed AST.
@@ -191,8 +195,7 @@ impl<T: PartialEq> PartialEq for Positioned<T> {
     }
 }
 
-impl<T: Eq> Eq for Positioned<T> {
-}
+impl<T: Eq> Eq for Positioned<T> {}
 
 impl<T: Ord> Ord for Positioned<T> {
     fn cmp(&self, other: &Self) -> Ordering {
@@ -453,7 +456,7 @@ mod ast_test {
 
     #[test]
     pub fn test_macro_validation_selector_happy_path() {
-        let def = MacroDef{
+        let def = MacroDef {
             argdefs: vec![
                 Positioned::new("foo".to_string())
             ],

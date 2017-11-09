@@ -56,7 +56,13 @@ named!(quoted_value( Span ) -> Value,
 // Helper function to make the return types work for down below.
 fn triple_to_number(v: (Option<Token>, Option<Token>, Option<Token>)) -> ParseResult<Value> {
     let (pref, mut pref_pos) = match v.0 {
-        None => ("", Position{line: 0, column: 0}),
+        None => {
+            ("",
+             Position {
+                line: 0,
+                column: 0,
+            })
+        }
         Some(ref bs) => (bs.fragment.borrow(), bs.pos.clone()),
     };
 
@@ -69,7 +75,7 @@ fn triple_to_number(v: (Option<Token>, Option<Token>, Option<Token>)) -> ParseRe
     if v.0.is_none() && has_dot {
         pref_pos = v.1.unwrap().pos;
     }
-    
+
     let suf = match v.2 {
         None => "",
         Some(ref bs) => &bs.fragment,
@@ -170,12 +176,16 @@ named!(simple_expression( Span ) -> Expression,
        )
 );
 
-fn tuple_to_binary_expression(tpl: (Span, BinaryExprType, Value, Expression)) -> ParseResult<Expression> {
+fn tuple_to_binary_expression(tpl: (Span, BinaryExprType, Value, Expression))
+                              -> ParseResult<Expression> {
     Ok(Expression::Binary(BinaryOpDef {
         kind: tpl.1,
         left: tpl.2,
         right: Box::new(tpl.3),
-        pos: Some(Position{line: tpl.0.line as usize, column: tpl.0.offset as usize}),
+        pos: Some(Position {
+            line: tpl.0.line as usize,
+            column: tpl.0.offset as usize,
+        }),
     }))
 }
 
@@ -227,7 +237,7 @@ named!(grouped_expression( Span ) -> Expression,
 
 fn assert_nonempty_list<T>(v: Vec<T>) -> ParseResult<Vec<T>> {
     if v.is_empty() {
-        return Err(Box::new(ParseError::EmptyExpression("Selectors can't be empty.".to_string())))
+        return Err(Box::new(ParseError::EmptyExpression("Selectors can't be empty.".to_string())));
     }
     return Ok(v);
 }
@@ -243,7 +253,10 @@ fn tuple_to_copy(t: (Span, SelectorList, FieldList)) -> ParseResult<Expression> 
     Ok(Expression::Copy(CopyDef {
         selector: t.1,
         fields: t.2,
-        pos: Some(Position{line: t.0.line as usize, column: t.0.offset as usize}),
+        pos: Some(Position {
+            line: t.0.line as usize,
+            column: t.0.offset as usize,
+        }),
     }))
 }
 
@@ -275,7 +288,10 @@ fn tuple_to_macro(mut t: (Span, Vec<Value>, Value)) -> ParseResult<Expression> {
                     })
                     .collect(),
                 fields: v.val,
-                pos: Some(Position{line: t.0.line as usize, column: t.0.offset as usize}),
+                pos: Some(Position {
+                    line: t.0.line as usize,
+                    column: t.0.offset as usize,
+                }),
             }))
         }
         // TODO(jwall): Show a better version of the unexpected parsed value.
@@ -310,7 +326,10 @@ fn tuple_to_select(t: (Span, Expression, Expression, Value)) -> ParseResult<Expr
                 val: Box::new(t.1),
                 default: Box::new(t.2),
                 tuple: v.val,
-                pos: Some(Position{line: t.0.line as usize, column: t.0.offset as usize}),
+                pos: Some(Position {
+                    line: t.0.line as usize,
+                    column: t.0.offset as usize,
+                }),
             }))
         }
         // TODO(jwall): Show a better version of the unexpected parsed value.
@@ -361,7 +380,10 @@ fn tuple_to_call(t: (Span, Value, Vec<Expression>)) -> ParseResult<Expression> {
         Ok(Expression::Call(CallDef {
             macroref: sl.val,
             arglist: t.2,
-            pos: Some(Position{line: t.0.line as usize, column: t.0.offset as usize}),
+            pos: Some(Position {
+                line: t.0.line as usize,
+                column: t.0.offset as usize,
+            }),
         }))
     } else {
         Err(Box::new(ParseError::UnexpectedToken("Selector".to_string(), format!("{:?}", t.0))))
@@ -609,7 +631,7 @@ mod test {
                     },
                     value: Expression::Simple(Value::Float(value_node!(1.0, Position{line: 1, column: 11})))
                 }));
-        
+
         let_stmt = "let foo= 1.0;";
         assert_eq!(let_statement(LocatedSpan::new(let_stmt)),
                IResult::Done(LocatedSpan{
@@ -848,13 +870,13 @@ mod test {
                         (Token::new("foo", Position{line: 1, column: 25}),
                          Expression::Simple(Value::Symbol(value_node!("arg1".to_string(), Position{line: 1, column: 31})))),
                     ],
-                    // FIXME(jwall): I think this is incorrect.
+        // FIXME(jwall): I think this is incorrect.
                     pos: Some(Position{line: 1, column: 0}),
                 })
                )
     );
-    let select_expr = "select foo, 1, { foo = 2 }";
-    assert_eq!(expression(LocatedSpan::new(select_expr)),
+        let select_expr = "select foo, 1, { foo = 2 }";
+        assert_eq!(expression(LocatedSpan::new(select_expr)),
             IResult::Done(LocatedSpan {
               fragment: "",
               offset: select_expr.len(),
@@ -871,8 +893,8 @@ mod test {
             })
            )
     );
-     let call_expr = "foo.bar (1, \"foo\")";
-     assert_eq!(expression(LocatedSpan::new(call_expr)),
+        let call_expr = "foo.bar (1, \"foo\")";
+        assert_eq!(expression(LocatedSpan::new(call_expr)),
             IResult::Done(LocatedSpan {
                fragment: "",
                offset: call_expr.len(),
@@ -889,7 +911,7 @@ mod test {
             })
            )
     );
-    assert_eq!(expression(LocatedSpan::new("(1 + 1)")),
+        assert_eq!(expression(LocatedSpan::new("(1 + 1)")),
             IResult::Done(LocatedSpan {
               fragment: "",
               offset: 7,
@@ -1180,7 +1202,7 @@ mod test {
                                    Expression::Simple(Value::String(value_node!("1".to_string(), Position{line: 1, column: 18}))))
                               ], Position{line: 1, column: 0}))));
         tuple_expr = "{ foo = 1, bar = {} }";
-       assert_eq!(tuple(LocatedSpan::new(tuple_expr)),
+        assert_eq!(tuple(LocatedSpan::new(tuple_expr)),
                IResult::Done(LocatedSpan {
                   fragment: "",
                   offset: tuple_expr.len(),
@@ -1256,8 +1278,7 @@ mod test {
         assert!(bad_result.is_err() );
 
         // Valid parsing tree
-        let input =
-            LocatedSpan::new("import \"mylib\" as lib;let foo = 1;1+1;");
+        let input = LocatedSpan::new("import \"mylib\" as lib;let foo = 1;1+1;");
         let result = parse(input);
         assert!(result.is_done() );
         let tpl = result.unwrap();

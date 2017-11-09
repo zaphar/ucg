@@ -350,8 +350,7 @@ impl Builder {
                     if self.assets.get(&positioned_sym).is_none() {
                         let mut b = Self::new();
                         try!(b.build_file(&val));
-                        let fields: Vec<(Positioned<String>, Rc<Val>)> =
-                            b.out.drain().collect();
+                        let fields: Vec<(Positioned<String>, Rc<Val>)> = b.out.drain().collect();
                         let result = Rc::new(Val::Tuple(fields));
                         self.assets.entry(positioned_sym).or_insert(result.clone());
                         self.files.insert(val.clone());
@@ -1142,7 +1141,11 @@ mod test {
     fn test_let_statement() {
         let mut b = Builder::new();
         let stmt = Statement::Let {
-            name: Token::new("foo", Position{line: 1, column: 1}),
+            name: Token::new("foo",
+                             Position {
+                                 line: 1,
+                                 column: 1,
+                             }),
             value: Expression::Simple(Value::String(make_value_node("bar".to_string(), 1, 1))),
         };
         b.build_stmt(&stmt).unwrap();

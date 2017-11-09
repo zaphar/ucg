@@ -52,7 +52,8 @@ impl<V: Into<String> + Clone> Formatter<V> {
             }
         }
         if self.args.len() != count {
-            return Err(Box::new(BuildError::FormatError("Too many arguments to string formatter."
+            return Err(Box::new(BuildError::FormatError("Too many arguments to string \
+                                                         formatter."
                 .to_string())));
         }
         return Ok(buf);
