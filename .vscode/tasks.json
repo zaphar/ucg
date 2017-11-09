@@ -8,7 +8,10 @@
             "taskName": "cargo fmt",
             "command": "cargo",
             "args": [
-                "fmt"
+                "fmt",
+                "--",
+                "--write-mode",
+                "overwrite"
             ],
             "problemMatcher": [
                 "$rustc"
