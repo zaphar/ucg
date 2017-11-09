@@ -153,7 +153,7 @@ impl Value {
 pub struct CallDef {
     pub macroref: SelectorList,
     pub arglist: Vec<Expression>,
-    pub pos: Option<Position>,
+    pub pos: Position,
 }
 
 /// SelectDef selects a value from a tuple with a default if the value doesn't
@@ -163,29 +163,19 @@ pub struct SelectDef {
     pub val: Box<Expression>,
     pub default: Box<Expression>,
     pub tuple: FieldList,
-    pub pos: Option<Position>,
+    pub pos: Position,
 }
 
 // TODO(jwall): This should have a way of rendering with position information.
 #[derive(Debug,Clone)]
 pub struct Positioned<T> {
-    pub pos: Option<Position>,
+    pub pos: Position,
     pub val: T,
 }
 
 impl<T> Positioned<T> {
-    pub fn new(v: T) -> Self {
-        Positioned {
-            pos: None,
-            val: v,
-        }
-    }
-
-    pub fn new_with_pos(v: T, pos: Position) -> Self {
-        Positioned {
-            pos: Some(pos),
-            val: v,
-        }
+    pub fn new(v: T, pos: Position) -> Self {
+        Positioned { pos: pos, val: v }
     }
 }
 
@@ -218,7 +208,7 @@ impl<T: Hash> Hash for Positioned<T> {
 impl<'a> From<&'a Token> for Positioned<String> {
     fn from(t: &'a Token) -> Positioned<String> {
         Positioned {
-            pos: Some(t.pos.clone()),
+            pos: t.pos.clone(),
             val: t.fragment.to_string(),
         }
     }
@@ -227,7 +217,7 @@ impl<'a> From<&'a Token> for Positioned<String> {
 impl<'a> From<&'a LocatedNode<String>> for Positioned<String> {
     fn from(t: &LocatedNode<String>) -> Positioned<String> {
         Positioned {
-            pos: Some(t.pos.clone()),
+            pos: t.pos.clone(),
             val: t.val.clone(),
         }
     }
@@ -241,7 +231,7 @@ impl<'a> From<&'a LocatedNode<String>> for Positioned<String> {
 pub struct MacroDef {
     pub argdefs: Vec<Positioned<String>>,
     pub fields: FieldList,
-    pub pos: Option<Position>,
+    pub pos: Position,
 }
 
 impl MacroDef {
@@ -354,21 +344,21 @@ pub struct BinaryOpDef {
     pub kind: BinaryExprType,
     pub left: Value,
     pub right: Box<Expression>,
-    pub pos: Option<Position>,
+    pub pos: Position,
 }
 
 #[derive(Debug,PartialEq,Clone)]
 pub struct CopyDef {
     pub selector: SelectorList,
     pub fields: FieldList,
-    pub pos: Option<Position>,
+    pub pos: Position,
 }
 
 #[derive(Debug,PartialEq,Clone)]
 pub struct FormatDef {
     pub template: String,
     pub args: Vec<Expression>,
-    pub pos: Option<Position>,
+    pub pos: Position,
 }
 
 /// Expression encodes an expression. Expressions compute a value from operands.
@@ -417,18 +407,23 @@ mod ast_test {
     #[test]
     pub fn test_macro_validation_happy_path() {
         let def = MacroDef {
-            argdefs: vec![
-                Positioned::new("foo".to_string())
-            ],
+            argdefs: vec![Positioned::new("foo".to_string(),
+                                          Position {
+                                              line: 1,
+                                              column: 0,
+                                          })],
             fields: vec![
                 (Token::new("f1", Position { line: 1, column: 1}), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
                     left: Value::Symbol(make_value_node("foo".to_string(), 1, 1)),
                     right: Box::new(Expression::Simple(Value::Int(make_value_node(1, 1, 1)))),
-                    pos: None,
+                    pos: Position{line: 1, column: 0},
                 })),
             ],
-            pos: None,
+            pos: Position {
+                line: 1,
+                column: 0,
+            },
         };
         assert!(def.validate_symbols().unwrap() == ());
     }
@@ -436,18 +431,23 @@ mod ast_test {
     #[test]
     pub fn test_macro_validation_fail() {
         let def = MacroDef {
-            argdefs: vec![
-                Positioned::new("foo".to_string())
-            ],
+            argdefs: vec![Positioned::new("foo".to_string(),
+                                          Position {
+                                              line: 1,
+                                              column: 0,
+                                          })],
             fields: vec![
                 (Token::new("f1", Position{line: 1, column: 1}), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
                     left: Value::Symbol(make_value_node("bar".to_string(), 1, 1)),
                     right: Box::new(Expression::Simple(Value::Int(make_value_node(1, 1, 1)))),
-                    pos: None,
+                    pos: Position{line: 1, column: 0},
                 })),
             ],
-            pos: None,
+            pos: Position {
+                line: 1,
+                column: 0,
+            },
         };
         let mut expected = HashSet::new();
         expected.insert("bar".to_string());
@@ -457,9 +457,11 @@ mod ast_test {
     #[test]
     pub fn test_macro_validation_selector_happy_path() {
         let def = MacroDef {
-            argdefs: vec![
-                Positioned::new("foo".to_string())
-            ],
+            argdefs: vec![Positioned::new("foo".to_string(),
+                                          Position {
+                                              line: 1,
+                                              column: 0,
+                                          })],
             fields: vec![
                 (Token::new("f1", Position{line: 1, column: 1}), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
@@ -467,10 +469,13 @@ mod ast_test {
                         Token::new("foo", Position{line: 1, column: 1}),
                         Token::new("quux", Position{line: 1, column: 1})], 1, 1)),
                     right: Box::new(Expression::Simple(Value::Int(make_value_node(1, 1, 1)))),
-                    pos: None,
+            pos: Position{line: 1, column: 0},
                 })),
             ],
-            pos: None,
+            pos: Position {
+                line: 1,
+                column: 0,
+            },
         };
         assert!(def.validate_symbols().unwrap() == ());
     }
@@ -478,9 +483,11 @@ mod ast_test {
     #[test]
     pub fn test_macro_validation_selector_fail() {
         let def = MacroDef {
-            argdefs: vec![
-                Positioned::new("foo".to_string()),
-            ],
+            argdefs: vec![Positioned::new("foo".to_string(),
+                                          Position {
+                                              line: 1,
+                                              column: 0,
+                                          })],
             fields: vec![
                 (Token::new("f1", Position{line: 1, column: 1}), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
@@ -488,10 +495,13 @@ mod ast_test {
                         Token::new("bar", Position{line: 1, column: 1}),
                         Token::new("quux", Position{line: 1, column: 1})], 1, 1)),
                     right: Box::new(Expression::Simple(Value::Int(make_value_node(1, 1, 1)))),
-                    pos: None,
+            pos: Position{line: 1, column: 0},
                 })),
             ],
-            pos: None,
+            pos: Position {
+                line: 1,
+                column: 0,
+            },
         };
         let mut expected = HashSet::new();
         expected.insert("bar".to_string());

@@ -182,10 +182,10 @@ fn tuple_to_binary_expression(tpl: (Span, BinaryExprType, Value, Expression))
         kind: tpl.1,
         left: tpl.2,
         right: Box::new(tpl.3),
-        pos: Some(Position {
+        pos: Position {
             line: tpl.0.line as usize,
             column: tpl.0.offset as usize,
-        }),
+        },
     }))
 }
 
@@ -253,10 +253,10 @@ fn tuple_to_copy(t: (Span, SelectorList, FieldList)) -> ParseResult<Expression> 
     Ok(Expression::Copy(CopyDef {
         selector: t.1,
         fields: t.2,
-        pos: Some(Position {
+        pos: Position {
             line: t.0.line as usize,
             column: t.0.offset as usize,
-        }),
+        },
     }))
 }
 
@@ -282,16 +282,16 @@ fn tuple_to_macro(mut t: (Span, Vec<Value>, Value)) -> ParseResult<Expression> {
                     .drain(0..)
                     .map(|s| {
                         Positioned {
-                            pos: Some(s.pos().clone()),
+                            pos: s.pos().clone(),
                             val: s.to_string(),
                         }
                     })
                     .collect(),
                 fields: v.val,
-                pos: Some(Position {
+                pos: Position {
                     line: t.0.line as usize,
                     column: t.0.offset as usize,
-                }),
+                },
             }))
         }
         // TODO(jwall): Show a better version of the unexpected parsed value.
@@ -326,10 +326,10 @@ fn tuple_to_select(t: (Span, Expression, Expression, Value)) -> ParseResult<Expr
                 val: Box::new(t.1),
                 default: Box::new(t.2),
                 tuple: v.val,
-                pos: Some(Position {
+                pos: Position {
                     line: t.0.line as usize,
                     column: t.0.offset as usize,
-                }),
+                },
             }))
         }
         // TODO(jwall): Show a better version of the unexpected parsed value.
@@ -357,7 +357,7 @@ fn tuple_to_format(t: (Token, Vec<Expression>)) -> ParseResult<Expression> {
     Ok(Expression::Format(FormatDef {
         template: t.0.fragment.to_string(),
         args: t.1,
-        pos: Some(t.0.pos),
+        pos: t.0.pos,
     }))
 }
 
@@ -380,10 +380,10 @@ fn tuple_to_call(t: (Span, Value, Vec<Expression>)) -> ParseResult<Expression> {
         Ok(Expression::Call(CallDef {
             macroref: sl.val,
             arglist: t.2,
-            pos: Some(Position {
+            pos: Position {
                 line: t.0.line as usize,
                 column: t.0.offset as usize,
-            }),
+            },
         }))
     } else {
         Err(Box::new(ParseError::UnexpectedToken("Selector".to_string(), format!("{:?}", t.0))))
@@ -767,7 +767,7 @@ mod test {
                     kind: BinaryExprType::Add,
                     left: Value::Int(value_node!(1, Position{line: 1, column: 1})),
                     right: Box::new(Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 5})))),
-                    pos: Some(Position { line: 1, column: 0 }),
+                    pos: Position { line: 1, column: 0 },
                 })));
         assert_eq!(expression(LocatedSpan::new("1 - 1")),
                IResult::Done(LocatedSpan {
@@ -779,7 +779,7 @@ mod test {
                     kind: BinaryExprType::Sub,
                     left: Value::Int(value_node!(1, Position{line: 1, column: 1})),
                     right: Box::new(Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 5})))),
-                    pos: Some(Position { line: 1, column: 0 }),
+                    pos: Position { line: 1, column: 0 },
                 })));
         assert_eq!(expression(LocatedSpan::new("1 * 1")),
                 IResult::Done(LocatedSpan {
@@ -791,7 +791,7 @@ mod test {
                     kind: BinaryExprType::Mul,
                     left: Value::Int(value_node!(1, Position{line: 1, column: 1})),
                     right: Box::new(Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 5})))),
-                    pos: Some(Position { line: 1, column: 0 }),
+                    pos: Position { line: 1, column: 0 },
                 })));
         assert_eq!(expression(LocatedSpan::new("1 / 1")),
                 IResult::Done(LocatedSpan {
@@ -803,7 +803,7 @@ mod test {
                     kind: BinaryExprType::Div,
                     left: Value::Int(value_node!(1, Position{line: 1, column: 1})),
                     right: Box::new(Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 5})))),
-                    pos: Some(Position { line: 1, column: 0 }),
+                    pos: Position { line: 1, column: 0 },
                 })));
 
         assert_eq!(expression(LocatedSpan::new("1+1")),
@@ -816,7 +816,7 @@ mod test {
                     kind: BinaryExprType::Add,
                     left: Value::Int(value_node!(1, Position{line: 1, column: 1})),
                     right: Box::new(Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 3})))),
-                    pos: Some(Position { line: 1, column: 0 }),
+                    pos: Position { line: 1, column: 0 },
                 })));
         assert_eq!(expression(LocatedSpan::new("1-1")),
                 IResult::Done(LocatedSpan {
@@ -828,7 +828,7 @@ mod test {
                     kind: BinaryExprType::Sub,
                     left: Value::Int(value_node!(1, Position{line: 1, column: 1})),
                     right: Box::new(Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 3})))),
-                    pos: Some(Position { line: 1, column: 0 }),
+                    pos: Position { line: 1, column: 0 },
                 })));
         assert_eq!(expression(LocatedSpan::new("1*1")),
                 IResult::Done(LocatedSpan {
@@ -840,7 +840,7 @@ mod test {
                     kind: BinaryExprType::Mul,
                     left: Value::Int(value_node!(1, Position{line: 1, column: 1})),
                     right: Box::new(Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 3})))),
-                    pos: Some(Position { line: 1, column: 0 }),
+                    pos: Position { line: 1, column: 0 },
                 })));
         assert_eq!(expression(LocatedSpan::new("1/1")),
                 IResult::Done(LocatedSpan {
@@ -852,7 +852,7 @@ mod test {
                     kind: BinaryExprType::Div,
                     left: Value::Int(value_node!(1, Position{line: 1, column: 1})),
                     right: Box::new(Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 3})))),
-                    pos: Some(Position { line: 1, column: 0 }),
+                    pos: Position { line: 1, column: 0 },
                 })));
         let macro_expr = "macro (arg1, arg2) => { foo = arg1 }";
         assert_eq!(expression(LocatedSpan::new(macro_expr)),
@@ -863,15 +863,14 @@ mod test {
                   },
                 Expression::Macro(MacroDef{
                     argdefs: vec![
-                        Positioned::new_with_pos("arg1".to_string(), Position{line: 1, column: 8}),
-                        Positioned::new_with_pos("arg2".to_string(), Position{line: 1, column: 14}),
+                        Positioned::new("arg1".to_string(), Position{line: 1, column: 8}),
+                        Positioned::new("arg2".to_string(), Position{line: 1, column: 14}),
                     ],
                     fields: vec![
                         (Token::new("foo", Position{line: 1, column: 25}),
                          Expression::Simple(Value::Symbol(value_node!("arg1".to_string(), Position{line: 1, column: 31})))),
                     ],
-        // FIXME(jwall): I think this is incorrect.
-                    pos: Some(Position{line: 1, column: 0}),
+                    pos: Position{line: 1, column: 0},
                 })
                )
     );
@@ -889,7 +888,7 @@ mod test {
                     (Token::new("foo", Position{line: 1, column: 18}),
                      Expression::Simple(Value::Int(value_node!(2, Position{line: 1, column: 24}))))
                 ],
-                pos: Some(Position{line: 1, column: 0}),
+                pos: Position{line: 1, column: 0},
             })
            )
     );
@@ -907,7 +906,7 @@ mod test {
                     Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 10}))),
                     Expression::Simple(Value::String(value_node!("foo".to_string(), Position{line: 1, column: 13}))),
                 ],
-                pos: Some(Position{line: 1, column: 0}),
+                pos: Position{line: 1, column: 0},
             })
            )
     );
@@ -924,7 +923,7 @@ mod test {
                             kind: BinaryExprType::Add,
                             left: Value::Int(value_node!(1, Position{line: 1, column: 2})),
                             right: Box::new(Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 6})))),
-                            pos: Some(Position { line: 1, column: 1 }),
+                            pos: Position { line: 1, column: 1 },
                         }
                     )
                 )
@@ -952,7 +951,7 @@ mod test {
                             template: "foo @ @".to_string(),
                             args: vec![Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 14}))),
                                        Expression::Simple(Value::Int(value_node!(2, Position{line: 1, column: 17})))],
-                            pos: Some(Position{line: 1, column: 1}),
+                            pos: Position{line: 1, column: 1},
                         }
                     )
                )
@@ -970,7 +969,7 @@ mod test {
                         template: "foo @ @".to_string(),
                         args: vec![Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 12}))),
                                    Expression::Simple(Value::Int(value_node!(2, Position{line: 1, column: 15})))],
-                        pos: Some(Position { line: 1, column: 1 }),
+                        pos: Position { line: 1, column: 1 },
                     }
                 )
             )
@@ -999,7 +998,7 @@ mod test {
                             Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 6}))),
                             Expression::Simple(Value::String(value_node!("foo".to_string(), Position{line: 1, column: 9}))),
                         ],
-                        pos: Some(Position{line: 1, column: 0}),
+                        pos: Position{line: 1, column: 0},
                     })
                )
         );
@@ -1019,7 +1018,7 @@ mod test {
                             Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 10}))),
                             Expression::Simple(Value::String(value_node!("foo".to_string(), Position{line: 1, column: 13}))),
                         ],
-                        pos: Some(Position{line: 1, column: 0}),
+                        pos: Position{line: 1, column: 0},
                     })
                )
     );
@@ -1045,7 +1044,7 @@ mod test {
                     tuple: vec![
                         (Token::new("foo", Position{line: 1, column: 18}), Expression::Simple(Value::Int(value_node!(2, Position{line: 1, column: 24}))))
                     ],
-                    pos: Some(Position{line: 1, column: 0}),
+                    pos: Position{line: 1, column: 0},
                 })
                )
     );
@@ -1074,12 +1073,12 @@ mod test {
                         line: 1
                     },
                     Expression::Macro(MacroDef{
-                        argdefs: vec![Positioned::new_with_pos("arg1".to_string(), Position{line: 1, column: 8}),
-                                      Positioned::new_with_pos("arg2".to_string(), Position{line: 1, column: 14})],
+                        argdefs: vec![Positioned::new("arg1".to_string(), Position{line: 1, column: 8}),
+                                      Positioned::new("arg2".to_string(), Position{line: 1, column: 14})],
                         fields: vec![(Token::new("foo", Position{line: 1, column: 24}), Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 28})))),
                                      (Token::new("bar", Position{line: 1, column: 30}), Expression::Simple(Value::Int(value_node!(2, Position{line: 1, column: 34}))))
                         ],
-                        pos: Some(Position{line: 1, column: 0}),
+                        pos: Position{line: 1, column: 0},
                     })
                )
     );
@@ -1102,7 +1101,7 @@ mod test {
                     Expression::Copy(CopyDef{
                         selector: vec![Token::new("foo", Position{line: 1, column: 1})],
                         fields: Vec::new(),
-                        pos: Some(Position{line: 1, column: 0}),
+                        pos: Position{line: 1, column: 0},
                     })
                )
         );
@@ -1119,7 +1118,7 @@ mod test {
                     selector: vec![Token::new("foo", Position{line: 1, column: 1})],
                     fields: vec![(Token::new("bar", Position{line: 1, column: 5}),
                                   Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 9}))))],
-                    pos: Some(Position{line: 1, column: 0}),
+                    pos: Position{line: 1, column: 0},
                 })
             )
         );
@@ -1146,7 +1145,7 @@ mod test {
                                           left: Value::Int(value_node!(1, Position{line: 1, column: 2})),
                                           right: Box::new(Expression::Simple(
                                               Value::Int(value_node!(1, Position{line: 1, column: 6})))),
-                                          pos: Some(Position { line: 1, column: 1 }),
+                                          pos: Position { line: 1, column: 1 },
                                       }
                                   )
                               )
@@ -1311,7 +1310,7 @@ mod test {
                                kind: BinaryExprType::Add,
                                left: Value::Int(value_node!(1, Position{line: 1, column: 35})),
                                right: Box::new(Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 37})))),
-                               pos: Some(Position { line: 1, column: 34 }),
+                               pos: Position { line: 1, column: 34 },
                            })
                    )
                ]);
