@@ -15,6 +15,9 @@ use std::str::FromStr;
 use std::error::Error;
 use std::borrow::Borrow;
 
+use nom::IResult;
+use nom::InputLength;
+
 use ast::*;
 use tokenizer::*;
 
@@ -163,7 +166,27 @@ named!(
     )
 );
 
-named!(value( Span ) -> Value, alt!(number | quoted_value | symbol | tuple));
+pub fn selector_or_symbol(input: Span) -> IResult<Span, Value> {
+    let sym = do_parse!(input,
+        sym: symbol >>
+             not!(dottok) >>
+             (sym)
+    );
+    match sym {
+        IResult::Incomplete(i) => {
+            return IResult::Incomplete(i);
+        },
+        IResult::Error(_) => {
+            // TODO(jwall): Maybe be smarter about the error reporting here?
+            return ws!(input, selector_value);
+        },
+        IResult::Done(rest, val) => {
+            return IResult::Done(rest, val);
+        }
+    }
+}
+
+named!(value( Span ) -> Value, alt!(number | quoted_value | tuple | selector_or_symbol ));
 
 fn value_to_expression(v: Value) -> ParseResult<Expression> {
     Ok(Expression::Simple(v))
@@ -504,19 +527,90 @@ named!(statement( Span ) -> Statement,
        )
 );
 
-named!(pub parse( Span ) -> Vec<Statement>, many1!(ws!(statement)));
+pub fn parse(input: Span) -> IResult<Span, Vec<Statement>> {
+    let mut out = Vec::new();
+    let mut i = input;
+    loop {
+        match ws!(i, statement) {
+            IResult::Error(e) => {
+                return IResult::Error(e);
+            },
+            IResult::Incomplete(i) => {
+                return IResult::Incomplete(i);
+            },
+            IResult::Done(rest, stmt) => {
+                out.push(stmt);
+                i = rest;
+                if i.input_len() == 0 {
+                    break;
+                }
+            }
+        }
+    }
+    return IResult::Done(i, out);
+}
+
+//named!(pub parse( Span ) -> Vec<Statement>, many1!());
 
 #[cfg(test)]
 mod test {
     use super::{Statement, Expression, Value, MacroDef, SelectDef, CallDef};
-    use super::{number, symbol, parse, field_value, tuple, grouped_expression};
+    use super::{number, symbol, parse, field_value, selector_value, selector_or_symbol, tuple, grouped_expression};
     use super::{copy_expression, macro_expression, select_expression};
     use super::{format_expression, call_expression, expression};
     use super::{expression_statement, let_statement, import_statement, statement};
     use ast::*;
     use nom_locate::LocatedSpan;
 
-    use nom::IResult;
+    use nom::{Needed, IResult};
+
+    #[test]
+    fn test_symbol_parsing() {
+        assert_eq!(symbol(LocatedSpan::new("foo")),
+               IResult::Done(LocatedSpan{fragment: "", offset: 3, line: 1},
+               Value::Symbol(value_node!("foo".to_string(), Position{line: 1, column: 1}))) );
+        assert_eq!(symbol(LocatedSpan::new("foo-bar")),
+               IResult::Done(LocatedSpan{fragment: "", offset: 7, line: 1},
+               Value::Symbol(value_node!("foo-bar".to_string(), Position{line: 1, column: 1}))) );
+        assert_eq!(symbol(LocatedSpan::new("foo_bar")),
+               IResult::Done(LocatedSpan{fragment: "", offset: 7, line: 1},
+               Value::Symbol(value_node!("foo_bar".to_string(), Position{line: 1, column: 1}))) );
+    }
+
+    #[test]
+    fn test_selector_parsing() {
+        assert_eq!(selector_value(LocatedSpan::new("foo.")),
+            IResult::Incomplete(Needed::Unknown)
+        );
+        assert_eq!(selector_value(LocatedSpan::new("foo.bar ")),
+          IResult::Done(LocatedSpan{fragment: "", offset: 8, line: 1},
+          Value::Selector(value_node!(vec![Token{fragment:"foo".to_string(), pos: Position{line: 1, column: 1}},
+                                           Token{fragment:"bar".to_string(), pos: Position{line: 1, column: 5}}],
+                                      Position{line: 1, column: 0})))
+        );
+        assert_eq!(selector_value(LocatedSpan::new("foo.bar;")),
+            IResult::Done(LocatedSpan{fragment: ";", offset: 7, line: 1},
+            Value::Selector(value_node!(vec![Token{fragment:"foo".to_string(), pos: Position{line: 1, column: 1}},
+                                             Token{fragment:"bar".to_string(), pos: Position{line: 1, column: 5}}],
+                                        Position{line: 1, column: 0})))
+        );
+    }
+
+    #[test]
+    fn test_selector_or_symbol_parsing() {
+        assert_eq!(selector_or_symbol(LocatedSpan::new("foo.")),
+            IResult::Incomplete(Needed::Unknown)
+        );
+        assert_eq!(selector_or_symbol(LocatedSpan::new("foo")),
+               IResult::Done(LocatedSpan{fragment: "", offset: 3, line: 1},
+               Value::Symbol(value_node!("foo".to_string(), Position{line: 1, column: 1}))) );
+        assert_eq!(selector_or_symbol(LocatedSpan::new("foo.bar ")),
+          IResult::Done(LocatedSpan{fragment: "", offset: 8, line: 1},
+          Value::Selector(value_node!(vec![Token{fragment:"foo".to_string(), pos: Position{line: 1, column: 1}},
+                                           Token{fragment:"bar".to_string(), pos: Position{line: 1, column: 5}}],
+                                      Position{line: 1, column: 0})))
+        );
+    }
 
     #[test]
     fn test_statement_parse() {
@@ -744,19 +838,27 @@ mod test {
     #[test]
     fn test_expression_parse() {
         assert_eq!(expression(LocatedSpan::new("1")),
-               IResult::Done(LocatedSpan {
-                  fragment: "",
-                  offset: 1,
-                  line: 1,
-                  },
-               Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 1})))));
+              IResult::Done(LocatedSpan {
+                 fragment: "",
+                 offset: 1,
+                 line: 1,
+                 },
+              Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 1})))));
         assert_eq!(expression(LocatedSpan::new("foo")),
+              IResult::Done(LocatedSpan {
+                 fragment: "",
+                 offset: 3,
+                 line: 1,
+                 },
+              Expression::Simple(Value::Symbol(value_node!("foo".to_string(), Position{line: 1, column: 1})))));
+        assert_eq!(expression(LocatedSpan::new("foo.bar ")),
                IResult::Done(LocatedSpan {
                   fragment: "",
-                  offset: 3,
+                  offset: 8,
                   line: 1,
                   },
-               Expression::Simple(Value::Symbol(value_node!("foo".to_string(), Position{line: 1, column: 1})))));
+               Expression::Simple(Value::Selector(make_value_node(vec![Token::new("foo", Position{line: 1, column: 1}),
+                                                                       Token::new("bar", Position{line: 1, column: 5})], 1, 0)))));
         assert_eq!(expression(LocatedSpan::new("1 + 1")),
                IResult::Done(LocatedSpan {
                   fragment: "",
@@ -1237,6 +1339,10 @@ mod test {
                IResult::Done(LocatedSpan { offset: 10, line: 1, fragment: "" },
                (Token::new("foo", Position{line: 1, column: 1}),
                 Expression::Simple(Value::Symbol(value_node!("bar".to_string(), Position{line: 1, column: 7}))))) );
+        assert_eq!(field_value(LocatedSpan::new("foo = bar.baz ")),
+               IResult::Done(LocatedSpan { offset: 14, line: 1, fragment: "" },
+               (Token::new("foo", Position{line: 1, column: 1}),
+               Expression::Simple(Value::Selector(make_value_node(vec![Token::new("bar", Position{line: 1, column: 7}), Token::new("baz", Position{line: 1, column: 11})], 1, 6))))));
     }
 
     #[test]
@@ -1255,19 +1361,6 @@ mod test {
         assert_eq!(number(LocatedSpan::new(".1")),
                IResult::Done(LocatedSpan{fragment: "", offset: 2, line: 1},
                Value::Float(value_node!(0.1, Position{line: 1, column: 1}))) );
-    }
-
-    #[test]
-    fn test_symbol_parsing() {
-        assert_eq!(symbol(LocatedSpan::new("foo")),
-               IResult::Done(LocatedSpan{fragment: "", offset: 3, line: 1},
-               Value::Symbol(value_node!("foo".to_string(), Position{line: 1, column: 1}))) );
-        assert_eq!(symbol(LocatedSpan::new("foo-bar")),
-               IResult::Done(LocatedSpan{fragment: "", offset: 7, line: 1},
-               Value::Symbol(value_node!("foo-bar".to_string(), Position{line: 1, column: 1}))) );
-        assert_eq!(symbol(LocatedSpan::new("foo_bar")),
-               IResult::Done(LocatedSpan{fragment: "", offset: 7, line: 1},
-               Value::Symbol(value_node!("foo_bar".to_string(), Position{line: 1, column: 1}))) );
     }
 
     #[test]

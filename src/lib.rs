@@ -24,6 +24,7 @@ pub mod ast;
 pub mod tokenizer;
 pub mod parse;
 pub mod build;
+pub mod convert;
 mod format;
 
 pub use ast::Value;

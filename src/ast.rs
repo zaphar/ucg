@@ -241,24 +241,29 @@ impl MacroDef {
                                   -> HashSet<String> {
         let mut bad_symbols = HashSet::new();
         if let &Value::Symbol(ref name) = val {
-            let mut ok = true;
+            let mut ok = false;
             for arg in self.argdefs.iter() {
-                ok &= arg.val == name.val
+                if arg.val == name.val {
+                    ok = true;
+                }
             }
             if !ok {
                 bad_symbols.insert(name.val.clone());
             }
         } else if let &Value::Selector(ref sel_node) = val {
             let list = &sel_node.val;
-            let mut ok = true;
+            let mut ok = false;
             if list.len() > 0 {
                 // We only look to see if the first selector item exists.
                 // This is because only the first one is a symbol all of the
                 // rest of the items in the selector are fields in a tuple.
                 // But we don't know at this time of the value passed into
                 // this macro is a tuple since this isn't a callsite.
+                println!("checking selector head {}", list[0].fragment);
                 for arg in self.argdefs.iter() {
-                    ok &= arg.val == list[0].fragment
+                    if arg.val == list[0].fragment {
+                        ok = true;
+                    }
                 }
                 if !ok {
                     bad_symbols.insert(list[0].fragment.to_string());

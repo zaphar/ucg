@@ -2,13 +2,13 @@ let dbhost = "localhost";
 let dbname = "testdb";
 
 let mk_db_conn = macro (host, port, db) => {
-    conn_string = "@:@/@" % (host, port, db)
     host = host,
     port = port,
     db = db,
+    conn_string = "@:@/@" % (host, port, db)
 };
 
-let db_conn = mk_db_conn(host, 3306, dbame);
+let db_conn = mk_db_conn(dbhost, 3306, dbname);
 
 let server_config = {
     dbconn = db_conn.conn_string,

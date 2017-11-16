@@ -231,7 +231,7 @@ pub struct Builder {
     /// out is our built output.
     out: ValueMap,
     /// last is the result of the last statement.
-    last: Option<Rc<Val>>,
+    pub last: Option<Rc<Val>>,
 }
 
 macro_rules! eval_binary_expr {
@@ -294,6 +294,17 @@ impl Builder {
         }
     }
 
+    pub fn get_out_by_name(&self, name: &str) -> Option<Rc<Val>> {
+        let key = Positioned {
+            pos: Position {
+                line: 0,
+                column: 0,
+            },
+            val: name.to_string(),
+        };
+        self.lookup_sym(&key)
+    }
+
     pub fn build(&mut self, ast: &Vec<Statement>) -> BuildResult {
         for stmt in ast.iter() {
             try!(self.build_stmt(stmt));
@@ -303,7 +314,7 @@ impl Builder {
 
     pub fn build_file_string(&mut self, name: &str, input: String) -> BuildResult {
         match parse(Span::new(&input)) {
-            nom::IResult::Done(_, stmts) => {
+            nom::IResult::Done(_span, stmts) => {
                 for stmt in stmts.iter() {
                     try!(self.build_stmt(stmt));
                 }
@@ -324,6 +335,7 @@ impl Builder {
         // TODO(jwall): It would be nice to be able to do this with streaming
         try!(f.read_to_string(&mut s));
         self.build_file_string(name, s)
+        // TODO(jwall): Call an output converter.
     }
 
     fn build_stmt(&mut self, stmt: &Statement) -> BuildResult {
@@ -923,8 +935,16 @@ mod test {
                                    }))
             .or_insert(Rc::new(Val::Int(2)));
         b.out
-            .entry(Positioned::new("var3".to_string(), Position{line: 1, column: 0}))
-            .or_insert(Rc::new(Val::Tuple(vec![(Positioned::new("lvl1".to_string(), Position{line: 1, column: 0}),
+            .entry(Positioned::new("var3".to_string(),
+                                   Position {
+                                       line: 1,
+                                       column: 0,
+                                   }))
+            .or_insert(Rc::new(Val::Tuple(vec![(Positioned::new("lvl1".to_string(),
+                                                                Position {
+                                                                    line: 1,
+                                                                    column: 0,
+                                                                }),
                                                 Rc::new(Val::Int(4)))])));
         test_expr_to_val(vec![
             (Expression::Simple(Value::Selector(make_value_node(vec![Token::new("var1", Position{line: 1, column: 1})], 1, 1))), Val::Tuple(
