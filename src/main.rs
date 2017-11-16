@@ -22,7 +22,6 @@ use std::process;
 
 use ucglib::build::Val;
 use ucglib::build;
-//use ucglib::convert::get_converter;
 use ucglib::convert::ConverterRunner;
 
 // TODO(jwall): List the target output types automatically.
