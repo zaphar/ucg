@@ -5,13 +5,23 @@
     "tasks": [
         {
             "type": "shell",
-            "taskName": "cargo fmt",
+            "label": "cargo fmt",
             "command": "cargo",
             "args": [
                 "fmt",
                 "--",
-                "--write-mode",
-                "overwrite"
+                "--write-mode", "overwrite"
+            ],
+            "problemMatcher": [
+                "$rustc"
+            ]
+        },
+        {
+            "type": "shell",
+            "label": "cargo doc",
+            "command": "cargo",
+            "args": [
+                "doc", "--open"
             ],
             "problemMatcher": [
                 "$rustc"
