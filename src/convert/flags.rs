@@ -32,20 +32,24 @@ impl FlagConverter {
         match v {
             &Val::Float(ref f) => {
                 try!(write!(w, "{} ", f));
-            },
+            }
             &Val::Int(ref i) => {
                 try!(write!(w, "{} ", i));
-            },
+            }
             &Val::String(ref s) => {
                 try!(write!(w, "'{}' ", s));
-            },
+            }
+            &Val::List(ref _def) => {
+                // FIXME(jwall): Fill this in?
+                eprintln!("Skipping List...");
+            }
             &Val::Tuple(ref flds) => {
                 for &(ref name, ref val) in flds.iter() {
                     try!(write!(w, "--{} ", name.val));
                     // TODO(jwall): What if the value is a tuple?
                     try!(self.write(&val, w));
                 }
-            },
+            }
             &Val::Macro(ref _def) => {
                 // This is ignored
                 eprintln!("Skipping macro...");

@@ -106,6 +106,7 @@ pub enum Val {
     Int(i64),
     Float(f64),
     String(String),
+    List(Vec<Rc<Val>>),
     Tuple(Vec<(Positioned<String>, Rc<Val>)>),
     Macro(MacroDef),
 }
@@ -116,6 +117,7 @@ impl Val {
             &Val::Int(_) => "Integer".to_string(),
             &Val::Float(_) => "Float".to_string(),
             &Val::String(_) => "String".to_string(),
+            &Val::List(_) => "List".to_string(),
             &Val::Tuple(_) => "Tuple".to_string(),
             &Val::Macro(_) => "Macro".to_string(),
         }
@@ -139,6 +141,13 @@ impl Val {
             }
             &Val::String(_) => {
                 if let &Val::String(_) = target {
+                    true
+                } else {
+                    false
+                }
+            }
+            &Val::List(_) => {
+                if let &Val::List(_) = target {
                     true
                 } else {
                     false
@@ -332,10 +341,9 @@ impl Builder {
     pub fn build_file(&mut self, name: &str) -> BuildResult {
         let mut f = try!(File::open(name));
         let mut s = String::new();
-        // TODO(jwall): It would be nice to be able to do this with streaming
+        // TODO(jwall): It would be nice to be able to do this while streaming
         try!(f.read_to_string(&mut s));
         self.build_file_string(name, s)
-        // TODO(jwall): Call an output converter.
     }
 
     fn build_stmt(&mut self, stmt: &Statement) -> BuildResult {
@@ -622,6 +630,13 @@ impl Builder {
             }
             &Expression::Grouped(ref expr) => {
                 return self.eval_expr(expr);
+            }
+            &Expression::List(ref def) => {
+                let mut vals = Vec::new();
+                for expr in def.elems.iter() {
+                    vals.push(try!(self.eval_expr(expr)));
+                }
+                return Ok(Rc::new(Val::List(vals)));
             }
             &Expression::Format(ref def) => {
                 let tmpl = &def.template;
@@ -918,7 +933,6 @@ mod test {
 
     #[test]
     fn test_eval_selector_expr() {
-        // TODO(jwall): Tests for this expression.
         let mut b = Builder::new();
         b.out.entry(Positioned::new("var1".to_string(), Position{line: 1, column: 0})).or_insert(Rc::new(Val::Tuple(vec![
             (Positioned::new("lvl1".to_string(), Position{line: 1, column: 0}), Rc::new(Val::Tuple(
@@ -1024,11 +1038,8 @@ mod test {
         ], b);
     }
 
-    // TODO(jwall): What about the duplicate field error?
-
     #[test]
     fn test_expr_copy() {
-        // TODO(jwall): Tests for this expression.
         let mut b = Builder::new();
         b.out.entry(Positioned::new("tpl1".to_string(), Position{line: 1, column: 0})).or_insert(Rc::new(Val::Tuple(vec![
             (Positioned::new("fld1".to_string(), Position{line: 1, column: 0}), Rc::new(Val::Int(1))),
@@ -1248,5 +1259,4 @@ mod test {
         ],
                          b);
     }
-    // TODO(jwall): Unit test for MacroDef Symbol Validation.
 }

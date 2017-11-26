@@ -137,6 +137,14 @@ named!(pub semicolontok( Span ) -> Token,
        do_tag_tok!(";")
 );
 
+named!(pub leftsquarebracket( Span ) -> Token,
+    do_tag_tok!("[")
+);
+
+named!(pub rightsquarebracket( Span ) -> Token,
+    do_tag_tok!("]")
+);
+
 named!(pub fatcommatok( Span ) -> Token,
        do_tag_tok!("=>")
 );

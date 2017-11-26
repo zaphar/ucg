@@ -59,7 +59,7 @@ pub type SelectorList = Vec<Token>; // str is expected to always be a symbol.
 
 #[derive(Debug,PartialEq,Clone)]
 pub struct LocatedNode<T> {
-    // TODO(jwall): Make this non-optional, Should we just use positioned instead?
+    // TODO(jwall): Should we just use positioned instead?
     pub pos: Position,
     pub val: T,
 }
@@ -78,7 +78,6 @@ impl<T> LocatedNode<T> {
 }
 
 
-// TODO(jwall): This should take a line and a column as argumentsn now.
 pub fn make_value_node<T>(v: T, line: usize, column: usize) -> LocatedNode<T> {
     LocatedNode::new(v,
                      Position {
@@ -290,6 +289,9 @@ impl MacroDef {
                         bad_symbols.extend(syms_set.drain());
                         stack.push(&bexpr.right);
                     }
+                    &Expression::List(ref def) => {
+                        stack.extend(def.elems.iter());
+                    }
                     &Expression::Grouped(ref expr) => {
                         stack.push(expr);
                     }
@@ -366,6 +368,12 @@ pub struct FormatDef {
     pub pos: Position,
 }
 
+#[derive(Debug,PartialEq,Clone)]
+pub struct ListDef {
+    pub elems: Vec<Expression>,
+    pub pos: Position,
+}
+
 /// Expression encodes an expression. Expressions compute a value from operands.
 #[derive(Debug,PartialEq,Clone)]
 pub enum Expression {
@@ -377,6 +385,7 @@ pub enum Expression {
     // Complex Expressions
     Copy(CopyDef),
     Grouped(Box<Expression>),
+    List(ListDef),
 
     Format(FormatDef),
 
