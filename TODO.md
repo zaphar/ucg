@@ -15,9 +15,8 @@ organiztion for a given configuration structure. Some options here could be
 
 # Minor Fixes and Polish
 
-* List parsing and semantics.
 * Full selector support. (i.e. expressions in the selector parts)
-   * List indexing?
 * JSON export
 * YAML export
 * Error Reporting with Line, Column, and File information.
+* All enums should use the tuple wrapping a concrete type pattern.
