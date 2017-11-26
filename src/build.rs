@@ -205,6 +205,13 @@ impl Val {
         }
         return false;
     }
+    
+    pub fn is_list(&self) -> bool {
+        if let &Val::Tuple(_) = self {
+            return true;
+        }
+        return false;
+    }
 }
 
 impl Display for Val {
@@ -410,58 +417,53 @@ impl Builder {
             let pos_sl = (&sl[0]).into();
             if let Some(v) = self.lookup_sym(&pos_sl) {
                 let mut it = sl.iter().skip(1).peekable();
-                if it.peek().is_none() {
-                    return Ok(v.clone());
-                }
-                if let &Val::Tuple(_) = v.as_ref() {
-                    let mut stack = VecDeque::new();
-                    stack.push_back(v.clone());
-                    loop {
-                        let vref = stack.pop_front().unwrap();
-                        if it.peek().is_none() {
-                            return Ok(vref.clone());
+                let mut stack = VecDeque::new();
+                stack.push_back(v.clone());
+                loop {
+                    let vref = stack.pop_front().unwrap();
+                    if it.peek().is_none() {
+                        return Ok(vref.clone());
+                    }
+                    // This unwrap is safe because we already checked for
+                    // None above.
+                    let next = it.next().unwrap();
+                    match vref.as_ref() {
+                        &Val::Tuple(_) => {
+                                // This unwrap is safe because we already checked for
+                                // Tuple in the pattern match.
+                                let fs = vref.get_fields().unwrap();
+                                if let Some(vv) = Self::find_in_fieldlist(&next.fragment, fs) {
+                                        stack.push_back(vv.clone());
+                                        continue;
+                                } else {
+                                    // TODO(jwall): A better error for this would be nice.
+                                    return Err(Box::new(BuildError::NoSuchSymbol(format!("Unable to \
+                                                                                          match selector \
+                                                                                          path {:?}",
+                                                                                         sl))));
+                                }
                         }
-                        // This unwrap is safe because we already checked for
-                        // None above.
-                        let k = it.next().unwrap();
-                        if !vref.is_tuple() {
-                            // TODO(jeremy) BuildErrors should take a token so they can
-                            // render the location of the error.
-                            return Err(Box::new(BuildError::NoSuchSymbol(format!("Attempted \
-                                                                                  to dereference \
-                                                                                  non-tuple \
-                                                                                  {:?} at field \
-                                                                                  {}.",
-                                                                                 sl,
-                                                                                 k.fragment))));
-                        }
-                        // This unwrap is safe because we already checked for
-                        // Tuple above.
-                        let fs = vref.get_fields().unwrap();
-                        if let Some(vv) = Self::find_in_fieldlist(&k.fragment, fs) {
-                            if vv.is_tuple() {
-                                stack.push_back(vv.clone());
+                        &Val::List(ref elems) => {
+                            // FIXME(jwall): better error reporting here would probably be good.
+                            let idx = try!(next.fragment.parse::<usize>());
+                            if idx < elems.len() {
+                                stack.push_back(elems[idx].clone());
                                 continue;
-                            }
-                            if it.peek().is_some() {
+                            } else {
+                                // TODO(jwall): A better error for this would be nice.
                                 return Err(Box::new(BuildError::NoSuchSymbol(format!("Unable to \
                                                                                       match selector \
                                                                                       path {:?}",
                                                                                      sl))));
-                            } else {
-                                return Ok(vv.clone());
+
                             }
-                        } else {
-                            // TODO(jwall): A better error for this would be nice.
-                            return Err(Box::new(BuildError::NoSuchSymbol(format!("Unable to \
-                                                                                  match selector \
-                                                                                  path {:?}",
-                                                                                 sl))));
+                        }
+                        _ => {
+                            return Err(Box::new(BuildError::TypeFail(format!("{} is not a Tuple or List",
+                                sl[0].fragment))));
                         }
                     }
                 }
-                return Err(Box::new(BuildError::TypeFail(format!("{} is not a Tuple",
-                                                                 sl[0].fragment))));
             }
             return Err(Box::new(BuildError::NoSuchSymbol(format!("Unable to find Symbol {}",
                                                                  sl[0].fragment))));
@@ -941,25 +943,16 @@ mod test {
                 ]
             ))),
         ])));
-        b.out
-            .entry(Positioned::new("var2".to_string(),
-                                   Position {
-                                       line: 1,
-                                       column: 0,
-                                   }))
+        b.out.entry(Positioned::new("var2".to_string(),
+                                    Position {line: 1, column: 0}))
             .or_insert(Rc::new(Val::Int(2)));
-        b.out
-            .entry(Positioned::new("var3".to_string(),
-                                   Position {
-                                       line: 1,
-                                       column: 0,
-                                   }))
-            .or_insert(Rc::new(Val::Tuple(vec![(Positioned::new("lvl1".to_string(),
-                                                                Position {
-                                                                    line: 1,
-                                                                    column: 0,
-                                                                }),
-                                                Rc::new(Val::Int(4)))])));
+        b.out.entry(Positioned::new("var3".to_string(),
+                                    Position {line: 1, column: 0}))
+            .or_insert(Rc::new(Val::Tuple(
+                vec![(Positioned::new("lvl1".to_string(),
+                                      Position {line: 1, column: 0}),
+                      Rc::new(Val::Int(4)))])));
+            
         test_expr_to_val(vec![
             (Expression::Simple(Value::Selector(make_value_node(vec![Token::new("var1", Position{line: 1, column: 1})], 1, 1))), Val::Tuple(
                 vec![
@@ -986,6 +979,28 @@ mod test {
             (Expression::Simple(Value::Selector(make_value_node(vec![Token::new("var3", Position{line: 1, column: 1}),
                                                      Token::new("lvl1", Position{line: 1, column: 1})], 1, 1))),
              Val::Int(4)),
+        ], b);
+    }
+
+    #[test]
+    fn test_eval_selector_list_expr() {
+        let mut b = Builder::new();
+        b.out.entry(Positioned::new("var1".to_string(), Position{line: 1, column: 1})).or_insert(Rc::new(Val::List(
+            vec![
+                Rc::new(Val::String("val1".to_string())),
+                Rc::new(Val::Tuple(vec![
+                            (Positioned::new("var2".to_string(), Position{line: 1, column: 1}),
+                             Rc::new(Val::Int(1))),
+                        ])),
+                ])));
+        // TODO(jwall): Assert that we can index into lists using dot syntax.
+
+        test_expr_to_val(vec![
+            (Expression::Simple(Value::Selector(make_value_node(vec![
+                Token::new("var1", Position{line: 1, column: 1}),
+                Token::new("0", Position{line: 1, column: 1})
+             ], 1, 1))),
+             Val::String("val1".to_string()))
         ], b);
     }
 
