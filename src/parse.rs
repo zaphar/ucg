@@ -501,10 +501,10 @@ named!(expression_statement( Span ) -> Statement,
 );
 
 fn tuple_to_let(t: (Token, Expression)) -> ParseResult<Statement> {
-    Ok(Statement::Let {
+    Ok(Statement::Let(LetDef {
         name: t.0,
         value: t.1,
-    })
+    }))
 }
 
 named!(let_statement( Span ) -> Statement,
@@ -521,10 +521,10 @@ named!(let_statement( Span ) -> Statement,
 );
 
 fn tuple_to_import(t: (Token, Token)) -> ParseResult<Statement> {
-    Ok(Statement::Import {
+    Ok(Statement::Import(ImportDef {
         name: t.0,
-        path: t.1.fragment.to_string(),
-    })
+        path: t.1,
+    }))
 }
 
 named!(import_statement( Span ) -> Statement,
@@ -645,8 +645,14 @@ mod test {
                        line: 1,
                        fragment: "",
                    },
-                   Statement::Import{
-                       path: "foo".to_string(),
+                   Statement::Import(ImportDef{
+                       path: Token{
+                           fragment: "foo".to_string(),
+                           pos: Position {
+                               line: 1,
+                               column: 8,
+                           }
+                       },
                        name: Token{
                           fragment: "foo".to_string(),
                           pos: Position{
@@ -654,7 +660,7 @@ mod test {
                               column: 17,
                           },
                       }
-                   }
+                   })
                )
         );
 
@@ -669,7 +675,7 @@ mod test {
                         line: 1,
                         fragment: "",
                     },
-                    Statement::Let{
+                    Statement::Let(LetDef{
                         name: Token{
                             fragment: "foo".to_string(),
                             pos: Position {
@@ -678,7 +684,7 @@ mod test {
                            },
                        },
                        value: Expression::Simple(Value::Float(value_node!(1.0, Position{line: 1, column: 11})))
-        }));
+        })));
         stmt = "1.0;";
         let input = LocatedSpan::new(stmt);
         assert_eq!(statement(input),
@@ -706,8 +712,14 @@ mod test {
                         line: 1,
                         offset: import_stmt.len(),
                     },
-                    Statement::Import{
-                        path: "foo".to_string(),
+                    Statement::Import(ImportDef{
+                        path: Token{
+                                fragment: "foo".to_string(),
+                                pos: Position{
+                                    line: 1,
+                                    column: 8,
+                                },
+                            },
                         name: Token{
                                 fragment: "foo".to_string(),
                                 pos: Position{
@@ -715,7 +727,7 @@ mod test {
                                     column: 17,
                                 },
                             }
-                    }
+                    })
                )
     );
     }
@@ -738,7 +750,7 @@ mod test {
                     offset: let_stmt.len(),
                     line: 1,
                 },
-                Statement::Let{name: Token{
+                Statement::Let(LetDef{name: Token{
                     fragment: "foo".to_string(),
                     pos: Position{
                             line: 1,
@@ -746,7 +758,7 @@ mod test {
                          },
                     },
                     value: Expression::Simple(Value::Float(value_node!(1.0, Position{line: 1, column: 11})))
-                }));
+                })));
 
         let_stmt = "let foo= 1.0;";
         assert_eq!(let_statement(LocatedSpan::new(let_stmt)),
@@ -755,14 +767,14 @@ mod test {
                     offset: let_stmt.len(),
                     line: 1,
                 },
-                Statement::Let{name: Token{
+                Statement::Let(LetDef{name: Token{
                     fragment: "foo".to_string(),
                     pos: Position{
                         line: 1,
                         column: 5,
                     }
                 },
-                value: Expression::Simple(Value::Float(value_node!(1.0, Position{line: 1, column: 10})))}));
+                value: Expression::Simple(Value::Float(value_node!(1.0, Position{line: 1, column: 10})))})));
         let_stmt = "let foo =1.0;";
         assert_eq!(let_statement(LocatedSpan::new(let_stmt)),
                IResult::Done(LocatedSpan{
@@ -770,14 +782,14 @@ mod test {
                     offset: let_stmt.len(),
                     line: 1,
                 },
-                Statement::Let{name: Token{
+                Statement::Let(LetDef{name: Token{
                     fragment: "foo".to_string(),
                     pos: Position{
                         line: 1,
                         column: 5,
                     }
                 },
-                value: Expression::Simple(Value::Float(value_node!(1.0, Position{line: 1, column: 10})))}));
+                value: Expression::Simple(Value::Float(value_node!(1.0, Position{line: 1, column: 10})))})));
     }
 
     #[test]
@@ -1444,8 +1456,14 @@ mod test {
         assert_eq!(tpl.0.fragment, "");
         assert_eq!(tpl.1,
                vec![
-                   Statement::Import{
-                       path: "mylib".to_string(),
+                   Statement::Import(ImportDef{
+                       path: Token{
+                           fragment: "mylib".to_string(),
+                           pos: Position{
+                               line: 1,
+                               column: 8,
+                           }
+                       },
                        name: Token{
                            fragment: "lib".to_string(),
                            pos: Position{
@@ -1453,8 +1471,8 @@ mod test {
                                column: 19,
                            }
                        }
-                   },
-                   Statement::Let{
+                   }),
+                   Statement::Let(LetDef{
                        name: Token{
                            fragment: "foo".to_string(),
                            pos: Position{
@@ -1463,7 +1481,7 @@ mod test {
                            }
                        },
                        value: Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 33})))
-                   },
+                   }),
                    Statement::Expression(
                        Expression::Binary(
                            BinaryOpDef{

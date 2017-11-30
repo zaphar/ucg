@@ -395,6 +395,18 @@ pub enum Expression {
     Select(SelectDef),
 }
 
+#[derive(Debug,PartialEq)]
+pub struct LetDef {
+    pub name: Token,
+    pub value: Expression,
+}
+
+#[derive(Debug,PartialEq)]
+pub struct ImportDef {
+    pub path: Token,
+    pub name: Token,
+}
+
 /// Statement encodes a parsed Statement in the UCG AST.
 #[derive(Debug,PartialEq)]
 pub enum Statement {
@@ -402,16 +414,10 @@ pub enum Statement {
     Expression(Expression),
 
     // Named bindings
-    Let {
-        name: Token,
-        value: Expression,
-    },
+    Let(LetDef),
 
     // Include a file.
-    Import {
-        path: String,
-        name: Token,
-    },
+    Import(ImportDef),
 }
 
 #[cfg(test)]

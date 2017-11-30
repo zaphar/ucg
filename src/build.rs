@@ -355,7 +355,7 @@ impl Builder {
 
     fn build_stmt(&mut self, stmt: &Statement) -> BuildResult {
         match stmt {
-            &Statement::Let { name: ref sym, value: ref expr } => {
+            &Statement::Let(LetDef{ name: ref sym, value: ref expr }) => {
                 let val = try!(self.eval_expr(expr));
                 self.last = Some(val.clone());
                 match self.out.entry(sym.into()) {
@@ -370,17 +370,17 @@ impl Builder {
                     }
                 }
             }
-            &Statement::Import { path: ref val, name: ref sym } => {
-                if !self.files.contains(val) {
+            &Statement::Import(ImportDef{ path: ref val, name: ref sym }) => {
+                if !self.files.contains(&val.fragment) {
                     // Only parse the file once on import.
                     let positioned_sym = sym.into();
                     if self.assets.get(&positioned_sym).is_none() {
                         let mut b = Self::new();
-                        try!(b.build_file(&val));
+                        try!(b.build_file(&val.fragment));
                         let fields: Vec<(Positioned<String>, Rc<Val>)> = b.out.drain().collect();
                         let result = Rc::new(Val::Tuple(fields));
                         self.assets.entry(positioned_sym).or_insert(result.clone());
-                        self.files.insert(val.clone());
+                        self.files.insert(val.fragment.clone());
                         self.last = Some(result);
                     }
                 }
@@ -1241,14 +1241,14 @@ mod test {
     #[test]
     fn test_let_statement() {
         let mut b = Builder::new();
-        let stmt = Statement::Let {
+        let stmt = Statement::Let(LetDef {
             name: Token::new("foo",
                              Position {
                                  line: 1,
                                  column: 1,
                              }),
             value: Expression::Simple(Value::String(make_value_node("bar".to_string(), 1, 1))),
-        };
+        });
         b.build_stmt(&stmt).unwrap();
         test_expr_to_val(vec![
             (Expression::Simple(Value::Symbol(make_value_node("foo".to_string(), 1, 1))),
