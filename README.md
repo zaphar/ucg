@@ -18,7 +18,7 @@ preferred format.
 
 #### Base Types
 
-UCG has 3 simple types Integer, Float, and String as well as Tuple for complex
+UCG has 3 simple types Integer, Float, and String as well as Tuple and List for complex
 types.
 
     1;
@@ -32,8 +32,12 @@ types.
         field2 = "strawberry",
     };
 
+    [1, 2, 3, 4];
+
 To specify that a number is a Float you must include a decimal point. Otherwise
-the number will be an integer. UCG does type inference for tuple fields based
+the number will be an integer.
+
+UCG does type inference for tuple fields based
 off of the value assigned.
 
 ### Simple Expressions
@@ -60,7 +64,7 @@ This gets turned into "foo 1 bar {"
 
 Let statements introduce a new name in a UCG file. Most configurations
 will be a tuple like below. Tuples are delimited by braces and have a list
-of named fields in them.
+of named fields in them. Fields in a tuple can be indexed using dotted selectors.
 
     let mysql_conn_base = {
       host = "db1.local.net",
@@ -68,8 +72,19 @@ of named fields in them.
       database = "place-holder",
     };
 
+    let mysql_host = mysql_conn_base.host;
+
 Tuple fields have no ordering guarantees. All bindings are immutable and
 can not be reassigned to once defined.
+
+### Lists
+
+Lists are an ordered collection of elements. Lists can be indexed using dotted selectors. List indexes start at 0.
+
+    let hosts = ["db1.local.net", "db2.local.net"];
+
+    let host1 = hosts.0;
+    let host2 = hosts.1;
 
 ### Variables
 
