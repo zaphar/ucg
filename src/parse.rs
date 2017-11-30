@@ -175,11 +175,11 @@ pub fn selector_or_symbol(input: Span) -> IResult<Span, Value> {
     match sym {
         IResult::Incomplete(i) => {
             return IResult::Incomplete(i);
-        },
+        }
         IResult::Error(_) => {
             // TODO(jwall): Maybe be smarter about the error reporting here?
             return ws!(input, selector_value);
-        },
+        }
         IResult::Done(rest, val) => {
             return IResult::Done(rest, val);
         }
@@ -442,8 +442,8 @@ named!(call_expression( Span ) -> Expression,
        )
 );
 
-fn tuple_to_list<Sp: Into<Position> >(t: (Sp, Vec<Expression>)) -> ParseResult<Expression> {
-    return Ok(Expression::List(ListDef{
+fn tuple_to_list<Sp: Into<Position>>(t: (Sp, Vec<Expression>)) -> ParseResult<Expression> {
+    return Ok(Expression::List(ListDef {
         elems: t.1,
         pos: t.0.into(),
     }));
@@ -555,10 +555,10 @@ pub fn parse(input: Span) -> IResult<Span, Vec<Statement>> {
         match ws!(i, statement) {
             IResult::Error(e) => {
                 return IResult::Error(e);
-            },
+            }
             IResult::Incomplete(i) => {
                 return IResult::Incomplete(i);
-            },
+            }
             IResult::Done(rest, stmt) => {
                 out.push(stmt);
                 i = rest;
@@ -571,12 +571,13 @@ pub fn parse(input: Span) -> IResult<Span, Vec<Statement>> {
     return IResult::Done(i, out);
 }
 
-//named!(pub parse( Span ) -> Vec<Statement>, many1!());
+// named!(pub parse( Span ) -> Vec<Statement>, many1!());
 
 #[cfg(test)]
 mod test {
     use super::{Statement, Expression, Value, MacroDef, SelectDef, CallDef};
-    use super::{number, symbol, parse, field_value, selector_value, selector_or_symbol, tuple, grouped_expression, list_expression};
+    use super::{number, symbol, parse, field_value, selector_value, selector_or_symbol, tuple,
+                grouped_expression, list_expression};
     use super::{copy_expression, macro_expression, select_expression};
     use super::{format_expression, call_expression, expression};
     use super::{expression_statement, let_statement, import_statement, statement};
@@ -1306,7 +1307,7 @@ mod test {
                           )
             )
         );
-        
+
         assert_eq!(list_expression(LocatedSpan::new("[1, 1]")),
             IResult::Done(LocatedSpan{fragment: "", offset: 6, line: 1},
                 Expression::List(

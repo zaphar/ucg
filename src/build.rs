@@ -205,7 +205,7 @@ impl Val {
         }
         return false;
     }
-    
+
     pub fn is_list(&self) -> bool {
         if let &Val::Tuple(_) = self {
             return true;
@@ -429,22 +429,22 @@ impl Builder {
                     let next = it.next().unwrap();
                     match vref.as_ref() {
                         &Val::Tuple(_) => {
-                                // This unwrap is safe because we already checked for
-                                // Tuple in the pattern match.
-                                let fs = vref.get_fields().unwrap();
-                                if let Some(vv) = Self::find_in_fieldlist(&next.fragment, fs) {
-                                        stack.push_back(vv.clone());
-                                        continue;
-                                } else {
-                                    // TODO(jwall): A better error for this would be nice.
-                                    return Err(Box::new(BuildError::NoSuchSymbol(format!("Unable to \
+                            // This unwrap is safe because we already checked for
+                            // Tuple in the pattern match.
+                            let fs = vref.get_fields().unwrap();
+                            if let Some(vv) = Self::find_in_fieldlist(&next.fragment, fs) {
+                                stack.push_back(vv.clone());
+                                continue;
+                            } else {
+                                // TODO(jwall): A better error for this would be nice.
+                                return Err(Box::new(BuildError::NoSuchSymbol(format!("Unable to \
                                                                                           match selector \
                                                                                           path {:?}",
                                                                                          sl))));
-                                }
+                            }
                         }
                         &Val::List(ref elems) => {
-                            // FIXME(jwall): better error reporting here would probably be good.
+                            // TODO(jwall): better error reporting here would probably be good.
                             let idx = try!(next.fragment.parse::<usize>());
                             if idx < elems.len() {
                                 stack.push_back(elems[idx].clone());
@@ -943,16 +943,23 @@ mod test {
                 ]
             ))),
         ])));
-        b.out.entry(Positioned::new("var2".to_string(),
-                                    Position {line: 1, column: 0}))
+        b.out
+            .entry(Positioned::new("var2".to_string(),
+                                   Position {
+                                       line: 1,
+                                       column: 0,
+                                   }))
             .or_insert(Rc::new(Val::Int(2)));
-        b.out.entry(Positioned::new("var3".to_string(),
-                                    Position {line: 1, column: 0}))
-            .or_insert(Rc::new(Val::Tuple(
-                vec![(Positioned::new("lvl1".to_string(),
+        b.out
+            .entry(Positioned::new("var3".to_string(),
+                                   Position {
+                                       line: 1,
+                                       column: 0,
+                                   }))
+            .or_insert(Rc::new(Val::Tuple(vec![(Positioned::new("lvl1".to_string(),
                                       Position {line: 1, column: 0}),
                       Rc::new(Val::Int(4)))])));
-            
+
         test_expr_to_val(vec![
             (Expression::Simple(Value::Selector(make_value_node(vec![Token::new("var1", Position{line: 1, column: 1})], 1, 1))), Val::Tuple(
                 vec![
@@ -985,8 +992,13 @@ mod test {
     #[test]
     fn test_eval_selector_list_expr() {
         let mut b = Builder::new();
-        b.out.entry(Positioned::new("var1".to_string(), Position{line: 1, column: 1})).or_insert(Rc::new(Val::List(
-            vec![
+        b.out
+            .entry(Positioned::new("var1".to_string(),
+                                   Position {
+                                       line: 1,
+                                       column: 1,
+                                   }))
+            .or_insert(Rc::new(Val::List(vec![
                 Rc::new(Val::String("val1".to_string())),
                 Rc::new(Val::Tuple(vec![
                             (Positioned::new("var2".to_string(), Position{line: 1, column: 1}),
@@ -1001,7 +1013,8 @@ mod test {
                 Token::new("0", Position{line: 1, column: 1})
              ], 1, 1))),
              Val::String("val1".to_string()))
-        ], b);
+        ],
+                         b);
     }
 
     #[test]

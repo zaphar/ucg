@@ -60,7 +60,7 @@ fn main() {
         let sym = matches.value_of("sym");
         let target = matches.value_of("target").unwrap();
         let mut builder = build::Builder::new();
-         match ConverterRunner::new(target) {
+        match ConverterRunner::new(target) {
             Ok(converter) => {
                 let result = builder.build_file(file);
                 if !result.is_ok() {
@@ -87,7 +87,7 @@ fn main() {
                 eprintln!("{}", msg);
                 process::exit(1);
             }
-         }
+        }
     } else if let Some(matches) = app.subcommand_matches("validate") {
         let file = matches.value_of("INPUT").unwrap();
         let mut builder = build::Builder::new();

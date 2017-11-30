@@ -27,11 +27,9 @@ pub struct ConverterRunner {
 impl ConverterRunner {
     pub fn new(typ: &str) -> Result<Self, String> {
         if typ == "flags" {
-            return Ok(ConverterRunner {
-                converter: Box::new(flags::FlagConverter::new()),
-            });
+            return Ok(ConverterRunner { converter: Box::new(flags::FlagConverter::new()) });
         }
-        return Err(format!("Unknown Target output type: {}", typ))
+        return Err(format!("Unknown Target output type: {}", typ));
     }
 
     pub fn convert(&self, v: Rc<Val>, w: Box<Write>) -> io::Result<()> {

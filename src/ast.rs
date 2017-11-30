@@ -54,8 +54,8 @@ macro_rules! value_node {
     };
 }
 
-pub type FieldList = Vec<(Token, Expression)>; // str is expected to be a symbol
-pub type SelectorList = Vec<Token>; // str is expected to always be a symbol.
+pub type FieldList = Vec<(Token, Expression)>; // Token is expected to be a symbol
+pub type SelectorList = Vec<Token>; // Token is expected to always be a symbol.
 
 #[derive(Debug,PartialEq,Clone)]
 pub struct LocatedNode<T> {
@@ -497,11 +497,7 @@ mod ast_test {
     #[test]
     pub fn test_macro_validation_selector_fail() {
         let def = MacroDef {
-            argdefs: vec![Positioned::new("foo".to_string(),
-                                          Position {
-                                              line: 1,
-                                              column: 0,
-                                          })],
+            argdefs: vec![Positioned::new("foo".to_string(), Position {line: 1, column: 0})],
             fields: vec![
                 (Token::new("f1", Position{line: 1, column: 1}), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
