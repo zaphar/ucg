@@ -186,7 +186,33 @@ pub fn selector_or_symbol(input: Span) -> IResult<Span, Value> {
     }
 }
 
-named!(value( Span ) -> Value, alt!(number | quoted_value | tuple | selector_or_symbol ));
+fn tuple_to_list<Sp: Into<Position>>(t: (Sp, Vec<Expression>)) -> ParseResult<Value> {
+    return Ok(Value::List(ListDef {
+        elems: t.1,
+        pos: t.0.into(),
+    }));
+}
+
+named!(list_value( Span ) -> Value,
+       map_res!(
+           do_parse!(
+               pos: position!() >>
+               leftsquarebracket >>
+               elements: ws!(separated_list!(ws!(commatok), expression)) >>
+               rightsquarebracket >>
+               (pos, elements)
+           ),
+           tuple_to_list
+       )
+);
+
+named!(value( Span ) -> Value,
+    alt!(
+        number |
+        quoted_value |
+        list_value |
+        tuple |
+        selector_or_symbol ));
 
 fn value_to_expression(v: Value) -> ParseResult<Expression> {
     Ok(Expression::Simple(v))
@@ -442,26 +468,6 @@ named!(call_expression( Span ) -> Expression,
        )
 );
 
-fn tuple_to_list<Sp: Into<Position>>(t: (Sp, Vec<Expression>)) -> ParseResult<Expression> {
-    return Ok(Expression::List(ListDef {
-        elems: t.1,
-        pos: t.0.into(),
-    }));
-}
-
-named!(list_expression( Span ) -> Expression,
-       map_res!(
-           do_parse!(
-               pos: position!() >>
-               leftsquarebracket >>
-               elements: ws!(separated_list!(ws!(commatok), expression)) >>
-               rightsquarebracket >>
-               (pos, elements)
-           ),
-           tuple_to_list
-       )
-);
-
 // NOTE(jwall): HERE THERE BE DRAGONS. The order for these matters
 // alot. We need to process alternatives in order of decreasing
 // specificity.  Unfortunately this means we are required to go in a
@@ -479,7 +485,6 @@ named!(expression( Span ) -> Expression,
            complete!(mul_expression) |
            complete!(div_expression) |
            complete!(grouped_expression) |
-           complete!(list_expression) |
            complete!(macro_expression) |
            complete!(format_expression) |
            complete!(select_expression) |
@@ -577,7 +582,7 @@ pub fn parse(input: Span) -> IResult<Span, Vec<Statement>> {
 mod test {
     use super::{Statement, Expression, Value, MacroDef, SelectDef, CallDef};
     use super::{number, symbol, parse, field_value, selector_value, selector_or_symbol, tuple,
-                grouped_expression, list_expression};
+                grouped_expression, list_value};
     use super::{copy_expression, macro_expression, select_expression};
     use super::{format_expression, call_expression, expression};
     use super::{expression_statement, let_statement, import_statement, statement};
@@ -1068,7 +1073,7 @@ mod test {
     );
         assert_eq!(expression(LocatedSpan::new("[1, 1]")),
             IResult::Done(LocatedSpan{fragment: "", offset: 6, line: 1},
-                Expression::List(
+                Expression::Simple(Value::List(
                     ListDef{
                         elems: vec![
                             Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 2}))),
@@ -1078,7 +1083,7 @@ mod test {
                     }
                 )
             )
-        );
+        ));
     }
 
     #[test]
@@ -1304,12 +1309,12 @@ mod test {
     }
 
     #[test]
-    fn test_list_expression_parse() {
-        assert!(list_expression(LocatedSpan::new("foo")).is_err() );
-        assert!(list_expression(LocatedSpan::new("[foo")).is_incomplete() );
-        assert_eq!(list_expression(LocatedSpan::new("[foo]")),
+    fn test_list_value_parse() {
+        assert!(list_value(LocatedSpan::new("foo")).is_err() );
+        assert!(list_value(LocatedSpan::new("[foo")).is_incomplete() );
+        assert_eq!(list_value(LocatedSpan::new("[foo]")),
             IResult::Done(LocatedSpan{fragment: "", offset: 5, line: 1},
-                          Expression::List(
+                          Value::List(
                               ListDef{
                                       elems: vec![
                                                 Expression::Simple(Value::Symbol(value_node!("foo".to_string(), Position{line: 1, column: 2})))
@@ -1320,9 +1325,9 @@ mod test {
             )
         );
 
-        assert_eq!(list_expression(LocatedSpan::new("[1, 1]")),
+        assert_eq!(list_value(LocatedSpan::new("[1, 1]")),
             IResult::Done(LocatedSpan{fragment: "", offset: 6, line: 1},
-                Expression::List(
+                Value::List(
                     ListDef{
                         elems: vec![
                             Expression::Simple(Value::Int(value_node!(1, Position{line: 1, column: 2}))),

@@ -96,6 +96,7 @@ pub enum Value {
     Symbol(LocatedNode<String>),
     // Complex Values
     Tuple(LocatedNode<FieldList>),
+    List(ListDef),
     Selector(LocatedNode<SelectorList>),
 }
 
@@ -107,6 +108,7 @@ impl Value {
             &Value::String(_) => "String".to_string(),
             &Value::Symbol(_) => "Symbol".to_string(),
             &Value::Tuple(_) => "Tuple".to_string(),
+            &Value::List(_) => "List".to_string(),
             &Value::Selector(_) => "Selector".to_string(),
         }
     }
@@ -123,6 +125,10 @@ impl Value {
         return buf;
     }
 
+    fn elems_to_string(v: &Vec<Expression>) -> String {
+        return format!("{}", v.len());
+    }
+    
     pub fn to_string(&self) -> String {
         match self {
             &Value::Int(ref i) => format!("{}", i.val),
@@ -130,6 +136,7 @@ impl Value {
             &Value::String(ref s) => format!("{}", s.val),
             &Value::Symbol(ref s) => format!("{}", s.val),
             &Value::Tuple(ref fs) => format!("{}", Self::fields_to_string(&fs.val)),
+            &Value::List(ref def) => format!("[{}]", Self::elems_to_string(&def.elems)),
             &Value::Selector(ref v) => v.val.join("."),
         }
     }
@@ -141,6 +148,7 @@ impl Value {
             &Value::String(ref s) => &s.pos,
             &Value::Symbol(ref s) => &s.pos,
             &Value::Tuple(ref fs) => &fs.pos,
+            &Value::List(ref def) => &def.pos,
             &Value::Selector(ref v) => &v.pos,
         }
     }
@@ -234,24 +242,26 @@ pub struct MacroDef {
 }
 
 impl MacroDef {
+    fn symbol_is_in_args(&self, sym: &String) -> bool {
+        for arg in self.argdefs.iter() {
+            if &arg.val == sym {
+                return true;
+            }
+        }
+        return false;
+    }
+
     fn validate_value_symbols<'a>(&self,
                                   stack: &mut Vec<&'a Expression>,
                                   val: &'a Value)
                                   -> HashSet<String> {
         let mut bad_symbols = HashSet::new();
         if let &Value::Symbol(ref name) = val {
-            let mut ok = false;
-            for arg in self.argdefs.iter() {
-                if arg.val == name.val {
-                    ok = true;
-                }
-            }
-            if !ok {
+            if !self.symbol_is_in_args(&name.val) {
                 bad_symbols.insert(name.val.clone());
             }
         } else if let &Value::Selector(ref sel_node) = val {
             let list = &sel_node.val;
-            let mut ok = false;
             if list.len() > 0 {
                 // We only look to see if the first selector item exists.
                 // This is because only the first one is a symbol all of the
@@ -259,12 +269,7 @@ impl MacroDef {
                 // But we don't know at this time of the value passed into
                 // this macro is a tuple since this isn't a callsite.
                 println!("checking selector head {}", list[0].fragment);
-                for arg in self.argdefs.iter() {
-                    if arg.val == list[0].fragment {
-                        ok = true;
-                    }
-                }
-                if !ok {
+                if !self.symbol_is_in_args(&list[0].fragment) {
                     bad_symbols.insert(list[0].fragment.to_string());
                 }
             }
@@ -272,6 +277,10 @@ impl MacroDef {
             let fields = &tuple_node.val;
             for &(_, ref expr) in fields.iter() {
                 stack.push(expr);
+            }
+        } else if let &Value::List(ref def) = val {
+            for elem in def.elems.iter() {
+                stack.push(elem);
             }
         }
         return bad_symbols;
@@ -288,9 +297,6 @@ impl MacroDef {
                         let mut syms_set = self.validate_value_symbols(&mut stack, &bexpr.left);
                         bad_symbols.extend(syms_set.drain());
                         stack.push(&bexpr.right);
-                    }
-                    &Expression::List(ref def) => {
-                        stack.extend(def.elems.iter());
                     }
                     &Expression::Grouped(ref expr) => {
                         stack.push(expr);
@@ -385,7 +391,6 @@ pub enum Expression {
     // Complex Expressions
     Copy(CopyDef),
     Grouped(Box<Expression>),
-    List(ListDef),
 
     Format(FormatDef),
 

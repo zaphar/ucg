@@ -86,6 +86,12 @@ Lists are an ordered collection of elements. Lists can be indexed using dotted s
     let host1 = hosts.0;
     let host2 = hosts.1;
 
+Lista can be concatenated with the + operator.
+
+    let more_hosts = hosts + ["db3.local.net"];
+
+Both the left and the right side of the + operator must be lists or you will get a type fail.
+
 ### Variables
 
 UCG can reference a binding using variables. Any named value using

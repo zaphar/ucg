@@ -276,6 +276,13 @@ impl Builder {
                 self.lookup_sym(&(s.into()))
                     .ok_or(Box::new(BuildError::NoSuchSymbol(format!("Unable to find {}", s.val))))
             }
+            &Value::List(ref def) => {
+                let mut vals = Vec::new();
+                for expr in def.elems.iter() {
+                    vals.push(try!(self.eval_expr(expr)));
+                }
+                return Ok(Rc::new(Val::List(vals)));
+            }
             &Value::Tuple(ref tuple_node) => {
                 let fields = tuple_node.val();
                 let mut new_fields = Vec::<(Positioned<String>, Rc<Val>)>::new();
@@ -515,6 +522,23 @@ impl Builder {
                                     }
                                 }
                             }
+                            Val::List(ref l) => {
+                                match expr_result.as_ref() {
+                                    &Val::List(ref r) => {
+                                        let mut new_vec = Vec::new();
+                                        new_vec.extend(l.iter().cloned());
+                                        new_vec.extend(r.iter().cloned());
+                                        return Ok(Rc::new(Val::List(new_vec)));
+                                    }
+                                    val => {
+                                        return Err(Box::new(BuildError::TypeFail(format!("Expected \
+                                                                                          List \
+                                                                                          but got \
+                                                                                          {:?}",
+                                                                                         val))))
+                                    }
+                                }
+                            }
                             ref expr => {
                                 return Err(Box::new(
                                     BuildError::Unsupported(
@@ -632,13 +656,6 @@ impl Builder {
             }
             &Expression::Grouped(ref expr) => {
                 return self.eval_expr(expr);
-            }
-            &Expression::List(ref def) => {
-                let mut vals = Vec::new();
-                for expr in def.elems.iter() {
-                    vals.push(try!(self.eval_expr(expr)));
-                }
-                return Ok(Rc::new(Val::List(vals)));
             }
             &Expression::Format(ref def) => {
                 let tmpl = &def.template;
@@ -867,6 +884,23 @@ mod test {
             pos: Position{line: 1, column: 0},
                 }),
              Val::String("foobar".to_string())),
+            (Expression::Binary(
+                BinaryOpDef{
+                    kind: BinaryExprType::Add,
+                    left: Value::List(
+                        ListDef{
+                            elems: vec![Expression::Simple(Value::String(make_value_node("foo".to_string(), 1, 1)))],
+                            pos: Position{line: 1, column: 1},
+                        }),
+                    right: Box::new(Expression::Simple(Value::List(
+                        ListDef{
+                            elems: vec![Expression::Simple(Value::String(make_value_node("bar".to_string(), 1, 1)))],
+                            pos: Position{line: 1, column: 1},
+                        }))),
+            pos: Position{line: 1, column: 0},
+                }),
+             Val::List(vec![Rc::new(Val::String("foo".to_string())),
+                            Rc::new(Val::String("bar".to_string()))])),
         ], b);
     }
 
