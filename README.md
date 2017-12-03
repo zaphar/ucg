@@ -42,14 +42,16 @@ off of the value assigned.
 
 ### Simple Expressions
 
-UCG supports simple math expressions using `+`, `-`, `*`, `/`) and string
-concatenation using `+`. The expressions enforce the same type between operands.
+UCG supports simple math expressions using `+`, `-`, `*`, `/`) as well as string
+and list concatenation using `+`. The expressions enforce the same type between operands.
 
     1 + 1;
     
     1.0 + 1.0;
     
     "foo" + "bar";
+    
+    [1, 2] + [3, 4];
 
 ### String formatting
 
@@ -58,7 +60,7 @@ shamelessly ripped off from python.
 
     "foo @ @ \@" % (1, "bar")
 
-This gets turned into "foo 1 bar {"
+This gets turned into "foo 1 bar @"
 
 ### Bindings and Tuples.
 
@@ -80,6 +82,9 @@ can not be reassigned to once defined.
 ### Lists
 
 Lists are an ordered collection of elements. Lists can be indexed using dotted selectors. List indexes start at 0.
+
+Lists do not at present type check their contents so you can mix types freely within the list. In the future we may enforce that lists contain only the same types but it
+is as yet unclear if that would be desirable or not.
 
     let hosts = ["db1.local.net", "db2.local.net"];
 

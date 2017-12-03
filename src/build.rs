@@ -124,50 +124,12 @@ impl Val {
     }
 
     pub fn type_equal(&self, target: &Self) -> bool {
-        match self {
-            &Val::Int(_) => {
-                if let &Val::Int(_) = target {
-                    true
-                } else {
-                    false
-                }
-            }
-            &Val::Float(_) => {
-                if let &Val::Float(_) = target {
-                    true
-                } else {
-                    false
-                }
-            }
-            &Val::String(_) => {
-                if let &Val::String(_) = target {
-                    true
-                } else {
-                    false
-                }
-            }
-            &Val::List(_) => {
-                if let &Val::List(_) = target {
-                    true
-                } else {
-                    false
-                }
-            }
-            &Val::Tuple(_) => {
-                if let &Val::Tuple(_) = target {
-                    true
-                } else {
-                    false
-                }
-            }
-            &Val::Macro(_) => {
-                if let &Val::Macro(_) = target {
-                    true
-                } else {
-                    false
-                }
-            }
-        }
+        enum_type_equality!(self, target, &Val::Int(_),
+                                     &Val::Float(_),
+                                     &Val::String(_),
+                                     &Val::List(_),
+                                     &Val::Tuple(_),
+                                     &Val::Macro(_)) 
     }
 
     pub fn get_fields(&self) -> Option<&Vec<(Positioned<String>, Rc<Val>)>> {
@@ -284,7 +246,7 @@ impl Builder {
                 return Ok(Rc::new(Val::List(vals)));
             }
             &Value::Tuple(ref tuple_node) => {
-                let fields = tuple_node.val();
+                let fields = &tuple_node.val;
                 let mut new_fields = Vec::<(Positioned<String>, Rc<Val>)>::new();
                 for &(ref name, ref expr) in fields.iter() {
                     let val = try!(self.eval_expr(expr));
@@ -294,7 +256,7 @@ impl Builder {
                 Ok(Rc::new(Val::Tuple(new_fields)))
             }
             &Value::Selector(ref selector_list_node) => {
-                self.lookup_selector(&selector_list_node.val)
+                self.lookup_selector(&selector_list_node.sel)
             }
         }
     }
@@ -319,10 +281,7 @@ impl Builder {
 
     pub fn get_out_by_name(&self, name: &str) -> Option<Rc<Val>> {
         let key = Positioned {
-            pos: Position {
-                line: 0,
-                column: 0,
-            },
+            pos: Position::new(0, 0),
             val: name.to_string(),
         };
         self.lookup_sym(&key)
@@ -362,7 +321,7 @@ impl Builder {
 
     fn build_stmt(&mut self, stmt: &Statement) -> BuildResult {
         match stmt {
-            &Statement::Let(LetDef{ name: ref sym, value: ref expr }) => {
+            &Statement::Let(LetDef { name: ref sym, value: ref expr }) => {
                 let val = try!(self.eval_expr(expr));
                 self.last = Some(val.clone());
                 match self.out.entry(sym.into()) {
@@ -377,7 +336,7 @@ impl Builder {
                     }
                 }
             }
-            &Statement::Import(ImportDef{ path: ref val, name: ref sym }) => {
+            &Statement::Import(ImportDef { path: ref val, name: ref sym }) => {
                 if !self.files.contains(&val.fragment) {
                     // Only parse the file once on import.
                     let positioned_sym = sym.into();
@@ -612,7 +571,7 @@ impl Builder {
                 }
             }
             &Expression::Copy(ref def) => {
-                let v = try!(self.lookup_selector(&def.selector));
+                let v = try!(self.lookup_selector(&def.selector.sel));
                 if let Val::Tuple(ref src_fields) = *v {
                     let mut m = HashMap::<Positioned<String>, Rc<Val>>::new();
                     // loop through fields and build  up a hahsmap
@@ -671,7 +630,7 @@ impl Builder {
             &Expression::Call(ref def) => {
                 let sel = &def.macroref;
                 let args = &def.arglist;
-                let v = try!(self.lookup_selector(sel));
+                let v = try!(self.lookup_selector(&sel.sel));
                 if let &Val::Macro(ref m) = v.deref() {
                     // Congratulations this is actually a macro.
                     let mut argvals: Vec<Rc<Val>> = Vec::new();
@@ -740,17 +699,17 @@ mod test {
             (Expression::Binary(
                 BinaryOpDef{
                     kind: BinaryExprType::Div,
-                    left: Value::Int(make_value_node(2, 1, 1)),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(2, 1, 1)))),
-            pos: Position{line: 1, column: 0},
+                    left: Value::Int(value_node!(2, 1, 1)),
+                    right: Box::new(Expression::Simple(Value::Int(value_node!(2, 1, 1)))),
+            pos: Position::new(1, 0),
                 }),
              Val::Int(1)),
             (Expression::Binary(
                 BinaryOpDef{
                     kind: BinaryExprType::Div,
-                    left: Value::Float(make_value_node(2.0, 1, 1)),
-                    right: Box::new(Expression::Simple(Value::Float(make_value_node(2.0, 1, 1)))),
-            pos: Position{line: 1, column: 0},
+                    left: Value::Float(value_node!(2.0, 1, 1)),
+                    right: Box::new(Expression::Simple(Value::Float(value_node!(2.0, 1, 1)))),
+            pos: Position::new(1, 0),
                 }),
              Val::Float(1.0)),
         ],
@@ -765,9 +724,9 @@ mod test {
             (Expression::Binary(
                 BinaryOpDef{
                     kind: BinaryExprType::Div,
-                    left: Value::Float(make_value_node(2.0, 1, 1)),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(2, 1, 1)))),
-            pos: Position{line: 1, column: 0},
+                    left: Value::Float(value_node!(2.0, 1, 1)),
+                    right: Box::new(Expression::Simple(Value::Int(value_node!(2, 1, 1)))),
+            pos: Position::new(1, 0),
                 }),
              Val::Float(1.0)),
         ],
@@ -781,17 +740,17 @@ mod test {
             (Expression::Binary(
                 BinaryOpDef{
                     kind: BinaryExprType::Mul,
-                    left: Value::Int(make_value_node(2, 1, 1)),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(2, 1, 1)))),
-            pos: Position{line: 1, column: 0},
+                    left: Value::Int(value_node!(2, 1, 1)),
+                    right: Box::new(Expression::Simple(Value::Int(value_node!(2, 1, 1)))),
+            pos: Position::new(1, 0),
                 }),
              Val::Int(4)),
             (Expression::Binary(
                 BinaryOpDef{
                     kind: BinaryExprType::Mul,
-                    left: Value::Float(make_value_node(2.0, 1, 1)),
-                    right: Box::new(Expression::Simple(Value::Float(make_value_node(2.0, 1, 1)))),
-            pos: Position{line: 1, column: 0},
+                    left: Value::Float(value_node!(2.0, 1, 1)),
+                    right: Box::new(Expression::Simple(Value::Float(value_node!(2.0, 1, 1)))),
+            pos: Position::new(1, 0),
                 }),
              Val::Float(4.0)),
         ],
@@ -806,9 +765,9 @@ mod test {
             (Expression::Binary(
                 BinaryOpDef{
                     kind: BinaryExprType::Mul,
-                    left: Value::Float(make_value_node(2.0, 1, 1)),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(20, 1, 1)))),
-            pos: Position{line: 1, column: 0},
+                    left: Value::Float(value_node!(2.0, 1, 1)),
+                    right: Box::new(Expression::Simple(Value::Int(value_node!(20, 1, 1)))),
+            pos: Position::new(1, 0),
                 }),
              Val::Float(1.0)),
         ],
@@ -822,17 +781,17 @@ mod test {
             (Expression::Binary(
                 BinaryOpDef{
                     kind: BinaryExprType::Sub,
-                    left: Value::Int(make_value_node(2, 1, 1)),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1, 1, 1)))),
-            pos: Position{line: 1, column: 0},
+                    left: Value::Int(value_node!(2, 1, 1)),
+                    right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
+            pos: Position::new(1, 0),
                 }),
              Val::Int(1)),
             (Expression::Binary(
                 BinaryOpDef{
                     kind: BinaryExprType::Sub,
-                    left: Value::Float(make_value_node(2.0, 1, 1)),
-                    right: Box::new(Expression::Simple(Value::Float(make_value_node(1.0, 1, 1)))),
-            pos: Position{line: 1, column: 0},
+                    left: Value::Float(value_node!(2.0, 1, 1)),
+                    right: Box::new(Expression::Simple(Value::Float(value_node!(1.0, 1, 1)))),
+            pos: Position::new(1, 0),
                 }),
              Val::Float(1.0)),
         ],
@@ -847,9 +806,9 @@ mod test {
             (Expression::Binary(
                 BinaryOpDef{
                     kind: BinaryExprType::Sub,
-                    left: Value::Float(make_value_node(2.0, 1, 1)),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(2, 1, 1)))),
-            pos: Position{line: 1, column: 0},
+                    left: Value::Float(value_node!(2.0, 1, 1)),
+                    right: Box::new(Expression::Simple(Value::Int(value_node!(2, 1, 1)))),
+            pos: Position::new(1, 0),
                 }),
              Val::Float(1.0)),
         ],
@@ -863,25 +822,25 @@ mod test {
             (Expression::Binary(
                 BinaryOpDef{
                     kind: BinaryExprType::Add,
-                    left: Value::Int(make_value_node(1, 1, 1)),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1, 1, 1)))),
-            pos: Position{line: 1, column: 0},
+                    left: Value::Int(value_node!(1, 1, 1)),
+                    right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
+            pos: Position::new(1, 0),
                 }),
              Val::Int(2)),
             (Expression::Binary(
                 BinaryOpDef{
                     kind: BinaryExprType::Add,
-                    left: Value::Float(make_value_node(1.0, 1, 1)),
-                    right: Box::new(Expression::Simple(Value::Float(make_value_node(1.0, 1, 1)))),
-            pos: Position{line: 1, column: 0},
+                    left: Value::Float(value_node!(1.0, 1, 1)),
+                    right: Box::new(Expression::Simple(Value::Float(value_node!(1.0, 1, 1)))),
+            pos: Position::new(1, 0),
                 }),
              Val::Float(2.0)),
             (Expression::Binary(
                 BinaryOpDef{
                     kind: BinaryExprType::Add,
-                    left: Value::String(make_value_node("foo".to_string(), 1, 1)),
-                    right: Box::new(Expression::Simple(Value::String(make_value_node("bar".to_string(), 1, 1)))),
-            pos: Position{line: 1, column: 0},
+                    left: Value::String(value_node!("foo".to_string(), 1, 1)),
+                    right: Box::new(Expression::Simple(Value::String(value_node!("bar".to_string(), 1, 1)))),
+            pos: Position::new(1, 0),
                 }),
              Val::String("foobar".to_string())),
             (Expression::Binary(
@@ -889,15 +848,15 @@ mod test {
                     kind: BinaryExprType::Add,
                     left: Value::List(
                         ListDef{
-                            elems: vec![Expression::Simple(Value::String(make_value_node("foo".to_string(), 1, 1)))],
-                            pos: Position{line: 1, column: 1},
+                            elems: vec![Expression::Simple(Value::String(value_node!("foo".to_string(), 1, 1)))],
+                            pos: Position::new(1, 1),
                         }),
                     right: Box::new(Expression::Simple(Value::List(
                         ListDef{
-                            elems: vec![Expression::Simple(Value::String(make_value_node("bar".to_string(), 1, 1)))],
-                            pos: Position{line: 1, column: 1},
+                            elems: vec![Expression::Simple(Value::String(value_node!("bar".to_string(), 1, 1)))],
+                            pos: Position::new(1, 1),
                         }))),
-            pos: Position{line: 1, column: 0},
+            pos: Position::new(1, 0),
                 }),
              Val::List(vec![Rc::new(Val::String("foo".to_string())),
                             Rc::new(Val::String("bar".to_string()))])),
@@ -912,9 +871,9 @@ mod test {
             (Expression::Binary(
                 BinaryOpDef{
                     kind: BinaryExprType::Add,
-                    left: Value::Float(make_value_node(2.0, 1, 1)),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(2, 1, 1)))),
-            pos: Position{line: 1, column: 0},
+                    left: Value::Float(value_node!(2.0, 1, 1)),
+                    right: Box::new(Expression::Simple(Value::Int(value_node!(2, 1, 1)))),
+            pos: Position::new(1, 0),
                 }),
              Val::Float(1.0)),
         ],
@@ -924,14 +883,14 @@ mod test {
     #[test]
     fn test_eval_simple_expr() {
         test_expr_to_val(vec![
-            (Expression::Simple(Value::Int(make_value_node(1, 1, 1))), Val::Int(1)),
-            (Expression::Simple(Value::Float(make_value_node(2.0, 1, 1))), Val::Float(2.0)),
-            (Expression::Simple(Value::String(make_value_node("foo".to_string(), 1, 1))),
+            (Expression::Simple(Value::Int(value_node!(1, 1, 1))), Val::Int(1)),
+            (Expression::Simple(Value::Float(value_node!(2.0, 1, 1))), Val::Float(2.0)),
+            (Expression::Simple(Value::String(value_node!("foo".to_string(), 1, 1))),
              Val::String("foo".to_string())),
-            (Expression::Simple(Value::Tuple(make_value_node(vec![
-                (Token::new("bar", Position{line: 1, column: 1}), Expression::Simple(Value::Int(make_value_node(1, 1, 1))))
+            (Expression::Simple(Value::Tuple(value_node!(vec![
+                (Token::new("bar", 1, 1), Expression::Simple(Value::Int(value_node!(1, 1, 1))))
                 ], 1, 1))),
-             Val::Tuple(vec![(Positioned::new("bar".to_string(), Position{line: 1, column: 1}),
+             Val::Tuple(vec![(value_node!("bar".to_string(), 1, 1),
                               Rc::new(Val::Int(1)))])),
         ],
                          Builder::new());
@@ -941,14 +900,10 @@ mod test {
     fn test_eval_simple_lookup_expr() {
         let mut b = Builder::new();
         b.out
-            .entry(Positioned::new("var1".to_string(),
-                                   Position {
-                                       line: 1,
-                                       column: 0,
-                                   }))
+            .entry(value_node!("var1".to_string(), 1, 0))
             .or_insert(Rc::new(Val::Int(1)));
         test_expr_to_val(vec![
-            (Expression::Simple(Value::Symbol(make_value_node("var1".to_string(), 1, 1))), Val::Int(1)),
+            (Expression::Simple(Value::Symbol(value_node!("var1".to_string(), 1, 1))), Val::Int(1)),
         ],
                          b);
     }
@@ -957,68 +912,56 @@ mod test {
     fn test_eval_simple_lookup_error() {
         let mut b = Builder::new();
         b.out
-            .entry(Positioned::new("var1".to_string(),
-                                   Position {
-                                       line: 1,
-                                       column: 0,
-                                   }))
+            .entry(value_node!("var1".to_string(), 1, 0))
             .or_insert(Rc::new(Val::Int(1)));
-        let expr = Expression::Simple(Value::Symbol(make_value_node("var".to_string(), 1, 1)));
+        let expr = Expression::Simple(Value::Symbol(value_node!("var".to_string(), 1, 1)));
         assert!(b.eval_expr(&expr).is_err());
     }
 
     #[test]
     fn test_eval_selector_expr() {
         let mut b = Builder::new();
-        b.out.entry(Positioned::new("var1".to_string(), Position{line: 1, column: 0})).or_insert(Rc::new(Val::Tuple(vec![
-            (Positioned::new("lvl1".to_string(), Position{line: 1, column: 0}), Rc::new(Val::Tuple(
+        b.out.entry(value_node!("var1".to_string(), 1, 0)).or_insert(Rc::new(Val::Tuple(vec![
+            (value_node!("lvl1".to_string(), 1, 0), Rc::new(Val::Tuple(
                 vec![
-                    (Positioned::new("lvl2".to_string(), Position{line: 1, column: 0}), Rc::new(Val::Int(3))),
+                    (value_node!("lvl2".to_string(), 1, 0), Rc::new(Val::Int(3))),
                 ]
             ))),
         ])));
         b.out
-            .entry(Positioned::new("var2".to_string(),
-                                   Position {
-                                       line: 1,
-                                       column: 0,
-                                   }))
+            .entry(value_node!("var2".to_string(), 1, 0))
             .or_insert(Rc::new(Val::Int(2)));
         b.out
-            .entry(Positioned::new("var3".to_string(),
-                                   Position {
-                                       line: 1,
-                                       column: 0,
-                                   }))
-            .or_insert(Rc::new(Val::Tuple(vec![(Positioned::new("lvl1".to_string(),
-                                      Position {line: 1, column: 0}),
+            .entry(value_node!("var3".to_string(), 1, 0))
+            .or_insert(Rc::new(Val::Tuple(vec![(value_node!("lvl1".to_string(),
+                                      1, 0),
                       Rc::new(Val::Int(4)))])));
 
         test_expr_to_val(vec![
-            (Expression::Simple(Value::Selector(make_value_node(vec![Token::new("var1", Position{line: 1, column: 1})], 1, 1))), Val::Tuple(
+            (Expression::Simple(Value::Selector(SelectorDef::new(vec![Token::new("var1", 1, 1)], 1, 1))), Val::Tuple(
                 vec![
-                    (Positioned::new("lvl1".to_string(), Position{line: 1, column: 0}), Rc::new(Val::Tuple(
+                    (value_node!("lvl1".to_string(), 1, 0), Rc::new(Val::Tuple(
                         vec![
-                            (Positioned::new("lvl2".to_string(), Position{line: 1, column: 0}), Rc::new(Val::Int(3))),
+                            (value_node!("lvl2".to_string(), 1, 0), Rc::new(Val::Int(3))),
                         ]
                     ))),
                 ]
             )),
-            (Expression::Simple(Value::Selector(make_value_node(vec![Token::new("var1", Position{line: 1, column: 1}),
-                                                     Token::new("lvl1", Position{line: 1, column: 1})], 1, 1))),
+            (Expression::Simple(Value::Selector(SelectorDef::new(vec![Token::new("var1", 1, 1),
+                                                     Token::new("lvl1", 1, 1)], 1, 1))),
              Val::Tuple(
                 vec![
-                    (Positioned::new("lvl2".to_string(), Position{line: 1, column: 0}), Rc::new(Val::Int(3))),
+                    (value_node!("lvl2".to_string(), 1, 0), Rc::new(Val::Int(3))),
                 ]
             )),
-            (Expression::Simple(Value::Selector(make_value_node(vec![Token::new("var1", Position{line: 1, column: 1}),
-                                                     Token::new("lvl1", Position{line: 1, column: 1}),
-                                                     Token::new("lvl2", Position{line: 1, column: 1})], 1, 1))),
+            (Expression::Simple(Value::Selector(SelectorDef::new(vec![Token::new("var1", 1, 1),
+                                                     Token::new("lvl1", 1, 1),
+                                                     Token::new("lvl2", 1, 1)], 1, 1))),
              Val::Int(3)),
-            (Expression::Simple(Value::Selector(make_value_node(vec![Token::new("var2", Position{line: 1, column: 1})], 1, 1))),
+            (Expression::Simple(Value::Selector(SelectorDef::new(vec![Token::new("var2", 1, 1)], 1, 1))),
              Val::Int(2)),
-            (Expression::Simple(Value::Selector(make_value_node(vec![Token::new("var3", Position{line: 1, column: 1}),
-                                                     Token::new("lvl1", Position{line: 1, column: 1})], 1, 1))),
+            (Expression::Simple(Value::Selector(SelectorDef::new(vec![Token::new("var3", 1, 1),
+                                                     Token::new("lvl1", 1, 1)], 1, 1))),
              Val::Int(4)),
         ], b);
     }
@@ -1027,24 +970,20 @@ mod test {
     fn test_eval_selector_list_expr() {
         let mut b = Builder::new();
         b.out
-            .entry(Positioned::new("var1".to_string(),
-                                   Position {
-                                       line: 1,
-                                       column: 1,
-                                   }))
+            .entry(value_node!("var1".to_string(), 1, 1))
             .or_insert(Rc::new(Val::List(vec![
                 Rc::new(Val::String("val1".to_string())),
                 Rc::new(Val::Tuple(vec![
-                            (Positioned::new("var2".to_string(), Position{line: 1, column: 1}),
+                            (value_node!("var2".to_string(), 1, 1),
                              Rc::new(Val::Int(1))),
                         ])),
                 ])));
         // TODO(jwall): Assert that we can index into lists using dot syntax.
 
         test_expr_to_val(vec![
-            (Expression::Simple(Value::Selector(make_value_node(vec![
-                Token::new("var1", Position{line: 1, column: 1}),
-                Token::new("0", Position{line: 1, column: 1})
+            (Expression::Simple(Value::Selector(SelectorDef::new(vec![
+                Token::new("var1", 1, 1),
+                Token::new("0", 1, 1)
              ], 1, 1))),
              Val::String("val1".to_string()))
         ],
@@ -1056,9 +995,12 @@ mod test {
     fn test_expr_copy_no_such_tuple() {
         let b = Builder::new();
         test_expr_to_val(vec![
-            (Expression::Copy(CopyDef{selector: vec![Token::new("tpl1", Position{line: 1, column: 1})], fields: Vec::new(), pos: Position{line: 1, column: 0}}),
+            (Expression::Copy(CopyDef{
+                selector: SelectorDef::new(vec![Token::new("tpl1", 1, 1)], 1, 1),
+                fields: Vec::new(), pos: Position::new(1, 0)}),
              Val::Tuple(Vec::new())),
-        ], b);
+        ],
+                         b);
     }
 
     #[test]
@@ -1066,35 +1008,34 @@ mod test {
     fn test_expr_copy_not_a_tuple() {
         let mut b = Builder::new();
         b.out
-            .entry(Positioned::new("tpl1".to_string(),
-                                   Position {
-                                       line: 1,
-                                       column: 0,
-                                   }))
+            .entry(value_node!("tpl1".to_string(), 1, 0))
             .or_insert(Rc::new(Val::Int(1)));
         test_expr_to_val(vec![
-            (Expression::Copy(CopyDef{selector: vec![Token::new("tpl1", Position{line: 1, column: 1})], fields: Vec::new(), pos: Position{line: 1, column: 0}}),
+            (Expression::Copy(CopyDef{
+                selector: SelectorDef::new(vec![Token::new("tpl1", 1, 1)], 1, 1),
+                fields: Vec::new(), pos: Position::new(1, 0)}),
              Val::Tuple(Vec::new())),
-        ], b);
+        ],
+                         b);
     }
 
     #[test]
     #[should_panic(expected = "Expected type Integer for field fld1 but got String")]
     fn test_expr_copy_field_type_error() {
         let mut b = Builder::new();
-        b.out.entry(Positioned::new("tpl1".to_string(), Position{line: 1, column: 0})).or_insert(Rc::new(Val::Tuple(vec![
-            (Positioned::new("fld1".to_string(), Position{line: 1, column: 0}), Rc::new(Val::Int(1))),
+        b.out.entry(value_node!("tpl1".to_string(), 1, 0)).or_insert(Rc::new(Val::Tuple(vec![
+            (value_node!("fld1".to_string(), 1, 0), Rc::new(Val::Int(1))),
         ])));
         test_expr_to_val(vec![
             (Expression::Copy(
                 CopyDef{
-                    selector: vec![Token::new("tpl1", Position{line: 1, column: 1})],
-                    fields: vec![(Token::new("fld1", Position{line: 1, column: 1}),
-                                  Expression::Simple(Value::String(make_value_node("2".to_string(), 1, 1))))],
-                    pos: Position{line: 1, column: 0}}),
+                    selector: SelectorDef::new(vec![Token::new("tpl1", 1, 1)], 1, 1),
+                    fields: vec![(Token::new("fld1", 1, 1),
+                                  Expression::Simple(Value::String(value_node!("2".to_string(), 1, 1))))],
+                    pos: Position::new(1, 0)}),
              Val::Tuple(
                 vec![
-                    (Positioned::new("fld1".to_string(), Position{line: 1, column: 1}), Rc::new(Val::String("2".to_string()))),
+                    (value_node!("fld1".to_string(), 1, 1), Rc::new(Val::String("2".to_string()))),
                 ],
             )),
         ], b);
@@ -1103,16 +1044,16 @@ mod test {
     #[test]
     fn test_expr_copy() {
         let mut b = Builder::new();
-        b.out.entry(Positioned::new("tpl1".to_string(), Position{line: 1, column: 0})).or_insert(Rc::new(Val::Tuple(vec![
-            (Positioned::new("fld1".to_string(), Position{line: 1, column: 0}), Rc::new(Val::Int(1))),
+        b.out.entry(value_node!("tpl1".to_string(), 1, 0)).or_insert(Rc::new(Val::Tuple(vec![
+            (value_node!("fld1".to_string(), 1, 0), Rc::new(Val::Int(1))),
         ])));
         test_expr_to_val(vec![
             (Expression::Copy(
                 CopyDef{
-                    selector: vec![Token::new("tpl1", Position{line: 1, column: 1})],
-                    fields: vec![(Token::new("fld2", Position{line: 1, column: 1}),
-                                  Expression::Simple(Value::String(make_value_node("2".to_string(), 1, 1))))],
-                    pos: Position{line: 1, column: 0},
+                    selector: SelectorDef::new(vec![Token::new("tpl1", 1, 1)], 1, 1),
+                    fields: vec![(Token::new("fld2", 1, 1),
+                                  Expression::Simple(Value::String(value_node!("2".to_string(), 1, 1))))],
+                    pos: Position::new(1, 0),
                 }),
              // Add a new field to the copy
              Val::Tuple(
@@ -1120,33 +1061,33 @@ mod test {
                  // that the compare assertion is correct. The ordering has no
                  // semantics though so at some point we should probably be less restrictive.
                 vec![
-                    (Positioned::new("fld1".to_string(), Position{line: 1, column: 0}), Rc::new(Val::Int(1))),
-                    (Positioned::new("fld2".to_string(), Position{line: 1, column: 1}), Rc::new(Val::String("2".to_string()))),
+                    (value_node!("fld1".to_string(), 1, 0), Rc::new(Val::Int(1))),
+                    (value_node!("fld2".to_string(), 1, 1), Rc::new(Val::String("2".to_string()))),
                 ],
             )),
              // Overwrite a field in the copy
             (Expression::Copy(
                 CopyDef{
-                    selector: vec![Token::new("tpl1", Position{line: 1, column: 1})],
+                    selector: SelectorDef::new(vec![Token::new("tpl1", 1, 1)], 1, 1),
                     fields: vec![
-                        (Token::new("fld1", Position{line: 1, column: 1}),
-                         Expression::Simple(Value::Int(make_value_node(3, 1, 1)))),
-                        (Token::new("fld2", Position{line: 1, column: 1}),
-                         Expression::Simple(Value::String(make_value_node("2".to_string(), 1, 1)))),
+                        (Token::new("fld1", 1, 1),
+                         Expression::Simple(Value::Int(value_node!(3, 1, 1)))),
+                        (Token::new("fld2", 1, 1),
+                         Expression::Simple(Value::String(value_node!("2".to_string(), 1, 1)))),
                     ],
-                    pos: Position{line: 1, column: 0},
+                    pos: Position::new(1, 0),
                 }),
              Val::Tuple(
                 vec![
-                    (Positioned::new("fld1".to_string(), Position{line: 1, column: 0}), Rc::new(Val::Int(3))),
-                    (Positioned::new("fld2".to_string(), Position{line: 1, column: 0}), Rc::new(Val::String("2".to_string()))),
+                    (value_node!("fld1".to_string(), 1, 0), Rc::new(Val::Int(3))),
+                    (value_node!("fld2".to_string(), 1, 0), Rc::new(Val::String("2".to_string()))),
                 ],
              )),
             // The source tuple is still unmodified.
-            (Expression::Simple(Value::Selector(make_value_node(vec![Token::new("tpl1", Position{line: 1, column: 1})], 1, 1))),
+            (Expression::Simple(Value::Selector(SelectorDef::new(vec![Token::new("tpl1", 1, 1)], 1, 1))),
              Val::Tuple(
                 vec![
-                    (Positioned::new("fld1".to_string(), Position{line: 1, column: 0}), Rc::new(Val::Int(1))),
+                    (value_node!("fld1".to_string(), 1, 0), Rc::new(Val::Int(1))),
                 ],
             )),
         ], b);
@@ -1155,21 +1096,21 @@ mod test {
     #[test]
     fn test_macro_call() {
         let mut b = Builder::new();
-        b.out.entry(Positioned::new("tstmac".to_string(), Position{line: 1, column: 0})).or_insert(Rc::new(Val::Macro(MacroDef{
-            argdefs: vec![Positioned::new("arg1".to_string(), Position{line: 1, column: 0})],
+        b.out.entry(value_node!("tstmac".to_string(), 1, 0)).or_insert(Rc::new(Val::Macro(MacroDef{
+            argdefs: vec![value_node!("arg1".to_string(), 1, 0)],
             fields: vec![
-                (Token::new("foo", Position{line: 1, column: 1}), Expression::Simple(Value::Symbol(make_value_node("arg1".to_string(), 1, 1)))),
+                (Token::new("foo", 1, 1), Expression::Simple(Value::Symbol(value_node!("arg1".to_string(), 1, 1)))),
             ],
-            pos: Position{line: 1, column: 0},
+            pos: Position::new(1, 0),
         })));
         test_expr_to_val(vec![
             (Expression::Call(CallDef{
-                macroref: vec![Token::new("tstmac", Position{line: 1, column: 1})],
-                arglist: vec![Expression::Simple(Value::String(make_value_node("bar".to_string(), 1, 1)))],
-                pos: Position{line: 1, column: 0},
+                macroref: SelectorDef::new(vec![Token::new("tstmac", 1, 1)], 1, 1),
+                arglist: vec![Expression::Simple(Value::String(value_node!("bar".to_string(), 1, 1)))],
+                pos: Position::new(1, 0),
             }),
              Val::Tuple(vec![
-                 (Positioned::new("foo".to_string(), Position{line: 1, column: 1}),
+                 (value_node!("foo".to_string(), 1, 1),
                   Rc::new(Val::String("bar".to_string()))),
              ])),
         ], b);
@@ -1180,27 +1121,23 @@ mod test {
     fn test_macro_hermetic() {
         let mut b = Builder::new();
         b.out
-            .entry(Positioned::new("arg1".to_string(),
-                                   Position {
-                                       line: 1,
-                                       column: 0,
-                                   }))
+            .entry(value_node!("arg1".to_string(), 1, 0))
             .or_insert(Rc::new(Val::String("bar".to_string())));
-        b.out.entry(Positioned::new("tstmac".to_string(), Position{line: 1, column: 0})).or_insert(Rc::new(Val::Macro(MacroDef{
-            argdefs: vec![Positioned::new("arg2".to_string(), Position{line: 1, column: 0})],
+        b.out.entry(value_node!("tstmac".to_string(), 1, 0)).or_insert(Rc::new(Val::Macro(MacroDef{
+            argdefs: vec![value_node!("arg2".to_string(), 1, 0)],
             fields: vec![
-                (Token::new("foo", Position{line: 1, column: 1}), Expression::Simple(Value::Symbol(make_value_node("arg1".to_string(), 1, 1)))),
+                (Token::new("foo", 1, 1), Expression::Simple(Value::Symbol(value_node!("arg1".to_string(), 1, 1)))),
             ],
-            pos: Position{line: 1, column: 0},
+            pos: Position::new(1, 0),
         })));
         test_expr_to_val(vec![
             (Expression::Call(CallDef{
-                macroref: vec![Token::new("tstmac", Position{line: 1, column: 1})],
-                arglist: vec![Expression::Simple(Value::String(make_value_node("bar".to_string(), 1, 1)))],
-                pos: Position{line: 1, column: 1},
+                macroref: SelectorDef::new(vec![Token::new("tstmac", 1, 1)], 1, 1),
+                arglist: vec![Expression::Simple(Value::String(value_node!("bar".to_string(), 1, 1)))],
+                pos: Position::new(1, 1),
             }),
              Val::Tuple(vec![
-                 (Positioned::new("foo".to_string(), Position{line: 1, column: 0}), Rc::new(Val::String("bar".to_string()))),
+                 (value_node!("foo".to_string(), 1, 0), Rc::new(Val::String("bar".to_string()))),
              ])),
         ], b);
     }
@@ -1209,38 +1146,30 @@ mod test {
     fn test_select_expr() {
         let mut b = Builder::new();
         b.out
-            .entry(Positioned::new("foo".to_string(),
-                                   Position {
-                                       line: 1,
-                                       column: 0,
-                                   }))
+            .entry(value_node!("foo".to_string(), 1, 0))
             .or_insert(Rc::new(Val::String("bar".to_string())));
         b.out
-            .entry(Positioned::new("baz".to_string(),
-                                   Position {
-                                       line: 1,
-                                       column: 0,
-                                   }))
+            .entry(value_node!("baz".to_string(), 1, 0))
             .or_insert(Rc::new(Val::String("boo".to_string())));
         test_expr_to_val(vec![
             (Expression::Select(SelectDef{
-                val: Box::new(Expression::Simple(Value::Symbol(make_value_node("foo".to_string(), 1, 1)))),
-                default: Box::new(Expression::Simple(Value::Int(make_value_node(1, 1, 1)))),
+                val: Box::new(Expression::Simple(Value::Symbol(value_node!("foo".to_string(), 1, 1)))),
+                default: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
                 tuple: vec![
-                    (Token::new("foo", Position{line: 1, column: 1}), Expression::Simple(Value::String(make_value_node("2".to_string(), 1, 1)))),
-                    (Token::new("bar", Position{line: 1, column: 1}), Expression::Simple(Value::Int(make_value_node(2, 1, 1)))),
+                    (Token::new("foo", 1, 1), Expression::Simple(Value::String(value_node!("2".to_string(), 1, 1)))),
+                    (Token::new("bar", 1, 1), Expression::Simple(Value::Int(value_node!(2, 1, 1)))),
                 ],
-                pos: Position{line: 1, column: 0},
+                pos: Position::new(1, 0),
             }),
              Val::Int(2)),
             (Expression::Select(SelectDef{
-                val: Box::new(Expression::Simple(Value::Symbol(make_value_node("baz".to_string(), 1, 1)))),
-                default: Box::new(Expression::Simple(Value::Int(make_value_node(1, 1, 1)))),
+                val: Box::new(Expression::Simple(Value::Symbol(value_node!("baz".to_string(), 1, 1)))),
+                default: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
                 tuple: vec![
-                    (Token::new("bar", Position{line: 1, column: 1}), Expression::Simple(Value::Int(make_value_node(2, 1, 1)))),
-                    (Token::new("quux", Position{line: 1, column: 1}), Expression::Simple(Value::String(make_value_node("2".to_string(), 1, 1)))),
+                    (Token::new("bar", 1, 1), Expression::Simple(Value::Int(value_node!(2, 1, 1)))),
+                    (Token::new("quux", 1, 1), Expression::Simple(Value::String(value_node!("2".to_string(), 1, 1)))),
                 ],
-                pos: Position{line: 1, column: 0},
+                pos: Position::new(1, 0),
             }),
              // If the field doesn't exist then we get the default.
              Val::Int(1)),
@@ -1252,21 +1181,17 @@ mod test {
     fn test_select_expr_not_a_string() {
         let mut b = Builder::new();
         b.out
-            .entry(Positioned::new("foo".to_string(),
-                                   Position {
-                                       line: 1,
-                                       column: 0,
-                                   }))
+            .entry(value_node!("foo".to_string(), 1, 0))
             .or_insert(Rc::new(Val::Int(4)));
         test_expr_to_val(vec![
             (Expression::Select(SelectDef{
-                val: Box::new(Expression::Simple(Value::Symbol(make_value_node("foo".to_string(), 1, 1)))),
-                default: Box::new(Expression::Simple(Value::Int(make_value_node(1, 1, 1)))),
+                val: Box::new(Expression::Simple(Value::Symbol(value_node!("foo".to_string(), 1, 1)))),
+                default: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
                 tuple: vec![
-                    (Token::new("bar", Position{line: 1, column: 1}), Expression::Simple(Value::Int(make_value_node(2, 1, 1)))),
-                    (Token::new("quux", Position{line: 1, column: 1}), Expression::Simple(Value::String(make_value_node("2".to_string(), 1, 1)))),
+                    (Token::new("bar", 1, 1), Expression::Simple(Value::Int(value_node!(2, 1, 1)))),
+                    (Token::new("quux", 1, 1), Expression::Simple(Value::String(value_node!("2".to_string(), 1, 1)))),
                 ],
-                pos: Position{line: 1, column: 0},
+                pos: Position::new(1, 0),
              }),
              Val::Int(2)),
         ], b);
@@ -1276,16 +1201,12 @@ mod test {
     fn test_let_statement() {
         let mut b = Builder::new();
         let stmt = Statement::Let(LetDef {
-            name: Token::new("foo",
-                             Position {
-                                 line: 1,
-                                 column: 1,
-                             }),
-            value: Expression::Simple(Value::String(make_value_node("bar".to_string(), 1, 1))),
+            name: Token::new("foo", 1, 1),
+            value: Expression::Simple(Value::String(value_node!("bar".to_string(), 1, 1))),
         });
         b.build_stmt(&stmt).unwrap();
         test_expr_to_val(vec![
-            (Expression::Simple(Value::Symbol(make_value_node("foo".to_string(), 1, 1))),
+            (Expression::Simple(Value::Symbol(value_node!("foo".to_string(), 1, 1))),
              Val::String("bar".to_string())),
         ],
                          b);
@@ -1295,27 +1216,23 @@ mod test {
     fn test_build_file_string() {
         let mut b = Builder::new();
         b.build_file_string("foo.ucg", "let foo = 1;".to_string()).unwrap();
-        let key = Positioned::new("foo".to_string(),
-                                  Position {
-                                      line: 1,
-                                      column: 0,
-                                  });
+        let key = value_node!("foo".to_string(), 1, 0);
         assert!(b.out.contains_key(&key));
     }
 
     #[test]
     fn test_asset_symbol_lookups() {
         let mut b = Builder::new();
-        b.assets.entry(Positioned::new("foo".to_string(), Position{line: 1, column: 0})).or_insert(Rc::new(Val::Tuple(vec![
-                (Positioned::new("bar".to_string(), Position{line: 1, column: 0}), Rc::new(Val::Tuple(vec![
-                    (Positioned::new("quux".to_string(), Position{line: 1, column: 0}), Rc::new(Val::Int(1))),
+        b.assets.entry(value_node!("foo".to_string(), 1, 0)).or_insert(Rc::new(Val::Tuple(vec![
+                (value_node!("bar".to_string(), 1, 0), Rc::new(Val::Tuple(vec![
+                    (value_node!("quux".to_string(), 1, 0), Rc::new(Val::Int(1))),
                 ]))),
             ])));
         test_expr_to_val(vec![
-            (Expression::Simple(Value::Symbol(make_value_node("foo".to_string(), 1, 1))),
+            (Expression::Simple(Value::Symbol(value_node!("foo".to_string(), 1, 1))),
              Val::Tuple(vec![
-                (Positioned::new("bar".to_string(), Position{line: 1, column: 0}), Rc::new(Val::Tuple(vec![
-                    (Positioned::new("quux".to_string(), Position{line: 1, column: 0}), Rc::new(Val::Int(1))),
+                (value_node!("bar".to_string(), 1, 0), Rc::new(Val::Tuple(vec![
+                    (value_node!("quux".to_string(), 1, 0), Rc::new(Val::Int(1))),
                 ]))),
             ])),
         ],

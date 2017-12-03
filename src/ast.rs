@@ -21,10 +21,32 @@ use std::cmp::PartialEq;
 use std::hash::Hasher;
 use std::hash::Hash;
 
+macro_rules! enum_type_equality {
+    ( $slf:ident, $r:expr, $( $l:pat ),* ) => {
+        match $slf {
+        $(
+            $l => {
+                if let $l = $r {
+                    true
+                } else {
+                    false
+                }
+            }
+        )*
+        }
+    }
+}
+
 #[derive(Debug,PartialEq,Eq,Clone,PartialOrd,Ord,Hash)]
 pub struct Position {
     pub line: usize,
     pub column: usize,
+}
+
+impl Position {
+    pub fn new(line: usize, column: usize) -> Self {
+        Position{line:line, column: column}
+    }
 }
 
 #[derive(Debug,PartialEq,Eq,Clone,PartialOrd,Ord,Hash)]
@@ -34,9 +56,13 @@ pub struct Token {
 }
 
 impl Token {
-    pub fn new(f: &str, pos: Position) -> Self {
+    pub fn new<S: Into<String>>(f: S, line: usize, col: usize) -> Self {
+        Self::new_with_pos(f, Position::new(line, col))
+    }
+
+    pub fn new_with_pos<S: Into<String>>(f: S, pos: Position) -> Self {
         Token {
-            fragment: f.to_string(),
+            fragment: f.into(),
             pos: pos,
         }
     }
@@ -50,7 +76,10 @@ impl Borrow<str> for Token {
 
 macro_rules! value_node {
     ($v:expr, $p:expr) => {
-        LocatedNode::new($v, $p)
+        Positioned::new_with_pos($v, $p)
+    };
+    ($v:expr, $l:expr, $c:expr) => {
+        Positioned::new($v, $l, $c)
     };
 }
 
@@ -58,46 +87,32 @@ pub type FieldList = Vec<(Token, Expression)>; // Token is expected to be a symb
 pub type SelectorList = Vec<Token>; // Token is expected to always be a symbol.
 
 #[derive(Debug,PartialEq,Clone)]
-pub struct LocatedNode<T> {
-    // TODO(jwall): Should we just use positioned instead?
+pub struct SelectorDef {
     pub pos: Position,
-    pub val: T,
+    pub sel: SelectorList,
 }
 
-impl<T> LocatedNode<T> {
-    pub fn new<P: Into<Position>>(v: T, pos: P) -> Self {
-        Self {
-            pos: pos.into(),
-            val: v,
+impl SelectorDef {
+    pub fn new(sel: SelectorList, line: usize, col: usize) -> Self {
+        SelectorDef {
+            pos: Position::new(line, col),
+            sel: sel,
         }
     }
-
-    pub fn val(&self) -> &T {
-        return &self.val;
-    }
-}
-
-
-pub fn make_value_node<T>(v: T, line: usize, column: usize) -> LocatedNode<T> {
-    LocatedNode::new(v,
-                     Position {
-                         line: line,
-                         column: column,
-                     })
 }
 
 /// Value represents a Value in the UCG parsed AST.
 #[derive(Debug,PartialEq,Clone)]
 pub enum Value {
     // Constant Values
-    Int(LocatedNode<i64>),
-    Float(LocatedNode<f64>),
-    String(LocatedNode<String>),
-    Symbol(LocatedNode<String>),
+    Int(Positioned<i64>),
+    Float(Positioned<f64>),
+    String(Positioned<String>),
+    Symbol(Positioned<String>),
     // Complex Values
-    Tuple(LocatedNode<FieldList>),
+    Tuple(Positioned<FieldList>),
     List(ListDef),
-    Selector(LocatedNode<SelectorList>),
+    Selector(SelectorDef),
 }
 
 impl Value {
@@ -128,7 +143,7 @@ impl Value {
     fn elems_to_string(v: &Vec<Expression>) -> String {
         return format!("{}", v.len());
     }
-    
+
     pub fn to_string(&self) -> String {
         match self {
             &Value::Int(ref i) => format!("{}", i.val),
@@ -137,7 +152,7 @@ impl Value {
             &Value::Symbol(ref s) => format!("{}", s.val),
             &Value::Tuple(ref fs) => format!("{}", Self::fields_to_string(&fs.val)),
             &Value::List(ref def) => format!("[{}]", Self::elems_to_string(&def.elems)),
-            &Value::Selector(ref v) => v.val.join("."),
+            &Value::Selector(ref v) => v.sel.join("."),
         }
     }
 
@@ -152,13 +167,23 @@ impl Value {
             &Value::Selector(ref v) => &v.pos,
         }
     }
+
+    pub fn type_equal(&self, target: &Self) -> bool {
+        enum_type_equality!(self, target, &Value::Int(_),
+                                          &Value::Float(_),
+                                          &Value::String(_),
+                                          &Value::Symbol(_),
+                                          &Value::Tuple(_),
+                                          &Value::List(_),
+                                          &Value::Selector(_))
+    }
 }
 
 /// CallDef represents a call to a Macro that is expected to already have been
 /// defined.
 #[derive(PartialEq,Debug,Clone)]
 pub struct CallDef {
-    pub macroref: SelectorList,
+    pub macroref: SelectorDef,
     pub arglist: Vec<Expression>,
     pub pos: Position,
 }
@@ -181,7 +206,11 @@ pub struct Positioned<T> {
 }
 
 impl<T> Positioned<T> {
-    pub fn new(v: T, pos: Position) -> Self {
+    pub fn new(v: T, l: usize, c: usize) -> Self {
+        Self::new_with_pos(v, Position::new(l, c))
+    }
+
+    pub fn new_with_pos(v: T, pos: Position) -> Self {
         Positioned { pos: pos, val: v }
     }
 }
@@ -221,8 +250,8 @@ impl<'a> From<&'a Token> for Positioned<String> {
     }
 }
 
-impl<'a> From<&'a LocatedNode<String>> for Positioned<String> {
-    fn from(t: &LocatedNode<String>) -> Positioned<String> {
+impl<'a> From<&'a Positioned<String>> for Positioned<String> {
+    fn from(t: &Positioned<String>) -> Positioned<String> {
         Positioned {
             pos: t.pos.clone(),
             val: t.val.clone(),
@@ -261,7 +290,7 @@ impl MacroDef {
                 bad_symbols.insert(name.val.clone());
             }
         } else if let &Value::Selector(ref sel_node) = val {
-            let list = &sel_node.val;
+            let list = &sel_node.sel;
             if list.len() > 0 {
                 // We only look to see if the first selector item exists.
                 // This is because only the first one is a symbol all of the
@@ -362,7 +391,7 @@ pub struct BinaryOpDef {
 
 #[derive(Debug,PartialEq,Clone)]
 pub struct CopyDef {
-    pub selector: SelectorList,
+    pub selector: SelectorDef,
     pub fields: FieldList,
     pub pos: Position,
 }
@@ -432,23 +461,16 @@ mod ast_test {
     #[test]
     pub fn test_macro_validation_happy_path() {
         let def = MacroDef {
-            argdefs: vec![Positioned::new("foo".to_string(),
-                                          Position {
-                                              line: 1,
-                                              column: 0,
-                                          })],
+            argdefs: vec![value_node!("foo".to_string(), 1, 0)],
             fields: vec![
-                (Token::new("f1", Position { line: 1, column: 1}), Expression::Binary(BinaryOpDef{
+                (Token::new("f1", 1, 1), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
-                    left: Value::Symbol(make_value_node("foo".to_string(), 1, 1)),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1, 1, 1)))),
-                    pos: Position{line: 1, column: 0},
+                    left: Value::Symbol(value_node!("foo".to_string(), 1, 1)),
+                    right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
+                    pos: Position::new(1, 0),
                 })),
             ],
-            pos: Position {
-                line: 1,
-                column: 0,
-            },
+            pos: Position::new(1, 0),
         };
         assert!(def.validate_symbols().unwrap() == ());
     }
@@ -456,23 +478,16 @@ mod ast_test {
     #[test]
     pub fn test_macro_validation_fail() {
         let def = MacroDef {
-            argdefs: vec![Positioned::new("foo".to_string(),
-                                          Position {
-                                              line: 1,
-                                              column: 0,
-                                          })],
+            argdefs: vec![value_node!("foo".to_string(), 1, 0)],
             fields: vec![
-                (Token::new("f1", Position{line: 1, column: 1}), Expression::Binary(BinaryOpDef{
+                (Token::new("f1", 1, 1), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
-                    left: Value::Symbol(make_value_node("bar".to_string(), 1, 1)),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1, 1, 1)))),
-                    pos: Position{line: 1, column: 0},
+                    left: Value::Symbol(value_node!("bar".to_string(), 1, 1)),
+                    right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
+                    pos: Position::new(1, 0),
                 })),
             ],
-            pos: Position {
-                line: 1,
-                column: 0,
-            },
+            pos: Position::new(1, 0),
         };
         let mut expected = HashSet::new();
         expected.insert("bar".to_string());
@@ -482,25 +497,18 @@ mod ast_test {
     #[test]
     pub fn test_macro_validation_selector_happy_path() {
         let def = MacroDef {
-            argdefs: vec![Positioned::new("foo".to_string(),
-                                          Position {
-                                              line: 1,
-                                              column: 0,
-                                          })],
+            argdefs: vec![value_node!("foo".to_string(), 1, 0)],
             fields: vec![
-                (Token::new("f1", Position{line: 1, column: 1}), Expression::Binary(BinaryOpDef{
+                (Token::new("f1", 1, 1), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
-                    left: Value::Selector(make_value_node(vec![
-                        Token::new("foo", Position{line: 1, column: 1}),
-                        Token::new("quux", Position{line: 1, column: 1})], 1, 1)),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1, 1, 1)))),
-            pos: Position{line: 1, column: 0},
+                    left: Value::Selector(SelectorDef::new(vec![
+                        Token::new("foo", 1, 1),
+                        Token::new("quux", 1, 1)], 1, 1)),
+                    right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
+            pos: Position::new(1, 0),
                 })),
             ],
-            pos: Position {
-                line: 1,
-                column: 0,
-            },
+            pos: Position::new(1, 0),
         };
         assert!(def.validate_symbols().unwrap() == ());
     }
@@ -508,21 +516,18 @@ mod ast_test {
     #[test]
     pub fn test_macro_validation_selector_fail() {
         let def = MacroDef {
-            argdefs: vec![Positioned::new("foo".to_string(), Position {line: 1, column: 0})],
+            argdefs: vec![value_node!("foo".to_string(), 1, 0)],
             fields: vec![
-                (Token::new("f1", Position{line: 1, column: 1}), Expression::Binary(BinaryOpDef{
+                (Token::new("f1", 1, 1), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
-                    left: Value::Selector(make_value_node(vec![
-                        Token::new("bar", Position{line: 1, column: 1}),
-                        Token::new("quux", Position{line: 1, column: 1})], 1, 1)),
-                    right: Box::new(Expression::Simple(Value::Int(make_value_node(1, 1, 1)))),
-            pos: Position{line: 1, column: 0},
+                    left: Value::Selector(SelectorDef::new(vec![
+                        Token::new("bar", 1, 1),
+                        Token::new("quux", 1, 1)], 1, 1)),
+                    right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
+            pos: Position::new(1, 0),
                 })),
             ],
-            pos: Position {
-                line: 1,
-                column: 0,
-            },
+            pos: Position::new(1, 0),
         };
         let mut expected = HashSet::new();
         expected.insert("bar".to_string());

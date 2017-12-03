@@ -10,8 +10,9 @@ compiled configuration.
 For some configuration file formats we need a way to specify a particular
 organiztion for a given configuration structure. Some options here could be
  
-* A Functional Transform (i.e. xslt, or css transforms)
+* A Functional Transform similar to xslt or css transforms.
 * A Templating language
+* Annotations.
 
 # Minor Fixes and Polish
 
