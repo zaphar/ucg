@@ -129,7 +129,7 @@ impl Val {
                                      &Val::String(_),
                                      &Val::List(_),
                                      &Val::Tuple(_),
-                                     &Val::Macro(_)) 
+                                     &Val::Macro(_))
     }
 
     pub fn get_fields(&self) -> Option<&Vec<(Positioned<String>, Rc<Val>)>> {
@@ -228,7 +228,24 @@ macro_rules! eval_binary_expr {
 }
 
 impl Builder {
-    /// new_builder constructs Builder with initialized fields ready to parse.
+    fn tuple_to_val(&self, fields: &Vec<(Token, Expression)>) -> Result<Rc<Val>, Box<Error>> {
+        let mut new_fields = Vec::<(Positioned<String>, Rc<Val>)>::new();
+        for &(ref name, ref expr) in fields.iter() {
+            let val = try!(self.eval_expr(expr));
+            new_fields.push((name.into(), val));
+        }
+        new_fields.sort_by(|a, b| a.0.cmp(&b.0));
+        Ok(Rc::new(Val::Tuple(new_fields)))
+    }
+
+    fn list_to_val(&self, def: &ListDef) -> Result<Rc<Val>, Box<Error>> {
+        let mut vals = Vec::new();
+        for expr in def.elems.iter() {
+            vals.push(try!(self.eval_expr(expr)));
+        }
+        Ok(Rc::new(Val::List(vals)))
+    }
+
     fn value_to_val(&self, v: &Value) -> Result<Rc<Val>, Box<Error>> {
         match v {
             &Value::Int(ref i) => Ok(Rc::new(Val::Int(i.val))),
@@ -238,23 +255,8 @@ impl Builder {
                 self.lookup_sym(&(s.into()))
                     .ok_or(Box::new(BuildError::NoSuchSymbol(format!("Unable to find {}", s.val))))
             }
-            &Value::List(ref def) => {
-                let mut vals = Vec::new();
-                for expr in def.elems.iter() {
-                    vals.push(try!(self.eval_expr(expr)));
-                }
-                return Ok(Rc::new(Val::List(vals)));
-            }
-            &Value::Tuple(ref tuple_node) => {
-                let fields = &tuple_node.val;
-                let mut new_fields = Vec::<(Positioned<String>, Rc<Val>)>::new();
-                for &(ref name, ref expr) in fields.iter() {
-                    let val = try!(self.eval_expr(expr));
-                    new_fields.push((name.into(), val));
-                }
-                new_fields.sort_by(|a, b| a.0.cmp(&b.0));
-                Ok(Rc::new(Val::Tuple(new_fields)))
-            }
+            &Value::List(ref def) => self.list_to_val(def),
+            &Value::Tuple(ref tuple) => self.tuple_to_val(&tuple.val),
             &Value::Selector(ref selector_list_node) => {
                 self.lookup_selector(&selector_list_node.sel)
             }
@@ -319,37 +321,49 @@ impl Builder {
         self.build_file_string(name, s)
     }
 
+    fn build_import(&mut self, def: &ImportDef) -> BuildResult {
+        if !self.files.contains(&def.path.fragment) {
+            // Only parse the file once on import.
+            let sym = &def.name;
+            let positioned_sym = sym.into();
+            if self.assets.get(&positioned_sym).is_none() {
+                let mut b = Self::new();
+                try!(b.build_file(&def.path.fragment));
+                let fields: Vec<(Positioned<String>, Rc<Val>)> = b.out.drain().collect();
+                let result = Rc::new(Val::Tuple(fields));
+                self.assets.entry(positioned_sym).or_insert(result.clone());
+                self.files.insert(def.path.fragment.clone());
+                self.last = Some(result);
+            }
+        }
+        Ok(())
+    }
+
+    fn build_let(&mut self, def: &LetDef) -> BuildResult {
+        let val = try!(self.eval_expr(&def.value));
+        self.last = Some(val.clone());
+        let name = &def.name;
+        match self.out.entry(name.into()) {
+            Entry::Occupied(e) => {
+                return Err(Box::new(BuildError::DuplicateBinding(format!("Let binding \
+                                                                          for {:?} already \
+                                                                          exists",
+                                                                         e.key()))));
+            }
+            Entry::Vacant(e) => {
+                e.insert(val);
+            }
+        }
+        Ok(())
+    }
+
     fn build_stmt(&mut self, stmt: &Statement) -> BuildResult {
         match stmt {
-            &Statement::Let(LetDef { name: ref sym, value: ref expr }) => {
-                let val = try!(self.eval_expr(expr));
-                self.last = Some(val.clone());
-                match self.out.entry(sym.into()) {
-                    Entry::Occupied(e) => {
-                        return Err(Box::new(BuildError::DuplicateBinding(format!("Let binding \
-                                                                                  for {:?} already \
-                                                                                  exists",
-                                                                                 e.key()))));
-                    }
-                    Entry::Vacant(e) => {
-                        e.insert(val);
-                    }
-                }
+            &Statement::Let(ref def) => {
+                try!(self.build_let(def));
             }
-            &Statement::Import(ImportDef { path: ref val, name: ref sym }) => {
-                if !self.files.contains(&val.fragment) {
-                    // Only parse the file once on import.
-                    let positioned_sym = sym.into();
-                    if self.assets.get(&positioned_sym).is_none() {
-                        let mut b = Self::new();
-                        try!(b.build_file(&val.fragment));
-                        let fields: Vec<(Positioned<String>, Rc<Val>)> = b.out.drain().collect();
-                        let result = Rc::new(Val::Tuple(fields));
-                        self.assets.entry(positioned_sym).or_insert(result.clone());
-                        self.files.insert(val.fragment.clone());
-                        self.last = Some(result);
-                    }
-                }
+            &Statement::Import(ref def) => {
+                try!(self.build_import(def));
             }
             &Statement::Expression(ref expr) => {
                 self.last = Some(try!(self.eval_expr(expr)));
@@ -377,6 +391,46 @@ impl Builder {
         return None;
     }
 
+    fn lookup_in_tuple(&self,
+                       stack: &mut VecDeque<Rc<Val>>,
+                       sl: &SelectorList,
+                       next: &Token,
+                       fs: &Vec<(Positioned<String>, Rc<Val>)>)
+                       -> Result<(), Box<Error>> {
+        // This unwrap is safe because we already checked for
+        // Tuple in the pattern match.
+        if let Some(vv) = Self::find_in_fieldlist(&next.fragment, fs) {
+            stack.push_back(vv.clone());
+        } else {
+            // TODO(jwall): A better error for this would be nice.
+            return Err(Box::new(BuildError::NoSuchSymbol(format!("Unable to \
+                                                                      match selector \
+                                                                      path {:?}",
+                                                                     sl))));
+        }
+        Ok(())
+    }
+
+    fn lookup_in_list(&self,
+                      stack: &mut VecDeque<Rc<Val>>,
+                      sl: &SelectorList,
+                      next: &Token,
+                      elems: &Vec<Rc<Val>>)
+                      -> Result<(), Box<Error>> {
+        // TODO(jwall): better error reporting here would probably be good.
+        let idx = try!(next.fragment.parse::<usize>());
+        if idx < elems.len() {
+            stack.push_back(elems[idx].clone());
+        } else {
+            // TODO(jwall): A better error for this would be nice.
+            return Err(Box::new(BuildError::NoSuchSymbol(format!("Unable to \
+                                                                  match selector \
+                                                                  path {:?}",
+                                                                 sl))));
+        }
+        Ok(())
+    }
+
     fn lookup_selector(&self, sl: &SelectorList) -> Result<Rc<Val>, Box<Error>> {
         let len = sl.len();
         if len > 0 {
@@ -394,35 +448,13 @@ impl Builder {
                     // None above.
                     let next = it.next().unwrap();
                     match vref.as_ref() {
-                        &Val::Tuple(_) => {
-                            // This unwrap is safe because we already checked for
-                            // Tuple in the pattern match.
-                            let fs = vref.get_fields().unwrap();
-                            if let Some(vv) = Self::find_in_fieldlist(&next.fragment, fs) {
-                                stack.push_back(vv.clone());
-                                continue;
-                            } else {
-                                // TODO(jwall): A better error for this would be nice.
-                                return Err(Box::new(BuildError::NoSuchSymbol(format!("Unable to \
-                                                                                          match selector \
-                                                                                          path {:?}",
-                                                                                         sl))));
-                            }
+                        &Val::Tuple(ref fs) => {
+                            try!(self.lookup_in_tuple(&mut stack, sl, next, fs));
+                            continue;
                         }
                         &Val::List(ref elems) => {
-                            // TODO(jwall): better error reporting here would probably be good.
-                            let idx = try!(next.fragment.parse::<usize>());
-                            if idx < elems.len() {
-                                stack.push_back(elems[idx].clone());
-                                continue;
-                            } else {
-                                // TODO(jwall): A better error for this would be nice.
-                                return Err(Box::new(BuildError::NoSuchSymbol(format!("Unable to \
-                                                                                      match selector \
-                                                                                      path {:?}",
-                                                                                     sl))));
-
-                            }
+                            try!(self.lookup_in_list(&mut stack, sl, next, elems));
+                            continue;
                         }
                         _ => {
                             return Err(Box::new(BuildError::TypeFail(format!("{} is not a Tuple or List",
@@ -438,6 +470,247 @@ impl Builder {
             .to_string())));
     }
 
+    fn add_vals(&self, left: Rc<Val>, right: Rc<Val>) -> Result<Rc<Val>, Box<Error>> {
+        match *left {
+            Val::Int(i) => {
+                eval_binary_expr!(&Val::Int(ii),
+                                  right,
+                                  Val::Int(i + ii),
+                                  "Integer")
+            }
+            Val::Float(f) => {
+                eval_binary_expr!(&Val::Float(ff),
+                                  right,
+                                  Val::Float(f + ff),
+                                  "Float")
+            }
+            Val::String(ref s) => {
+                match right.as_ref() {
+                    &Val::String(ref ss) => {
+                        return Ok(Rc::new(Val::String([s.to_string(), ss.clone()].concat())))
+                    }
+                    val => {
+                        return Err(Box::new(BuildError::TypeFail(format!("Expected \
+                                                                          String \
+                                                                          but got \
+                                                                          {:?}",
+                                                                         val))))
+                    }
+                }
+            }
+            Val::List(ref l) => {
+                match right.as_ref() {
+                    &Val::List(ref r) => {
+                        let mut new_vec = Vec::new();
+                        new_vec.extend(l.iter().cloned());
+                        new_vec.extend(r.iter().cloned());
+                        return Ok(Rc::new(Val::List(new_vec)));
+                    }
+                    val => {
+                        return Err(Box::new(BuildError::TypeFail(format!("Expected \
+                                                                          List \
+                                                                          but got \
+                                                                          {:?}",
+                                                                         val))))
+                    }
+                }
+            }
+            ref expr => {
+                return Err(Box::new(
+                    BuildError::Unsupported(
+                        format!("{} does not support the '+' operation", expr.type_name()))))
+            }
+        }
+    }
+
+    fn subtract_vals(&self, left: Rc<Val>, right: Rc<Val>) -> Result<Rc<Val>, Box<Error>> {
+        match *left {
+            Val::Int(i) => {
+                eval_binary_expr!(&Val::Int(ii),
+                                  right,
+                                  Val::Int(i - ii),
+                                  "Integer")
+            }
+            Val::Float(f) => {
+                eval_binary_expr!(&Val::Float(ff),
+                                  right,
+                                  Val::Float(f - ff),
+                                  "Float")
+            }
+            ref expr => {
+                return Err(Box::new(
+                    BuildError::Unsupported(
+                        format!("{} does not support the '-' operation", expr.type_name()))))
+            }
+        }
+    }
+
+    fn multiply_vals(&self, left: Rc<Val>, right: Rc<Val>) -> Result<Rc<Val>, Box<Error>> {
+        match *left {
+            Val::Int(i) => {
+                eval_binary_expr!(&Val::Int(ii),
+                                  right,
+                                  Val::Int(i * ii),
+                                  "Integer")
+            }
+            Val::Float(f) => {
+                eval_binary_expr!(&Val::Float(ff),
+                                  right,
+                                  Val::Float(f * ff),
+                                  "Float")
+            }
+            ref expr => {
+                return Err(Box::new(
+                    BuildError::Unsupported(
+                        format!("{} does not support the '*' operation", expr.type_name()))))
+            }
+        }
+    }
+
+    fn divide_vals(&self, left: Rc<Val>, right: Rc<Val>) -> Result<Rc<Val>, Box<Error>> {
+        match *left {
+            Val::Int(i) => {
+                eval_binary_expr!(&Val::Int(ii),
+                                  right,
+                                  Val::Int(i / ii),
+                                  "Integer")
+            }
+            Val::Float(f) => {
+                eval_binary_expr!(&Val::Float(ff),
+                                  right,
+                                  Val::Float(f / ff),
+                                  "Float")
+            }
+            ref expr => {
+                return Err(Box::new(
+                    BuildError::Unsupported(
+                        format!("{} does not support the '*' operation", expr.type_name()))))
+            }
+        }
+    }
+
+    fn eval_binary(&self, def: &BinaryOpDef) -> Result<Rc<Val>, Box<Error>> {
+        let kind = &def.kind;
+        let v = &def.left;
+        let expr = &def.right;
+        let right = try!(self.eval_expr(expr));
+        let left = try!(self.value_to_val(v));
+        match kind {
+            &BinaryExprType::Add => self.add_vals(left, right),
+            &BinaryExprType::Sub => self.subtract_vals(left, right),
+            &BinaryExprType::Mul => self.multiply_vals(left, right),
+            &BinaryExprType::Div => self.divide_vals(left, right),
+        }
+    }
+
+    fn eval_copy(&self, def: &CopyDef) -> Result<Rc<Val>, Box<Error>> {
+        let v = try!(self.lookup_selector(&def.selector.sel));
+        if let Val::Tuple(ref src_fields) = *v {
+            let mut m = HashMap::<Positioned<String>, Rc<Val>>::new();
+            // loop through fields and build  up a hahsmap
+            for &(ref key, ref val) in src_fields.iter() {
+                if let Entry::Vacant(v) = m.entry(key.clone()) {
+                    v.insert(val.clone());
+                } else {
+                    return Err(Box::new(BuildError::TypeFail(format!("Duplicate \
+                                                                      field: {} in \
+                                                                      tuple",
+                                                                     key.val))));
+                }
+            }
+            for &(ref key, ref val) in def.fields.iter() {
+                let expr_result = try!(self.eval_expr(val));
+                match m.entry(key.into()) {
+                    Entry::Vacant(v) => {
+                        v.insert(expr_result);
+                    }
+                    Entry::Occupied(mut v) => {
+                        // Ensure that the new type matches the old type.
+                        let src_val = v.get().clone();
+                        if src_val.type_equal(&expr_result) {
+                            v.insert(expr_result);
+                        } else {
+                            return Err(Box::new(
+                                BuildError::TypeFail(
+                                    format!("Expected type {} for field {} but got {}",
+                                            src_val.type_name(), key.fragment, expr_result.type_name()))));
+                        }
+                    }
+                };
+            }
+            let mut new_fields: Vec<(Positioned<String>, Rc<Val>)> = m.drain().collect();
+            // We want a stable order for the fields to make comparing tuples
+            // easier in later code. So we sort by the field name before constructing a new tuple.
+            new_fields.sort_by(|a, b| a.0.cmp(&b.0));
+            return Ok(Rc::new(Val::Tuple(new_fields)));
+        }
+        Err(Box::new(BuildError::TypeFail(format!("Expected Tuple got {}", v))))
+    }
+
+    fn eval_format(&self, def: &FormatDef) -> Result<Rc<Val>, Box<Error>> {
+        let tmpl = &def.template;
+        let args = &def.args;
+        let mut vals = Vec::new();
+        for v in args.iter() {
+            let rcv = try!(self.eval_expr(v));
+            vals.push(rcv.deref().clone());
+        }
+        let formatter = format::Formatter::new(tmpl.clone(), vals);
+        Ok(Rc::new(Val::String(try!(formatter.render()))))
+    }
+
+    fn eval_call(&self, def: &CallDef) -> Result<Rc<Val>, Box<Error>> {
+        let sel = &def.macroref;
+        let args = &def.arglist;
+        let v = try!(self.lookup_selector(&sel.sel));
+        if let &Val::Macro(ref m) = v.deref() {
+            // Congratulations this is actually a macro.
+            let mut argvals: Vec<Rc<Val>> = Vec::new();
+            for arg in args.iter() {
+                argvals.push(try!(self.eval_expr(arg)));
+            }
+            let fields = try!(m.eval(argvals));
+            return Ok(Rc::new(Val::Tuple(fields)));
+        }
+        Err(Box::new(BuildError::TypeFail(// We should pretty print the selectors here.
+                                          format!("{} is not a Macro", v))))
+    }
+
+    fn eval_macro_def(&self, def: &MacroDef) -> Result<Rc<Val>, Box<Error>> {
+        match def.validate_symbols() {
+            Ok(()) => Ok(Rc::new(Val::Macro(def.clone()))),
+            Err(set) => {
+                Err(Box::new(BuildError::NoSuchSymbol(format!("Macro has the following \
+                                                               undefined symbols: {:?}",
+                                                              set))))
+            }
+        }
+    }
+
+    fn eval_select(&self, def: &SelectDef) -> Result<Rc<Val>, Box<Error>> {
+        let target = &def.val;
+        let def_expr = &def.default;
+        let fields = &def.tuple;
+        // First resolve the target expression.
+        let v = try!(self.eval_expr(target));
+        // Second ensure that the expression resolves to a string.
+        if let &Val::String(ref name) = v.deref() {
+            // Third find the field with that name in the tuple.
+            for &(ref fname, ref val_expr) in fields.iter() {
+                if &fname.fragment == name {
+                    // Fourth return the result of evaluating that field.
+                    return self.eval_expr(val_expr);
+                }
+            }
+            // Otherwise return the default
+            return self.eval_expr(def_expr);
+        } else {
+            return Err(Box::new(BuildError::TypeFail(format!("Expected String but got \
+                                                              {} in Select expression",
+                                                             v.type_name()))));
+        }
+    }
+
     // eval_expr evals a single Expression in the context of a running Builder.
     // It does not mutate the builders collected state at all.
     pub fn eval_expr(&self, expr: &Expression) -> Result<Rc<Val>, Box<Error>> {
@@ -445,237 +718,13 @@ impl Builder {
         //   Take a reference instead?
         match expr {
             &Expression::Simple(ref val) => self.value_to_val(val),
-            &Expression::Binary(ref def) => {
-                let kind = &def.kind;
-                let v = &def.left;
-                let expr = &def.right;
-                let expr_result = try!(self.eval_expr(expr));
-                let v = try!(self.value_to_val(v));
-                match kind {
-                    &BinaryExprType::Add => {
-                        match *v {
-                            Val::Int(i) => {
-                                eval_binary_expr!(&Val::Int(ii),
-                                                  expr_result,
-                                                  Val::Int(i + ii),
-                                                  "Integer")
-                            }
-                            Val::Float(f) => {
-                                eval_binary_expr!(&Val::Float(ff),
-                                                  expr_result,
-                                                  Val::Float(f + ff),
-                                                  "Float")
-                            }
-                            Val::String(ref s) => {
-                                match expr_result.as_ref() {
-                                    &Val::String(ref ss) => {
-                                        return Ok(Rc::new(Val::String([s.to_string(), ss.clone()]
-                                            .concat())))
-                                    }
-                                    val => {
-                                        return Err(Box::new(BuildError::TypeFail(format!("Expected \
-                                                                                          String \
-                                                                                          but got \
-                                                                                          {:?}",
-                                                                                         val))))
-                                    }
-                                }
-                            }
-                            Val::List(ref l) => {
-                                match expr_result.as_ref() {
-                                    &Val::List(ref r) => {
-                                        let mut new_vec = Vec::new();
-                                        new_vec.extend(l.iter().cloned());
-                                        new_vec.extend(r.iter().cloned());
-                                        return Ok(Rc::new(Val::List(new_vec)));
-                                    }
-                                    val => {
-                                        return Err(Box::new(BuildError::TypeFail(format!("Expected \
-                                                                                          List \
-                                                                                          but got \
-                                                                                          {:?}",
-                                                                                         val))))
-                                    }
-                                }
-                            }
-                            ref expr => {
-                                return Err(Box::new(
-                                    BuildError::Unsupported(
-                                        format!("{} does not support the '+' operation", expr.type_name()))))
-                            }
-                        }
-                    }
-                    &BinaryExprType::Sub => {
-                        match *v {
-                            Val::Int(i) => {
-                                eval_binary_expr!(&Val::Int(ii),
-                                                  expr_result,
-                                                  Val::Int(i - ii),
-                                                  "Integer")
-                            }
-                            Val::Float(f) => {
-                                eval_binary_expr!(&Val::Float(ff),
-                                                  expr_result,
-                                                  Val::Float(f - ff),
-                                                  "Float")
-                            }
-                            ref expr => {
-                                return Err(Box::new(
-                                    BuildError::Unsupported(
-                                        format!("{} does not support the '-' operation", expr.type_name()))))
-                            }
-                        }
-                    }
-                    &BinaryExprType::Mul => {
-                        match *v {
-                            Val::Int(i) => {
-                                eval_binary_expr!(&Val::Int(ii),
-                                                  expr_result,
-                                                  Val::Int(i * ii),
-                                                  "Integer")
-                            }
-                            Val::Float(f) => {
-                                eval_binary_expr!(&Val::Float(ff),
-                                                  expr_result,
-                                                  Val::Float(f * ff),
-                                                  "Float")
-                            }
-                            ref expr => {
-                                return Err(Box::new(
-                                    BuildError::Unsupported(
-                                        format!("{} does not support the '*' operation", expr.type_name()))))
-                            }
-                        }
-                    }
-                    &BinaryExprType::Div => {
-                        match *v {
-                            Val::Int(i) => {
-                                eval_binary_expr!(&Val::Int(ii),
-                                                  expr_result,
-                                                  Val::Int(i / ii),
-                                                  "Integer")
-                            }
-                            Val::Float(f) => {
-                                eval_binary_expr!(&Val::Float(ff),
-                                                  expr_result,
-                                                  Val::Float(f / ff),
-                                                  "Float")
-                            }
-                            ref expr => {
-                                return Err(Box::new(
-                                    BuildError::Unsupported(
-                                        format!("{} does not support the '*' operation", expr.type_name()))))
-                            }
-                        }
-                    }
-                }
-            }
-            &Expression::Copy(ref def) => {
-                let v = try!(self.lookup_selector(&def.selector.sel));
-                if let Val::Tuple(ref src_fields) = *v {
-                    let mut m = HashMap::<Positioned<String>, Rc<Val>>::new();
-                    // loop through fields and build  up a hahsmap
-                    for &(ref key, ref val) in src_fields.iter() {
-                        if let Entry::Vacant(v) = m.entry(key.clone()) {
-                            v.insert(val.clone());
-                        } else {
-                            return Err(Box::new(BuildError::TypeFail(format!("Duplicate \
-                                                                              field: {} in \
-                                                                              tuple",
-                                                                             key.val))));
-                        }
-                    }
-                    for &(ref key, ref val) in def.fields.iter() {
-                        let expr_result = try!(self.eval_expr(val));
-                        match m.entry(key.into()) {
-                            Entry::Vacant(v) => {
-                                v.insert(expr_result);
-                            }
-                            Entry::Occupied(mut v) => {
-                                // Ensure that the new type matches the old type.
-                                let src_val = v.get().clone();
-                                if src_val.type_equal(&expr_result) {
-                                    v.insert(expr_result);
-                                } else {
-                                    return Err(Box::new(
-                                        BuildError::TypeFail(
-                                            format!("Expected type {} for field {} but got {}",
-                                                    src_val.type_name(), key.fragment, expr_result.type_name()))));
-                                }
-                            }
-                        };
-                    }
-                    let mut new_fields: Vec<(Positioned<String>, Rc<Val>)> = m.drain().collect();
-                    // We want a stable order for the fields to make comparing tuples
-                    // easier in later code. So we sort by the field name before constructing a new tuple.
-                    new_fields.sort_by(|a, b| a.0.cmp(&b.0));
-                    return Ok(Rc::new(Val::Tuple(new_fields)));
-                }
-                Err(Box::new(BuildError::TypeFail(format!("Expected Tuple got {}", v))))
-            }
-            &Expression::Grouped(ref expr) => {
-                return self.eval_expr(expr);
-            }
-            &Expression::Format(ref def) => {
-                let tmpl = &def.template;
-                let args = &def.args;
-                let mut vals = Vec::new();
-                for v in args.iter() {
-                    let rcv = try!(self.eval_expr(v));
-                    vals.push(rcv.deref().clone());
-                }
-                let formatter = format::Formatter::new(tmpl.clone(), vals);
-                Ok(Rc::new(Val::String(try!(formatter.render()))))
-            }
-            &Expression::Call(ref def) => {
-                let sel = &def.macroref;
-                let args = &def.arglist;
-                let v = try!(self.lookup_selector(&sel.sel));
-                if let &Val::Macro(ref m) = v.deref() {
-                    // Congratulations this is actually a macro.
-                    let mut argvals: Vec<Rc<Val>> = Vec::new();
-                    for arg in args.iter() {
-                        argvals.push(try!(self.eval_expr(arg)));
-                    }
-                    let fields = try!(m.eval(argvals));
-                    return Ok(Rc::new(Val::Tuple(fields)));
-                }
-                Err(Box::new(BuildError::TypeFail(// We should pretty print the selectors here.
-                                                  format!("{} is not a Macro", v))))
-            }
-            &Expression::Macro(ref def) => {
-                match def.validate_symbols() {
-                    Ok(()) => Ok(Rc::new(Val::Macro(def.clone()))),
-                    Err(set) => {
-                        Err(Box::new(BuildError::NoSuchSymbol(format!("Macro has the following \
-                                                                       undefined symbols: {:?}",
-                                                                      set))))
-                    }
-                }
-            }
-            &Expression::Select(ref def) => {
-                let target = &def.val;
-                let def_expr = &def.default;
-                let fields = &def.tuple;
-                // First resolve the target expression.
-                let v = try!(self.eval_expr(target));
-                // Second ensure that the expression resolves to a string.
-                if let &Val::String(ref name) = v.deref() {
-                    // Third find the field with that name in the tuple.
-                    for &(ref fname, ref val_expr) in fields.iter() {
-                        if &fname.fragment == name {
-                            // Fourth return the result of evaluating that field.
-                            return self.eval_expr(val_expr);
-                        }
-                    }
-                    // Otherwise return the default
-                    return self.eval_expr(def_expr);
-                } else {
-                    return Err(Box::new(BuildError::TypeFail(format!("Expected String but got \
-                                                                      {} in Select expression",
-                                                                     v.type_name()))));
-                }
-            }
+            &Expression::Binary(ref def) => self.eval_binary(def),
+            &Expression::Copy(ref def) => self.eval_copy(def),
+            &Expression::Grouped(ref expr) => self.eval_expr(expr),
+            &Expression::Format(ref def) => self.eval_format(def),
+            &Expression::Call(ref def) => self.eval_call(def),
+            &Expression::Macro(ref def) => self.eval_macro_def(def),
+            &Expression::Select(ref def) => self.eval_select(def),
         }
     }
 }
