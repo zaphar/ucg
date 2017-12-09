@@ -20,23 +20,7 @@ use nom::InputLength;
 
 use ast::*;
 use tokenizer::*;
-
-quick_error! {
-    #[derive(Debug,PartialEq)]
-    pub enum ParseError {
-        UnexpectedToken(expected: String, actual: String) {
-            description("Unexpected Token")
-            display("Unexpected Token Expected {} Got {}", expected, actual)
-        }
-        EmptyExpression(msg: String ) {
-            description("EmptyExpression")
-            display("Unexpected EmptyExpression {}", msg)
-        }
-    }
-}
-
-
-// TODO(jwall): Error Reporting with Line and Column information.
+use error as E;
 
 type ParseResult<O> = Result<O, Box<Error>>;
 
@@ -171,7 +155,6 @@ pub fn selector_or_symbol(input: Span) -> IResult<Span, Value> {
             return IResult::Incomplete(i);
         }
         IResult::Error(_) => {
-            // TODO(jwall): Maybe be smarter about the error reporting here?
             return ws!(input, selector_value);
         }
         IResult::Done(rest, val) => {
@@ -275,16 +258,27 @@ named!(grouped_expression( Span ) -> Expression,
        )
 );
 
-fn assert_nonempty_list<T>(v: Vec<T>) -> ParseResult<Vec<T>> {
-    if v.is_empty() {
-        return Err(Box::new(ParseError::EmptyExpression("Selectors can't be empty.".to_string())));
+// TODO(jwall): This can go away once the non_empty_separated_list in nom is fixed to work
+//              with nom_locate.
+fn assert_nonempty_list<T>(t: (Span, Vec<T>)) -> ParseResult<Vec<T>> {
+    if t.1.is_empty() {
+        return Err(Box::new(E::Error::new("Selectors can't be empty.",
+                                          E::ErrorType::EmptyExpression,
+                                          Position {
+                                              line: t.0.line as usize,
+                                              column: t.0.offset as usize,
+                                          })));
     }
-    return Ok(v);
+    return Ok(t.1);
 }
 
 named!(selector_list( Span ) -> SelectorList,
     map_res!(
-        separated_list!(dottok, barewordtok),
+        do_parse!(
+            pos: position!() >>
+            list: separated_list!(dottok, barewordtok) >>
+            (pos, list)
+        ),
         assert_nonempty_list
     )
 );
@@ -330,7 +324,12 @@ fn tuple_to_macro(mut t: (Span, Vec<Value>, Value)) -> ParseResult<Expression> {
         }
         // TODO(jwall): Show a better version of the unexpected parsed value.
         val => {
-            Err(Box::new(ParseError::UnexpectedToken("{ .. }".to_string(), format!("{:?}", val))))
+            Err(Box::new(E::Error::new(format!("Expected Tuple Got {:?}", val),
+                                       E::ErrorType::UnexpectedToken,
+                                       Position {
+                                           line: t.0.line as usize,
+                                           column: t.0.offset as usize,
+                                       })))
         }
     }
 }
@@ -363,9 +362,13 @@ fn tuple_to_select(t: (Span, Expression, Expression, Value)) -> ParseResult<Expr
                 pos: Position::new(t.0.line as usize, t.0.offset as usize),
             }))
         }
-        // TODO(jwall): Show a better version of the unexpected parsed value.
         val => {
-            Err(Box::new(ParseError::UnexpectedToken("{ .. }".to_string(), format!("{:?}", val))))
+            Err(Box::new(E::Error::new(format!("Expected Tuple Got {:?}", val),
+                                       E::ErrorType::UnexpectedToken,
+                                       Position {
+                                           line: t.0.line as usize,
+                                           column: t.0.offset as usize,
+                                       })))
         }
     }
 }
@@ -414,7 +417,12 @@ fn tuple_to_call(t: (Span, Value, Vec<Expression>)) -> ParseResult<Expression> {
             pos: Position::new(t.0.line as usize, t.0.offset as usize),
         }))
     } else {
-        Err(Box::new(ParseError::UnexpectedToken("Selector".to_string(), format!("{:?}", t.0))))
+        Err(Box::new(E::Error::new(format!("Expected Selector Got {:?}", t.0),
+                                   E::ErrorType::UnexpectedToken,
+                                   Position {
+                                       line: t.0.line as usize,
+                                       column: t.0.offset as usize,
+                                   })))
     }
 }
 

@@ -15,7 +15,8 @@
 use std::clone::Clone;
 use std::error::Error;
 
-use build::BuildError;
+use ast::*;
+use error;
 
 pub struct Formatter<V: Into<String> + Clone> {
     tmpl: String,
@@ -30,16 +31,17 @@ impl<V: Into<String> + Clone> Formatter<V> {
         }
     }
 
-    pub fn render(&self) -> Result<String, Box<Error>> {
+    pub fn render(&self, pos: &Position) -> Result<String, Box<Error>> {
         let mut buf = String::new();
         let mut should_escape = false;
         let mut count = 0;
         for c in self.tmpl.chars() {
             if c == '@' && !should_escape {
                 if count == self.args.len() {
-                    return Err(Box::new(BuildError::FormatError("Too few arguments to string \
-                                                                 formatter."
-                        .to_string())));
+                    return Err(Box::new(error::Error::new("Too few arguments to string \
+                                                                 formatter.",
+                                                          error::ErrorType::FormatError,
+                                                          pos.clone())));
                 }
                 let arg = self.args[count].clone();
                 let strval = arg.into();
@@ -52,9 +54,10 @@ impl<V: Into<String> + Clone> Formatter<V> {
             }
         }
         if self.args.len() != count {
-            return Err(Box::new(BuildError::FormatError("Too many arguments to string \
-                                                         formatter."
-                .to_string())));
+            return Err(Box::new(error::Error::new("Too many arguments to string \
+                                                         formatter.",
+                                                  error::ErrorType::FormatError,
+                                                  pos.clone())));
         }
         return Ok(buf);
     }
@@ -63,22 +66,35 @@ impl<V: Into<String> + Clone> Formatter<V> {
 #[cfg(test)]
 mod test {
     use super::Formatter;
+    use ast::Position;
 
     #[test]
     fn test_format_happy_path() {
         let formatter = Formatter::new("foo @ @ \\@", vec!["bar", "quux"]);
-        assert_eq!(formatter.render().unwrap(), "foo bar quux @");
+        let pos = Position {
+            line: 0,
+            column: 0,
+        };
+        assert_eq!(formatter.render(&pos).unwrap(), "foo bar quux @");
     }
 
     #[test]
     fn test_format_happy_wrong_too_few_args() {
         let formatter = Formatter::new("foo @ @ \\@", vec!["bar"]);
-        assert!(formatter.render().is_err());
+        let pos = Position {
+            line: 0,
+            column: 0,
+        };
+        assert!(formatter.render(&pos).is_err());
     }
 
     #[test]
     fn test_format_happy_wrong_too_many_args() {
         let formatter = Formatter::new("foo @ @ \\@", vec!["bar", "quux", "baz"]);
-        assert!(formatter.render().is_err());
+        let pos = Position {
+            line: 0,
+            column: 0,
+        };
+        assert!(formatter.render(&pos).is_err());
     }
 }

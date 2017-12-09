@@ -28,6 +28,7 @@ use tokenizer::Span;
 use ast::*;
 use format;
 use parse::parse;
+use error;
 
 impl MacroDef {
     pub fn eval(&self,
@@ -36,8 +37,9 @@ impl MacroDef {
         // Error conditions. If the args don't match the length and types of the argdefs then this is
         // macro call error.
         if args.len() > self.argdefs.len() {
-            return Err(Box::new(BuildError::BadArgLen("Macro called with too many args"
-                .to_string())));
+            return Err(Box::new(error::Error::new("Macro called with too many args",
+                                                  error::ErrorType::BadArgLen,
+                                                  self.pos.clone())));
         }
         // If the args don't match the types required by the expressions then that is a TypeFail.
         // If the expressions reference Symbols not defined in the MacroDef that is also an error.
@@ -56,44 +58,6 @@ impl MacroDef {
             result.push((key.into(), val.clone()));
         }
         Ok(result)
-    }
-}
-
-quick_error! {
-    #[derive(Debug,PartialEq)]
-    pub enum BuildError {
-        TypeFail(msg: String) {
-            description("Type Error")
-            display("Type Error {}", msg)
-        }
-        DuplicateBinding(msg: String) {
-            description("Atttempt to add duplicate binding in file")
-            display("Atttempt to add duplicate binding in file {}", msg)
-        }
-        IncompleteParse(msg: String) {
-            description("Incomplete Parse of file")
-            display("Incomplete Parse of file {}", msg)
-        }
-        Unsupported(msg: String) {
-            description("Unsupported Operation")
-            display("Unsupported Operation {}", msg)
-        }
-        NoSuchSymbol(msg: String) {
-            description("Eval Error")
-            display("No Such Variable {}", msg)
-        }
-        BadArgLen(msg: String) {
-            description("Eval Error")
-            display("Bad Argument Length {}", msg)
-        }
-        FormatError(msg: String) {
-            description("String Format Error")
-            display("String format Error {}", msg)
-        }
-        TODO(msg: String) {
-            description("TODO Error")
-            display("TODO Error {}", msg)
-        }
     }
 }
 
@@ -213,15 +177,15 @@ pub struct Builder {
 }
 
 macro_rules! eval_binary_expr {
-    ($case:pat, $rside:ident, $result:expr, $msg:expr) => {
+    ($case:pat, $pos:ident, $rside:ident, $result:expr, $msg:expr) => {
         match $rside.as_ref() {
             $case => {
-                return Ok(Rc::new($result))
+                return Ok(Rc::new($result));
             },
             val => {
                 return Err(Box::new(
-                    BuildError::TypeFail(
-                        format!("Expected {} but got {}", $msg, val))))
+                    error::Error::new(
+                        format!("Expected {} but got {}", $msg, val), error::ErrorType::TypeFail, $pos.clone())));
             }
         }
     }
@@ -253,7 +217,9 @@ impl Builder {
             &Value::String(ref s) => Ok(Rc::new(Val::String(s.val.to_string()))),
             &Value::Symbol(ref s) => {
                 self.lookup_sym(&(s.into()))
-                    .ok_or(Box::new(BuildError::NoSuchSymbol(format!("Unable to find {}", s.val))))
+                    .ok_or(Box::new(error::Error::new(format!("Unable to find {}", s.val),
+                                                      error::ErrorType::NoSuchSymbol,
+                                                      v.pos().clone())))
             }
             &Value::List(ref def) => self.list_to_val(def),
             &Value::Tuple(ref tuple) => self.tuple_to_val(&tuple.val),
@@ -306,9 +272,11 @@ impl Builder {
             }
             nom::IResult::Error(err) => Err(Box::new(err)),
             nom::IResult::Incomplete(_) => {
-                Err(Box::new(BuildError::IncompleteParse(format!("Could not parse input from \
-                                                                  file: {}",
-                                                                 name))))
+                Err(Box::new(error::Error::new(
+                    format!("Could not parse input from file: {}", name),
+                    error::ErrorType::IncompleteParsing,
+                    Position{line: 0, column: 0}
+                )))
             }
         }
     }
@@ -345,10 +313,12 @@ impl Builder {
         let name = &def.name;
         match self.out.entry(name.into()) {
             Entry::Occupied(e) => {
-                return Err(Box::new(BuildError::DuplicateBinding(format!("Let binding \
+                return Err(Box::new(error::Error::new(format!("Let binding \
                                                                           for {:?} already \
                                                                           exists",
-                                                                         e.key()))));
+                                                                         e.key()),
+                                                      error::ErrorType::DuplicateBinding,
+                                                      def.name.pos.clone())));
             }
             Entry::Vacant(e) => {
                 e.insert(val);
@@ -403,10 +373,12 @@ impl Builder {
             stack.push_back(vv.clone());
         } else {
             // TODO(jwall): A better error for this would be nice.
-            return Err(Box::new(BuildError::NoSuchSymbol(format!("Unable to \
+            return Err(Box::new(error::Error::new(format!("Unable to \
                                                                       match selector \
                                                                       path {:?}",
-                                                                     sl))));
+                                                                     sl),
+                                                  error::ErrorType::NoSuchSymbol,
+                                                  next.pos.clone())));
         }
         Ok(())
     }
@@ -423,10 +395,12 @@ impl Builder {
             stack.push_back(elems[idx].clone());
         } else {
             // TODO(jwall): A better error for this would be nice.
-            return Err(Box::new(BuildError::NoSuchSymbol(format!("Unable to \
+            return Err(Box::new(error::Error::new(format!("Unable to \
                                                                   match selector \
                                                                   path {:?}",
-                                                                 sl))));
+                                                                 sl),
+                                                  error::ErrorType::NoSuchSymbol,
+                                                  next.pos.clone())));
         }
         Ok(())
     }
@@ -457,29 +431,42 @@ impl Builder {
                             continue;
                         }
                         _ => {
-                            return Err(Box::new(BuildError::TypeFail(format!("{} is not a Tuple or List",
-                                sl[0].fragment))));
+                            return Err(Box::new(error::Error::new(format!("{} is not a Tuple or List",
+                                sl[0].fragment),
+                                error::ErrorType::TypeFail, next.pos.clone())));
                         }
                     }
                 }
             }
-            return Err(Box::new(BuildError::NoSuchSymbol(format!("Unable to find Symbol {}",
-                                                                 sl[0].fragment))));
+            return Err(Box::new(error::Error::new(format!("Unable to find Symbol {}",
+                                                                 sl[0].fragment),
+                                                  error::ErrorType::NoSuchSymbol,
+                                                  pos_sl.pos.clone())));
         }
-        return Err(Box::new(BuildError::NoSuchSymbol("Attempted to lookup an empty selector"
-            .to_string())));
+        return Err(Box::new(error::Error::new("Attempted to lookup an empty selector",
+                                              error::ErrorType::NoSuchSymbol,
+                                              Position {
+                                                  line: 0,
+                                                  column: 0,
+                                              })));
     }
 
-    fn add_vals(&self, left: Rc<Val>, right: Rc<Val>) -> Result<Rc<Val>, Box<Error>> {
+    fn add_vals(&self,
+                pos: &Position,
+                left: Rc<Val>,
+                right: Rc<Val>)
+                -> Result<Rc<Val>, Box<Error>> {
         match *left {
             Val::Int(i) => {
                 eval_binary_expr!(&Val::Int(ii),
+                                  pos,
                                   right,
                                   Val::Int(i + ii),
                                   "Integer")
             }
             Val::Float(f) => {
                 eval_binary_expr!(&Val::Float(ff),
+                                  pos,
                                   right,
                                   Val::Float(f + ff),
                                   "Float")
@@ -490,11 +477,13 @@ impl Builder {
                         return Ok(Rc::new(Val::String([s.to_string(), ss.clone()].concat())))
                     }
                     val => {
-                        return Err(Box::new(BuildError::TypeFail(format!("Expected \
+                        return Err(Box::new(error::Error::new(format!("Expected \
                                                                           String \
                                                                           but got \
                                                                           {:?}",
-                                                                         val))))
+                                                                         val),
+                                                              error::ErrorType::TypeFail,
+                                                              pos.clone())))
                     }
                 }
             }
@@ -507,84 +496,112 @@ impl Builder {
                         return Ok(Rc::new(Val::List(new_vec)));
                     }
                     val => {
-                        return Err(Box::new(BuildError::TypeFail(format!("Expected \
+                        return Err(Box::new(error::Error::new(format!("Expected \
                                                                           List \
                                                                           but got \
                                                                           {:?}",
-                                                                         val))))
+                                                                         val),
+                                                              error::ErrorType::TypeFail,
+                                                              pos.clone())))
                     }
                 }
             }
             ref expr => {
                 return Err(Box::new(
-                    BuildError::Unsupported(
-                        format!("{} does not support the '+' operation", expr.type_name()))))
+                    error::Error::new(
+                        format!("{} does not support the '+' operation", expr.type_name()),
+                        error::ErrorType::Unsupported,
+                        pos.clone())))
             }
         }
     }
 
-    fn subtract_vals(&self, left: Rc<Val>, right: Rc<Val>) -> Result<Rc<Val>, Box<Error>> {
+    fn subtract_vals(&self,
+                     pos: &Position,
+                     left: Rc<Val>,
+                     right: Rc<Val>)
+                     -> Result<Rc<Val>, Box<Error>> {
         match *left {
             Val::Int(i) => {
                 eval_binary_expr!(&Val::Int(ii),
+                                  pos,
                                   right,
                                   Val::Int(i - ii),
                                   "Integer")
             }
             Val::Float(f) => {
                 eval_binary_expr!(&Val::Float(ff),
+                                  pos,
                                   right,
                                   Val::Float(f - ff),
                                   "Float")
             }
             ref expr => {
                 return Err(Box::new(
-                    BuildError::Unsupported(
-                        format!("{} does not support the '-' operation", expr.type_name()))))
+                    error::Error::new(
+                        format!("{} does not support the '-' operation", expr.type_name()),
+                        error::ErrorType::Unsupported,
+                        pos.clone())))
             }
         }
     }
 
-    fn multiply_vals(&self, left: Rc<Val>, right: Rc<Val>) -> Result<Rc<Val>, Box<Error>> {
+    fn multiply_vals(&self,
+                     pos: &Position,
+                     left: Rc<Val>,
+                     right: Rc<Val>)
+                     -> Result<Rc<Val>, Box<Error>> {
         match *left {
             Val::Int(i) => {
                 eval_binary_expr!(&Val::Int(ii),
+                                  pos,
                                   right,
                                   Val::Int(i * ii),
                                   "Integer")
             }
             Val::Float(f) => {
                 eval_binary_expr!(&Val::Float(ff),
+                                  pos,
                                   right,
                                   Val::Float(f * ff),
                                   "Float")
             }
             ref expr => {
                 return Err(Box::new(
-                    BuildError::Unsupported(
-                        format!("{} does not support the '*' operation", expr.type_name()))))
+                    error::Error::new(
+                        format!("{} does not support the '*' operation", expr.type_name()),
+                        error::ErrorType::Unsupported,
+                        pos.clone())))
             }
         }
     }
 
-    fn divide_vals(&self, left: Rc<Val>, right: Rc<Val>) -> Result<Rc<Val>, Box<Error>> {
+    fn divide_vals(&self,
+                   pos: &Position,
+                   left: Rc<Val>,
+                   right: Rc<Val>)
+                   -> Result<Rc<Val>, Box<Error>> {
         match *left {
             Val::Int(i) => {
                 eval_binary_expr!(&Val::Int(ii),
+                                  pos,
                                   right,
                                   Val::Int(i / ii),
                                   "Integer")
             }
             Val::Float(f) => {
                 eval_binary_expr!(&Val::Float(ff),
+                                  pos,
                                   right,
                                   Val::Float(f / ff),
                                   "Float")
             }
             ref expr => {
                 return Err(Box::new(
-                    BuildError::Unsupported(
-                        format!("{} does not support the '*' operation", expr.type_name()))))
+                    error::Error::new(
+                        format!("{} does not support the '*' operation", expr.type_name()),
+                        error::ErrorType::Unsupported,
+                        pos.clone())))
             }
         }
     }
@@ -596,10 +613,10 @@ impl Builder {
         let right = try!(self.eval_expr(expr));
         let left = try!(self.value_to_val(v));
         match kind {
-            &BinaryExprType::Add => self.add_vals(left, right),
-            &BinaryExprType::Sub => self.subtract_vals(left, right),
-            &BinaryExprType::Mul => self.multiply_vals(left, right),
-            &BinaryExprType::Div => self.divide_vals(left, right),
+            &BinaryExprType::Add => self.add_vals(&def.pos, left, right),
+            &BinaryExprType::Sub => self.subtract_vals(&def.pos, left, right),
+            &BinaryExprType::Mul => self.multiply_vals(&def.pos, left, right),
+            &BinaryExprType::Div => self.divide_vals(&def.pos, left, right),
         }
     }
 
@@ -612,10 +629,12 @@ impl Builder {
                 if let Entry::Vacant(v) = m.entry(key.clone()) {
                     v.insert(val.clone());
                 } else {
-                    return Err(Box::new(BuildError::TypeFail(format!("Duplicate \
+                    return Err(Box::new(error::Error::new(format!("Duplicate \
                                                                       field: {} in \
                                                                       tuple",
-                                                                     key.val))));
+                                                                     key.val),
+                                                          error::ErrorType::TypeFail,
+                                                          def.pos.clone())));
                 }
             }
             for &(ref key, ref val) in def.fields.iter() {
@@ -631,9 +650,11 @@ impl Builder {
                             v.insert(expr_result);
                         } else {
                             return Err(Box::new(
-                                BuildError::TypeFail(
+                                error::Error::new(
                                     format!("Expected type {} for field {} but got {}",
-                                            src_val.type_name(), key.fragment, expr_result.type_name()))));
+                                            src_val.type_name(), key.fragment, expr_result.type_name()),
+                                            error::ErrorType::TypeFail,
+                                            key.pos.clone())));
                         }
                     }
                 };
@@ -644,7 +665,9 @@ impl Builder {
             new_fields.sort_by(|a, b| a.0.cmp(&b.0));
             return Ok(Rc::new(Val::Tuple(new_fields)));
         }
-        Err(Box::new(BuildError::TypeFail(format!("Expected Tuple got {}", v))))
+        Err(Box::new(error::Error::new(format!("Expected Tuple got {}", v),
+                                       error::ErrorType::TypeFail,
+                                       def.selector.pos.clone())))
     }
 
     fn eval_format(&self, def: &FormatDef) -> Result<Rc<Val>, Box<Error>> {
@@ -656,7 +679,7 @@ impl Builder {
             vals.push(rcv.deref().clone());
         }
         let formatter = format::Formatter::new(tmpl.clone(), vals);
-        Ok(Rc::new(Val::String(try!(formatter.render()))))
+        Ok(Rc::new(Val::String(try!(formatter.render(&def.pos)))))
     }
 
     fn eval_call(&self, def: &CallDef) -> Result<Rc<Val>, Box<Error>> {
@@ -672,17 +695,21 @@ impl Builder {
             let fields = try!(m.eval(argvals));
             return Ok(Rc::new(Val::Tuple(fields)));
         }
-        Err(Box::new(BuildError::TypeFail(// We should pretty print the selectors here.
-                                          format!("{} is not a Macro", v))))
+        Err(Box::new(error::Error::new(// We should pretty print the selectors here.
+                                       format!("{} is not a Macro", v),
+                                       error::ErrorType::TypeFail,
+                                       def.pos.clone())))
     }
 
     fn eval_macro_def(&self, def: &MacroDef) -> Result<Rc<Val>, Box<Error>> {
         match def.validate_symbols() {
             Ok(()) => Ok(Rc::new(Val::Macro(def.clone()))),
             Err(set) => {
-                Err(Box::new(BuildError::NoSuchSymbol(format!("Macro has the following \
+                Err(Box::new(error::Error::new(format!("Macro has the following \
                                                                undefined symbols: {:?}",
-                                                              set))))
+                                                              set),
+                                               error::ErrorType::NoSuchSymbol,
+                                               def.pos.clone())))
             }
         }
     }
@@ -705,9 +732,11 @@ impl Builder {
             // Otherwise return the default
             return self.eval_expr(def_expr);
         } else {
-            return Err(Box::new(BuildError::TypeFail(format!("Expected String but got \
+            return Err(Box::new(error::Error::new(format!("Expected String but got \
                                                               {} in Select expression",
-                                                             v.type_name()))));
+                                                             v.type_name()),
+                                                  error::ErrorType::TypeFail,
+                                                  def.pos.clone())));
         }
     }
 
