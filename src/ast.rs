@@ -86,8 +86,136 @@ macro_rules! value_node {
     };
 }
 
+macro_rules! make_tok {
+    ( $e: expr, $l:expr, $c:expr ) => {
+        Token::new($e, $l, $c)
+    };
+}
+
+macro_rules! make_expr {
+    ( $e:expr ) => {
+        make_expr!($e, 1, 1)
+    };
+
+    ( $e:expr, $l:expr, $c:expr ) => {
+        Expression::Simple(Value::Symbol(Positioned::new($e.to_string(), $l, $c)))
+    }
+}
+
+/// Helper macro for making selectors.
+/// 
+/// ```
+/// make_selector!(Token::new("tpl", 1, 1), Token::new("fld", 1, 4));
+/// 
+/// make_selector!(Token::new("tpl", 1, 1), vec![Token::new("fld", 1, 4)], => 1, 1);
+/// 
+/// make_selector!(foo", ["bar"]);
+/// 
+/// make_selector!(foo", ["bar"] => 1, 0);
+/// ```
+macro_rules! make_selector {
+    ( $h:expr ) => {
+        make_selector!($h, 1, 0)
+    };
+
+    ( $h:expr, $l:expr, $c:expr ) => {
+        SelectorDef::new(
+            SelectorList{head: Box::new($h), tail: None},
+            $l, $c)
+    };
+
+    ( $h: expr, $list:expr, $l:expr, $c:expr) => {
+        SelectorDef::new(
+            SelectorList{head: Box::new($h), tail: Some($list)},
+            $l, $c)
+    };
+
+    // Tokens
+    ( $h:expr => [ $( $item:expr ),* ] ) => {
+        {
+            make_selector!($h => [ $( $item, )* ] => 1, 1)
+        }
+    };
+    
+    ( $h:expr => [ $( $item:expr ),* ] => $l:expr, $c:expr ) => {
+        {
+            let mut list: Vec<Token> = Vec::new();
+        
+            $(
+                list.push($item);
+            )*
+        
+            make_selector!($h, list, $l, $c)
+        }
+    };
+
+    // Strings not tokens
+    ( $h:expr => $( $item:expr ),* ) => {
+        {
+
+            let mut col = 1;
+            let mut list: Vec<Token> = Vec::new();
+        
+            $(
+                list.push(Token::new($item, 1, col));
+                col += $item.len() + 1;
+            )*
+            
+            // Shut up the lint about unused code;
+            assert!(col != 0);
+
+            make_selector!($h, list, 1, 1) 
+        }
+
+    };
+    
+    ( $h:expr => $( $item:expr ),* => $l:expr, $c:expr ) => {
+        {
+            let mut col = $c;
+            let mut list: Vec<Token> = Vec::new();
+        
+            $(
+                list.push(Token::new($item, $l, col));
+                col += $item.len() + 1;
+            )*
+
+            // Shut up the lint about unused code;
+            assert!(col != 0);
+
+            make_selector!($h, list, $l, $c) 
+        }
+    };
+}
+
+/// Selector is an Expression with a series of symbols specifying the key
+/// with which to descend into the result of the expression.
+///
+/// The expression must evaluate to either a tuple or an array. The token must
+/// evaluate to either a bareword Symbol or an Int.
+/// 
+/// ```ucg
+/// let foo = { bar = "a thing" };
+/// let thing = foo.bar;
+/// 
+/// let arr = ["one", "two"];
+/// let first = arr.0;
+/// 
+/// let berry = {best = "strawberry", unique = "acai"}.best;
+/// let third = ["uno", "dos", "tres"].1;
+/// '''
+#[derive(Debug,PartialEq,Clone)]
+pub struct SelectorList {
+    pub head: Box<Expression>,
+    pub tail: Option<Vec<Token>>,
+}
+
+impl SelectorList {
+    pub fn to_string(&self) -> String {
+        "TODO".to_string()
+    }
+}
+
 pub type FieldList = Vec<(Token, Expression)>; // Token is expected to be a symbol
-pub type SelectorList = Vec<Token>; // Token is expected to always be a symbol.
 
 #[derive(Debug,PartialEq,Clone)]
 pub struct SelectorDef {
@@ -155,7 +283,7 @@ impl Value {
             &Value::Symbol(ref s) => format!("{}", s.val),
             &Value::Tuple(ref fs) => format!("{}", Self::fields_to_string(&fs.val)),
             &Value::List(ref def) => format!("[{}]", Self::elems_to_string(&def.elems)),
-            &Value::Selector(ref v) => v.sel.join("."),
+            &Value::Selector(ref v) => v.sel.to_string(),
         }
     }
 
@@ -293,18 +421,7 @@ impl MacroDef {
                 bad_symbols.insert(name.val.clone());
             }
         } else if let &Value::Selector(ref sel_node) = val {
-            let list = &sel_node.sel;
-            if list.len() > 0 {
-                // We only look to see if the first selector item exists.
-                // This is because only the first one is a symbol all of the
-                // rest of the items in the selector are fields in a tuple.
-                // But we don't know at this time of the value passed into
-                // this macro is a tuple since this isn't a callsite.
-                println!("checking selector head {}", list[0].fragment);
-                if !self.symbol_is_in_args(&list[0].fragment) {
-                    bad_symbols.insert(list[0].fragment.to_string());
-                }
-            }
+            stack.push(&sel_node.sel.head);
         } else if let &Value::Tuple(ref tuple_node) = val {
             let fields = &tuple_node.val;
             for &(_, ref expr) in fields.iter() {
@@ -432,6 +549,21 @@ pub enum Expression {
     Select(SelectDef),
 }
 
+impl Expression {
+    pub fn pos(&self) -> &Position {
+        match self {
+            &Expression::Simple(ref v) => v.pos(),
+            &Expression::Binary(ref def) => &def.pos,
+            &Expression::Copy(ref def) => &def.pos,
+            &Expression::Grouped(ref expr) => expr.pos(),
+            &Expression::Format(ref def) => &def.pos,
+            &Expression::Call(ref def) => &def.pos,
+            &Expression::Macro(ref def) => &def.pos,
+            &Expression::Select(ref def) => &def.pos,
+        }
+    }
+}
+
 #[derive(Debug,PartialEq)]
 pub struct LetDef {
     pub name: Token,
@@ -504,9 +636,8 @@ mod ast_test {
             fields: vec![
                 (Token::new("f1", 1, 1), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
-                    left: Value::Selector(SelectorDef::new(vec![
-                        Token::new("foo", 1, 1),
-                        Token::new("quux", 1, 1)], 1, 1)),
+                    left: Value::Selector(make_selector!(make_expr!("foo", 1, 1) => [
+                        Token::new("quux", 1, 1) ] => 1, 1)),
                     right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
             pos: Position::new(1, 0),
                 })),
@@ -523,9 +654,8 @@ mod ast_test {
             fields: vec![
                 (Token::new("f1", 1, 1), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
-                    left: Value::Selector(SelectorDef::new(vec![
-                        Token::new("bar", 1, 1),
-                        Token::new("quux", 1, 1)], 1, 1)),
+                    left: Value::Selector(make_selector!(make_expr!("bar", 1, 1) => [
+                        Token::new("quux", 1, 1) ] => 1, 1)),
                     right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
             pos: Position::new(1, 0),
                 })),

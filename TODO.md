@@ -16,6 +16,6 @@ organiztion for a given configuration structure. Some options here could be
 
 # Minor Fixes and Polish
 
-* Full selector support. (i.e. expressions in the selector parts)
+* Comment syntax
 * JSON export
 * YAML export

@@ -142,8 +142,28 @@ impl Val {
 
 impl Display for Val {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        // TODO(jwall): These should render better than this.
-        write!(f, "{}", self.type_name())
+        match self {
+            &Val::Float(ref ff) => write!(f, "Float({})", ff),
+            &Val::Int(ref i) => write!(f, "Int({})", i),
+            &Val::String(ref s) => write!(f, "String({})", s),
+            &Val::List(ref def) => {
+                try!(write!(f, "[\n"));
+                for v in def.iter() {
+                    try!(write!(f, "\t{},\n", v));
+                }
+                write!(f, "]")
+            }
+            &Val::Macro(_) => {
+                write!(f, "Macro(..)")
+            },
+            &Val::Tuple(ref def) => {
+                try!(write!(f, "Tuple(\n"));
+                for v in def.iter() {
+                    try!(write!(f, "\t{} = {},\n", v.0.val, v.1));
+                }
+                write!(f, ")")
+            },
+        }
     }
 }
 
@@ -364,12 +384,12 @@ impl Builder {
     fn lookup_in_tuple(&self,
                        stack: &mut VecDeque<Rc<Val>>,
                        sl: &SelectorList,
-                       next: &Token,
+                       next: (&Position, &str),
                        fs: &Vec<(Positioned<String>, Rc<Val>)>)
                        -> Result<(), Box<Error>> {
         // This unwrap is safe because we already checked for
         // Tuple in the pattern match.
-        if let Some(vv) = Self::find_in_fieldlist(&next.fragment, fs) {
+        if let Some(vv) = Self::find_in_fieldlist(next.1, fs) {
             stack.push_back(vv.clone());
         } else {
             // TODO(jwall): A better error for this would be nice.
@@ -378,7 +398,7 @@ impl Builder {
                                                                       path {:?}",
                                                                      sl),
                                                   error::ErrorType::NoSuchSymbol,
-                                                  next.pos.clone())));
+                                                  next.0.clone())));
         }
         Ok(())
     }
@@ -386,11 +406,11 @@ impl Builder {
     fn lookup_in_list(&self,
                       stack: &mut VecDeque<Rc<Val>>,
                       sl: &SelectorList,
-                      next: &Token,
+                      next: (&Position, &str),
                       elems: &Vec<Rc<Val>>)
                       -> Result<(), Box<Error>> {
         // TODO(jwall): better error reporting here would probably be good.
-        let idx = try!(next.fragment.parse::<usize>());
+        let idx = try!(next.1.parse::<usize>());
         if idx < elems.len() {
             stack.push_back(elems[idx].clone());
         } else {
@@ -400,55 +420,58 @@ impl Builder {
                                                                   path {:?}",
                                                                  sl),
                                                   error::ErrorType::NoSuchSymbol,
-                                                  next.pos.clone())));
+                                                  next.0.clone())));
         }
         Ok(())
     }
 
     fn lookup_selector(&self, sl: &SelectorList) -> Result<Rc<Val>, Box<Error>> {
-        let len = sl.len();
-        if len > 0 {
-            let pos_sl = (&sl[0]).into();
-            if let Some(v) = self.lookup_sym(&pos_sl) {
-                let mut it = sl.iter().skip(1).peekable();
-                let mut stack = VecDeque::new();
-                stack.push_back(v.clone());
-                loop {
-                    let vref = stack.pop_front().unwrap();
-                    if it.peek().is_none() {
-                        return Ok(vref.clone());
+        let first = try!(self.eval_expr(&sl.head));
+        // First we ensure that the result is a tuple or a list.
+        let mut stack = VecDeque::new();
+        match first.as_ref() {
+            &Val::Tuple(_) => {
+                stack.push_back(first.clone());
+            }
+            &Val::List(_) =>{
+                stack.push_back(first.clone());
+            }
+            _ => {
+                //noop
+            }
+        }
+
+        if let &Some(ref tail) = &sl.tail {
+            let mut it = tail.iter().peekable();
+            loop {
+                let vref = stack.pop_front().unwrap();
+                if it.peek().is_none() {
+                    return Ok(vref.clone());
+                }
+                // This unwrap is safe because we already checked for
+                // None above.
+                let next = it.next().unwrap();
+                match vref.as_ref() {
+                    &Val::Tuple(ref fs) => {
+                        try!(self.lookup_in_tuple(
+                            &mut stack, sl, (&next.pos, &next.fragment), fs));
+                        continue;
                     }
-                    // This unwrap is safe because we already checked for
-                    // None above.
-                    let next = it.next().unwrap();
-                    match vref.as_ref() {
-                        &Val::Tuple(ref fs) => {
-                            try!(self.lookup_in_tuple(&mut stack, sl, next, fs));
-                            continue;
-                        }
-                        &Val::List(ref elems) => {
-                            try!(self.lookup_in_list(&mut stack, sl, next, elems));
-                            continue;
-                        }
-                        _ => {
-                            return Err(Box::new(error::Error::new(format!("{} is not a Tuple or List",
-                                sl[0].fragment),
-                                error::ErrorType::TypeFail, next.pos.clone())));
-                        }
+                    &Val::List(ref elems) => {
+                        try!(self.lookup_in_list(&mut stack, sl, (
+                            &next.pos, &next.fragment), elems));
+                        continue;
+                    }
+                    _ => {
+                        return Err(Box::new(error::Error::new(format!("{} is not a Tuple or List",
+                            vref),
+                            error::ErrorType::TypeFail, next.pos.clone())));
                     }
                 }
             }
-            return Err(Box::new(error::Error::new(format!("Unable to find Symbol {}",
-                                                                 sl[0].fragment),
-                                                  error::ErrorType::NoSuchSymbol,
-                                                  pos_sl.pos.clone())));
+        } else {
+            return Ok(first);
         }
-        return Err(Box::new(error::Error::new("Attempted to lookup an empty selector",
-                                              error::ErrorType::NoSuchSymbol,
-                                              Position {
-                                                  line: 0,
-                                                  column: 0,
-                                              })));
     }
 
     fn add_vals(&self,
@@ -1016,7 +1039,8 @@ mod test {
                       Rc::new(Val::Int(4)))])));
 
         test_expr_to_val(vec![
-            (Expression::Simple(Value::Selector(SelectorDef::new(vec![Token::new("var1", 1, 1)], 1, 1))), Val::Tuple(
+            (Expression::Simple(Value::Selector(make_selector!(make_expr!("var1")))),
+             Val::Tuple(
                 vec![
                     (value_node!("lvl1".to_string(), 1, 0), Rc::new(Val::Tuple(
                         vec![
@@ -1025,21 +1049,17 @@ mod test {
                     ))),
                 ]
             )),
-            (Expression::Simple(Value::Selector(SelectorDef::new(vec![Token::new("var1", 1, 1),
-                                                     Token::new("lvl1", 1, 1)], 1, 1))),
+            (Expression::Simple(Value::Selector(make_selector!(make_expr!("var1") => "lvl1"))),
              Val::Tuple(
                 vec![
                     (value_node!("lvl2".to_string(), 1, 0), Rc::new(Val::Int(3))),
                 ]
             )),
-            (Expression::Simple(Value::Selector(SelectorDef::new(vec![Token::new("var1", 1, 1),
-                                                     Token::new("lvl1", 1, 1),
-                                                     Token::new("lvl2", 1, 1)], 1, 1))),
+            (Expression::Simple(Value::Selector(make_selector!(make_expr!("var1") => "lvl1", "lvl2"))),
              Val::Int(3)),
-            (Expression::Simple(Value::Selector(SelectorDef::new(vec![Token::new("var2", 1, 1)], 1, 1))),
+            (Expression::Simple(Value::Selector(make_selector!(make_expr!("var2")))),
              Val::Int(2)),
-            (Expression::Simple(Value::Selector(SelectorDef::new(vec![Token::new("var3", 1, 1),
-                                                     Token::new("lvl1", 1, 1)], 1, 1))),
+            (Expression::Simple(Value::Selector(make_selector!(make_expr!("var3") => "lvl1"))),
              Val::Int(4)),
         ], b);
     }
@@ -1059,22 +1079,18 @@ mod test {
         // TODO(jwall): Assert that we can index into lists using dot syntax.
 
         test_expr_to_val(vec![
-            (Expression::Simple(Value::Selector(SelectorDef::new(vec![
-                Token::new("var1", 1, 1),
-                Token::new("0", 1, 1)
-             ], 1, 1))),
+            (Expression::Simple(Value::Selector(make_selector!(make_expr!("var1") =>  "0" => 1, 1))),
              Val::String("val1".to_string()))
-        ],
-                         b);
+        ], b);
     }
 
     #[test]
-    #[should_panic(expected = "Unable to find Symbol tpl1")]
+    #[should_panic(expected = "Unable to find tpl1")]
     fn test_expr_copy_no_such_tuple() {
         let b = Builder::new();
         test_expr_to_val(vec![
             (Expression::Copy(CopyDef{
-                selector: SelectorDef::new(vec![Token::new("tpl1", 1, 1)], 1, 1),
+                selector: make_selector!(make_expr!("tpl1")),
                 fields: Vec::new(), pos: Position::new(1, 0)}),
              Val::Tuple(Vec::new())),
         ],
@@ -1082,7 +1098,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "Expected Tuple got Integer")]
+    #[should_panic(expected = "Expected Tuple got Int(1)")]
     fn test_expr_copy_not_a_tuple() {
         let mut b = Builder::new();
         b.out
@@ -1090,7 +1106,7 @@ mod test {
             .or_insert(Rc::new(Val::Int(1)));
         test_expr_to_val(vec![
             (Expression::Copy(CopyDef{
-                selector: SelectorDef::new(vec![Token::new("tpl1", 1, 1)], 1, 1),
+                selector: make_selector!(make_expr!("tpl1")),
                 fields: Vec::new(), pos: Position::new(1, 0)}),
              Val::Tuple(Vec::new())),
         ],
@@ -1107,7 +1123,7 @@ mod test {
         test_expr_to_val(vec![
             (Expression::Copy(
                 CopyDef{
-                    selector: SelectorDef::new(vec![Token::new("tpl1", 1, 1)], 1, 1),
+                    selector: make_selector!(make_expr!("tpl1")),
                     fields: vec![(Token::new("fld1", 1, 1),
                                   Expression::Simple(Value::String(value_node!("2".to_string(), 1, 1))))],
                     pos: Position::new(1, 0)}),
@@ -1128,7 +1144,7 @@ mod test {
         test_expr_to_val(vec![
             (Expression::Copy(
                 CopyDef{
-                    selector: SelectorDef::new(vec![Token::new("tpl1", 1, 1)], 1, 1),
+                    selector: make_selector!(make_expr!("tpl1")),
                     fields: vec![(Token::new("fld2", 1, 1),
                                   Expression::Simple(Value::String(value_node!("2".to_string(), 1, 1))))],
                     pos: Position::new(1, 0),
@@ -1146,7 +1162,7 @@ mod test {
              // Overwrite a field in the copy
             (Expression::Copy(
                 CopyDef{
-                    selector: SelectorDef::new(vec![Token::new("tpl1", 1, 1)], 1, 1),
+                    selector: make_selector!(make_expr!("tpl1")),
                     fields: vec![
                         (Token::new("fld1", 1, 1),
                          Expression::Simple(Value::Int(value_node!(3, 1, 1)))),
@@ -1162,7 +1178,7 @@ mod test {
                 ],
              )),
             // The source tuple is still unmodified.
-            (Expression::Simple(Value::Selector(SelectorDef::new(vec![Token::new("tpl1", 1, 1)], 1, 1))),
+            (Expression::Simple(Value::Selector(make_selector!(make_expr!["tpl1"]))),
              Val::Tuple(
                 vec![
                     (value_node!("fld1".to_string(), 1, 0), Rc::new(Val::Int(1))),
@@ -1183,7 +1199,7 @@ mod test {
         })));
         test_expr_to_val(vec![
             (Expression::Call(CallDef{
-                macroref: SelectorDef::new(vec![Token::new("tstmac", 1, 1)], 1, 1),
+                macroref: make_selector!(make_expr!("tstmac")),
                 arglist: vec![Expression::Simple(Value::String(value_node!("bar".to_string(), 1, 1)))],
                 pos: Position::new(1, 0),
             }),
@@ -1210,7 +1226,7 @@ mod test {
         })));
         test_expr_to_val(vec![
             (Expression::Call(CallDef{
-                macroref: SelectorDef::new(vec![Token::new("tstmac", 1, 1)], 1, 1),
+                macroref: make_selector!(make_expr!("tstmac")),
                 arglist: vec![Expression::Simple(Value::String(value_node!("bar".to_string(), 1, 1)))],
                 pos: Position::new(1, 1),
             }),
