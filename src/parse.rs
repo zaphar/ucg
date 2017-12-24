@@ -1412,26 +1412,22 @@ mod test {
         assert!(field_value(LocatedSpan::new("foo")).is_incomplete() );
         assert!(field_value(LocatedSpan::new("foo =")).is_incomplete() );
 
-        //assert_eq!(field_value(LocatedSpan::new("foo = 1")),
-        //       IResult::Done(LocatedSpan { offset: 7, line: 1, fragment: "" },
-        //       (Token::new("foo", 1, 1),
-        //        Expression::Simple(Value::Int(value_node!(1, 1, 7))))) );
-        //assert_eq!(field_value(LocatedSpan::new("foo = \"1\"")),
-        //       IResult::Done(LocatedSpan { offset: 9, line: 1, fragment: "" },
-        //       (Token::new("foo", 1, 1),
-        //        Expression::Simple(Value::String(value_node!("1".to_string(), 1, 7))))) );
-        //assert_eq!(field_value(LocatedSpan::new("foo = bar")),
-        //       IResult::Done(LocatedSpan { offset: 9, line: 1, fragment: "" },
-        //       (Token::new("foo", 1, 1),
-        //        Expression::Simple(Value::Symbol(value_node!("bar".to_string(), 1, 7))))) );
-        //assert_eq!(field_value(LocatedSpan::new("foo = bar ")),
-        //       IResult::Done(LocatedSpan { offset: 10, line: 1, fragment: "" },
-        //       (Token::new("foo", 1, 1),
-        //        Expression::Simple(Value::Symbol(value_node!("bar".to_string(), 1, 7))))) );
-        //assert_eq!(field_value(LocatedSpan::new("foo = bar.baz ")),
-        //       IResult::Done(LocatedSpan { offset: 14, line: 1, fragment: "" },
-        //       (Token::new("foo", 1, 1),
-        //       Expression::Simple(Value::Selector(make_selector!(make_expr!("bar") => "baz"))))));
+        assert_eq!(field_value(LocatedSpan::new("foo = 1")),
+               IResult::Done(LocatedSpan { offset: 7, line: 1, fragment: "" },
+               (Token::new("foo", 1, 1),
+                Expression::Simple(Value::Int(value_node!(1, 1, 7))))) );
+        assert_eq!(field_value(LocatedSpan::new("foo = \"1\"")),
+               IResult::Done(LocatedSpan { offset: 9, line: 1, fragment: "" },
+               (Token::new("foo", 1, 1),
+                Expression::Simple(Value::String(value_node!("1".to_string(), 1, 7))))) );
+        assert_eq!(field_value(LocatedSpan::new("foo = bar ")),
+               IResult::Done(LocatedSpan { offset: 10, line: 1, fragment: "" },
+               (Token::new("foo", 1, 1),
+                Expression::Simple(Value::Selector(make_selector!(make_expr!("bar", 1, 7), 1, 6))))) );
+        assert_eq!(field_value(LocatedSpan::new("foo = bar.baz ")),
+               IResult::Done(LocatedSpan { offset: 14, line: 1, fragment: "" },
+               (Token::new("foo", 1, 1),
+               Expression::Simple(Value::Selector(make_selector!(make_expr!("bar", 1, 7) => [ make_tok!("baz", 1, 11) ] => 1, 6))))));
     }
 
     #[test]
