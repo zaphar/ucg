@@ -23,6 +23,14 @@ use ast::*;
 use tokenizer::*;
 use error as E;
 
+macro_rules! eat_space {
+  ($i:expr, $($args:tt)*) => (
+    {
+      sep!($i, emptyspace, $($args)*)
+    }
+  )
+}
+
 type ParseResult<O> = Result<O, Box<Error>>;
 
 fn symbol_to_value(s: Token) -> ParseResult<Value> {
@@ -116,7 +124,7 @@ named!(
     field_value( Span ) -> (Token, Expression),
     do_parse!(
         field: barewordtok >>
-            ws!(equaltok) >>
+            eat_space!(equaltok) >>
             value: expression >>
             (field, value)
     )
@@ -128,7 +136,7 @@ fn vec_to_tuple(t: (Span, FieldList)) -> ParseResult<Value> {
 }
 
 named!(field_list( Span ) -> FieldList,
-       separated_list!(commatok, ws!(field_value)));
+       separated_list!(commatok, eat_space!(field_value)));
 
 named!(
     #[doc="Capture a tuple of named fields with values. {<field>=<value>,...}"],
@@ -137,7 +145,7 @@ named!(
         do_parse!(
             pos: position!() >>
             v: delimited!(lbracetok,
-                   ws!(field_list),
+                   eat_space!(field_list),
                    rbracetok) >>
                    (pos, v)
         ),
@@ -157,7 +165,7 @@ named!(list_value( Span ) -> Value,
            do_parse!(
                pos: position!() >>
                leftsquarebracket >>
-               elements: ws!(separated_list!(ws!(commatok), expression)) >>
+               elements: eat_space!(separated_list!(eat_space!(commatok), expression)) >>
                rightsquarebracket >>
                (pos, elements)
            ),
@@ -204,7 +212,7 @@ macro_rules! do_binary_expr {
             $i, do_parse!(
                 pos: position!() >>
                 left: value >>
-                    ws!($fn) >>
+                    eat_space!($fn) >>
                     right: expression >>
                     (pos, $typ, left, right)
             ),
@@ -329,7 +337,7 @@ named!(copy_expression( Span ) -> Expression,
                pos: position!() >>
                selector: selector_list >>
                lbracetok >>
-               fields: ws!(field_list) >>
+               fields: eat_space!(field_list) >>
                rbracetok >>
                (pos, SelectorDef::new(selector, pos.line as usize, pos.offset as usize), fields)
            ),
@@ -366,17 +374,17 @@ fn tuple_to_macro(mut t: (Span, Vec<Value>, Value)) -> ParseResult<Expression> {
     }
 }
 
-named!(arglist( Span ) -> Vec<Value>, separated_list!(ws!(commatok), symbol));
+named!(arglist( Span ) -> Vec<Value>, separated_list!(eat_space!(commatok), symbol));
 
 named!(macro_expression( Span ) -> Expression,
        map_res!(
            do_parse!(
                 pos: position!() >>
                 macrotok >>
-                ws!(lparentok) >>
-                arglist: ws!(arglist) >>
+                eat_space!(lparentok) >>
+                arglist: eat_space!(arglist) >>
                 rparentok >>
-                ws!(fatcommatok) >>
+                eat_space!(fatcommatok) >>
                 map: tuple >>
                 (pos, arglist, map)
            ),
@@ -410,9 +418,9 @@ named!(select_expression( Span ) -> Expression,
            do_parse!(
                pos: position!() >>
                selecttok >>
-               val: ws!(terminated!(expression, commatok)) >>
-               default: ws!(terminated!(expression, commatok)) >>
-               map: ws!(tuple) >>
+               val: eat_space!(terminated!(expression, commatok)) >>
+               default: eat_space!(terminated!(expression, commatok)) >>
+               map: eat_space!(tuple) >>
                (pos, val, default, map)
            ),
            tuple_to_select
@@ -430,10 +438,10 @@ fn tuple_to_format(t: (Token, Vec<Expression>)) -> ParseResult<Expression> {
 named!(format_expression( Span ) -> Expression,
        map_res!(
            do_parse!(
-               tmpl: ws!(strtok) >>
-                   ws!(pcttok) >>
+               tmpl: eat_space!(strtok) >>
+                   eat_space!(pcttok) >>
                    lparentok >>
-                   args: ws!(separated_list!(ws!(commatok), expression)) >>
+                   args: eat_space!(separated_list!(eat_space!(commatok), expression)) >>
                    rparentok >>
                    (tmpl, args)
            ),
@@ -466,7 +474,7 @@ named!(selector_value( Span ) -> Value,
        map_res!(
            do_parse!(
                pos: position!() >>
-               sl: ws!(selector_list) >>
+               sl: eat_space!(selector_list) >>
                (pos, sl)
            ),
            vec_to_selector_value
@@ -479,7 +487,7 @@ named!(call_expression( Span ) -> Expression,
                pos: position!() >>
                macroname: selector_value >>
                lparentok >>
-               args: ws!(separated_list!(ws!(commatok), expression)) >>
+               args: eat_space!(separated_list!(eat_space!(commatok), expression)) >>
                rparentok >>
                (pos, macroname, args)
            ),
@@ -509,7 +517,7 @@ named!(expression( Span ) -> Expression,
            complete!(select_expression) |
            complete!(call_expression) |
            complete!(copy_expression) |
-           ws!(simple_expression)
+           eat_space!(simple_expression)
        )
 );
 
@@ -519,7 +527,7 @@ fn expression_to_statement(v: Expression) -> ParseResult<Statement> {
 
 named!(expression_statement( Span ) -> Statement,
        map_res!(
-           terminated!(ws!(expression), semicolontok),
+           terminated!(eat_space!(expression), semicolontok),
            expression_to_statement
        )
 );
@@ -535,9 +543,9 @@ named!(let_statement( Span ) -> Statement,
        map_res!(
            terminated!(do_parse!(
                lettok >>
-                   name: ws!(barewordtok) >>
+                   name: eat_space!(barewordtok) >>
                    equaltok >>
-                   val: ws!(expression) >>
+                   val: eat_space!(expression) >>
                    (name, val)
            ), semicolontok),
            tuple_to_let
@@ -555,9 +563,9 @@ named!(import_statement( Span ) -> Statement,
        map_res!(
            terminated!(do_parse!(
                importtok >>
-                   path: ws!(strtok) >>
+                   path: eat_space!(strtok) >>
                    astok >>
-                   name: ws!(barewordtok) >>
+                   name: eat_space!(barewordtok) >>
                    (name, path)
            ), semicolontok),
            tuple_to_import
@@ -576,7 +584,7 @@ pub fn parse(input: Span) -> IResult<Span, Vec<Statement>> {
     let mut out = Vec::new();
     let mut i = input;
     loop {
-        match ws!(i, statement) {
+        match eat_space!(i, statement) {
             IResult::Error(e) => {
                 return IResult::Error(e);
             }

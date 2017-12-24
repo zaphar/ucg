@@ -1,7 +1,9 @@
+// A few constants.
 let dbhost1 = "db1.prod.net";
 let dbhost2 = "db2.prod.net";
 let dbname = "testdb";
 
+// Constructor for database connection strings.
 let mk_db_conn = macro (host, port, db) => {
     host = host,
     port = port,
@@ -12,8 +14,10 @@ let mk_db_conn = macro (host, port, db) => {
 let db_conn1 = mk_db_conn(dbhost1, 3306, dbname);
 let db_conn2 = mk_db_conn(dbhost2, 3306, dbname);
 
+// We have two database connections in a list
 let db_conns = [db_conn1.conn_string, db_conn2.conn_string];
 
+// Our server configuration.
 let server_config = {
     dbconn_list = db_conns,
     db_conn1 = db_conns.0,

@@ -160,3 +160,10 @@ We also support a limited macro facility with the macro expression.
 Macro's always output a tuple whose fields are evaluated at the location they
 are called from. You can acccess the generated fields from the resulting tuple
 like usual.
+
+### Comments
+
+Comments begin with `//` and go till the end of the line.
+
+    // This is a comment.
+    let one = 1;

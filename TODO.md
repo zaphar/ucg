@@ -16,6 +16,5 @@ organiztion for a given configuration structure. Some options here could be
 
 # Minor Fixes and Polish
 
-* Comment syntax
 * JSON export
 * YAML export

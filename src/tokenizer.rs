@@ -12,7 +12,8 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 use nom_locate::LocatedSpan;
-use nom::{alpha, is_alphanumeric, digit};
+use nom;
+use nom::{alpha, is_alphanumeric, digit, InputLength, sp};
 
 use ast::*;
 
@@ -145,6 +146,10 @@ named!(pub rightsquarebracket( Span ) -> Token,
     do_tag_tok!("]")
 );
 
+named!(pub commentprefix( Span ) -> Token,
+    do_tag_tok!("//")
+);
+
 named!(pub fatcommatok( Span ) -> Token,
        do_tag_tok!("=>")
 );
@@ -167,4 +172,40 @@ named!(pub importtok( Span ) -> Token,
 
 named!(pub astok( Span ) -> Token,
        do_tag_tok!("as")
+);
+
+pub fn end_of_input(input: Span) -> nom::IResult<Span, Span> {
+    if input.input_len() == 0 {
+        return nom::IResult::Done(input, input);
+    } else {
+        return nom::IResult::Incomplete(nom::Needed::Unknown);
+    }
+}
+
+fn comment(input: Span) -> nom::IResult<Span, Span> {
+    match commentprefix(input) {
+        nom::IResult::Done(rest, _) => {
+             match alt!(rest, take_until!("\r\n") | take_until!("\n")) {
+                nom::IResult::Done(rest, cmt) => nom::IResult::Done(rest, cmt),
+                nom::IResult::Incomplete(i) => nom::IResult::Incomplete(i),
+                nom::IResult::Error(e) => {
+                    if let nom::ErrorKind::Eof = e {
+                        return nom::IResult::Done(input, input)
+                    } else {
+                        return nom::IResult::Error(e)
+                    }
+                }
+             }
+        }
+        nom::IResult::Incomplete(i) => {
+            return nom::IResult::Incomplete(i)
+        }
+        nom::IResult::Error(e) => {
+            return nom::IResult::Error(e)
+        }
+    }
+}
+
+named!(pub emptyspace( Span ) -> Span,
+        alt!(sp | comment)
 );

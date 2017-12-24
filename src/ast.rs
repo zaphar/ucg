@@ -86,12 +86,14 @@ macro_rules! value_node {
     };
 }
 
+#[allow(unused_macros)]
 macro_rules! make_tok {
     ( $e: expr, $l:expr, $c:expr ) => {
         Token::new($e, $l, $c)
     };
 }
 
+#[allow(unused_macros)]
 macro_rules! make_expr {
     ( $e:expr ) => {
         make_expr!($e, 1, 1)
@@ -113,6 +115,7 @@ macro_rules! make_expr {
 /// 
 /// make_selector!(foo", ["bar"] => 1, 0);
 /// ```
+#[allow(unused_macros)]
 macro_rules! make_selector {
     ( $h:expr ) => {
         make_selector!($h, 1, 0)
