@@ -294,7 +294,7 @@ fn selector_list(input: Span) -> IResult<Span, SelectorList> {
     };
     
     let (rest, list) = if is_dot {
-        let (rest, list) = match separated_list!(rest, dottok, barewordtok) {
+        let (rest, list) = match separated_list!(rest, dottok, alt!(barewordtok | digittok)) {
             IResult::Done(rest, val) => {
                 (rest, val)
             }
@@ -640,6 +640,12 @@ mod test {
           IResult::Done(LocatedSpan{fragment: "", offset: 8, line: 1},
           Value::Selector(make_selector!(make_expr!("foo".to_string(), 1, 1) => [
                                           Token::new("bar", 1, 5)] =>
+                                        1, 0)))
+        );
+        assert_eq!(selector_value(LocatedSpan::new("foo.0 ")),
+          IResult::Done(LocatedSpan{fragment: "", offset: 6, line: 1},
+          Value::Selector(make_selector!(make_expr!("foo".to_string(), 1, 1) => [
+                                          Token::new("0", 1, 5)] =>
                                         1, 0)))
         );
         assert_eq!(selector_value(LocatedSpan::new("foo.bar;")),
