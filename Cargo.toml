@@ -8,8 +8,10 @@ readme      = "README.md"
 keywords    = ["compiler", "config"]
 license     = "Apache-2.0"
 
+[dependencies.nom]
+version        = "^3.2"
+
 [dependencies]
-nom         = "^3.2"
 nom_locate  = "^0.1.1"
 clap        = "~2.26.0"
 

@@ -22,8 +22,6 @@ use std::ops::Deref;
 use std::rc::Rc;
 use std::convert::From;
 
-use nom;
-
 use tokenizer::Span;
 use ast::*;
 use format;
@@ -153,16 +151,14 @@ impl Display for Val {
                 }
                 write!(f, "]")
             }
-            &Val::Macro(_) => {
-                write!(f, "Macro(..)")
-            },
+            &Val::Macro(_) => write!(f, "Macro(..)"),
             &Val::Tuple(ref def) => {
                 try!(write!(f, "Tuple(\n"));
                 for v in def.iter() {
                     try!(write!(f, "\t{} = {},\n", v.0.val, v.1));
                 }
                 write!(f, ")")
-            },
+            }
         }
     }
 }
@@ -282,22 +278,15 @@ impl Builder {
         Ok(())
     }
 
-    pub fn build_file_string(&mut self, name: &str, input: String) -> BuildResult {
+    pub fn build_file_string(&mut self, _name: &str, input: String) -> BuildResult {
         match parse(Span::new(&input)) {
-            nom::IResult::Done(_span, stmts) => {
+            Ok(stmts) => {
                 for stmt in stmts.iter() {
                     try!(self.build_stmt(stmt));
                 }
                 Ok(())
             }
-            nom::IResult::Error(err) => Err(Box::new(err)),
-            nom::IResult::Incomplete(_) => {
-                Err(Box::new(error::Error::new(
-                    format!("Could not parse input from file: {}", name),
-                    error::ErrorType::IncompleteParsing,
-                    Position{line: 0, column: 0}
-                )))
-            }
+            Err(err) => Err(Box::new(err)),
         }
     }
 
@@ -433,11 +422,11 @@ impl Builder {
             &Val::Tuple(_) => {
                 stack.push_back(first.clone());
             }
-            &Val::List(_) =>{
+            &Val::List(_) => {
                 stack.push_back(first.clone());
             }
             _ => {
-                //noop
+                // noop
             }
         }
 
@@ -465,7 +454,8 @@ impl Builder {
                     _ => {
                         return Err(Box::new(error::Error::new(format!("{} is not a Tuple or List",
                             vref),
-                            error::ErrorType::TypeFail, next.pos.clone())));
+                                                              error::ErrorType::TypeFail,
+                                                              next.pos.clone())));
                     }
                 }
             }
@@ -989,7 +979,7 @@ mod test {
             (Expression::Simple(Value::String(value_node!("foo".to_string(), 1, 1))),
              Val::String("foo".to_string())),
             (Expression::Simple(Value::Tuple(value_node!(vec![
-                (Token::new("bar", 1, 1), Expression::Simple(Value::Int(value_node!(1, 1, 1))))
+                (make_tok!("bar", 1, 1), Expression::Simple(Value::Int(value_node!(1, 1, 1))))
                 ], 1, 1))),
              Val::Tuple(vec![(value_node!("bar".to_string(), 1, 1),
                               Rc::new(Val::Int(1)))])),
@@ -1124,7 +1114,7 @@ mod test {
             (Expression::Copy(
                 CopyDef{
                     selector: make_selector!(make_expr!("tpl1")),
-                    fields: vec![(Token::new("fld1", 1, 1),
+                    fields: vec![(make_tok!("fld1", 1, 1),
                                   Expression::Simple(Value::String(value_node!("2".to_string(), 1, 1))))],
                     pos: Position::new(1, 0)}),
              Val::Tuple(
@@ -1145,7 +1135,7 @@ mod test {
             (Expression::Copy(
                 CopyDef{
                     selector: make_selector!(make_expr!("tpl1")),
-                    fields: vec![(Token::new("fld2", 1, 1),
+                    fields: vec![(make_tok!("fld2", 1, 1),
                                   Expression::Simple(Value::String(value_node!("2".to_string(), 1, 1))))],
                     pos: Position::new(1, 0),
                 }),
@@ -1164,9 +1154,9 @@ mod test {
                 CopyDef{
                     selector: make_selector!(make_expr!("tpl1")),
                     fields: vec![
-                        (Token::new("fld1", 1, 1),
+                        (make_tok!("fld1", 1, 1),
                          Expression::Simple(Value::Int(value_node!(3, 1, 1)))),
-                        (Token::new("fld2", 1, 1),
+                        (make_tok!("fld2", 1, 1),
                          Expression::Simple(Value::String(value_node!("2".to_string(), 1, 1)))),
                     ],
                     pos: Position::new(1, 0),
@@ -1193,7 +1183,7 @@ mod test {
         b.out.entry(value_node!("tstmac".to_string(), 1, 0)).or_insert(Rc::new(Val::Macro(MacroDef{
             argdefs: vec![value_node!("arg1".to_string(), 1, 0)],
             fields: vec![
-                (Token::new("foo", 1, 1), Expression::Simple(Value::Symbol(value_node!("arg1".to_string(), 1, 1)))),
+                (make_tok!("foo", 1, 1), Expression::Simple(Value::Symbol(value_node!("arg1".to_string(), 1, 1)))),
             ],
             pos: Position::new(1, 0),
         })));
@@ -1220,7 +1210,7 @@ mod test {
         b.out.entry(value_node!("tstmac".to_string(), 1, 0)).or_insert(Rc::new(Val::Macro(MacroDef{
             argdefs: vec![value_node!("arg2".to_string(), 1, 0)],
             fields: vec![
-                (Token::new("foo", 1, 1), Expression::Simple(Value::Symbol(value_node!("arg1".to_string(), 1, 1)))),
+                (make_tok!("foo", 1, 1), Expression::Simple(Value::Symbol(value_node!("arg1".to_string(), 1, 1)))),
             ],
             pos: Position::new(1, 0),
         })));
@@ -1250,8 +1240,8 @@ mod test {
                 val: Box::new(Expression::Simple(Value::Symbol(value_node!("foo".to_string(), 1, 1)))),
                 default: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
                 tuple: vec![
-                    (Token::new("foo", 1, 1), Expression::Simple(Value::String(value_node!("2".to_string(), 1, 1)))),
-                    (Token::new("bar", 1, 1), Expression::Simple(Value::Int(value_node!(2, 1, 1)))),
+                    (make_tok!("foo", 1, 1), Expression::Simple(Value::String(value_node!("2".to_string(), 1, 1)))),
+                    (make_tok!("bar", 1, 1), Expression::Simple(Value::Int(value_node!(2, 1, 1)))),
                 ],
                 pos: Position::new(1, 0),
             }),
@@ -1260,8 +1250,8 @@ mod test {
                 val: Box::new(Expression::Simple(Value::Symbol(value_node!("baz".to_string(), 1, 1)))),
                 default: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
                 tuple: vec![
-                    (Token::new("bar", 1, 1), Expression::Simple(Value::Int(value_node!(2, 1, 1)))),
-                    (Token::new("quux", 1, 1), Expression::Simple(Value::String(value_node!("2".to_string(), 1, 1)))),
+                    (make_tok!("bar", 1, 1), Expression::Simple(Value::Int(value_node!(2, 1, 1)))),
+                    (make_tok!("quux", 1, 1), Expression::Simple(Value::String(value_node!("2".to_string(), 1, 1)))),
                 ],
                 pos: Position::new(1, 0),
             }),
@@ -1282,8 +1272,8 @@ mod test {
                 val: Box::new(Expression::Simple(Value::Symbol(value_node!("foo".to_string(), 1, 1)))),
                 default: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
                 tuple: vec![
-                    (Token::new("bar", 1, 1), Expression::Simple(Value::Int(value_node!(2, 1, 1)))),
-                    (Token::new("quux", 1, 1), Expression::Simple(Value::String(value_node!("2".to_string(), 1, 1)))),
+                    (make_tok!("bar", 1, 1), Expression::Simple(Value::Int(value_node!(2, 1, 1)))),
+                    (make_tok!("quux", 1, 1), Expression::Simple(Value::String(value_node!("2".to_string(), 1, 1)))),
                 ],
                 pos: Position::new(1, 0),
              }),
@@ -1295,7 +1285,7 @@ mod test {
     fn test_let_statement() {
         let mut b = Builder::new();
         let stmt = Statement::Let(LetDef {
-            name: Token::new("foo", 1, 1),
+            name: make_tok!("foo", 1, 1),
             value: Expression::Simple(Value::String(value_node!("bar".to_string(), 1, 1))),
         });
         b.build_stmt(&stmt).unwrap();

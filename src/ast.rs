@@ -11,6 +11,7 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
+use std;
 use std::collections::HashSet;
 use std::borrow::Borrow;
 use std::convert::Into;
@@ -20,6 +21,29 @@ use std::cmp::Eq;
 use std::cmp::PartialEq;
 use std::hash::Hasher;
 use std::hash::Hash;
+
+#[derive(Debug,PartialEq)]
+pub struct ParseError {
+    pub pos: Position,
+    pub description: String,
+}
+
+impl std::fmt::Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        write!(f,
+               "Parsing Error {} at line: {} column: {}",
+               self.description,
+               self.pos.line,
+               self.pos.column)
+    }
+}
+
+impl std::error::Error for ParseError {
+    fn description(&self) -> &str {
+        &self.description
+    }
+}
+
 
 macro_rules! enum_type_equality {
     ( $slf:ident, $r:expr, $( $l:pat ),* ) => {
@@ -53,18 +77,32 @@ impl Position {
 }
 
 #[derive(Debug,PartialEq,Eq,Clone,PartialOrd,Ord,Hash)]
+pub enum TokenType {
+    END,
+    WS,
+    COMMENT,
+    QUOTED,
+    DIGIT,
+    BAREWORD,
+    PUNCT,
+}
+
+// FIXME(jwall): We should probably implement copy for this.
+#[derive(Debug,PartialEq,Eq,Clone,PartialOrd,Ord,Hash)]
 pub struct Token {
+    pub typ: TokenType,
     pub fragment: String,
     pub pos: Position,
 }
 
 impl Token {
-    pub fn new<S: Into<String>>(f: S, line: usize, col: usize) -> Self {
-        Self::new_with_pos(f, Position::new(line, col))
+    pub fn new<S: Into<String>>(f: S, typ: TokenType, line: usize, col: usize) -> Self {
+        Self::new_with_pos(f, typ, Position::new(line, col))
     }
 
-    pub fn new_with_pos<S: Into<String>>(f: S, pos: Position) -> Self {
+    pub fn new_with_pos<S: Into<String>>(f: S, typ: TokenType, pos: Position) -> Self {
         Token {
+            typ: typ,
             fragment: f.into(),
             pos: pos,
         }
@@ -88,8 +126,32 @@ macro_rules! value_node {
 
 #[allow(unused_macros)]
 macro_rules! make_tok {
-    ( $e: expr, $l:expr, $c:expr ) => {
-        Token::new($e, $l, $c)
+    ( EOF => $l:expr, $c:expr  ) => {
+        Token::new("", TokenType::END, $l, $c)
+    };
+    
+    ( WS => $l:expr, $c:expr  ) => {
+        Token::new("", TokenType::WS, $l, $c)
+    };
+    
+    ( CMT => $e:expr, $l:expr, $c:expr  ) => {
+        Token::new($e, TokenType::COMMENT, $l, $c)
+    };
+    
+    ( QUOT => $e:expr, $l:expr, $c:expr  ) => {
+        Token::new($e, TokenType::QUOTED, $l, $c)
+    };
+    
+    ( PUNCT => $e:expr, $l:expr, $c:expr  ) => {
+        Token::new($e, TokenType::PUNCT, $l, $c)
+    };
+    
+    ( DIGIT => $e:expr, $l:expr, $c:expr  ) => {
+        Token::new($e, TokenType::DIGIT, $l, $c)
+    };
+    
+    ( $e:expr, $l:expr, $c:expr ) => {
+        Token::new($e, TokenType::BAREWORD, $l, $c)
     };
 }
 
@@ -101,18 +163,22 @@ macro_rules! make_expr {
 
     ( $e:expr, $l:expr, $c:expr ) => {
         Expression::Simple(Value::Symbol(Positioned::new($e.to_string(), $l, $c)))
-    }
+    };
+    
+    ( $e:expr => int, $l:expr, $c:expr ) => {
+        Expression::Simple(Value::Int(Positioned::new($e, $l, $c)))
+    };
 }
 
 /// Helper macro for making selectors.
-/// 
+///
 /// ```
 /// make_selector!(Token::new("tpl", 1, 1), Token::new("fld", 1, 4));
-/// 
+///
 /// make_selector!(Token::new("tpl", 1, 1), vec![Token::new("fld", 1, 4)], => 1, 1);
-/// 
+///
 /// make_selector!(foo", ["bar"]);
-/// 
+///
 /// make_selector!(foo", ["bar"] => 1, 0);
 /// ```
 #[allow(unused_macros)]
@@ -160,7 +226,7 @@ macro_rules! make_selector {
             let mut list: Vec<Token> = Vec::new();
         
             $(
-                list.push(Token::new($item, 1, col));
+                list.push(make_tok!($item, 1, col));
                 col += $item.len() + 1;
             )*
             
@@ -178,7 +244,7 @@ macro_rules! make_selector {
             let mut list: Vec<Token> = Vec::new();
         
             $(
-                list.push(Token::new($item, $l, col));
+                list.push(make_tok!($item, $l, col));
                 col += $item.len() + 1;
             )*
 
@@ -195,14 +261,14 @@ macro_rules! make_selector {
 ///
 /// The expression must evaluate to either a tuple or an array. The token must
 /// evaluate to either a bareword Symbol or an Int.
-/// 
+///
 /// ```ucg
 /// let foo = { bar = "a thing" };
 /// let thing = foo.bar;
-/// 
+///
 /// let arr = ["one", "two"];
 /// let first = arr.0;
-/// 
+///
 /// let berry = {best = "strawberry", unique = "acai"}.best;
 /// let third = ["uno", "dos", "tres"].1;
 /// '''
@@ -601,7 +667,7 @@ mod ast_test {
         let def = MacroDef {
             argdefs: vec![value_node!("foo".to_string(), 1, 0)],
             fields: vec![
-                (Token::new("f1", 1, 1), Expression::Binary(BinaryOpDef{
+                (make_tok!("f1", 1, 1), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
                     left: Value::Symbol(value_node!("foo".to_string(), 1, 1)),
                     right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
@@ -618,7 +684,7 @@ mod ast_test {
         let def = MacroDef {
             argdefs: vec![value_node!("foo".to_string(), 1, 0)],
             fields: vec![
-                (Token::new("f1", 1, 1), Expression::Binary(BinaryOpDef{
+                (make_tok!("f1", 1, 1), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
                     left: Value::Symbol(value_node!("bar".to_string(), 1, 1)),
                     right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
@@ -637,10 +703,10 @@ mod ast_test {
         let def = MacroDef {
             argdefs: vec![value_node!("foo".to_string(), 1, 0)],
             fields: vec![
-                (Token::new("f1", 1, 1), Expression::Binary(BinaryOpDef{
+                (make_tok!("f1", 1, 1), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
                     left: Value::Selector(make_selector!(make_expr!("foo", 1, 1) => [
-                        Token::new("quux", 1, 1) ] => 1, 1)),
+                        make_tok!("quux", 1, 1) ] => 1, 1)),
                     right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
             pos: Position::new(1, 0),
                 })),
@@ -655,10 +721,10 @@ mod ast_test {
         let def = MacroDef {
             argdefs: vec![value_node!("foo".to_string(), 1, 0)],
             fields: vec![
-                (Token::new("f1", 1, 1), Expression::Binary(BinaryOpDef{
+                (make_tok!("f1", 1, 1), Expression::Binary(BinaryOpDef{
                     kind: BinaryExprType::Add,
                     left: Value::Selector(make_selector!(make_expr!("bar", 1, 1) => [
-                        Token::new("quux", 1, 1) ] => 1, 1)),
+                        make_tok!("quux", 1, 1) ] => 1, 1)),
                     right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
             pos: Position::new(1, 0),
                 })),

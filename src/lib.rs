@@ -11,7 +11,7 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
-//#![feature(trace_macros,log_syntax)]
+// #![feature(trace_macros,log_syntax)]
 
 #[macro_use]
 extern crate nom;
@@ -20,6 +20,7 @@ extern crate nom_locate;
 
 #[macro_use]
 pub mod ast;
+#[macro_use]
 pub mod tokenizer;
 pub mod parse;
 pub mod build;

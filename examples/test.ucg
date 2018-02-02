@@ -20,7 +20,7 @@ let db_conns = [db_conn1.conn_string, db_conn2.conn_string];
 // Our server configuration.
 let server_config = {
     dbconn_list = db_conns,
-    db_conn1 = db_conns.0,
+    db_conn1 = db_conns.0, // connection one
     db_conn2 = db_conns.1,
     tmpldir = "./templates"
 };

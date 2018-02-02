@@ -13,9 +13,11 @@
 //  limitations under the License.
 use nom_locate::LocatedSpan;
 use nom;
-use nom::{alpha, is_alphanumeric, digit, InputLength, sp};
-
+use nom::{alpha, is_alphanumeric, digit, multispace};
+use nom::{InputLength, Slice};
 use ast::*;
+use std;
+use std::result::Result;
 
 pub type Span<'a> = LocatedSpan<&'a str>;
 
@@ -32,35 +34,38 @@ fn is_symbol_char(c: char) -> bool {
     is_alphanumeric(c as u8) || c == '-' as char || c == '_' as char
 }
 
-named!(pub strtok( Span ) -> Token,
+named!(strtok( Span ) -> Token,
        do_parse!(
            span: position!() >>
                tag!("\"") >>
                frag: take_until!("\"") >>
                tag!("\"") >>
            (Token{
+               typ: TokenType::QUOTED,
                pos: Position::from(span),
                fragment: frag.fragment.to_string(),
            })
        )
 );
 
-named!(pub barewordtok( Span ) -> Token,
+named!(barewordtok( Span ) -> Token,
        do_parse!(
            span: position!() >>
            frag: preceded!(peek!(alpha), take_while!(is_symbol_char)) >>
            (Token{
+               typ: TokenType::BAREWORD,
                pos: Position::from(span),
                fragment: frag.fragment.to_string(),
            })
        )
 );
 
-named!(pub digittok( Span ) -> Token,
+named!(digittok( Span ) -> Token,
        do_parse!(
            span: position!() >>
                digits: digit >>
                (Token{
+                   typ: TokenType::DIGIT,
                    pos: Position::from(span),
                    fragment: digits.fragment.to_string(),
                })
@@ -74,11 +79,12 @@ macro_rules! do_tag_tok {
     // rewrite your macro argumets for you. Which means we require this $i
     // paramater even though we don't explicitely pass it below. I don't
     // particularly like this but I'm living with it for now.
-    ($i:expr, $tag:expr) => {
+    ($i:expr, $type:expr, $tag:expr) => {
        do_parse!($i,
            span: position!() >>
            frag: tag!($tag) >>
            (Token{
+               typ: $type,
                pos: Position::from(span),
                fragment: frag.fragment.to_string(),
            })
@@ -86,126 +92,549 @@ macro_rules! do_tag_tok {
     }
 }
 
-named!(pub commatok( Span ) -> Token,
-       do_tag_tok!(",")
+named!(commatok( Span ) -> Token,
+       do_tag_tok!(TokenType::PUNCT, ",")
 );
 
-named!(pub lbracetok( Span ) -> Token,
-       do_tag_tok!("{")
+named!(lbracetok( Span ) -> Token,
+       do_tag_tok!(TokenType::PUNCT, "{")
 );
 
-named!(pub rbracetok( Span ) -> Token,
-       do_tag_tok!("}")
+named!(rbracetok( Span ) -> Token,
+       do_tag_tok!(TokenType::PUNCT, "}")
 );
 
-named!(pub lparentok( Span ) -> Token,
-       do_tag_tok!("(")
+named!(lparentok( Span ) -> Token,
+       do_tag_tok!(TokenType::PUNCT, "(")
 );
 
-named!(pub rparentok( Span ) -> Token,
-       do_tag_tok!(")")
+named!(rparentok( Span ) -> Token,
+       do_tag_tok!(TokenType::PUNCT, ")")
 );
 
-named!(pub dottok( Span ) -> Token,
-       do_tag_tok!(".")
+named!(dottok( Span ) -> Token,
+       do_tag_tok!(TokenType::PUNCT, ".")
 );
 
-named!(pub plustok( Span ) -> Token,
-       do_tag_tok!("+")
+named!(plustok( Span ) -> Token,
+       do_tag_tok!(TokenType::PUNCT, "+")
 );
 
-named!(pub dashtok( Span ) -> Token,
-       do_tag_tok!("-")
+named!(dashtok( Span ) -> Token,
+       do_tag_tok!(TokenType::PUNCT, "-")
 );
 
-named!(pub startok( Span ) -> Token,
-       do_tag_tok!("*")
+named!(startok( Span ) -> Token,
+       do_tag_tok!(TokenType::PUNCT, "*")
 );
 
-named!(pub slashtok( Span ) -> Token,
-       do_tag_tok!("/")
+named!(slashtok( Span ) -> Token,
+       do_tag_tok!(TokenType::PUNCT, "/")
 );
 
-named!(pub pcttok( Span ) -> Token,
-       do_tag_tok!("%")
+named!(pcttok( Span ) -> Token,
+       do_tag_tok!(TokenType::PUNCT, "%")
 );
 
-named!(pub equaltok( Span ) -> Token,
-       do_tag_tok!("=")
+named!(equaltok( Span ) -> Token,
+       do_tag_tok!(TokenType::PUNCT, "=")
 );
 
-named!(pub semicolontok( Span ) -> Token,
-       do_tag_tok!(";")
+named!(semicolontok( Span ) -> Token,
+       do_tag_tok!(TokenType::PUNCT, ";")
 );
 
-named!(pub leftsquarebracket( Span ) -> Token,
-    do_tag_tok!("[")
+named!(leftsquarebracket( Span ) -> Token,
+    do_tag_tok!(TokenType::PUNCT, "[")
 );
 
-named!(pub rightsquarebracket( Span ) -> Token,
-    do_tag_tok!("]")
+named!(rightsquarebracket( Span ) -> Token,
+    do_tag_tok!(TokenType::PUNCT, "]")
 );
 
-named!(pub commentprefix( Span ) -> Token,
-    do_tag_tok!("//")
+named!(fatcommatok( Span ) -> Token,
+       do_tag_tok!(TokenType::PUNCT, "=>")
 );
 
-named!(pub fatcommatok( Span ) -> Token,
-       do_tag_tok!("=>")
+named!(lettok( Span ) -> Token,
+       do_tag_tok!(TokenType::BAREWORD, "let")
 );
 
-named!(pub lettok( Span ) -> Token,
-       do_tag_tok!("let")
+named!(selecttok( Span ) -> Token,
+       do_tag_tok!(TokenType::BAREWORD, "select")
 );
 
-named!(pub selecttok( Span ) -> Token,
-       do_tag_tok!("select")
+named!(macrotok( Span ) -> Token,
+       do_tag_tok!(TokenType::BAREWORD, "macro")
 );
 
-named!(pub macrotok( Span ) -> Token,
-       do_tag_tok!("macro")
+named!(importtok( Span ) -> Token,
+       do_tag_tok!(TokenType::BAREWORD, "import")
 );
 
-named!(pub importtok( Span ) -> Token,
-       do_tag_tok!("import")
+named!(astok( Span ) -> Token,
+       do_tag_tok!(TokenType::BAREWORD, "as")
 );
 
-named!(pub astok( Span ) -> Token,
-       do_tag_tok!("as")
-);
-
-pub fn end_of_input(input: Span) -> nom::IResult<Span, Span> {
-    if input.input_len() == 0 {
-        return nom::IResult::Done(input, input);
-    } else {
-        return nom::IResult::Incomplete(nom::Needed::Unknown);
-    }
-}
-
-fn comment(input: Span) -> nom::IResult<Span, Span> {
-    match commentprefix(input) {
-        nom::IResult::Done(rest, _) => {
-             match alt!(rest, take_until!("\r\n") | take_until!("\n")) {
-                nom::IResult::Done(rest, cmt) => nom::IResult::Done(rest, cmt),
-                nom::IResult::Incomplete(i) => nom::IResult::Incomplete(i),
-                nom::IResult::Error(e) => {
-                    if let nom::ErrorKind::Eof = e {
-                        return nom::IResult::Done(input, input)
-                    } else {
-                        return nom::IResult::Error(e)
-                    }
-                }
-             }
+fn end_of_input(input: Span) -> nom::IResult<Span, Token> {
+    match eof!(input,) {
+        nom::IResult::Done(_, _) => {
+            return nom::IResult::Done(input,
+                                      make_tok!(EOF => input.line as usize,
+                                                input.get_column() as usize));
         }
-        nom::IResult::Incomplete(i) => {
-            return nom::IResult::Incomplete(i)
+        nom::IResult::Incomplete(_) => {
+            return nom::IResult::Incomplete(nom::Needed::Unknown);
         }
         nom::IResult::Error(e) => {
-            return nom::IResult::Error(e)
+            return nom::IResult::Error(e);
         }
     }
 }
 
-named!(pub emptyspace( Span ) -> Span,
-        alt!(sp | comment)
+fn comment(input: Span) -> nom::IResult<Span, Token> {
+    match tag!(input, "//") {
+        nom::IResult::Done(rest, _) => {
+            match alt!(rest, take_until_and_consume!("\r\n") | take_until_and_consume!("\n")) {
+                nom::IResult::Done(rest, cmt) => {
+                    return nom::IResult::Done(rest,
+                                              make_tok!(CMT => cmt.fragment.to_string(),
+                                  input.line as usize,
+                                  input.get_column() as usize));
+                }
+                // If we didn't find a new line then we just grab everything.
+                _ => {
+                    let blen = rest.input_len();
+                    let next = rest.slice(blen..);
+                    let tok = rest.slice(..blen);
+                    return nom::IResult::Done(next,
+                                              make_tok!(CMT => tok.fragment.to_string(),
+                                  input.line as usize, input.get_column() as usize
+                    ));
+                }
+            }
+        }
+        nom::IResult::Incomplete(i) => return nom::IResult::Incomplete(i),
+        nom::IResult::Error(e) => return nom::IResult::Error(e),
+    }
+}
+
+named!(whitespace( Span ) -> Token,
+    do_parse!(
+        span: position!() >>
+        many1!(multispace) >>
+         (Token{
+            typ: TokenType::WS,
+            pos: Position::from(span),
+            fragment: String::new(),
+         })
+    )
 );
+
+named!(token( Span ) -> Token,
+    alt!(
+        strtok |
+        barewordtok |
+        digittok |
+        commatok |
+        rbracetok |
+        lbracetok |
+        lparentok |
+        rparentok |
+        dottok |
+        plustok |
+        dashtok |
+        startok |
+        comment | // Note comment must come before slashtok
+        slashtok |
+        pcttok |
+        fatcommatok | // Note fatcommatok must come before equaltok
+        equaltok |
+        semicolontok |
+        leftsquarebracket |
+        rightsquarebracket |
+        lettok |
+        selecttok |
+        macrotok |
+        importtok |
+        astok |
+        whitespace |
+        end_of_input)
+);
+
+// TODO(jwall): This should return a ParseError instead.
+pub fn tokenize(input: Span) -> Result<Vec<Token>, nom::ErrorKind> {
+    let mut out = Vec::new();
+    let mut i = input;
+    loop {
+        if i.input_len() == 0 {
+            break;
+        }
+        match token(i) {
+            nom::IResult::Error(e) => {
+                return Err(e);
+            }
+            nom::IResult::Incomplete(_) => {
+                return Err(nom::ErrorKind::Complete);
+            }
+            nom::IResult::Done(rest, tok) => {
+                i = rest;
+                if tok.typ == TokenType::COMMENT || tok.typ == TokenType::WS {
+                    // we skip comments and whitespace
+                    continue;
+                }
+                out.push(tok);
+            }
+        }
+    }
+    // ensure that we always have an END token to go off of.
+    out.push(Token {
+        fragment: String::new(),
+        typ: TokenType::END,
+        pos: Position {
+            line: i.line as usize,
+            column: i.get_column() as usize,
+        },
+    });
+    Ok(out)
+}
+
+pub fn token_clone(t: &Token) -> Result<Token, ParseError> {
+    Ok(t.clone())
+}
+
+macro_rules! match_type {
+    ($i:expr, COMMENT => $h:expr) => {
+        match_type!($i, TokenType::COMMENT, "Not a Comment", $h)
+    };
+
+    ($i:expr, COMMENT) => {
+        match_type!($i, COMMENT => token_clone)
+    };
+
+    ($i:expr, BAREWORD => $h:expr) => {
+        match_type!($i, TokenType::BAREWORD, "Not a Bareword", $h)
+    };
+
+    ($i:expr, BAREWORD) => {
+        match_type!($i, BAREWORD => token_clone)
+    };
+
+    ($i:expr, STR => $h:expr) => {
+        match_type!($i, TokenType::QUOTED, "Not a String", $h)
+    };
+
+    ($i:expr, STR) => {
+        match_type!($i, STR => token_clone)
+    };
+
+    ($i:expr, DIGIT => $h:expr) => {
+        match_type!($i, TokenType::DIGIT, "Not a DIGIT", $h)
+    };
+
+    ($i:expr, DIGIT) => {
+        match_type!($i, DIGIT => token_clone)
+    };
+
+    ($i:expr, PUNCT => $h:expr) => {
+        match_type!($i, TokenType::PUNCT, "Not PUNCTUATION", $h)
+    };
+
+    ($i:expr, PUNCT) => {
+        match_type!($i, PUNCT => token_clone)
+    };
+
+    ($i:expr, $t:expr, $msg:expr, $h:expr) => {
+        {
+            let i_ = $i.clone();
+            use nom::Slice;
+            use std::convert::Into;
+            if i_.input_len() == 0 {
+                nom::IResult::Error(
+                        nom::ErrorKind::Custom(ParseError{
+                            description: format!("End of Input! {}", $msg),
+                            pos: Position{line: 0, column: 0}
+                        }))
+            } else {
+                let tok = &(i_[0]);
+                if tok.typ == $t {
+                    match $h(tok) {
+                        Result::Ok(v) => nom::IResult::Done($i.slice(1..), v),
+                        Result::Err(e) => nom::IResult::Error(
+                            nom::ErrorKind::Custom(e.into())),
+                    }
+                } else {
+                    nom::IResult::Error(nom::ErrorKind::Custom(ParseError{
+                        description: $msg.to_string(),
+                        pos: tok.pos.clone()}))
+                }
+            }
+        }
+    };
+}
+
+macro_rules! match_token {
+    ($i:expr, PUNCT => $f:expr) => {
+        match_token!($i, PUNCT => $f, token_clone)
+    };
+
+    ($i:expr, PUNCT => $f:expr, $h:expr) => {
+        match_token!($i, TokenType::PUNCT, $f, format!("Not PUNCT ({})", $f), $h)
+    };
+
+    ($i:expr, BAREWORD => $f:expr) => {
+        match_token!($i, BAREWORD => $f, token_clone)
+    };
+
+    ($i:expr, BAREWORD => $f:expr, $h:expr) => {
+        match_token!($i, TokenType::BAREWORD, $f, format!("Not a BAREWORD ({})", $f), $h)
+    };
+
+    ($i:expr, $t:expr, $f:expr, $msg:expr, $h:expr) => {
+        {
+            let i_ = $i.clone();
+            use nom::Slice;
+            use std::convert::Into;
+            let tok = &(i_[0]);
+            if tok.typ == $t && &tok.fragment == $f {
+                match $h(tok) {
+                    Result::Ok(v) => nom::IResult::Done($i.slice(1..), v),
+                    Result::Err(e) => nom::IResult::Error(
+                        nom::ErrorKind::Custom(e.into())),
+                }
+            } else {
+                nom::IResult::Error(nom::ErrorKind::Custom(ParseError{
+                    description: format!("{} Instead is ({})", $msg, tok.fragment),
+                    pos: tok.pos.clone()}))
+            }
+        }
+    };
+}
+
+macro_rules! punct {
+    ($i:expr, $c:expr) => {
+        match_token!($i, PUNCT => $c)
+    };
+}
+
+macro_rules! word {
+    ($i:expr, $w:expr) => {
+        match_token!($i, BAREWORD => $w)
+    };
+}
+
+pub fn pos(i: TokenIter) -> nom::IResult<TokenIter, Position, ParseError> {
+    let tok = &i[0];
+    let line = tok.pos.line;
+    let column = tok.pos.column;
+    nom::IResult::Done(i.clone(),
+                       Position {
+                           line: line,
+                           column: column,
+                       })
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TokenIter<'a> {
+    pub source: &'a [Token],
+}
+
+impl<'a> TokenIter<'a> {
+    pub fn len(&self) -> usize {
+        self.source.len()
+    }
+}
+
+impl<'a> nom::InputLength for TokenIter<'a> {
+    fn input_len(&self) -> usize {
+        self.source.input_len()
+    }
+}
+
+macro_rules! impl_token_iter_slice {
+    ($r:ty) => {
+        impl<'a> nom::Slice<$r> for TokenIter<'a> {
+            fn slice(&self, range: $r) -> Self {
+                TokenIter {
+                    source: self.source.slice(range),
+                }
+            }
+        }
+    }
+}
+
+impl_token_iter_slice!(std::ops::Range<usize>);
+impl_token_iter_slice!(std::ops::RangeTo<usize>);
+impl_token_iter_slice!(std::ops::RangeFrom<usize>);
+impl_token_iter_slice!(std::ops::RangeFull);
+
+impl<'a> std::ops::Index<usize> for TokenIter<'a> {
+    type Output = Token;
+
+    fn index(&self, i: usize) -> &Self::Output {
+        &self.source[i]
+    }
+}
+
+impl<'a> nom::InputIter for TokenIter<'a> {
+    type Item = &'a Token;
+    type RawItem = Token;
+
+    type Iter = std::iter::Enumerate<std::slice::Iter<'a, Self::RawItem>>;
+    type IterElem = std::slice::Iter<'a, Self::RawItem>;
+
+    fn iter_indices(&self) -> Self::Iter {
+        self.source.iter().enumerate()
+    }
+
+    fn iter_elements(&self) -> Self::IterElem {
+        self.source.iter()
+    }
+
+    fn position<P>(&self, predicate: P) -> Option<usize>
+        where P: Fn(Self::RawItem) -> bool
+    {
+        for (o, v) in self.iter_indices() {
+            if predicate(v.clone()) {
+                return Some(o);
+            }
+        }
+        None
+    }
+
+    fn slice_index(&self, count: usize) -> Option<usize> {
+        let mut cnt = 0;
+        for (index, _) in self.iter_indices() {
+            if cnt == count {
+                return Some(index);
+            }
+            cnt += 1;
+        }
+        if cnt == count {
+            return Some(self.len());
+        }
+        None
+    }
+}
+
+#[cfg(test)]
+mod tokenizer_test {
+    use super::*;
+    use nom;
+    use nom_locate::LocatedSpan;
+
+    #[test]
+    fn test_tokenize_one_of_each() {
+        //                                                                          1 1 1 1 1 1 1 1 1 1 2 2 2 2 2   2       2            2
+        //                                       1  2      3     4      5  6  7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4   5       6            7
+        let result = tokenize(LocatedSpan::new("let import macro select as => [ ] { } ; = % / * \
+                                                + - . ( ) , 1 . foo \"bar\" // comment\n ;"));
+        assert!(result.is_ok(), format!("result {:?} is not ok", result));
+        let v = result.unwrap();
+        for (i, t) in v.iter().enumerate() {
+            println!("{}: {:?}", i, t);
+        }
+        assert_eq!(v.len(), 27);
+        assert_eq!(v[26].typ, TokenType::END);
+    }
+
+    #[test]
+    fn test_parse_has_end() {
+        let result = tokenize(LocatedSpan::new("foo"));
+        assert!(result.is_ok());
+        let v = result.unwrap();
+        assert_eq!(v.len(), 2);
+        assert_eq!(v[1].typ, TokenType::END);
+    }
+
+    #[test]
+    fn test_parse_comment() {
+        assert!(comment(LocatedSpan::new("// comment\n")).is_done());
+        assert!(comment(LocatedSpan::new("// comment")).is_done());
+        assert_eq!(comment(LocatedSpan::new("// comment\n")),
+            nom::IResult::Done(LocatedSpan{fragment: "", offset: 11, line: 2},
+            Token{
+                typ: TokenType::COMMENT,
+                fragment: " comment".to_string(),
+                pos: Position{line: 1, column: 1},
+            }));
+        assert!(comment(LocatedSpan::new("// comment\r\n")).is_done());
+        assert_eq!(comment(LocatedSpan::new("// comment\r\n")),
+            nom::IResult::Done(LocatedSpan{fragment: "", offset: 12, line: 2},
+                Token{
+                    typ: TokenType::COMMENT,
+                    fragment: " comment".to_string(),
+                    pos: Position{column: 1, line: 1}
+                }));
+        assert!(comment(LocatedSpan::new("// comment\r\n ")).is_done());
+        assert_eq!(comment(LocatedSpan::new("// comment\r\n ")),
+            nom::IResult::Done(LocatedSpan{fragment: " ", offset: 12, line: 2},
+                Token{
+                    typ: TokenType::COMMENT,
+                    fragment: " comment".to_string(),
+                    pos: Position{column: 1, line: 1},
+                }));
+        // TODO(jwall): assert!(comment(LocatedSpan::new("// comment")).is_done());
+    }
+
+    #[test]
+    fn test_match_word() {
+        let input = vec![Token{
+            fragment: "foo".to_string(),
+            typ: TokenType::BAREWORD,
+            pos: Position{line: 1, column: 1}
+        }];
+        let result = word!(TokenIter{source: input.as_slice()}, "foo");
+        match result {
+            nom::IResult::Done(_, tok) => assert_eq!(tok, input[0]),
+            res => assert!(false, format!("Fail: {:?}", res)),
+        }
+    }
+
+    #[test]
+    fn test_match_word_empty_input() {
+        let input = vec![Token{
+            fragment: "".to_string(),
+            typ: TokenType::END,
+            pos: Position{line: 1, column: 1},
+        }];
+        let result = word!(TokenIter{source: input.as_slice()}, "foo");
+        match result {
+            nom::IResult::Done(_, _) => assert!(false, "Should have been an error but was Done"),
+            nom::IResult::Incomplete(_) => {
+                assert!(false, "Should have been an error but was Incomplete")
+            }
+            nom::IResult::Error(_) => {
+                // noop
+            }
+        }
+    }
+
+    #[test]
+    fn test_match_punct() {
+        let input = vec![Token{
+            fragment: "!".to_string(),
+            typ: TokenType::PUNCT,
+            pos: Position{line: 1, column: 1}
+        }];
+        let result = punct!(TokenIter{source: input.as_slice()}, "!");
+        match result {
+            nom::IResult::Done(_, tok) => assert_eq!(tok, input[0]),
+            res => assert!(false, format!("Fail: {:?}", res)),
+        }
+    }
+
+    #[test]
+    fn test_match_type() {
+        let input = vec![Token{
+            fragment: "foo".to_string(),
+            typ: TokenType::BAREWORD,
+            pos: Position{line: 1, column: 1}
+        }];
+        let result = match_type!(TokenIter{source: input.as_slice()}, BAREWORD);
+        match result {
+            nom::IResult::Done(_, tok) => assert_eq!(tok, input[0]),
+            res => assert!(false, format!("Fail: {:?}", res)),
+        }
+    }
+}
