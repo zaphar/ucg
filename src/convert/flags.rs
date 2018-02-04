@@ -25,9 +25,7 @@ impl FlagConverter {
     pub fn new() -> Self {
         FlagConverter {}
     }
-}
 
-impl FlagConverter {
     fn write(&self, v: &Val, w: &mut Write) -> Result<()> {
         match v {
             &Val::Float(ref f) => {
@@ -45,6 +43,10 @@ impl FlagConverter {
             }
             &Val::Tuple(ref flds) => {
                 for &(ref name, ref val) in flds.iter() {
+                    if val.is_tuple() {
+                        eprintln!("Skipping embedded tuple...");
+                        return Ok(());
+                    }
                     try!(write!(w, "--{} ", name.val));
                     // TODO(jwall): What if the value is a tuple?
                     try!(self.write(&val, w));
@@ -61,6 +63,6 @@ impl FlagConverter {
 
 impl Converter for FlagConverter {
     fn convert(&self, v: Rc<Val>, mut w: Box<Write>) -> Result<()> {
-        return self.write(&v, &mut w);
+        self.write(&v, &mut w)
     }
 }

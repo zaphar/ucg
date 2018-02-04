@@ -12,6 +12,7 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 pub mod flags;
+pub mod json;
 pub mod traits;
 
 use std::io;
@@ -28,6 +29,9 @@ impl ConverterRunner {
     pub fn new(typ: &str) -> Result<Self, String> {
         if typ == "flags" {
             return Ok(ConverterRunner { converter: Box::new(flags::FlagConverter::new()) });
+        }
+        if typ == "json" {
+            return Ok(ConverterRunner { converter: Box::new(json::JsonConverter::new()) });
         }
         return Err(format!("Unknown Target output type: {}", typ));
     }

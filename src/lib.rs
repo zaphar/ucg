@@ -17,6 +17,7 @@
 extern crate nom;
 #[macro_use]
 extern crate nom_locate;
+extern crate serde_json;
 
 #[macro_use]
 pub mod ast;
