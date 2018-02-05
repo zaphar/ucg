@@ -208,13 +208,13 @@ macro_rules! eval_binary_expr {
 }
 
 impl Builder {
+    // TODO(jwall): Maintain order for tuples.
     fn tuple_to_val(&self, fields: &Vec<(Token, Expression)>) -> Result<Rc<Val>, Box<Error>> {
         let mut new_fields = Vec::<(Positioned<String>, Rc<Val>)>::new();
         for &(ref name, ref expr) in fields.iter() {
             let val = try!(self.eval_expr(expr));
             new_fields.push((name.into(), val));
         }
-        new_fields.sort_by(|a, b| a.0.cmp(&b.0));
         Ok(Rc::new(Val::Tuple(new_fields)))
     }
 
@@ -636,47 +636,57 @@ impl Builder {
     fn eval_copy(&self, def: &CopyDef) -> Result<Rc<Val>, Box<Error>> {
         let v = try!(self.lookup_selector(&def.selector.sel));
         if let Val::Tuple(ref src_fields) = *v {
-            let mut m = HashMap::<Positioned<String>, Rc<Val>>::new();
-            // loop through fields and build  up a hahsmap
+            let mut m = HashMap::<Positioned<String>, (i32, Rc<Val>)>::new();
+            // loop through fields and build  up a hashmap
+            // TODO(jwall): Maintain field order here.
+            let mut count = 0;
             for &(ref key, ref val) in src_fields.iter() {
                 if let Entry::Vacant(v) = m.entry(key.clone()) {
-                    v.insert(val.clone());
+                    v.insert((count, val.clone()));
+                    count += 1;
                 } else {
                     return Err(Box::new(error::Error::new(format!("Duplicate \
                                                                       field: {} in \
                                                                       tuple",
                                                                      key.val),
                                                           error::ErrorType::TypeFail,
-                                                          def.pos.clone())));
+                                                          key.pos.clone())));
                 }
             }
             for &(ref key, ref val) in def.fields.iter() {
                 let expr_result = try!(self.eval_expr(val));
-                match m.entry(key.into()) {
+                // TODO(jwall): Maintain field order here.
+                match m.entry(key.into()) { // brand new field here.
                     Entry::Vacant(v) => {
-                        v.insert(expr_result);
+                        v.insert((count, expr_result));
+                        count += 1;
                     }
-                    Entry::Occupied(mut v) => {
+                    Entry::Occupied(mut v) => { // overriding field here.
                         // Ensure that the new type matches the old type.
                         let src_val = v.get().clone();
-                        if src_val.type_equal(&expr_result) {
-                            v.insert(expr_result);
+                        if src_val.1.type_equal(&expr_result) {
+                            v.insert((src_val.0, expr_result));
                         } else {
                             return Err(Box::new(
                                 error::Error::new(
                                     format!("Expected type {} for field {} but got {}",
-                                            src_val.type_name(), key.fragment, expr_result.type_name()),
+                                            src_val.1.type_name(), key.fragment, expr_result.type_name()),
                                             error::ErrorType::TypeFail,
                                             key.pos.clone())));
                         }
                     }
                 };
             }
-            let mut new_fields: Vec<(Positioned<String>, Rc<Val>)> = m.drain().collect();
-            // We want a stable order for the fields to make comparing tuples
-            // easier in later code. So we sort by the field name before constructing a new tuple.
-            new_fields.sort_by(|a, b| a.0.cmp(&b.0));
-            return Ok(Rc::new(Val::Tuple(new_fields)));
+            let mut new_fields: Vec<(Positioned<String>, (i32, Rc<Val>))> = m.drain().collect();
+            // We want to maintain our order for the fields to make comparing tuples
+            // easier in later code. So we sort by the field order before constructing a new tuple.
+            new_fields.sort_by(|a, b| {
+                let ta = a.1.clone(); let tb = b.1.clone(); ta.0.cmp(&tb.0)
+            });
+            return Ok(Rc::new(Val::Tuple(new_fields.iter().map(|a| {
+                let first = a.0.clone(); let t = a.1.clone();
+                (first, t.1)
+            }).collect())));
         }
         Err(Box::new(error::Error::new(format!("Expected Tuple got {}", v),
                                        error::ErrorType::TypeFail,
