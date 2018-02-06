@@ -677,24 +677,6 @@ mod test {
         }
     }
 
-    macro_rules! assert_incomplete {
-        ($parsemac:ident( $i:expr )) => {
-            assert_incomplete!($i, $parsemac)
-        };
-        ($i:expr, $f:expr) => {
-            {
-                let input = LocatedSpan::new($i);
-                match tokenize(input) {
-                    Err(_) => assert!(false),
-                    Ok(val) => {
-                        let result = $f(TokenIter{source: val.as_slice()});
-                        assert!(result.is_incomplete(), format!("Not Incomplete: {:?}", result));
-                    },
-                }
-            }
-        }
-    }
-
     macro_rules! assert_error {
         ($parsemac:ident( $i:expr )) => {
             assert_error!($i, $parsemac)

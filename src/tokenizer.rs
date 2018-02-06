@@ -40,9 +40,11 @@ fn escapequoted(input: Span) -> nom::IResult<Span, String> {
     let mut frag = String::new();
     let mut escape = false;
     for (i, c) in input.iter_indices() {
-        if c == '\\' && ! escape { // eat this slash and set our escaping sentinel
+        if c == '\\' && !escape {
+            // eat this slash and set our escaping sentinel
             escape = true;
-        } else if c == '"' && !escape { // Bail if this is an unescaped "
+        } else if c == '"' && !escape {
+            // Bail if this is an unescaped "
             // we exit here.
             return nom::IResult::Done(input.slice(i..), frag);
         } else {

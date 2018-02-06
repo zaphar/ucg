@@ -661,7 +661,8 @@ impl Builder {
                         v.insert((count, expr_result));
                         count += 1;
                     }
-                    Entry::Occupied(mut v) => { // overriding field here.
+                    Entry::Occupied(mut v) => {
+                        // overriding field here.
                         // Ensure that the new type matches the old type.
                         let src_val = v.get().clone();
                         if src_val.1.type_equal(&expr_result) {
@@ -681,12 +682,17 @@ impl Builder {
             // We want to maintain our order for the fields to make comparing tuples
             // easier in later code. So we sort by the field order before constructing a new tuple.
             new_fields.sort_by(|a, b| {
-                let ta = a.1.clone(); let tb = b.1.clone(); ta.0.cmp(&tb.0)
+                let ta = a.1.clone();
+                let tb = b.1.clone();
+                ta.0.cmp(&tb.0)
             });
-            return Ok(Rc::new(Val::Tuple(new_fields.iter().map(|a| {
-                let first = a.0.clone(); let t = a.1.clone();
-                (first, t.1)
-            }).collect())));
+            return Ok(Rc::new(Val::Tuple(new_fields.iter()
+                .map(|a| {
+                    let first = a.0.clone();
+                    let t = a.1.clone();
+                    (first, t.1)
+                })
+                .collect())));
         }
         Err(Box::new(error::Error::new(format!("Expected Tuple got {}", v),
                                        error::ErrorType::TypeFail,

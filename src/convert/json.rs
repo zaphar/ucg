@@ -33,7 +33,9 @@ impl JsonConverter {
         Ok(serde_json::Value::Array(v))
     }
 
-    fn convert_tuple(&self, items: &Vec<(ast::Positioned<String>, Rc<Val>)>) -> Result<serde_json::Value> {
+    fn convert_tuple(&self,
+                     items: &Vec<(ast::Positioned<String>, Rc<Val>)>)
+                     -> Result<serde_json::Value> {
         let mut mp = serde_json::Map::new();
         for &(ref k, ref v) in items.iter() {
             mp.entry(k.val.clone()).or_insert(try!(self.convert_value(v)));
@@ -50,7 +52,7 @@ impl JsonConverter {
                     None => panic!("Float is too large or Not a Number {}", f),
                 };
                 serde_json::Value::Number(n)
-            },
+            }
             &Val::Int(i) => {
                 let n = match serde_json::Number::from_f64(i as f64) {
                     Some(n) => n,
@@ -58,20 +60,20 @@ impl JsonConverter {
                     None => panic!("Float is too large or Not a Number {}", i),
                 };
                 serde_json::Value::Number(n)
-            },
+            }
             &Val::String(ref s) => serde_json::Value::String(s.clone()),
             &Val::Macro(_) => {
                 // TODO(jwall): We probably want to actually skip this but for now
                 // we'll use null
                 eprintln!("Skipping macro encoding as null...");
                 serde_json::Value::Null
-            },
+            }
             &Val::List(ref l) => try!(self.convert_list(l)),
             &Val::Tuple(ref t) => try!(self.convert_tuple(t)),
         };
         Ok(jsn_val)
     }
-    
+
     fn write(&self, v: &Val, w: &mut Write) -> Result<()> {
         let jsn_val = try!(self.convert_value(v));
         try!(serde_json::to_writer(w, &jsn_val));
