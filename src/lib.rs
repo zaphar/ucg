@@ -67,7 +67,8 @@
 //! .1 // the leading 0 is also optional.
 //! ```
 //! 
-//! * String is any quoted text.
+//! * String is any quoted text. backslashes within a string escape the next preceding
+//! character.
 //! 
 //! ``` ucg
 //! "foo"; // a smiple string

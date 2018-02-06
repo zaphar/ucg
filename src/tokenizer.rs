@@ -14,7 +14,7 @@
 use nom_locate::LocatedSpan;
 use nom;
 use nom::{alpha, is_alphanumeric, digit, multispace};
-use nom::{InputLength, Slice};
+use nom::{InputLength, InputIter, Slice};
 use ast::*;
 use std;
 use std::result::Result;
@@ -34,16 +34,37 @@ fn is_symbol_char(c: char) -> bool {
     is_alphanumeric(c as u8) || c == '-' as char || c == '_' as char
 }
 
+fn escapequoted(input: Span) -> nom::IResult<Span, String> {
+    // loop until we find a " that is not preceded by \.
+    // Collapse all \<char> to just char  for escaping.
+    let mut frag = String::new();
+    let mut escape = false;
+    for (i, c) in input.iter_indices() {
+        if c == '\\' && ! escape { // eat this slash and set our escaping sentinel
+            escape = true;
+        } else if c == '"' && !escape { // Bail if this is an unescaped "
+            // we exit here.
+            return nom::IResult::Done(input.slice(i..), frag);
+        } else {
+            // we accumulate this character.
+            frag.push(c);
+            escape = false; // reset our escaping sentinel
+        }
+    }
+    return nom::IResult::Incomplete(nom::Needed::Unknown);
+}
+
+// TODO(jwall): Handle escapes
 named!(strtok( Span ) -> Token,
        do_parse!(
            span: position!() >>
                tag!("\"") >>
-               frag: take_until!("\"") >>
+               frag: escapequoted >>
                tag!("\"") >>
            (Token{
                typ: TokenType::QUOTED,
                pos: Position::from(span),
-               fragment: frag.fragment.to_string(),
+               fragment: frag,
            })
        )
 );
@@ -476,7 +497,7 @@ impl<'a> std::ops::Index<usize> for TokenIter<'a> {
     }
 }
 
-impl<'a> nom::InputIter for TokenIter<'a> {
+impl<'a> InputIter for TokenIter<'a> {
     type Item = &'a Token;
     type RawItem = Token;
 
@@ -522,6 +543,25 @@ mod tokenizer_test {
     use super::*;
     use nom;
     use nom_locate::LocatedSpan;
+
+    #[test]
+    fn test_escape_quoted() {
+        let result = escapequoted(LocatedSpan::new("foo \\\"bar\""));
+        assert!(result.is_done(), format!("result {:?} is not ok", result));
+        if let nom::IResult::Done(rest, frag) = result {
+            assert_eq!(frag, "foo \"bar");
+            assert_eq!(rest.fragment, "\"");
+        }
+    }
+
+    #[test]
+    fn test_string_with_escaping() {
+        let result = strtok(LocatedSpan::new("\"foo \\\\ \\\"bar\""));
+        assert!(result.is_done(), format!("result {:?} is not ok", result));
+        if let nom::IResult::Done(_, tok) = result {
+            assert_eq!(tok.fragment, "foo \\ \"bar".to_string());
+        }
+    }
 
     #[test]
     fn test_tokenize_one_of_each() {
@@ -574,7 +614,7 @@ mod tokenizer_test {
                     fragment: " comment".to_string(),
                     pos: Position{column: 1, line: 1},
                 }));
-        // TODO(jwall): assert!(comment(LocatedSpan::new("// comment")).is_done());
+        assert!(comment(LocatedSpan::new("// comment")).is_done());
     }
 
     #[test]
