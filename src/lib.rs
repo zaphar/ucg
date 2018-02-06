@@ -58,7 +58,12 @@
 //!
 //! ucg has a relatively simple syntax with 3 primitive types, Int, Float, and String.
 //!
-//! * Int, is any integer number.
+//! * Int is any integer number.
+//!
+//! ```ucg
+//! 1; // a single Integer
+//! ```
+//!
 //! * Float is any number with a decimal point.
 //!
 //! ```ucg
@@ -79,7 +84,7 @@
 //!
 //! ucg has two complex data types, Lists and Tuples.
 //!
-//! * List's start are surrounded with square brackets `[ ]` and have comma separated elements.
+//! * Lists start are surrounded with square brackets `[ ]` and have comma separated elements.
 //!
 //! ```ucg
 //! [1, 2, 3]; // A simple list of numbers.
@@ -145,9 +150,43 @@
 //! [1,2] + [3,4]; // result is [1,2,3,4]
 //! ```
 //!
-//! #### Conditional data.
+//! #### Copy expressions
+//! 
+//! ucg Tuples support a form of reuse with copy on write semantics. You can copy a tuple and selectively overwrite fields or add new
+//! fields to it with the copy expression. To perform a copy first reference the tuple by a bound name and then use `{ field = value, ... }`
+//! syntax to copy with overridden fields  or add completely new fields. When replacing a preexisting field with a new value you cannot
+//! change the type of the field. This allows you to define a typed shape for a tuple with default values and then provide new values for
+//! some or all of the fields while still enforcing the same types for those fields. Adding completely new fields has no such restriction.
+//! 
+//! ```ucg
+//! let base = {
+//!     field1 = "value1",
+//!     field2 = 100,
+//!     field3 = 5.6,
+//! };
+//! 
+//! let overridden = base{
+//!     field1 = "new value"
+//! };
+//! 
+//! let expanded = base{
+//!     field2 = 200,
+//!     field3 = "look ma a new field",
+//! };
+//! ```
+//! 
+//! The following will cause an error because the overriden field's value does not match the original.
+//! 
+//! ```ucg
+//! let bad = base{
+//!     field1 = 300, // Error!!! must be a string.
+//! };
+//! 
+//! ```
+//! 
+//! #### Conditional data
 //!
-//! ucg supports a limited form of conditional selection of data using the select expression. A select expression starts with the select
+//! ucg supports a limited form of conditional data selection of using the select expression. A select expression starts with the `select`
 //! keyword and is followed by a an expression resolving to a string naming the field to select, an expression resolving to the default value,
 //! and a tuple to select the field from. If the field selected is not in the tuple then the default value will be used.
 //!
@@ -170,7 +209,7 @@
 //! #### Macros
 //!
 //! Macros look like functions but they are resolved at compile time and configurations don't execute so they never appear in output.
-//! They are useful for constructing tuples of a certain shape or otherwise promoting data reuse. You define a macro with the macro
+//! They are useful for constructing tuples of a certain shape or otherwise promoting data reuse. You define a macro with the `macro`
 //! keyword followed by the arguments in parentheses and then a tuple.
 //!
 //! ```ucg
@@ -190,9 +229,11 @@
 //! ### Statements
 //!
 //! There are 3 kinds of statements in a ucg configuration file. expression statements, let statements, and import statements.
+//! All ucg statements must be terminated by a semicolon.
 //!
 //! * expression statements
-//! The simplest and least useful is the expression statements. It is any valid expression followed by a semicolon.
+//! 
+//! The simplest and least useful is the expression statement. It is any valid expression followed by a semicolon.
 //!
 //! ```ucg
 //! 1;
@@ -205,17 +246,19 @@
 //! ever create a repl for ucg statements they may prove more useful.
 //!
 //!  * Let statements
-//! The let expression binds the result of any valid expression to a name. It starts with the let keyword and is followed by
-//! the name of the binding, =, and a valid ucg expression.
+//! 
+//! The let expression binds the result of any valid expression to a name. It starts with the `let` keyword and is followed by
+//! the name of the binding, an `=`, and a valid ucg expression.
 //!
 //! ```ucg
 //! let name = "foo";
 //! ```
 //!
 //! * Import statement
+//! 
 //! The import statement imports the contents of another ucg file into the current file with a name. The imported files bound
-//! values are exposed as a tuple in the referencing file. It starts with the import keyword and is followed by a quoted path
-//! to the ucg file, they keyword as, and a name for the imported values.
+//! values are exposed as a tuple in the referencing file. It starts with the `import` keyword and is followed by a quoted path
+//! to the ucg file, the keyword `as`, and a name for the imported values.
 //!
 //! ```ucg
 //! import "dbconfigs.ucg" as dbconfigs;
