@@ -12,18 +12,21 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
+//! The format string logic for ucg format expressions.
 use std::clone::Clone;
 use std::error::Error;
 
 use ast::*;
 use error;
 
+/// Implements the logic for format strings in UCG format expressions.
 pub struct Formatter<V: Into<String> + Clone> {
     tmpl: String,
     args: Vec<V>,
 }
 
 impl<V: Into<String> + Clone> Formatter<V> {
+    /// Constructs a Formatter with a template and args.
     pub fn new<S: Into<String>>(tmpl: S, args: Vec<V>) -> Self {
         Formatter {
             tmpl: tmpl.into(),
@@ -31,6 +34,10 @@ impl<V: Into<String> + Clone> Formatter<V> {
         }
     }
 
+    /// Renders a formatter to a string or returns an error.
+    /// 
+    /// If the formatter has the wrong number of arguments for the number of replacements
+    /// it will return an error. Otherwise it will return the formatted string.
     pub fn render(&self, pos: &Position) -> Result<String, Box<Error>> {
         let mut buf = String::new();
         let mut should_escape = false;

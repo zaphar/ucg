@@ -11,6 +11,8 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
+
+//! The conversion stage of the ucg compiler.
 pub mod flags;
 pub mod json;
 pub mod traits;
@@ -21,11 +23,16 @@ use std::rc::Rc;
 
 use build::Val;
 
+/// ConverterRunner knows how to run a given converter on a Val.
 pub struct ConverterRunner {
     converter: Box<traits::Converter>,
 }
 
 impl ConverterRunner {
+    /// new creates a new ConverterRunner with a converter for the provided output target.
+    /// 
+    /// * flags
+    /// * json
     pub fn new(typ: &str) -> Result<Self, String> {
         if typ == "flags" {
             return Ok(ConverterRunner { converter: Box::new(flags::FlagConverter::new()) });
@@ -36,6 +43,7 @@ impl ConverterRunner {
         return Err(format!("Unknown Target output type: {}", typ));
     }
 
+    /// convert runs the Converter on a Val and writes the output to the provided writer.
     pub fn convert(&self, v: Rc<Val>, w: Box<Write>) -> io::Result<()> {
         self.converter.convert(v, w)
     }

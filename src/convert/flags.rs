@@ -12,6 +12,7 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
+//! Flags contains code for converting a UCG Val into the command line flag output target.
 use std::rc::Rc;
 use std::io::Write;
 use std::io::Result;
@@ -19,6 +20,7 @@ use std::io::Result;
 use build::Val;
 use convert::traits::Converter;
 
+/// FlagConverter implements the conversion logic for converting a Val into a set of command line flags.
 pub struct FlagConverter {}
 
 impl FlagConverter {

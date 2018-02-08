@@ -11,6 +11,8 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
+
+//! The Parsing stage of the ucg compiler.
 use std::str::FromStr;
 use std::borrow::Borrow;
 
@@ -591,6 +593,7 @@ named!(statement<TokenIter, Statement, ParseError>,
     )
 );
 
+/// Parses a LocatedSpan into a list of Statements or a ParseError.
 pub fn parse(input: LocatedSpan<&str>) -> Result<Vec<Statement>, ParseError> {
     match tokenize(input) {
         Ok(tokenized) => {

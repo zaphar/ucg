@@ -11,6 +11,8 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
+
+//! The definitions of the ucg AST and Tokens.
 use std;
 use std::collections::HashSet;
 use std::borrow::Borrow;
@@ -22,6 +24,7 @@ use std::cmp::PartialEq;
 use std::hash::Hasher;
 use std::hash::Hash;
 
+/// Encodes a parsing error with position information and a helpful description.
 #[derive(Debug,PartialEq)]
 pub struct ParseError {
     pub pos: Position,
@@ -61,6 +64,10 @@ macro_rules! enum_type_equality {
     }
 }
 
+/// Represents a line and a column position in UCG code.
+/// 
+/// It is used for generating error messages mostly. Most all
+/// parts of the UCG AST have a positioned associated with them.
 #[derive(Debug,PartialEq,Eq,Clone,PartialOrd,Ord,Hash)]
 pub struct Position {
     pub line: usize,
@@ -68,6 +75,7 @@ pub struct Position {
 }
 
 impl Position {
+    /// Construct a new Position.
     pub fn new(line: usize, column: usize) -> Self {
         Position {
             line: line,
@@ -76,6 +84,7 @@ impl Position {
     }
 }
 
+/// Defines the types of tokens in UCG syntax.
 #[derive(Debug,PartialEq,Eq,Clone,PartialOrd,Ord,Hash)]
 pub enum TokenType {
     END,
@@ -88,6 +97,10 @@ pub enum TokenType {
 }
 
 // FIXME(jwall): We should probably implement copy for this.
+
+/// Defines a Token representing a building block of UCG syntax.
+/// 
+/// Token's are passed to the parser stage to be parsed into an AST.
 #[derive(Debug,PartialEq,Eq,Clone,PartialOrd,Ord,Hash)]
 pub struct Token {
     pub typ: TokenType,
@@ -96,10 +109,12 @@ pub struct Token {
 }
 
 impl Token {
+    /// Constructs a new Token with a type and line and column information.
     pub fn new<S: Into<String>>(f: S, typ: TokenType, line: usize, col: usize) -> Self {
         Self::new_with_pos(f, typ, Position::new(line, col))
     }
 
+    // Constructs a new Token with a type and a Position.
     pub fn new_with_pos<S: Into<String>>(f: S, typ: TokenType, pos: Position) -> Self {
         Token {
             typ: typ,
@@ -115,6 +130,7 @@ impl Borrow<str> for Token {
     }
 }
 
+/// Helper macro for making a Positioned Value.
 macro_rules! value_node {
     ($v:expr, $p:expr) => {
         Positioned::new_with_pos($v, $p)
@@ -124,6 +140,7 @@ macro_rules! value_node {
     };
 }
 
+/// Helper macro for making a Token.
 #[allow(unused_macros)]
 macro_rules! make_tok {
     ( EOF => $l:expr, $c:expr  ) => {
@@ -155,6 +172,7 @@ macro_rules! make_tok {
     };
 }
 
+/// Helper macro for making expressions.
 #[allow(unused_macros)]
 macro_rules! make_expr {
     ( $e:expr ) => {
@@ -248,7 +266,7 @@ macro_rules! make_selector {
                 col += $item.len() + 1;
             )*
 
-            // Shut up the lint about unused code;
+            // Shut up the linter about unused code;
             assert!(col != 0);
 
             make_selector!($h, list, $l, $c) 
@@ -256,7 +274,7 @@ macro_rules! make_selector {
     };
 }
 
-/// Selector is an Expression with a series of symbols specifying the key
+/// An Expression with a series of symbols specifying the key
 /// with which to descend into the result of the expression.
 ///
 /// The expression must evaluate to either a tuple or an array. The token must
@@ -279,13 +297,18 @@ pub struct SelectorList {
 }
 
 impl SelectorList {
+    /// Returns a stringified version of a SelectorList.
     pub fn to_string(&self) -> String {
         "TODO".to_string()
     }
 }
 
+/// An ordered list of Name = Value pairs.
+/// 
+/// This is usually used as the body of a tuple in the UCG AST.
 pub type FieldList = Vec<(Token, Expression)>; // Token is expected to be a symbol
 
+/// Encodes a selector expression in the UCG AST.
 #[derive(Debug,PartialEq,Clone)]
 pub struct SelectorDef {
     pub pos: Position,
@@ -293,6 +316,7 @@ pub struct SelectorDef {
 }
 
 impl SelectorDef {
+    /// Constructs a new SelectorDef.
     pub fn new(sel: SelectorList, line: usize, col: usize) -> Self {
         SelectorDef {
             pos: Position::new(line, col),
@@ -301,7 +325,7 @@ impl SelectorDef {
     }
 }
 
-/// Value represents a Value in the UCG parsed AST.
+/// Represents a Value in the UCG parsed AST.
 #[derive(Debug,PartialEq,Clone)]
 pub enum Value {
     // Constant Values
@@ -316,6 +340,7 @@ pub enum Value {
 }
 
 impl Value {
+    /// Returns the type name of the Value it is called on as a string.
     pub fn type_name(&self) -> String {
         match self {
             &Value::Int(_) => "Integer".to_string(),
@@ -344,6 +369,7 @@ impl Value {
         return format!("{}", v.len());
     }
 
+    /// Returns a stringified version of the Value.
     pub fn to_string(&self) -> String {
         match self {
             &Value::Int(ref i) => format!("{}", i.val),
@@ -356,6 +382,7 @@ impl Value {
         }
     }
 
+    /// Returns the position for a Value.
     pub fn pos(&self) -> &Position {
         match self {
             &Value::Int(ref i) => &i.pos,
@@ -368,6 +395,7 @@ impl Value {
         }
     }
 
+    /// Returns true if called on a Value that is the same type as itself.
     pub fn type_equal(&self, target: &Self) -> bool {
         enum_type_equality!(self, target, &Value::Int(_),
                                           &Value::Float(_),
@@ -379,7 +407,7 @@ impl Value {
     }
 }
 
-/// CallDef represents a call to a Macro that is expected to already have been
+/// Represents an expansion of a Macro that is expected to already have been
 /// defined.
 #[derive(PartialEq,Debug,Clone)]
 pub struct CallDef {
@@ -388,8 +416,7 @@ pub struct CallDef {
     pub pos: Position,
 }
 
-/// SelectDef selects a value from a tuple with a default if the value doesn't
-/// exist.
+/// Encodes a select expression in the UCG AST.
 #[derive(PartialEq,Debug,Clone)]
 pub struct SelectDef {
     pub val: Box<Expression>,
@@ -399,6 +426,8 @@ pub struct SelectDef {
 }
 
 // TODO(jwall): This should have a way of rendering with position information.
+
+/// Adds position information to any type `T`.
 #[derive(Debug,Clone)]
 pub struct Positioned<T> {
     pub pos: Position,
@@ -406,10 +435,12 @@ pub struct Positioned<T> {
 }
 
 impl<T> Positioned<T> {
+    /// Constructs a new Positioned<T> with a value, line, and column information.
     pub fn new(v: T, l: usize, c: usize) -> Self {
         Self::new_with_pos(v, Position::new(l, c))
     }
 
+    /// Constructs a new Positioned<T> with a value and a Position.
     pub fn new_with_pos(v: T, pos: Position) -> Self {
         Positioned { pos: pos, val: v }
     }
@@ -459,9 +490,10 @@ impl<'a> From<&'a Positioned<String>> for Positioned<String> {
     }
 }
 
-/// MacroDef is a pure function that always returns a Tuple.
+/// Encodes a macro expression in the UCG AST..
 ///
-/// MacroDef's are not closures. They can not reference
+/// A macro is a pure function over a tuple.
+/// MacroDefs are not closures. They can not reference
 /// any values except what is defined in their arguments.
 #[derive(PartialEq,Debug,Clone)]
 pub struct MacroDef {
@@ -504,6 +536,8 @@ impl MacroDef {
         return bad_symbols;
     }
 
+    /// Performs typechecking of a ucg macro's arguments to ensure
+    /// that they are valid for the expressions in the macro.
     pub fn validate_symbols(&self) -> Result<(), HashSet<String>> {
         let mut bad_symbols = HashSet::new();
         for &(_, ref expr) in self.fields.iter() {
@@ -561,6 +595,8 @@ impl MacroDef {
     }
 }
 
+/// Specifies the types of binary operations supported in
+/// UCG expression.
 #[derive(Debug,PartialEq,Clone)]
 pub enum BinaryExprType {
     Add,
@@ -569,7 +605,7 @@ pub enum BinaryExprType {
     Div,
 }
 
-/// BinaryOpDef represents an expression with a left and a right side.
+/// Represents an expression with a left and a right side.
 #[derive(Debug,PartialEq,Clone)]
 pub struct BinaryOpDef {
     pub kind: BinaryExprType,
@@ -578,6 +614,7 @@ pub struct BinaryOpDef {
     pub pos: Position,
 }
 
+/// Encodes a tuple Copy expression in the UCG AST.
 #[derive(Debug,PartialEq,Clone)]
 pub struct CopyDef {
     pub selector: SelectorDef,
@@ -585,6 +622,7 @@ pub struct CopyDef {
     pub pos: Position,
 }
 
+/// Encodes a format expression in the UCG AST.
 #[derive(Debug,PartialEq,Clone)]
 pub struct FormatDef {
     pub template: String,
@@ -592,33 +630,33 @@ pub struct FormatDef {
     pub pos: Position,
 }
 
+/// Encodes a list expression in the UCG AST.
 #[derive(Debug,PartialEq,Clone)]
 pub struct ListDef {
     pub elems: Vec<Expression>,
     pub pos: Position,
 }
 
-/// Expression encodes an expression. Expressions compute a value from operands.
+/// Encodes a ucg expression. Expressions compute a value from.
 #[derive(Debug,PartialEq,Clone)]
 pub enum Expression {
     // Base Expression
     Simple(Value),
 
+    // Binary expressions
     Binary(BinaryOpDef),
 
     // Complex Expressions
     Copy(CopyDef),
     Grouped(Box<Expression>),
-
     Format(FormatDef),
-
     Call(CallDef),
-
     Macro(MacroDef),
     Select(SelectDef),
 }
 
 impl Expression {
+    /// Returns the position of the Expression.
     pub fn pos(&self) -> &Position {
         match self {
             &Expression::Simple(ref v) => v.pos(),
@@ -633,19 +671,21 @@ impl Expression {
     }
 }
 
+/// Encodes a let statement in the UCG AST.
 #[derive(Debug,PartialEq)]
 pub struct LetDef {
     pub name: Token,
     pub value: Expression,
 }
 
+/// Encodes an import statement in the UCG AST.
 #[derive(Debug,PartialEq)]
 pub struct ImportDef {
     pub path: Token,
     pub name: Token,
 }
 
-/// Statement encodes a parsed Statement in the UCG AST.
+/// Encodes a parsed statement in the UCG AST.
 #[derive(Debug,PartialEq)]
 pub enum Statement {
     // simple expression
@@ -654,7 +694,7 @@ pub enum Statement {
     // Named bindings
     Let(LetDef),
 
-    // Include a file.
+    // Import a file.
     Import(ImportDef),
 }
 

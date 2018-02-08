@@ -11,6 +11,8 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
+
+//! The tokenization stage of the ucg compiler.
 use nom_locate::LocatedSpan;
 use nom;
 use nom::{alpha, is_alphanumeric, digit, multispace};
@@ -286,6 +288,8 @@ named!(token( Span ) -> Token,
 );
 
 // TODO(jwall): This should return a ParseError instead.
+
+/// Consumes an input Span and returns either a Vec<Token> or a nom::ErrorKind.
 pub fn tokenize(input: Span) -> Result<Vec<Token>, nom::ErrorKind> {
     let mut out = Vec::new();
     let mut i = input;
@@ -326,6 +330,8 @@ pub fn token_clone(t: &Token) -> Result<Token, ParseError> {
     Ok(t.clone())
 }
 
+/// nom macro that matches a Token by type and uses an optional conversion handler
+/// for the matched Token.
 macro_rules! match_type {
     ($i:expr, COMMENT => $h:expr) => {
         match_type!($i, TokenType::COMMENT, "Not a Comment", $h)
@@ -396,6 +402,8 @@ macro_rules! match_type {
     };
 }
 
+/// nom style macro that matches various Tokens by type and value and allows optional
+/// conversion handlers for the matched Token.
 macro_rules! match_token {
     ($i:expr, PUNCT => $f:expr) => {
         match_token!($i, PUNCT => $f, token_clone)
@@ -434,18 +442,21 @@ macro_rules! match_token {
     };
 }
 
+/// nom style macro that matches punctuation Tokens.
 macro_rules! punct {
     ($i:expr, $c:expr) => {
         match_token!($i, PUNCT => $c)
     };
 }
 
+/// nom style macro that matches any bareword Token.
 macro_rules! word {
     ($i:expr, $w:expr) => {
         match_token!($i, BAREWORD => $w)
     };
 }
 
+/// pos gets the current position from a TokenIter input without consuming it.
 pub fn pos(i: TokenIter) -> nom::IResult<TokenIter, Position, ParseError> {
     let tok = &i[0];
     let line = tok.pos.line;
@@ -457,6 +468,8 @@ pub fn pos(i: TokenIter) -> nom::IResult<TokenIter, Position, ParseError> {
                        })
 }
 
+/// TokenIter wraps a slice of Tokens and implements the various necessary
+/// nom traits to use it as an input to nom parsers.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TokenIter<'a> {
     pub source: &'a [Token],

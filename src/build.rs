@@ -11,6 +11,8 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
+
+//! The build stage of the ucg compiler.
 use std::fs::File;
 use std::io::Read;
 use std::error::Error;
@@ -29,6 +31,7 @@ use parse::parse;
 use error;
 
 impl MacroDef {
+    /// Expands a ucg Macro using the given arguments into a new Tuple.
     pub fn eval(&self,
                 mut args: Vec<Rc<Val>>)
                 -> Result<Vec<(Positioned<String>, Rc<Val>)>, Box<Error>> {
@@ -59,10 +62,10 @@ impl MacroDef {
     }
 }
 
-/// BuildResult is the result of a build.
+/// The result of a build.
 type BuildResult = Result<(), Box<Error>>;
 
-/// Val is the Intermediate representation of a compiled UCG AST.
+/// The Intermediate representation of a compiled UCG AST.
 #[derive(PartialEq,Debug,Clone)]
 pub enum Val {
     Int(i64),
@@ -74,6 +77,7 @@ pub enum Val {
 }
 
 impl Val {
+    /// Returns the Type of a Val as a string.
     pub fn type_name(&self) -> String {
         match self {
             &Val::Int(_) => "Integer".to_string(),
@@ -85,6 +89,7 @@ impl Val {
         }
     }
 
+    /// Returns true if called with a Val of the same type as itself.
     pub fn type_equal(&self, target: &Self) -> bool {
         enum_type_equality!(self, target, &Val::Int(_),
                                      &Val::Float(_),
@@ -94,6 +99,7 @@ impl Val {
                                      &Val::Macro(_))
     }
 
+    /// Returns the fields if this Val is a tuple. None otherwise.
     pub fn get_fields(&self) -> Option<&Vec<(Positioned<String>, Rc<Val>)>> {
         if let &Val::Tuple(ref fs) = self {
             Some(fs)
@@ -174,10 +180,10 @@ impl From<Val> for String {
     }
 }
 
-/// ValueMap defines a set of values in a parsed file.
+/// Defines a set of values in a parsed file.
 type ValueMap = HashMap<Positioned<String>, Rc<Val>>;
 
-/// Builder parses one or more statements into a out Tuple.
+/// Handles building ucg code.
 pub struct Builder {
     /// assets are other parsed files from import statements. They
     /// are keyed by the normalized import path. This acts as a cache
@@ -208,7 +214,6 @@ macro_rules! eval_binary_expr {
 }
 
 impl Builder {
-    // TODO(jwall): Maintain order for tuples.
     fn tuple_to_val(&self, fields: &Vec<(Token, Expression)>) -> Result<Rc<Val>, Box<Error>> {
         let mut new_fields = Vec::<(Positioned<String>, Rc<Val>)>::new();
         for &(ref name, ref expr) in fields.iter() {
@@ -245,6 +250,7 @@ impl Builder {
         }
     }
 
+    /// Constructs a new Builder.
     pub fn new() -> Self {
         Builder {
             assets: HashMap::new(),
@@ -254,6 +260,7 @@ impl Builder {
         }
     }
 
+    /// Constructs a new Builder with a provided scope.
     pub fn new_with_scope(scope: ValueMap) -> Self {
         Builder {
             assets: HashMap::new(),
@@ -263,6 +270,7 @@ impl Builder {
         }
     }
 
+    /// Returns a Val by name from previously built UCG.
     pub fn get_out_by_name(&self, name: &str) -> Option<Rc<Val>> {
         let key = Positioned {
             pos: Position::new(0, 0),
@@ -271,6 +279,7 @@ impl Builder {
         self.lookup_sym(&key)
     }
 
+    /// Builds a list of parsed UCG Statements.
     pub fn build(&mut self, ast: &Vec<Statement>) -> BuildResult {
         for stmt in ast.iter() {
             try!(self.build_stmt(stmt));
@@ -278,7 +287,8 @@ impl Builder {
         Ok(())
     }
 
-    pub fn build_file_string(&mut self, _name: &str, input: String) -> BuildResult {
+    /// Builds a string of ucg syntax.
+    pub fn build_file_string(&mut self, input: String) -> BuildResult {
         match parse(Span::new(&input)) {
             Ok(stmts) => {
                 for stmt in stmts.iter() {
@@ -290,12 +300,13 @@ impl Builder {
         }
     }
 
+    /// Builds a ucg file at the named path.
     pub fn build_file(&mut self, name: &str) -> BuildResult {
         let mut f = try!(File::open(name));
         let mut s = String::new();
         // TODO(jwall): It would be nice to be able to do this while streaming
         try!(f.read_to_string(&mut s));
-        self.build_file_string(name, s)
+        self.build_file_string(s)
     }
 
     fn build_import(&mut self, def: &ImportDef) -> BuildResult {
@@ -769,7 +780,7 @@ impl Builder {
         }
     }
 
-    // eval_expr evals a single Expression in the context of a running Builder.
+    // Evals a single Expression in the context of a running Builder.
     // It does not mutate the builders collected state at all.
     pub fn eval_expr(&self, expr: &Expression) -> Result<Rc<Val>, Box<Error>> {
         // TODO(jwall): We probably don't want to consume these expressions.
