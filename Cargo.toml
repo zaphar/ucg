@@ -2,8 +2,9 @@
 name        = "ucg"
 version     = "0.0.1"
 authors     = ["Jeremy Wall <jeremy@marzhillstudios.com>"]
-description = "Runs a command on user specified triggers."
+description = "A configuration generation grammar."
 repository  = "https://github.com/zaphar/ucg"
+documentation = "https://docs.rs/crate/ucg"
 readme      = "README.md"
 keywords    = ["compiler", "config"]
 license     = "Apache-2.0"
