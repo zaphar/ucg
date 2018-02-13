@@ -12,20 +12,45 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-//! Contains code for converting a UCG Val into the command line flag output target.
+//! An environment variable converter.
 use std::rc::Rc;
 use std::io::Write;
 use std::io::Result;
 
+use ast;
 use build::Val;
 use convert::traits::Converter;
 
-/// FlagConverter implements the conversion logic for converting a Val into a set of command line flags.
-pub struct FlagConverter {}
+/// EnvConverter implements the conversion logic for converting a Val into a set of environment variables.
+pub struct EnvConverter {}
 
-impl FlagConverter {
+impl EnvConverter {
     pub fn new() -> Self {
-        FlagConverter {}
+        EnvConverter {}
+    }
+
+    fn convert_tuple(
+        &self,
+        flds: &Vec<(ast::Positioned<String>, Rc<Val>)>,
+        w: &mut Write,
+    ) -> Result<()> {
+        for &(ref name, ref val) in flds.iter() {
+            // TODO(jwall): What if the value is a tuple?
+            if val.is_tuple() {
+                eprintln!("Skipping embedded tuple...");
+                return Ok(());
+            }
+            try!(write!(w, "{}=", name.val));
+            try!(self.write(&val, w));
+        }
+        Ok(())
+    }
+
+    fn convert_list(&self, _items: &Vec<Rc<Val>>, _w: &mut Write) -> Result<()> {
+        // FIXME(jwall): Fill this in?
+        // TODO(jwall)
+        eprintln!("Skipping List...");
+        Ok(())
     }
 
     fn write(&self, v: &Val, w: &mut Write) -> Result<()> {
@@ -39,20 +64,11 @@ impl FlagConverter {
             &Val::String(ref s) => {
                 try!(write!(w, "'{}' ", s));
             }
-            &Val::List(ref _def) => {
-                // FIXME(jwall): Fill this in?
-                eprintln!("Skipping List...");
+            &Val::List(ref items) => {
+                try!(self.convert_list(items, w));
             }
             &Val::Tuple(ref flds) => {
-                for &(ref name, ref val) in flds.iter() {
-                    if val.is_tuple() {
-                        eprintln!("Skipping embedded tuple...");
-                        return Ok(());
-                    }
-                    try!(write!(w, "--{} ", name.val));
-                    // TODO(jwall): What if the value is a tuple?
-                    try!(self.write(&val, w));
-                }
+                try!(self.convert_tuple(flds, w));
             }
             &Val::Macro(ref _def) => {
                 // This is ignored
@@ -63,7 +79,7 @@ impl FlagConverter {
     }
 }
 
-impl Converter for FlagConverter {
+impl Converter for EnvConverter {
     fn convert(&self, v: Rc<Val>, mut w: Box<Write>) -> Result<()> {
         self.write(&v, &mut w)
     }
