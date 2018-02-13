@@ -14,7 +14,29 @@ be version controlled, enforce _some_ typesafety, and output
 configuration for any application regardless of that applications
 preferred format.
 
-## Examples
+## Usage
+
+You can get ucg with cargo `cargo install ucg`.
+
+Running ucg help will show the following output.
+
+```sh
+Universal Configuration Grammar compiler.
+
+USAGE:
+    ucg [SUBCOMMAND]
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+SUBCOMMANDS:
+    build       Compile a specific ucg file.
+    help        Prints this message or the help of the given subcommand(s)
+    validate    Check a specific ucg file for errors.
+```
+
+## Language Examples
 
 #### Base Types
 
