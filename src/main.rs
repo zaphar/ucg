@@ -34,7 +34,7 @@ fn do_flags<'a>() -> clap::ArgMatches<'a> {
             (@subcommand build =>
              (about: "Compile a specific ucg file.")
              (@arg sym: --sym +takes_value "Specify a specific let binding in the ucg file to output.")
-             (@arg target: --target -t +required +takes_value "Target output type. (flags, json)")
+             (@arg target: --target -t +required +takes_value "Target output type. (flags, json, env)")
              (@arg out: --out -o +takes_value "Output file to write to.")
              (@arg INPUT: +required "Input ucg file to build.")
             )
@@ -42,8 +42,7 @@ fn do_flags<'a>() -> clap::ArgMatches<'a> {
              (about: "Check a specific ucg file for errors.")
              (@arg INPUT: +required "Input ucg file to validate.")
             )
-    )
-        .get_matches()
+    ).get_matches()
 }
 
 fn run_converter(c: ConverterRunner, v: Rc<Val>, f: &str) -> io::Result<()> {
