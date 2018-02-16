@@ -15,8 +15,8 @@
 //! The tokenization stage of the ucg compiler.
 use nom_locate::LocatedSpan;
 use nom;
-use nom::{alpha, is_alphanumeric, digit, multispace};
-use nom::{InputLength, InputIter, Slice};
+use nom::{alpha, digit, is_alphanumeric, multispace};
+use nom::{InputIter, InputLength, Slice};
 use ast::*;
 use std;
 use std::result::Result;
@@ -204,9 +204,11 @@ named!(astok( Span ) -> Token,
 fn end_of_input(input: Span) -> nom::IResult<Span, Token> {
     match eof!(input,) {
         nom::IResult::Done(_, _) => {
-            return nom::IResult::Done(input,
-                                      make_tok!(EOF => input.line as usize,
-                                                input.get_column() as usize));
+            return nom::IResult::Done(
+                input,
+                make_tok!(EOF => input.line as usize,
+                                                input.get_column() as usize),
+            );
         }
         nom::IResult::Incomplete(_) => {
             return nom::IResult::Incomplete(nom::Needed::Unknown);
@@ -220,22 +222,29 @@ fn end_of_input(input: Span) -> nom::IResult<Span, Token> {
 fn comment(input: Span) -> nom::IResult<Span, Token> {
     match tag!(input, "//") {
         nom::IResult::Done(rest, _) => {
-            match alt!(rest, take_until_and_consume!("\r\n") | take_until_and_consume!("\n")) {
+            match alt!(
+                rest,
+                take_until_and_consume!("\r\n") | take_until_and_consume!("\n")
+            ) {
                 nom::IResult::Done(rest, cmt) => {
-                    return nom::IResult::Done(rest,
-                                              make_tok!(CMT => cmt.fragment.to_string(),
+                    return nom::IResult::Done(
+                        rest,
+                        make_tok!(CMT => cmt.fragment.to_string(),
                                   input.line as usize,
-                                  input.get_column() as usize));
+                                  input.get_column() as usize),
+                    );
                 }
                 // If we didn't find a new line then we just grab everything.
                 _ => {
                     let blen = rest.input_len();
                     let next = rest.slice(blen..);
                     let tok = rest.slice(..blen);
-                    return nom::IResult::Done(next,
-                                              make_tok!(CMT => tok.fragment.to_string(),
+                    return nom::IResult::Done(
+                        next,
+                        make_tok!(CMT => tok.fragment.to_string(),
                                   input.line as usize, input.get_column() as usize
-                    ));
+                    ),
+                    );
                 }
             }
         }
@@ -461,11 +470,13 @@ pub fn pos(i: TokenIter) -> nom::IResult<TokenIter, Position, ParseError> {
     let tok = &i[0];
     let line = tok.pos.line;
     let column = tok.pos.column;
-    nom::IResult::Done(i.clone(),
-                       Position {
-                           line: line,
-                           column: column,
-                       })
+    nom::IResult::Done(
+        i.clone(),
+        Position {
+            line: line,
+            column: column,
+        },
+    )
 }
 
 /// TokenIter wraps a slice of Tokens and implements the various necessary
@@ -528,7 +539,8 @@ impl<'a> InputIter for TokenIter<'a> {
     }
 
     fn position<P>(&self, predicate: P) -> Option<usize>
-        where P: Fn(Self::RawItem) -> bool
+    where
+        P: Fn(Self::RawItem) -> bool,
     {
         for (o, v) in self.iter_indices() {
             if predicate(v.clone()) {
@@ -580,10 +592,10 @@ mod tokenizer_test {
 
     #[test]
     fn test_tokenize_one_of_each() {
-        //                                                                          1 1 1 1 1 1 1 1 1 1 2 2 2 2 2   2       2            2
-        //                                       1  2      3     4      5  6  7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4   5       6            7
-        let result = tokenize(LocatedSpan::new("let import macro select as => [ ] { } ; = % / * \
-                                                + - . ( ) , 1 . foo \"bar\" // comment\n ;"));
+        let result = tokenize(LocatedSpan::new(
+            "let import macro select as => [ ] { } ; = % / * \
+             + - . ( ) , 1 . foo \"bar\" // comment\n ;",
+        ));
         assert!(result.is_ok(), format!("result {:?} is not ok", result));
         let v = result.unwrap();
         for (i, t) in v.iter().enumerate() {
@@ -606,40 +618,71 @@ mod tokenizer_test {
     fn test_parse_comment() {
         assert!(comment(LocatedSpan::new("// comment\n")).is_done());
         assert!(comment(LocatedSpan::new("// comment")).is_done());
-        assert_eq!(comment(LocatedSpan::new("// comment\n")),
-            nom::IResult::Done(LocatedSpan{fragment: "", offset: 11, line: 2},
-            Token{
-                typ: TokenType::COMMENT,
-                fragment: " comment".to_string(),
-                pos: Position{line: 1, column: 1},
-            }));
+        assert_eq!(
+            comment(LocatedSpan::new("// comment\n")),
+            nom::IResult::Done(
+                LocatedSpan {
+                    fragment: "",
+                    offset: 11,
+                    line: 2,
+                },
+                Token {
+                    typ: TokenType::COMMENT,
+                    fragment: " comment".to_string(),
+                    pos: Position { line: 1, column: 1 },
+                }
+            )
+        );
         assert!(comment(LocatedSpan::new("// comment\r\n")).is_done());
-        assert_eq!(comment(LocatedSpan::new("// comment\r\n")),
-            nom::IResult::Done(LocatedSpan{fragment: "", offset: 12, line: 2},
-                Token{
+        assert_eq!(
+            comment(LocatedSpan::new("// comment\r\n")),
+            nom::IResult::Done(
+                LocatedSpan {
+                    fragment: "",
+                    offset: 12,
+                    line: 2,
+                },
+                Token {
                     typ: TokenType::COMMENT,
                     fragment: " comment".to_string(),
-                    pos: Position{column: 1, line: 1}
-                }));
+                    pos: Position { column: 1, line: 1 },
+                }
+            )
+        );
         assert!(comment(LocatedSpan::new("// comment\r\n ")).is_done());
-        assert_eq!(comment(LocatedSpan::new("// comment\r\n ")),
-            nom::IResult::Done(LocatedSpan{fragment: " ", offset: 12, line: 2},
-                Token{
+        assert_eq!(
+            comment(LocatedSpan::new("// comment\r\n ")),
+            nom::IResult::Done(
+                LocatedSpan {
+                    fragment: " ",
+                    offset: 12,
+                    line: 2,
+                },
+                Token {
                     typ: TokenType::COMMENT,
                     fragment: " comment".to_string(),
-                    pos: Position{column: 1, line: 1},
-                }));
+                    pos: Position { column: 1, line: 1 },
+                }
+            )
+        );
         assert!(comment(LocatedSpan::new("// comment")).is_done());
     }
 
     #[test]
     fn test_match_word() {
-        let input = vec![Token{
-            fragment: "foo".to_string(),
-            typ: TokenType::BAREWORD,
-            pos: Position{line: 1, column: 1}
-        }];
-        let result = word!(TokenIter{source: input.as_slice()}, "foo");
+        let input = vec![
+            Token {
+                fragment: "foo".to_string(),
+                typ: TokenType::BAREWORD,
+                pos: Position { line: 1, column: 1 },
+            },
+        ];
+        let result = word!(
+            TokenIter {
+                source: input.as_slice(),
+            },
+            "foo"
+        );
         match result {
             nom::IResult::Done(_, tok) => assert_eq!(tok, input[0]),
             res => assert!(false, format!("Fail: {:?}", res)),
@@ -648,12 +691,19 @@ mod tokenizer_test {
 
     #[test]
     fn test_match_word_empty_input() {
-        let input = vec![Token{
-            fragment: "".to_string(),
-            typ: TokenType::END,
-            pos: Position{line: 1, column: 1},
-        }];
-        let result = word!(TokenIter{source: input.as_slice()}, "foo");
+        let input = vec![
+            Token {
+                fragment: "".to_string(),
+                typ: TokenType::END,
+                pos: Position { line: 1, column: 1 },
+            },
+        ];
+        let result = word!(
+            TokenIter {
+                source: input.as_slice(),
+            },
+            "foo"
+        );
         match result {
             nom::IResult::Done(_, _) => assert!(false, "Should have been an error but was Done"),
             nom::IResult::Incomplete(_) => {
@@ -667,12 +717,19 @@ mod tokenizer_test {
 
     #[test]
     fn test_match_punct() {
-        let input = vec![Token{
-            fragment: "!".to_string(),
-            typ: TokenType::PUNCT,
-            pos: Position{line: 1, column: 1}
-        }];
-        let result = punct!(TokenIter{source: input.as_slice()}, "!");
+        let input = vec![
+            Token {
+                fragment: "!".to_string(),
+                typ: TokenType::PUNCT,
+                pos: Position { line: 1, column: 1 },
+            },
+        ];
+        let result = punct!(
+            TokenIter {
+                source: input.as_slice(),
+            },
+            "!"
+        );
         match result {
             nom::IResult::Done(_, tok) => assert_eq!(tok, input[0]),
             res => assert!(false, format!("Fail: {:?}", res)),
@@ -681,12 +738,19 @@ mod tokenizer_test {
 
     #[test]
     fn test_match_type() {
-        let input = vec![Token{
-            fragment: "foo".to_string(),
-            typ: TokenType::BAREWORD,
-            pos: Position{line: 1, column: 1}
-        }];
-        let result = match_type!(TokenIter{source: input.as_slice()}, BAREWORD);
+        let input = vec![
+            Token {
+                fragment: "foo".to_string(),
+                typ: TokenType::BAREWORD,
+                pos: Position { line: 1, column: 1 },
+            },
+        ];
+        let result = match_type!(
+            TokenIter {
+                source: input.as_slice(),
+            },
+            BAREWORD
+        );
         match result {
             nom::IResult::Done(_, tok) => assert_eq!(tok, input[0]),
             res => assert!(false, format!("Fail: {:?}", res)),

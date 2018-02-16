@@ -34,12 +34,14 @@ impl JsonConverter {
         Ok(serde_json::Value::Array(v))
     }
 
-    fn convert_tuple(&self,
-                     items: &Vec<(ast::Positioned<String>, Rc<Val>)>)
-                     -> Result<serde_json::Value> {
+    fn convert_tuple(
+        &self,
+        items: &Vec<(ast::Positioned<String>, Rc<Val>)>,
+    ) -> Result<serde_json::Value> {
         let mut mp = serde_json::Map::new();
         for &(ref k, ref v) in items.iter() {
-            mp.entry(k.val.clone()).or_insert(try!(self.convert_value(v)));
+            mp.entry(k.val.clone())
+                .or_insert(try!(self.convert_value(v)));
         }
         Ok(serde_json::Value::Object(mp))
     }

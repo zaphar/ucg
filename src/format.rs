@@ -35,7 +35,7 @@ impl<V: Into<String> + Clone> Formatter<V> {
     }
 
     /// Renders a formatter to a string or returns an error.
-    /// 
+    ///
     /// If the formatter has the wrong number of arguments for the number of replacements
     /// it will return an error. Otherwise it will return the formatted string.
     pub fn render(&self, pos: &Position) -> Result<String, Box<Error>> {
@@ -45,10 +45,12 @@ impl<V: Into<String> + Clone> Formatter<V> {
         for c in self.tmpl.chars() {
             if c == '@' && !should_escape {
                 if count == self.args.len() {
-                    return Err(Box::new(error::Error::new("Too few arguments to string \
-                                                                 formatter.",
-                                                          error::ErrorType::FormatError,
-                                                          pos.clone())));
+                    return Err(Box::new(error::Error::new(
+                        "Too few arguments to string \
+                         formatter.",
+                        error::ErrorType::FormatError,
+                        pos.clone(),
+                    )));
                 }
                 let arg = self.args[count].clone();
                 let strval = arg.into();
@@ -61,10 +63,12 @@ impl<V: Into<String> + Clone> Formatter<V> {
             }
         }
         if self.args.len() != count {
-            return Err(Box::new(error::Error::new("Too many arguments to string \
-                                                         formatter.",
-                                                  error::ErrorType::FormatError,
-                                                  pos.clone())));
+            return Err(Box::new(error::Error::new(
+                "Too many arguments to string \
+                 formatter.",
+                error::ErrorType::FormatError,
+                pos.clone(),
+            )));
         }
         return Ok(buf);
     }
@@ -78,30 +82,21 @@ mod test {
     #[test]
     fn test_format_happy_path() {
         let formatter = Formatter::new("foo @ @ \\@", vec!["bar", "quux"]);
-        let pos = Position {
-            line: 0,
-            column: 0,
-        };
+        let pos = Position { line: 0, column: 0 };
         assert_eq!(formatter.render(&pos).unwrap(), "foo bar quux @");
     }
 
     #[test]
     fn test_format_happy_wrong_too_few_args() {
         let formatter = Formatter::new("foo @ @ \\@", vec!["bar"]);
-        let pos = Position {
-            line: 0,
-            column: 0,
-        };
+        let pos = Position { line: 0, column: 0 };
         assert!(formatter.render(&pos).is_err());
     }
 
     #[test]
     fn test_format_happy_wrong_too_many_args() {
         let formatter = Formatter::new("foo @ @ \\@", vec!["bar", "quux", "baz"]);
-        let pos = Position {
-            line: 0,
-            column: 0,
-        };
+        let pos = Position { line: 0, column: 0 };
         assert!(formatter.render(&pos).is_err());
     }
 }

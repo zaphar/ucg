@@ -75,10 +75,7 @@ impl fmt::Debug for Error {
         write!(
             w,
             "{}: \"{}\" {}:{}",
-            self.err_type,
-            self.msg,
-            self.pos.line,
-            self.pos.column
+            self.err_type, self.msg, self.pos.line, self.pos.column
         )
     }
 }
@@ -88,10 +85,7 @@ impl fmt::Display for Error {
         write!(
             w,
             "{}: \"{}\" {}:{}",
-            self.err_type,
-            self.msg,
-            self.pos.line,
-            self.pos.column
+            self.err_type, self.msg, self.pos.line, self.pos.column
         )
     }
 }
