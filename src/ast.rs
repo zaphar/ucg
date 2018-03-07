@@ -437,6 +437,12 @@ pub struct Positioned<T> {
     pub val: T,
 }
 
+impl<T: std::fmt::Display> std::fmt::Display for Positioned<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        write!(f, "{}", self.val)
+    }
+}
+
 impl<T> Positioned<T> {
     /// Constructs a new Positioned<T> with a value, line, and column information.
     pub fn new(v: T, l: usize, c: usize) -> Self {

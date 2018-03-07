@@ -28,7 +28,7 @@ impl FlagConverter {
         FlagConverter {}
     }
 
-    fn write(&self, v: &Val, w: &mut Write) -> Result<()> {
+    fn write(&self, pfx: &str, v: &Val, w: &mut Write) -> Result<()> {
         match v {
             &Val::Float(ref f) => {
                 try!(write!(w, "{} ", f));
@@ -46,12 +46,17 @@ impl FlagConverter {
             &Val::Tuple(ref flds) => {
                 for &(ref name, ref val) in flds.iter() {
                     if val.is_tuple() {
-                        eprintln!("Skipping embedded tuple...");
-                        return Ok(());
+                        let new_pfx = format!("{}{}.", pfx, name);
+                        try!(self.write(&new_pfx, val, w));
+                    } else {
+                        if name.val.chars().count() > 1 || pfx.chars().count() > 0 {
+                            try!(write!(w, "--{}{} ", pfx, name.val));
+                        } else {
+                            try!(write!(w, "-{} ", name.val));
+                        }
+                        // TODO(jwall): What if the value is a tuple?
+                        try!(self.write(pfx, &val, w));
                     }
-                    try!(write!(w, "--{} ", name.val));
-                    // TODO(jwall): What if the value is a tuple?
-                    try!(self.write(&val, w));
                 }
             }
             &Val::Macro(ref _def) => {
@@ -65,6 +70,6 @@ impl FlagConverter {
 
 impl Converter for FlagConverter {
     fn convert(&self, v: Rc<Val>, mut w: Box<Write>) -> Result<()> {
-        self.write(&v, &mut w)
+        self.write("", &v, &mut w)
     }
 }
