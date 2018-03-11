@@ -33,7 +33,7 @@ fn do_flags<'a>() -> clap::ArgMatches<'a> {
             (about: "Universal Configuration Grammar compiler.")
             (@subcommand build =>
              (about: "Compile a specific ucg file.")
-             (@arg sym: --sym +takes_value "Specify a specific let binding in the ucg file to output.")
+             (@arg sym: --sym +takes_value +required "Specify a specific let binding in the ucg file to output.")
              (@arg target: --target -t +required +takes_value "Target output type. (flags, json, env)")
              (@arg out: --out -o +takes_value "Output file to write to.")
              (@arg INPUT: +required "Input ucg file to build.")
@@ -45,9 +45,12 @@ fn do_flags<'a>() -> clap::ArgMatches<'a> {
     ).get_matches()
 }
 
-fn run_converter(c: ConverterRunner, v: Rc<Val>, f: &str) -> io::Result<()> {
-    let file = File::create(f);
-    c.convert(v, Box::new(file.unwrap()))
+fn run_converter(c: ConverterRunner, v: Rc<Val>, f: Option<&str>) -> io::Result<()> {
+    let file: Box<std::io::Write> = match f {
+        Some(f) => Box::new(try!(File::create(f))),
+        None => Box::new(io::stdout()),
+    };
+    c.convert(v, file)
 }
 
 fn main() {
@@ -55,7 +58,7 @@ fn main() {
     let app = do_flags();
     if let Some(matches) = app.subcommand_matches("build") {
         let file = matches.value_of("INPUT").unwrap();
-        let out = matches.value_of("out").unwrap();
+        let out = matches.value_of("out");
         let sym = matches.value_of("sym");
         let target = matches.value_of("target").unwrap();
         let mut builder = build::Builder::new();
@@ -73,7 +76,7 @@ fn main() {
                 match val {
                     Some(value) => {
                         run_converter(converter, value, out).unwrap();
-                        println!("Build successful");
+                        eprintln!("Build successful");
                         process::exit(0);
                     }
                     None => {
