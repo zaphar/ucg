@@ -591,6 +591,16 @@ mod tokenizer_test {
     }
 
     #[test]
+    fn test_tokenize_bareword_with_dash() {
+        let result = tokenize(LocatedSpan::new("foo-bar "));
+        assert!(result.is_ok(), format!("result {:?} is not ok", result));
+        if let Ok(toks) = result {
+            assert_eq!(toks.len(), 2);
+            assert_eq!(toks[0].fragment, "foo-bar");
+        }
+    }
+
+    #[test]
     fn test_tokenize_one_of_each() {
         let result = tokenize(LocatedSpan::new(
             "let import macro select as => [ ] { } ; = % / * \

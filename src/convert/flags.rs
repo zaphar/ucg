@@ -73,3 +73,5 @@ impl Converter for FlagConverter {
         self.write("", &v, &mut w)
     }
 }
+
+// We need some unit tests for this now :D
