@@ -17,6 +17,7 @@ organiztion for a given configuration structure. Some options here could be
 
 # Minor Fixes and Polish
 
+* Allow trailing commas
 * Flags should allow different seperators for prefixed flags.
 * None value types
 * YAML export

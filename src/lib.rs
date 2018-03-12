@@ -53,6 +53,7 @@
 //! * as
 //! * select
 //! * macro
+//! * env
 //!
 //! ### Primitive types
 //!
@@ -137,6 +138,9 @@
 //!
 //! mytuple.field2.0; // descend into a deeply nested tuple and array.
 //! ```
+//!
+//! The env variable is a reserved variable that always contains a tuple with the any environment variables.
+//! Attempting to reference an enviroment variable that does not exist is a compile error.
 //!
 //! #### Binary operators
 //!

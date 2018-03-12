@@ -13,6 +13,7 @@
 //  limitations under the License.
 
 //! The build stage of the ucg compiler.
+use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::error::Error;
@@ -187,11 +188,18 @@ impl From<Val> for String {
     }
 }
 
+impl From<String> for Val {
+    fn from(s: String) -> Val {
+        Val::String(s)
+    }
+}
+
 /// Defines a set of values in a parsed file.
 type ValueMap = HashMap<Positioned<String>, Rc<Val>>;
 
 /// Handles building ucg code.
 pub struct Builder {
+    env: Rc<Val>,
     /// assets are other parsed files from import statements. They
     /// are keyed by the normalized import path. This acts as a cache
     /// so multiple imports of the same file don't have to be parsed
@@ -260,17 +268,21 @@ impl Builder {
 
     /// Constructs a new Builder.
     pub fn new() -> Self {
-        Builder {
-            assets: HashMap::new(),
-            files: HashSet::new(),
-            out: HashMap::new(),
-            last: None,
-        }
+        // TODO(jwall): Construct a map with the environment variables in it.
+        Self::new_with_scope(HashMap::new())
     }
 
     /// Constructs a new Builder with a provided scope.
     pub fn new_with_scope(scope: ValueMap) -> Self {
+        let env_vars: Vec<(Positioned<String>, Rc<Val>)> = env::vars()
+            .map(|t| (Positioned::new(t.0, 0, 0), Rc::new(t.1.into())))
+            .collect();
+        Self::new_with_env_and_scope(scope, Val::Tuple(env_vars))
+    }
+
+    pub fn new_with_env_and_scope(scope: ValueMap, env: Val) -> Self {
         Builder {
+            env: Rc::new(env),
             assets: HashMap::new(),
             files: HashSet::new(),
             out: scope,
@@ -375,6 +387,9 @@ impl Builder {
     }
 
     fn lookup_sym(&self, sym: &Positioned<String>) -> Option<Rc<Val>> {
+        if &sym.val == "env" {
+            return Some(self.env.clone());
+        }
         if self.out.contains_key(sym) {
             return Some(self.out[sym].clone());
         }
@@ -449,6 +464,7 @@ impl Builder {
 
     fn lookup_selector(&self, sl: &SelectorList) -> Result<Rc<Val>, Box<Error>> {
         let first = try!(self.eval_expr(&sl.head));
+        // TODO(jwall): Handle environment lookups.
         // First we ensure that the result is a tuple or a list.
         let mut stack = VecDeque::new();
         match first.as_ref() {
