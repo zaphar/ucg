@@ -1,4 +1,4 @@
-# Universal Configuration Grammar - Working Title.
+# Universal Configuration Grammar.
 
 This is an experiment in configuration management. The approach is **not**
 to create a "parsable" config file format.  We have plenty of
@@ -13,6 +13,12 @@ The goal is to allow a global shared configuration repository that can
 be version controlled, enforce _some_ typesafety, and output
 configuration for any application regardless of that applications
 preferred format.
+
+## The Usual Warnings
+
+This is still very much an experiment and the language and api can be expected
+to change and mutate. It also probably has bugs and isn't yet the most user
+friendly language and compiler to use. You have been warned.
 
 ## Usage
 
@@ -38,4 +44,4 @@ SUBCOMMANDS:
 
 ## Language Reference
 
-https://docs.rs/ucg/0.0.1/
+https://docs.rs/ucg/
