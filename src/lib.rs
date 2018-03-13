@@ -59,13 +59,13 @@
 //!
 //! ucg has a relatively simple syntax with 3 primitive types, Int, Float, and String.
 //!
-//! * Int is any integer number.
+//! * An Int is any integer number.
 //!
 //! ```ucg
 //! 1; // a single Integer
 //! ```
 //!
-//! * Float is any number with a decimal point.
+//! * A Float is any number with a decimal point.
 //!
 //! ```ucg
 //! 1.0; // A typical float.
@@ -73,7 +73,7 @@
 //! .1 // the leading 0 is also optional.
 //! ```
 //!
-//! * String is any quoted text. backslashes within a string escape the next preceding
+//! * A String is any quoted text. Backslashes within a string escape the next preceding
 //! character.
 //!
 //! ``` ucg
@@ -85,7 +85,7 @@
 //!
 //! ucg has two complex data types, Lists and Tuples.
 //!
-//! * Lists start are surrounded with square brackets `[ ]` and have comma separated elements.
+//! * Lists are surrounded with square brackets `[ ]` and have comma separated elements.
 //!
 //! ```ucg
 //! [1, 2, 3]; // A simple list of numbers.
@@ -139,7 +139,9 @@
 //! mytuple.field2.0; // descend into a deeply nested tuple and array.
 //! ```
 //!
-//! The env variable is a reserved variable that always contains a tuple with the any environment variables.
+//! The `env` variable is a reserved variable that always contains a tuple with any environment
+//! variables in it.
+//!
 //! Attempting to reference an enviroment variable that does not exist is a compile error.
 //!
 //! #### Binary operators
@@ -223,9 +225,9 @@
 //!     connstr = "couchdb://@:@" % (arg1, arg2),
 //! }
 //!
-//! let my dbconf = myfunc("couchdb.example.org", "9090");
+//! let my_dbconf = myfunc("couchdb.example.org", "9090");
 //!
-//! let my dbhost = dbconf.host;
+//! let my_dbhost = dbconf.host;
 //! ```
 //!
 //! macros always resolve to a tuple. If you want to get a single value out you can use selector syntax to retrieve it.
@@ -292,3 +294,4 @@ pub use ast::Statement;
 
 pub use parse::parse;
 pub use build::Builder;
+pub use build::Val;
