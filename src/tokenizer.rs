@@ -117,6 +117,10 @@ macro_rules! do_tag_tok {
     }
 }
 
+named!(emptytok( Span ) -> Token,
+       do_tag_tok!(TokenType::EMPTY, "NULL")
+);
+
 named!(commatok( Span ) -> Token,
        do_tag_tok!(TokenType::PUNCT, ",")
 );
@@ -268,6 +272,7 @@ named!(whitespace( Span ) -> Token,
 named!(token( Span ) -> Token,
     alt!(
         strtok |
+        emptytok | // This must come before the barewordtok
         barewordtok |
         digittok |
         commatok |
@@ -356,6 +361,14 @@ macro_rules! match_type {
 
     ($i:expr, BAREWORD) => {
         match_type!($i, BAREWORD => token_clone)
+    };
+
+    ($i:expr, EMPTY => $h:expr) => {
+        match_type!($i, TokenType::EMPTY, "Not NULL", $h)
+    };
+
+    ($i:expr, EMPTY) => {
+        match_type!($i, EMPTY => token_clone)
     };
 
     ($i:expr, STR => $h:expr) => {
@@ -570,6 +583,16 @@ mod tokenizer_test {
     use super::*;
     use nom;
     use nom_locate::LocatedSpan;
+
+    #[test]
+    fn test_empty_token() {
+        let result = emptytok(LocatedSpan::new("NULL"));
+        assert!(result.is_done(), format!("result {:?} is not done", result));
+        if let nom::IResult::Done(_, tok) = result {
+            assert_eq!(tok.fragment, "NULL");
+            assert_eq!(tok.typ, TokenType::EMPTY);
+        }
+    }
 
     #[test]
     fn test_escape_quoted() {

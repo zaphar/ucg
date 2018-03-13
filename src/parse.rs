@@ -195,8 +195,17 @@ named!(list_value<TokenIter, Value, ParseError>,
        )
 );
 
+named!(empty_value<TokenIter, Value, ParseError>,
+    do_parse!(
+        pos: pos >>
+        match_type!(EMPTY) >>
+        (Value::Empty(pos))
+    )
+);
+
 named!(value<TokenIter, Value, ParseError>,
     alt!(
+        empty_value |
         number |
         quoted_value |
         list_value |
@@ -355,17 +364,17 @@ fn tuple_to_copy(t: (SelectorDef, FieldList)) -> ParseResult<Expression> {
 }
 
 named!(copy_expression<TokenIter, Expression, ParseError>,
-       map_res!(
-           do_parse!(
-               pos: pos >>
-               selector: selector_list >>
-               punct!("{") >>
-               fields: field_list >>
-               punct!("}") >>
-               (SelectorDef::new(selector, pos.line, pos.column as usize), fields)
-           ),
-           tuple_to_copy
-       )
+    map_res!(
+        do_parse!(
+            pos: pos >>
+            selector: selector_list >>
+            punct!("{") >>
+            fields: field_list >>
+            punct!("}") >>
+            (SelectorDef::new(selector, pos.line, pos.column as usize), fields)
+        ),
+        tuple_to_copy
+    )
 );
 
 fn tuple_to_macro(mut t: (Position, Vec<Value>, Value)) -> ParseResult<Expression> {
@@ -703,6 +712,11 @@ mod test {
     }
 
     #[test]
+    fn test_null_parsing() {
+        assert_parse!(empty_value("NULL"), Value::Empty(Position::new(1, 1)));
+    }
+
+    #[test]
     fn test_symbol_parsing() {
         assert_parse!(
             symbol("foo"),
@@ -924,6 +938,10 @@ mod test {
 
     #[test]
     fn test_expression_parse() {
+        assert_parse!(
+            expression("NULL"),
+            Expression::Simple(Value::Empty(Position::new(1, 1)))
+        );
         assert_parse!(
             expression("\"foo\""),
             Expression::Simple(Value::String(value_node!("foo".to_string(), 1, 1)))

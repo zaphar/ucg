@@ -40,6 +40,10 @@ impl EnvConverter {
                 eprintln!("Skipping embedded tuple...");
                 return Ok(());
             }
+            if let &Val::Empty = val.as_ref() {
+                eprintln!("Skipping empty variable: {}", name);
+                return Ok(());
+            }
             try!(write!(w, "{}=", name.val));
             try!(self.write(&val, w));
         }
@@ -55,6 +59,10 @@ impl EnvConverter {
 
     fn write(&self, v: &Val, w: &mut Write) -> Result<()> {
         match v {
+            &Val::Empty => {
+                // Empty is a noop.
+                return Ok(());
+            }
             &Val::Float(ref f) => {
                 try!(write!(w, "{} ", f));
             }

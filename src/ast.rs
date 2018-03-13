@@ -86,6 +86,7 @@ impl Position {
 /// Defines the types of tokens in UCG syntax.
 #[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord, Hash)]
 pub enum TokenType {
+    EMPTY,
     END,
     WS,
     COMMENT,
@@ -328,6 +329,7 @@ impl SelectorDef {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Value {
     // Constant Values
+    Empty(Position),
     Int(Positioned<i64>),
     Float(Positioned<f64>),
     String(Positioned<String>),
@@ -342,6 +344,7 @@ impl Value {
     /// Returns the type name of the Value it is called on as a string.
     pub fn type_name(&self) -> String {
         match self {
+            &Value::Empty(_) => "EmptyValue".to_string(),
             &Value::Int(_) => "Integer".to_string(),
             &Value::Float(_) => "Float".to_string(),
             &Value::String(_) => "String".to_string(),
@@ -371,6 +374,7 @@ impl Value {
     /// Returns a stringified version of the Value.
     pub fn to_string(&self) -> String {
         match self {
+            &Value::Empty(_) => "EmptyValue".to_string(),
             &Value::Int(ref i) => format!("{}", i.val),
             &Value::Float(ref f) => format!("{}", f.val),
             &Value::String(ref s) => format!("{}", s.val),
@@ -384,6 +388,7 @@ impl Value {
     /// Returns the position for a Value.
     pub fn pos(&self) -> &Position {
         match self {
+            &Value::Empty(ref pos) => pos,
             &Value::Int(ref i) => &i.pos,
             &Value::Float(ref f) => &f.pos,
             &Value::String(ref s) => &s.pos,
@@ -399,6 +404,7 @@ impl Value {
         enum_type_equality!(
             self,
             target,
+            &Value::Empty(_),
             &Value::Int(_),
             &Value::Float(_),
             &Value::String(_),

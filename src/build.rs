@@ -72,6 +72,7 @@ type BuildResult = Result<(), Box<Error>>;
 /// The Intermediate representation of a compiled UCG AST.
 #[derive(PartialEq, Debug, Clone)]
 pub enum Val {
+    Empty,
     Int(i64),
     Float(f64),
     String(String),
@@ -84,6 +85,7 @@ impl Val {
     /// Returns the Type of a Val as a string.
     pub fn type_name(&self) -> String {
         match self {
+            &Val::Empty => "EmptyValue".to_string(),
             &Val::Int(_) => "Integer".to_string(),
             &Val::Float(_) => "Float".to_string(),
             &Val::String(_) => "String".to_string(),
@@ -98,6 +100,7 @@ impl Val {
         enum_type_equality!(
             self,
             target,
+            &Val::Empty,
             &Val::Int(_),
             &Val::Float(_),
             &Val::String(_),
@@ -155,6 +158,7 @@ impl Val {
 impl Display for Val {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
+            &Val::Empty => write!(f, "EmptyValue"),
             &Val::Float(ref ff) => write!(f, "Float({})", ff),
             &Val::Int(ref i) => write!(f, "Int({})", i),
             &Val::String(ref s) => write!(f, "String({})", s),
@@ -248,6 +252,7 @@ impl Builder {
 
     fn value_to_val(&self, v: &Value) -> Result<Rc<Val>, Box<Error>> {
         match v {
+            &Value::Empty(_) => Ok(Rc::new(Val::Empty)),
             &Value::Int(ref i) => Ok(Rc::new(Val::Int(i.val))),
             &Value::Float(ref f) => Ok(Rc::new(Val::Float(f.val))),
             &Value::String(ref s) => Ok(Rc::new(Val::String(s.val.to_string()))),

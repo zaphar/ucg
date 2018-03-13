@@ -28,8 +28,21 @@ impl FlagConverter {
         FlagConverter {}
     }
 
+    fn write_flag_name(&self, pfx: &str, name: &str, w: &mut Write) -> Result<()> {
+        if name.chars().count() > 1 || pfx.chars().count() > 0 {
+            try!(write!(w, "--{}{} ", pfx, name));
+        } else {
+            try!(write!(w, "-{} ", name));
+        }
+        return Ok(());
+    }
+
     fn write(&self, pfx: &str, v: &Val, w: &mut Write) -> Result<()> {
         match v {
+            &Val::Empty => {
+                // Empty is a noop.
+                return Ok(());
+            }
             &Val::Float(ref f) => {
                 try!(write!(w, "{} ", f));
             }
@@ -45,15 +58,15 @@ impl FlagConverter {
             }
             &Val::Tuple(ref flds) => {
                 for &(ref name, ref val) in flds.iter() {
+                    if let &Val::Empty = val.as_ref() {
+                        try!(self.write_flag_name(pfx, &name.val, w));
+                        continue;
+                    }
                     if val.is_tuple() {
                         let new_pfx = format!("{}{}.", pfx, name);
                         try!(self.write(&new_pfx, val, w));
                     } else {
-                        if name.val.chars().count() > 1 || pfx.chars().count() > 0 {
-                            try!(write!(w, "--{}{} ", pfx, name.val));
-                        } else {
-                            try!(write!(w, "-{} ", name.val));
-                        }
+                        try!(self.write_flag_name(pfx, &name.val, w));
                         // TODO(jwall): What if the value is a tuple?
                         try!(self.write(pfx, &val, w));
                     }
