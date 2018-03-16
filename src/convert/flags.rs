@@ -37,6 +37,27 @@ impl FlagConverter {
         return Ok(());
     }
 
+    fn write_list_flag(&self, pfx: &str, name: &str, v: &Val, w: &mut Write) -> Result<()> {
+        if let &Val::List(ref def) = v {
+            // first of all we need to make sure that each &Val is only a primitive type.
+            for v in def.iter() {
+                let vref = v.as_ref();
+                if vref.is_list() || vref.is_tuple() || vref.is_macro() {
+                    eprintln!(
+                        "Skipping non primitive val in list for flag {}{}",
+                        pfx, name
+                    );
+                } else {
+                    try!(self.write_flag_name(pfx, name, w));
+                    try!(self.write(pfx, vref, w));
+                }
+            }
+        } else {
+            panic!("Impossible call happened. Somebody messed up.")
+        }
+        return Ok(());
+    }
+
     fn write(&self, pfx: &str, v: &Val, w: &mut Write) -> Result<()> {
         match v {
             &Val::Empty => {
@@ -56,22 +77,21 @@ impl FlagConverter {
                 // FIXME(jwall): Fill this in?
                 eprintln!("Skipping List...");
             }
-            &Val::Tuple(ref flds) => {
-                for &(ref name, ref val) in flds.iter() {
-                    if let &Val::Empty = val.as_ref() {
-                        try!(self.write_flag_name(pfx, &name.val, w));
-                        continue;
-                    }
-                    if val.is_tuple() {
-                        let new_pfx = format!("{}{}.", pfx, name);
-                        try!(self.write(&new_pfx, val, w));
-                    } else {
-                        try!(self.write_flag_name(pfx, &name.val, w));
-                        // TODO(jwall): What if the value is a tuple?
-                        try!(self.write(pfx, &val, w));
-                    }
+            &Val::Tuple(ref flds) => for &(ref name, ref val) in flds.iter() {
+                if let &Val::Empty = val.as_ref() {
+                    try!(self.write_flag_name(pfx, &name.val, w));
+                    continue;
                 }
-            }
+                if val.is_tuple() {
+                    let new_pfx = format!("{}{}.", pfx, name);
+                    try!(self.write(&new_pfx, val, w));
+                } else if val.is_list() {
+                    try!(self.write_list_flag(pfx, &name.val, &val, w));
+                } else {
+                    try!(self.write_flag_name(pfx, &name.val, w));
+                    try!(self.write(pfx, &val, w));
+                }
+            },
             &Val::Macro(ref _def) => {
                 // This is ignored
                 eprintln!("Skipping macro...");

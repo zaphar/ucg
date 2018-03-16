@@ -24,5 +24,6 @@ let server_config = {
     tmpldir = "./templates",
     prefix = {
         foo = "bar"
-    }
+    },
+    l = ["foo", "bar"]
 };

@@ -126,6 +126,13 @@ impl Val {
         return false;
     }
 
+    pub fn is_empty(&self) -> bool {
+        if let &Val::Empty = self {
+            return true;
+        }
+        return false;
+    }
+
     pub fn is_float(&self) -> bool {
         if let &Val::Float(_) = self {
             return true;
@@ -148,7 +155,14 @@ impl Val {
     }
 
     pub fn is_list(&self) -> bool {
-        if let &Val::Tuple(_) = self {
+        if let &Val::List(_) = self {
+            return true;
+        }
+        return false;
+    }
+
+    pub fn is_macro(&self) -> bool {
+        if let &Val::Macro(_) = self {
             return true;
         }
         return false;
