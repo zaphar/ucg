@@ -1,5 +1,11 @@
 # Major Planned Features
 
+## Boolean operations
+
+* equality (for everything)
+* contains (for lists or strings)
+* less than or greater than (for numeric types)
+
 ## List processing
 
 * Map over lists
