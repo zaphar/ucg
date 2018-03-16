@@ -1,17 +1,10 @@
 # Major Planned Features
 
-## Boolean operations
+## Boolean operations and type
 
 * equality (for everything)
 * contains (for lists or strings)
 * less than or greater than (for numeric types)
-
-## List processing
-
-* Map over lists
-* Filtering lists
-* Flags could automatically expand a list of values into a list of flags.
-* Joining a lists elements. (i.e. folds)
 
 ## Query Language (Experimental)
 

@@ -599,6 +599,10 @@ impl MacroDef {
                         // noop
                         continue;
                     }
+                    &Expression::ListOp(_) => {
+                        // noop
+                        continue;
+                    }
                 }
             }
         }
@@ -651,6 +655,21 @@ pub struct ListDef {
     pub pos: Position,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum ListOpType {
+    Map,
+    Filter,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct ListOpDef {
+    pub typ: ListOpType,
+    pub mac: SelectorDef,
+    pub field: String,
+    pub target: ListDef,
+    pub pos: Position,
+}
+
 /// Encodes a ucg expression. Expressions compute a value from.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
@@ -667,6 +686,7 @@ pub enum Expression {
     Call(CallDef),
     Macro(MacroDef),
     Select(SelectDef),
+    ListOp(ListOpDef),
 }
 
 impl Expression {
@@ -681,6 +701,7 @@ impl Expression {
             &Expression::Call(ref def) => &def.pos,
             &Expression::Macro(ref def) => &def.pos,
             &Expression::Select(ref def) => &def.pos,
+            &Expression::ListOp(ref def) => &def.pos,
         }
     }
 }

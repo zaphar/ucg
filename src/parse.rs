@@ -404,7 +404,7 @@ named!(macro_expression<TokenIter, Expression, ParseError>,
        map_res!(
            do_parse!(
                 pos: pos >>
-                start: word!("macro") >>
+                word!("macro") >>
                 punct!("(") >>
                 arglist: arglist >>
                 punct!(")") >>
@@ -512,6 +512,105 @@ named!(call_expression<TokenIter, Expression, ParseError>,
        )
 );
 
+fn symbol_or_list(input: TokenIter) -> NomResult<Value> {
+    let sym = do_parse!(input, sym: symbol >> (sym));
+
+    match sym {
+        IResult::Incomplete(i) => {
+            return IResult::Incomplete(i);
+        }
+        IResult::Error(_) => {
+            // TODO(jwall): Still missing some. But we need to avoid recursion
+            match list_value(input) {
+                IResult::Incomplete(i) => {
+                    return IResult::Incomplete(i);
+                }
+                IResult::Error(e) => {
+                    return IResult::Error(e);
+                }
+                IResult::Done(i, val) => {
+                    return IResult::Done(i, val);
+                }
+            }
+        }
+        IResult::Done(rest, val) => {
+            return IResult::Done(rest, val);
+        }
+    }
+}
+
+fn tuple_to_list_op(tpl: (Position, Token, Value, Value)) -> ParseResult<Expression> {
+    let pos = tpl.0;
+    let t = if &tpl.1.fragment == "map" {
+        ListOpType::Map
+    } else if &tpl.1.fragment == "filter" {
+        ListOpType::Filter
+    } else {
+        return Err(ParseError {
+            description: format!(
+                "Expected one of 'map' or 'filter' but got '{}'",
+                tpl.1.fragment
+            ),
+            pos: pos,
+        });
+    };
+    let macroname = tpl.2;
+    let list = tpl.3;
+    if let Value::Selector(mut def) = macroname {
+        // First of all we need to assert that this is a selector of at least
+        // two sections.
+        let fieldname: String = match &mut def.sel.tail {
+            &mut None => {
+                return Err(ParseError {
+                    description: format!("Missing a result field for the macro"),
+                    pos: pos,
+                });
+            }
+            &mut Some(ref mut tl) => {
+                if tl.len() < 1 {
+                    return Err(ParseError {
+                        description: format!("Missing a result field for the macro"),
+                        pos: def.pos.clone(),
+                    });
+                }
+                let fname = tl.pop();
+                fname.unwrap().fragment
+            }
+        };
+        if let Value::List(ldef) = list {
+            return Ok(Expression::ListOp(ListOpDef {
+                typ: t,
+                mac: def,
+                field: fieldname,
+                target: ldef,
+                pos: pos,
+            }));
+        }
+        // TODO(jwall): We should print a pretter message than debug formatting here.
+        return Err(ParseError {
+            pos: pos,
+            description: format!("Expected a list but got {:?}", list),
+        });
+    }
+    return Err(ParseError {
+        pos: pos,
+        description: format!("Expected a macro but got {:?}", macroname),
+    });
+}
+
+named!(list_op_expression<TokenIter, Expression, ParseError>,
+    map_res!(
+        do_parse!(
+            pos: pos >>
+            optype: alt!(word!("map") | word!("filter")) >>
+            macroname: selector_value >>
+            list: symbol_or_list >>
+            (pos, optype, macroname, list)
+        ),
+        tuple_to_list_op
+    )
+);
+
 // NOTE(jwall): HERE THERE BE DRAGONS. The order for these matters
 // alot. We need to process alternatives in order of decreasing
 // specificity.  Unfortunately this means we are required to go in a
@@ -525,6 +624,7 @@ named!(call_expression<TokenIter, Expression, ParseError>,
 named!(expression<TokenIter, Expression, ParseError>,
     do_parse!(
         expr: alt!(
+           complete!(list_op_expression) |
            complete!(add_expression) |
            complete!(sub_expression) |
            complete!(mul_expression) |
@@ -625,7 +725,7 @@ pub fn parse(input: LocatedSpan<&str>) -> Result<Vec<Statement>, ParseError> {
                     IResult::Error(e) => {
                         return Err(ParseError {
                             description: format!(
-                                "Tokenization error: {:?} current token: {:?}",
+                                "Statement Parse error: {:?} current token: {:?}",
                                 e, i_[0]
                             ),
                             pos: Position {

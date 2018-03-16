@@ -493,12 +493,16 @@ impl Builder {
             &Val::List(_) => {
                 stack.push_back(first.clone());
             }
-            _ => {
+            val => {
+                eprintln!("Not a tuple or list! {:?}", val)
                 // noop
             }
         }
 
         if let &Some(ref tail) = &sl.tail {
+            if tail.len() == 0 {
+                return Ok(first);
+            }
             let mut it = tail.iter().peekable();
             loop {
                 let vref = stack.pop_front().unwrap();
@@ -839,6 +843,39 @@ impl Builder {
         }
     }
 
+    // FIXME(jwall): We still need to write unit tests for these.
+    fn eval_list_op(&self, def: &ListOpDef) -> Result<Rc<Val>, Box<Error>> {
+        let l = &def.target.elems;
+        let mac = &def.mac;
+        if let &Val::Macro(ref macdef) = try!(self.lookup_selector(&mac.sel)).as_ref() {
+            let mut out = Vec::new();
+            for expr in l.iter() {
+                let argvals = vec![try!(self.eval_expr(expr))];
+                let fields = try!(macdef.eval(argvals));
+                if let Some(v) = Self::find_in_fieldlist(&def.field, &fields) {
+                    match def.typ {
+                        ListOpType::Map => {
+                            out.push(v.clone());
+                        }
+                        ListOpType::Filter => {
+                            if let &Val::Empty = v.as_ref() {
+                                // noop
+                                continue;
+                            }
+                            out.push(v.clone());
+                        }
+                    }
+                }
+            }
+            return Ok(Rc::new(Val::List(out)));
+        }
+        return Err(Box::new(error::Error::new(
+            format!("Expected macro but got {:?}", mac),
+            error::ErrorType::TypeFail,
+            def.pos.clone(),
+        )));
+    }
+
     // Evals a single Expression in the context of a running Builder.
     // It does not mutate the builders collected state at all.
     pub fn eval_expr(&self, expr: &Expression) -> Result<Rc<Val>, Box<Error>> {
@@ -853,6 +890,7 @@ impl Builder {
             &Expression::Call(ref def) => self.eval_call(def),
             &Expression::Macro(ref def) => self.eval_macro_def(def),
             &Expression::Select(ref def) => self.eval_select(def),
+            &Expression::ListOp(ref def) => self.eval_list_op(def),
         }
     }
 }

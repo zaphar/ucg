@@ -54,19 +54,25 @@
 //! * select
 //! * macro
 //! * env
+//! * map
+//! * filter
 //! * NULL
 //!
 //! ### Primitive types
 //!
 //! ucg has a relatively simple syntax with 3 primitive types, Int, Float, and String.
 //!
-//! * An Int is any integer number.
+//! #### Int
+//!
+//! An Int is any integer number.
 //!
 //! ```ucg
 //! 1; // a single Integer
 //! ```
 //!
-//! * A Float is any number with a decimal point.
+//! #### Float
+//!
+//! A Float is any number with a decimal point.
 //!
 //! ```ucg
 //! 1.0; // A typical float.
@@ -74,7 +80,9 @@
 //! .1 // the leading 0 is also optional.
 //! ```
 //!
-//! * A String is any quoted text. Backslashes within a string escape the next preceding
+//! #### String
+//!
+//! A String is any quoted text. Backslashes within a string escape the next preceding
 //! character.
 //!
 //! ``` ucg
@@ -82,7 +90,9 @@
 //! "I'm a \"fine\" looking string"; // escaped quotes in a string.
 //! ```
 //!
-//! * A NULL is an empty type. It represents no value.
+//! #### NULL or the Empty type.
+//!
+//!  A NULL is an empty type. It represents no value.
 //!
 //! ```ucg
 //! let empty = NULL;
@@ -92,7 +102,9 @@
 //!
 //! ucg has two complex data types, Lists and Tuples.
 //!
-//! * Lists are surrounded with square brackets `[ ]` and have comma separated elements.
+//! #### Lists
+//!
+//! Lists are surrounded with square brackets `[ ]` and have comma separated elements.
 //!
 //! ```ucg
 //! [1, 2, 3]; // A simple list of numbers.
@@ -108,7 +120,47 @@
 //! let zero = mylist.0;
 //! ```
 //!
-//! * Tuple's are an ordered collection of name, value pairs. They are bounded by curly braces `{ }`
+//! ##### List macros
+//!
+//! ucg supports a couple of ways to use macros for mapping or filtering a list to a new list.
+//!
+//! A map expression starts with the map keyword followed by the name of a macro with exactly
+//! one argument, a `.`, and the name of the output field for the macro. ucg will apply the macro
+//! to each element of the list and then take the output field from the resulting tuple and add append
+//! it to the resulting list. If the output field does not exist in the macro it will be a compile
+//! error.
+//!
+//! ```ucg
+//! let list = [1, 2, 3, 4];
+//! let mapper = macro(item) => { result = item + 1 };
+//!
+//! // results in: [2, 3, 4, 5]
+//! let mapped = map mapper.result list;
+//! ```
+//!
+//
+//! A filter expression starts with the filter keyword followed by the name of a macro with exactly
+//! one argument, a `.`, and the name of the output field for the macro. The filter will apply the
+//! macro to each element of the list and if the output field is a Value that is not NULL then the
+//! list element is appended to the output list. If the output field returns a NULL Value then the
+//! element is not appended to the output list. If the output field does not exist in the macro it
+//! will be a compile error.
+//!
+//! ```ucg
+//! let list = ["foo", "bar", "foo", "bar"];
+//! let filtrator = macro(item) => {
+//!   ok = select item NULL {
+//!     foo = 1
+//!   }
+//! };
+//!
+//! // results in: ["foo", "foo"]
+//! let filtered = filter filtrator.ok list;
+//! ```
+//!
+//! #### Tuple
+//!
+//! Tuple's are an ordered collection of name, value pairs. They are bounded by curly braces `{ }`
 //! and contain name = value pairs separated by commas. Trailing commas are permitted. The name must
 //! be a bareword without quotes.
 //!
@@ -223,10 +275,10 @@
 //!
 //! Macros look like functions but they are resolved at compile time and configurations don't execute so they never appear in output.
 //! They are useful for constructing tuples of a certain shape or otherwise promoting data reuse. You define a macro with the `macro`
-//! keyword followed by the arguments in parentheses and then a tuple.
+//! keyword followed by the arguments in parentheses, a `=>`, and then a tuple.
 //!
 //! ```ucg
-//! let myfunc = macro (arg1, arg2) {
+//! let myfunc = macro (arg1, arg2) => {
 //!     host = arg1,
 //!     port = arg2,
 //!     connstr = "couchdb://@:@" % (arg1, arg2),
@@ -278,6 +330,10 @@
 //!
 //! let mysqlconf = dbconfigs.mysql;
 //! ```
+
+// The following is necessary to allow the macros in tokenizer and parse modules
+// to succeed.
+#![recursion_limit = "128"]
 #[macro_use]
 extern crate nom;
 #[macro_use]

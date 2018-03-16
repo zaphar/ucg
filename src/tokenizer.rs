@@ -205,6 +205,14 @@ named!(astok( Span ) -> Token,
        do_tag_tok!(TokenType::BAREWORD, "as")
 );
 
+named!(maptok( Span ) -> Token,
+       do_tag_tok!(TokenType::BAREWORD, "map")
+);
+
+named!(filtertok( Span ) -> Token,
+       do_tag_tok!(TokenType::BAREWORD, "filter")
+);
+
 fn end_of_input(input: Span) -> nom::IResult<Span, Token> {
     match eof!(input,) {
         nom::IResult::Done(_, _) => {
@@ -273,7 +281,6 @@ named!(token( Span ) -> Token,
     alt!(
         strtok |
         emptytok | // This must come before the barewordtok
-        barewordtok |
         digittok |
         commatok |
         rbracetok |
@@ -297,6 +304,9 @@ named!(token( Span ) -> Token,
         macrotok |
         importtok |
         astok |
+        maptok |
+        filtertok |
+        barewordtok |
         whitespace |
         end_of_input)
 );
