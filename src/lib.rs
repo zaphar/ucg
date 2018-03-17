@@ -54,6 +54,7 @@
 //! * select
 //! * macro
 //! * env
+//! * NULL
 //!
 //! ### Primitive types
 //!
@@ -79,6 +80,12 @@
 //! ``` ucg
 //! "foo"; // a smiple string
 //! "I'm a \"fine\" looking string"; // escaped quotes in a string.
+//! ```
+//!
+//! * A NULL is an empty type. It represents no value.
+//!
+//! ```ucg
+//! let empty = NULL;
 //! ```
 //!
 //! ### Complex types
