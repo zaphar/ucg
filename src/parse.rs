@@ -658,8 +658,8 @@ pub fn parse(input: LocatedSpan<&str>) -> Result<Vec<Statement>, ParseError> {
             // FIXME(jwall): We should really capture the location
             // of the tokenization error here.
             return Err(ParseError {
-                description: format!("Tokenize Error: {:?}", e),
-                pos: Position { line: 0, column: 0 },
+                description: format!("Tokenize Error: {:?}", e.1),
+                pos: e.0,
             });
         }
     }

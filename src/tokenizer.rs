@@ -304,7 +304,7 @@ named!(token( Span ) -> Token,
 // TODO(jwall): This should return a ParseError instead.
 
 /// Consumes an input Span and returns either a Vec<Token> or a nom::ErrorKind.
-pub fn tokenize(input: Span) -> Result<Vec<Token>, nom::ErrorKind> {
+pub fn tokenize(input: Span) -> Result<Vec<Token>, (Position, nom::ErrorKind)> {
     let mut out = Vec::new();
     let mut i = input;
     loop {
@@ -313,10 +313,22 @@ pub fn tokenize(input: Span) -> Result<Vec<Token>, nom::ErrorKind> {
         }
         match token(i) {
             nom::IResult::Error(e) => {
-                return Err(e);
+                return Err((
+                    Position {
+                        line: i.line as usize,
+                        column: i.get_column() as usize,
+                    },
+                    e,
+                ));
             }
             nom::IResult::Incomplete(_) => {
-                return Err(nom::ErrorKind::Complete);
+                return Err((
+                    Position {
+                        line: i.line as usize,
+                        column: i.get_column() as usize,
+                    },
+                    nom::ErrorKind::Complete,
+                ));
             }
             nom::IResult::Done(rest, tok) => {
                 i = rest;
