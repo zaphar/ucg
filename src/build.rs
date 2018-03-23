@@ -73,6 +73,7 @@ type BuildResult = Result<(), Box<Error>>;
 #[derive(PartialEq, Debug, Clone)]
 pub enum Val {
     Empty,
+    Boolean(bool),
     Int(i64),
     Float(f64),
     String(String),
@@ -86,6 +87,7 @@ impl Val {
     pub fn type_name(&self) -> String {
         match self {
             &Val::Empty => "EmptyValue".to_string(),
+            &Val::Boolean(_) => "Boolean".to_string(),
             &Val::Int(_) => "Integer".to_string(),
             &Val::Float(_) => "Float".to_string(),
             &Val::String(_) => "String".to_string(),
@@ -101,6 +103,7 @@ impl Val {
             self,
             target,
             &Val::Empty,
+            &Val::Boolean(_),
             &Val::Int(_),
             &Val::Float(_),
             &Val::String(_),
@@ -172,6 +175,7 @@ impl Val {
 impl Display for Val {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
+            &Val::Boolean(b) => write!(f, "Boolean({})", b),
             &Val::Empty => write!(f, "EmptyValue"),
             &Val::Float(ref ff) => write!(f, "Float({})", ff),
             &Val::Int(ref i) => write!(f, "Int({})", i),
@@ -267,6 +271,7 @@ impl Builder {
     fn value_to_val(&self, v: &Value) -> Result<Rc<Val>, Box<Error>> {
         match v {
             &Value::Empty(_) => Ok(Rc::new(Val::Empty)),
+            &Value::Boolean(ref b) => Ok(Rc::new(Val::Boolean(b.val))),
             &Value::Int(ref i) => Ok(Rc::new(Val::Int(i.val))),
             &Value::Float(ref f) => Ok(Rc::new(Val::Float(f.val))),
             &Value::String(ref s) => Ok(Rc::new(Val::String(s.val.to_string()))),

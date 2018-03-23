@@ -97,6 +97,21 @@ named!(digittok( Span ) -> Token,
        )
 );
 
+named!(booleantok( Span ) -> Token,
+    do_parse!(
+        span: position!() >>
+        b: alt!(
+            tag!("true") |
+            tag!("false")
+        ) >>
+        (Token{
+            typ: TokenType::BOOLEAN,
+            pos: Position::from(span),
+            fragment: b.fragment.to_string(),
+        })
+    )
+);
+
 /// do_tag_tok! is a helper macro to make building a simple tag token
 /// less code.
 macro_rules! do_tag_tok {
@@ -299,6 +314,7 @@ named!(token( Span ) -> Token,
         semicolontok |
         leftsquarebracket |
         rightsquarebracket |
+        booleantok |
         lettok |
         selecttok |
         macrotok |
@@ -369,6 +385,14 @@ pub fn token_clone(t: &Token) -> Result<Token, ParseError> {
 /// nom macro that matches a Token by type and uses an optional conversion handler
 /// for the matched Token.
 macro_rules! match_type {
+    ($i:expr, BOOLEAN => $h:expr) => {
+        match_type!($i, TokenType::BOOLEAN, "Not a Boolean", $h)
+    };
+
+    ($i:expr, BOOLEAN) => {
+        match_type!($i, BOOLEAN => token_clone)
+    };
+
     ($i:expr, COMMENT => $h:expr) => {
         match_type!($i, TokenType::COMMENT, "Not a Comment", $h)
     };
@@ -646,18 +670,31 @@ mod tokenizer_test {
     }
 
     #[test]
+    fn test_boolean() {
+        let result = token(LocatedSpan::new("true"));
+        assert!(
+            result.is_done(),
+            format!("result {:?} is not a boolean", result)
+        );
+        if let nom::IResult::Done(_, tok) = result {
+            assert_eq!(tok.fragment, "true");
+            assert_eq!(tok.typ, TokenType::BOOLEAN);
+        }
+    }
+
+    #[test]
     fn test_tokenize_one_of_each() {
         let result = tokenize(LocatedSpan::new(
             "let import macro select as => [ ] { } ; = % / * \
-             + - . ( ) , 1 . foo \"bar\" // comment\n ;",
+             + - . ( ) , 1 . foo \"bar\" // comment\n ; true false",
         ));
         assert!(result.is_ok(), format!("result {:?} is not ok", result));
         let v = result.unwrap();
         for (i, t) in v.iter().enumerate() {
             println!("{}: {:?}", i, t);
         }
-        assert_eq!(v.len(), 27);
-        assert_eq!(v[26].typ, TokenType::END);
+        assert_eq!(v.len(), 29);
+        assert_eq!(v[28].typ, TokenType::END);
     }
 
     #[test]

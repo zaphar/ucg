@@ -138,6 +138,16 @@ named!(number<TokenIter, Value, ParseError>,
 );
 // trace_macros!(false);
 
+named!(boolean_value<TokenIter, Value, ParseError>,
+    do_parse!(
+        b: match_type!(BOOLEAN) >>
+        (Value::Boolean(Positioned{
+            val: b.fragment == "true",
+            pos: b.pos,
+        }))
+    )
+);
+
 named!(
     field_value<TokenIter, (Token, Expression), ParseError>,
     do_parse!(
@@ -205,6 +215,7 @@ named!(empty_value<TokenIter, Value, ParseError>,
 
 named!(value<TokenIter, Value, ParseError>,
     alt!(
+        boolean_value |
         empty_value |
         number |
         quoted_value |
@@ -814,6 +825,19 @@ mod test {
     #[test]
     fn test_null_parsing() {
         assert_parse!(empty_value("NULL"), Value::Empty(Position::new(1, 1)));
+    }
+
+    #[test]
+    fn test_boolean_parsing() {
+        assert_parse!(
+            boolean_value("true"),
+            Value::Boolean(Positioned::new(true, 1, 1))
+        );
+        assert_parse!(
+            boolean_value("false"),
+            Value::Boolean(Positioned::new(false, 1, 1))
+        );
+        assert_error!(boolean_value("truth"));
     }
 
     #[test]

@@ -87,6 +87,7 @@ impl Position {
 #[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord, Hash)]
 pub enum TokenType {
     EMPTY,
+    BOOLEAN,
     END,
     WS,
     COMMENT,
@@ -330,6 +331,7 @@ impl SelectorDef {
 pub enum Value {
     // Constant Values
     Empty(Position),
+    Boolean(Positioned<bool>),
     Int(Positioned<i64>),
     Float(Positioned<f64>),
     String(Positioned<String>),
@@ -345,6 +347,7 @@ impl Value {
     pub fn type_name(&self) -> String {
         match self {
             &Value::Empty(_) => "EmptyValue".to_string(),
+            &Value::Boolean(_) => "Boolean".to_string(),
             &Value::Int(_) => "Integer".to_string(),
             &Value::Float(_) => "Float".to_string(),
             &Value::String(_) => "String".to_string(),
@@ -375,6 +378,7 @@ impl Value {
     pub fn to_string(&self) -> String {
         match self {
             &Value::Empty(_) => "EmptyValue".to_string(),
+            &Value::Boolean(ref b) => format!("{}", b.val),
             &Value::Int(ref i) => format!("{}", i.val),
             &Value::Float(ref f) => format!("{}", f.val),
             &Value::String(ref s) => format!("{}", s.val),
@@ -389,6 +393,7 @@ impl Value {
     pub fn pos(&self) -> &Position {
         match self {
             &Value::Empty(ref pos) => pos,
+            &Value::Boolean(ref b) => &b.pos,
             &Value::Int(ref i) => &i.pos,
             &Value::Float(ref f) => &f.pos,
             &Value::String(ref s) => &s.pos,
@@ -405,6 +410,7 @@ impl Value {
             self,
             target,
             &Value::Empty(_),
+            &Value::Boolean(_),
             &Value::Int(_),
             &Value::Float(_),
             &Value::String(_),

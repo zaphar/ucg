@@ -48,6 +48,7 @@ impl JsonConverter {
 
     fn convert_value(&self, v: &Val) -> Result<serde_json::Value> {
         let jsn_val = match v {
+            &Val::Boolean(b) => serde_json::Value::Bool(b),
             &Val::Empty => serde_json::Value::Null,
             &Val::Float(f) => {
                 let n = match serde_json::Number::from_f64(f) {

@@ -48,6 +48,8 @@
 //!
 //! The following words are reserved in ucg and can't be used as named bindings.
 //!
+//! * true
+//! * false
 //! * let
 //! * import
 //! * as
@@ -60,7 +62,16 @@
 //!
 //! ### Primitive types
 //!
-//! ucg has a relatively simple syntax with 3 primitive types, Int, Float, and String.
+//! ucg has a relatively simple syntax with a few primitive types, Null, Boolean, Int, Float, and String.
+//!
+//! ### Boolean
+//!
+//! A Boolean is either `true` or `false`.
+//!
+//! ```uct
+//! true;
+//! false;
+//! ```
 //!
 //! #### Int
 //!
