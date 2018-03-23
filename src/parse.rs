@@ -23,10 +23,11 @@ use nom::IResult;
 
 use ast::*;
 use tokenizer::*;
+use error;
 
-type NomResult<'a, O> = nom::IResult<TokenIter<'a>, O, ParseError>;
+type NomResult<'a, O> = nom::IResult<TokenIter<'a>, O, error::Error>;
 
-type ParseResult<O> = Result<O, ParseError>;
+type ParseResult<O> = Result<O, error::Error>;
 
 fn symbol_to_value(s: &Token) -> ParseResult<Value> {
     Ok(Value::Symbol(value_node!(
@@ -36,7 +37,7 @@ fn symbol_to_value(s: &Token) -> ParseResult<Value> {
 }
 
 // symbol is a bare unquoted field.
-named!(symbol<TokenIter, Value, ParseError>,
+named!(symbol<TokenIter, Value, error::Error>,
     match_type!(BAREWORD => symbol_to_value)
 );
 
@@ -48,7 +49,7 @@ fn str_to_value(s: &Token) -> ParseResult<Value> {
 }
 
 // quoted_value is a quoted string.
-named!(quoted_value<TokenIter, Value, ParseError>,
+named!(quoted_value<TokenIter, Value, error::Error>,
        match_type!(STR => str_to_value)
 );
 
@@ -65,10 +66,11 @@ fn triple_to_number(v: (Option<Token>, Option<Token>, Option<Token>)) -> ParseRe
         let i = match FromStr::from_str(pref) {
             Ok(i) => i,
             Err(_) => {
-                return Err(ParseError {
-                    description: format!("Not an integer! {}", pref),
-                    pos: pref_pos,
-                })
+                return Err(error::Error::new(
+                    format!("Not an integer! {}", pref),
+                    error::ErrorType::UnexpectedToken,
+                    pref_pos,
+                ))
             }
         };
         return Ok(Value::Int(value_node!(i, pref_pos)));
@@ -88,10 +90,11 @@ fn triple_to_number(v: (Option<Token>, Option<Token>, Option<Token>)) -> ParseRe
     let f = match FromStr::from_str(&to_parse) {
         Ok(f) => f,
         Err(_) => {
-            return Err(ParseError {
-                description: format!("Not a float! {}", to_parse),
-                pos: maybepos.unwrap(),
-            })
+            return Err(error::Error::new(
+                format!("Not a float! {}", to_parse),
+                error::ErrorType::UnexpectedToken,
+                maybepos.unwrap(),
+            ))
         }
     };
     return Ok(Value::Float(value_node!(f, pref_pos)));
@@ -109,7 +112,7 @@ fn triple_to_number(v: (Option<Token>, Option<Token>, Option<Token>)) -> ParseRe
 // *IMPORTANT*
 // It also means this combinator is risky when used with partial
 // inputs. So handle with care.
-named!(number<TokenIter, Value, ParseError>,
+named!(number<TokenIter, Value, error::Error>,
        map_res!(alt!(
            complete!(do_parse!( // 1.0
                prefix: match_type!(DIGIT) >>
@@ -138,7 +141,7 @@ named!(number<TokenIter, Value, ParseError>,
 );
 // trace_macros!(false);
 
-named!(boolean_value<TokenIter, Value, ParseError>,
+named!(boolean_value<TokenIter, Value, error::Error>,
     do_parse!(
         b: match_type!(BOOLEAN) >>
         (Value::Boolean(Positioned{
@@ -149,7 +152,7 @@ named!(boolean_value<TokenIter, Value, ParseError>,
 );
 
 named!(
-    field_value<TokenIter, (Token, Expression), ParseError>,
+    field_value<TokenIter, (Token, Expression), error::Error>,
     do_parse!(
             field: match_type!(BAREWORD) >>
             punct!("=") >>
@@ -167,13 +170,13 @@ fn vec_to_tuple(t: (Position, Option<FieldList>)) -> ParseResult<Value> {
     )))
 }
 
-named!(field_list<TokenIter, FieldList, ParseError>,
+named!(field_list<TokenIter, FieldList, error::Error>,
        separated_list!(punct!(","), field_value)
 );
 
 named!(
     #[doc="Capture a tuple of named fields with values. {<field>=<value>,...}"],
-    tuple<TokenIter, Value, ParseError>,
+    tuple<TokenIter, Value, error::Error>,
     map_res!(
         do_parse!(
             pos: pos >>
@@ -193,7 +196,7 @@ fn tuple_to_list<Sp: Into<Position>>(t: (Sp, Vec<Expression>)) -> ParseResult<Va
     }));
 }
 
-named!(list_value<TokenIter, Value, ParseError>,
+named!(list_value<TokenIter, Value, error::Error>,
        map_res!(
            do_parse!(
                start: punct!("[") >>
@@ -205,7 +208,7 @@ named!(list_value<TokenIter, Value, ParseError>,
        )
 );
 
-named!(empty_value<TokenIter, Value, ParseError>,
+named!(empty_value<TokenIter, Value, error::Error>,
     do_parse!(
         pos: pos >>
         match_type!(EMPTY) >>
@@ -213,7 +216,7 @@ named!(empty_value<TokenIter, Value, ParseError>,
     )
 );
 
-named!(value<TokenIter, Value, ParseError>,
+named!(value<TokenIter, Value, error::Error>,
     alt!(
         boolean_value |
         empty_value |
@@ -228,7 +231,7 @@ fn value_to_expression(v: Value) -> ParseResult<Expression> {
     Ok(Expression::Simple(v))
 }
 
-named!(simple_expression<TokenIter, Expression, ParseError>,
+named!(simple_expression<TokenIter, Expression, error::Error>,
        map_res!(
            value,
            value_to_expression
@@ -266,20 +269,20 @@ macro_rules! do_binary_expr {
 }
 
 // trace_macros!(true);
-named!(add_expression<TokenIter, Expression, ParseError>,
+named!(add_expression<TokenIter, Expression, error::Error>,
        do_binary_expr!(punct!("+"), BinaryExprType::Add)
 );
 // trace_macros!(false);
 
-named!(sub_expression<TokenIter, Expression, ParseError>,
+named!(sub_expression<TokenIter, Expression, error::Error>,
        do_binary_expr!(punct!("-"), BinaryExprType::Sub)
 );
 
-named!(mul_expression<TokenIter, Expression, ParseError>,
+named!(mul_expression<TokenIter, Expression, error::Error>,
        do_binary_expr!(punct!("*"), BinaryExprType::Mul)
 );
 
-named!(div_expression<TokenIter, Expression, ParseError>,
+named!(div_expression<TokenIter, Expression, error::Error>,
        do_binary_expr!(punct!("/"), BinaryExprType::Div)
 );
 
@@ -287,7 +290,7 @@ fn expression_to_grouped_expression(e: Expression) -> ParseResult<Expression> {
     Ok(Expression::Grouped(Box::new(e)))
 }
 
-named!(grouped_expression<TokenIter, Expression, ParseError>,
+named!(grouped_expression<TokenIter, Expression, error::Error>,
        map_res!(
            preceded!(punct!("("), terminated!(expression, punct!(")"))),
            expression_to_grouped_expression
@@ -346,10 +349,11 @@ fn selector_list(input: TokenIter) -> NomResult<SelectorList> {
         };
 
         if list.is_empty() {
-            return IResult::Error(nom::ErrorKind::Custom(ParseError {
-                description: "(.) with no selector fields after".to_string(),
-                pos: is_dot.unwrap().pos,
-            }));
+            return IResult::Error(nom::ErrorKind::Custom(error::Error::new(
+                "(.) with no selector fields after".to_string(),
+                error::ErrorType::IncompleteParsing,
+                is_dot.unwrap().pos,
+            )));
         } else {
             (rest, Some(list))
         }
@@ -374,7 +378,7 @@ fn tuple_to_copy(t: (SelectorDef, FieldList)) -> ParseResult<Expression> {
     }))
 }
 
-named!(copy_expression<TokenIter, Expression, ParseError>,
+named!(copy_expression<TokenIter, Expression, error::Error>,
     map_res!(
         do_parse!(
             pos: pos >>
@@ -402,16 +406,17 @@ fn tuple_to_macro(mut t: (Position, Vec<Value>, Value)) -> ParseResult<Expressio
             pos: t.0,
         })),
         // TODO(jwall): Show a better version of the unexpected parsed value.
-        val => Err(ParseError {
-            description: format!("Expected Tuple Got {:?}", val),
-            pos: t.0,
-        }),
+        val => Err(error::Error::new(
+            format!("Expected Tuple Got {:?}", val),
+            error::ErrorType::UnexpectedToken,
+            t.0,
+        )),
     }
 }
 
-named!(arglist<TokenIter, Vec<Value>, ParseError>, separated_list!(punct!(","), symbol));
+named!(arglist<TokenIter, Vec<Value>, error::Error>, separated_list!(punct!(","), symbol));
 
-named!(macro_expression<TokenIter, Expression, ParseError>,
+named!(macro_expression<TokenIter, Expression, error::Error>,
        map_res!(
            do_parse!(
                 pos: pos >>
@@ -435,14 +440,15 @@ fn tuple_to_select(t: (Position, Expression, Expression, Value)) -> ParseResult<
             tuple: v.val,
             pos: t.0,
         })),
-        val => Err(ParseError {
-            description: format!("Expected Tuple Got {:?}", val),
-            pos: t.0,
-        }),
+        val => Err(error::Error::new(
+            format!("Expected Tuple Got {:?}", val),
+            error::ErrorType::UnexpectedToken,
+            t.0,
+        )),
     }
 }
 
-named!(select_expression<TokenIter, Expression, ParseError>,
+named!(select_expression<TokenIter, Expression, error::Error>,
        map_res!(
            do_parse!(
                start: word!("select") >>
@@ -463,7 +469,7 @@ fn tuple_to_format(t: (Token, Vec<Expression>)) -> ParseResult<Expression> {
     }))
 }
 
-named!(format_expression<TokenIter, Expression, ParseError>,
+named!(format_expression<TokenIter, Expression, error::Error>,
        map_res!(
            do_parse!(
                tmpl: match_type!(STR) >>
@@ -485,10 +491,11 @@ fn tuple_to_call(t: (Position, Value, Vec<Expression>)) -> ParseResult<Expressio
             pos: Position::new(t.0.line as usize, t.0.column as usize),
         }))
     } else {
-        Err(ParseError {
-            description: format!("Expected Selector Got {:?}", t.0),
-            pos: Position::new(t.0.line as usize, t.0.column as usize),
-        })
+        Err(error::Error::new(
+            format!("Expected Selector Got {:?}", t.0),
+            error::ErrorType::UnexpectedToken,
+            Position::new(t.0.line as usize, t.0.column as usize),
+        ))
     }
 }
 
@@ -500,7 +507,7 @@ fn vec_to_selector_value(t: (Position, SelectorList)) -> ParseResult<Value> {
     )))
 }
 
-named!(selector_value<TokenIter, Value, ParseError>,
+named!(selector_value<TokenIter, Value, error::Error>,
        map_res!(
            do_parse!(
                sl: selector_list >>
@@ -510,7 +517,7 @@ named!(selector_value<TokenIter, Value, ParseError>,
        )
 );
 
-named!(call_expression<TokenIter, Expression, ParseError>,
+named!(call_expression<TokenIter, Expression, error::Error>,
        map_res!(
            do_parse!(
                macroname: selector_value >>
@@ -557,13 +564,14 @@ fn tuple_to_list_op(tpl: (Position, Token, Value, Value)) -> ParseResult<Express
     } else if &tpl.1.fragment == "filter" {
         ListOpType::Filter
     } else {
-        return Err(ParseError {
-            description: format!(
+        return Err(error::Error::new(
+            format!(
                 "Expected one of 'map' or 'filter' but got '{}'",
                 tpl.1.fragment
             ),
-            pos: pos,
-        });
+            error::ErrorType::UnexpectedToken,
+            pos,
+        ));
     };
     let macroname = tpl.2;
     let list = tpl.3;
@@ -572,17 +580,19 @@ fn tuple_to_list_op(tpl: (Position, Token, Value, Value)) -> ParseResult<Express
         // two sections.
         let fieldname: String = match &mut def.sel.tail {
             &mut None => {
-                return Err(ParseError {
-                    description: format!("Missing a result field for the macro"),
-                    pos: pos,
-                });
+                return Err(error::Error::new(
+                    format!("Missing a result field for the macro"),
+                    error::ErrorType::IncompleteParsing,
+                    pos,
+                ));
             }
             &mut Some(ref mut tl) => {
                 if tl.len() < 1 {
-                    return Err(ParseError {
-                        description: format!("Missing a result field for the macro"),
-                        pos: def.pos.clone(),
-                    });
+                    return Err(error::Error::new(
+                        format!("Missing a result field for the macro"),
+                        error::ErrorType::IncompleteParsing,
+                        def.pos.clone(),
+                    ));
                 }
                 let fname = tl.pop();
                 fname.unwrap().fragment
@@ -598,18 +608,20 @@ fn tuple_to_list_op(tpl: (Position, Token, Value, Value)) -> ParseResult<Express
             }));
         }
         // TODO(jwall): We should print a pretter message than debug formatting here.
-        return Err(ParseError {
-            pos: pos,
-            description: format!("Expected a list but got {:?}", list),
-        });
+        return Err(error::Error::new(
+            format!("Expected a list but got {:?}", list),
+            error::ErrorType::UnexpectedToken,
+            pos,
+        ));
     }
-    return Err(ParseError {
-        pos: pos,
-        description: format!("Expected a macro but got {:?}", macroname),
-    });
+    return Err(error::Error::new(
+        format!("Expected a selector but got {:?}", macroname),
+        error::ErrorType::UnexpectedToken,
+        pos,
+    ));
 }
 
-named!(list_op_expression<TokenIter, Expression, ParseError>,
+named!(list_op_expression<TokenIter, Expression, error::Error>,
     map_res!(
         do_parse!(
             pos: pos >>
@@ -632,7 +644,7 @@ named!(list_op_expression<TokenIter, Expression, ParseError>,
 // *IMPORTANT*
 // It also means this combinator is risky when used with partial
 // inputs. So handle with care.
-named!(expression<TokenIter, Expression, ParseError>,
+named!(expression<TokenIter, Expression, error::Error>,
     do_parse!(
         expr: alt!(
            complete!(list_op_expression) |
@@ -656,7 +668,7 @@ fn expression_to_statement(v: Expression) -> ParseResult<Statement> {
     Ok(Statement::Expression(v))
 }
 
-named!(expression_statement<TokenIter, Statement, ParseError>,
+named!(expression_statement<TokenIter, Statement, error::Error>,
     map_res!(
         terminated!(expression, punct!(";")),
         expression_to_statement
@@ -670,7 +682,7 @@ fn tuple_to_let(t: (Token, Expression)) -> ParseResult<Statement> {
     }))
 }
 
-named!(let_statement<TokenIter, Statement, ParseError>,
+named!(let_statement<TokenIter, Statement, error::Error>,
     map_res!(
         do_parse!(
             word!("let") >>
@@ -691,7 +703,7 @@ fn tuple_to_import(t: (Token, Token)) -> ParseResult<Statement> {
     }))
 }
 
-named!(import_statement<TokenIter, Statement, ParseError>,
+named!(import_statement<TokenIter, Statement, error::Error>,
     map_res!(
        do_parse!(
            word!("import") >>
@@ -705,7 +717,7 @@ named!(import_statement<TokenIter, Statement, ParseError>,
     )
 );
 
-named!(statement<TokenIter, Statement, ParseError>,
+named!(statement<TokenIter, Statement, error::Error>,
     do_parse!(
        stmt: alt_complete!(
            import_statement |
@@ -716,8 +728,8 @@ named!(statement<TokenIter, Statement, ParseError>,
     )
 );
 
-/// Parses a LocatedSpan into a list of Statements or a ParseError.
-pub fn parse(input: LocatedSpan<&str>) -> Result<Vec<Statement>, ParseError> {
+/// Parses a LocatedSpan into a list of Statements or an error::Error.
+pub fn parse(input: LocatedSpan<&str>) -> Result<Vec<Statement>, error::Error> {
     match tokenize(input) {
         Ok(tokenized) => {
             let mut out = Vec::new();
@@ -734,25 +746,25 @@ pub fn parse(input: LocatedSpan<&str>) -> Result<Vec<Statement>, ParseError> {
                         return Err(e);
                     }
                     IResult::Error(e) => {
-                        return Err(ParseError {
-                            description: format!(
-                                "Statement Parse error: {:?} current token: {:?}",
-                                e, i_[0]
-                            ),
-                            pos: Position {
+                        return Err(error::Error::new_with_errorkind(
+                            format!("Statement Parse error: {:?} current token: {:?}", e, i_[0]),
+                            error::ErrorType::ParseError,
+                            Position {
                                 line: i_[0].pos.line,
                                 column: i_[0].pos.column,
                             },
-                        });
+                            e,
+                        ));
                     }
                     IResult::Incomplete(ei) => {
-                        return Err(ParseError {
-                            description: format!("Unexpected end of parsing input: {:?}", ei),
-                            pos: Position {
+                        return Err(error::Error::new(
+                            format!("Unexpected end of parsing input: {:?}", ei),
+                            error::ErrorType::IncompleteParsing,
+                            Position {
                                 line: i_[0].pos.line,
                                 column: i_[0].pos.column,
                             },
-                        });
+                        ));
                     }
                     IResult::Done(rest, stmt) => {
                         out.push(stmt);
@@ -766,12 +778,11 @@ pub fn parse(input: LocatedSpan<&str>) -> Result<Vec<Statement>, ParseError> {
             return Ok(out);
         }
         Err(e) => {
-            // FIXME(jwall): We should really capture the location
-            // of the tokenization error here.
-            return Err(ParseError {
-                description: format!("Tokenize Error: {:?}", e.1),
-                pos: e.0,
-            });
+            return Err(error::Error::new(
+                format!("Tokenization Error {:?}", e.1),
+                error::ErrorType::ParseError,
+                e.0,
+            ));
         }
     }
 }

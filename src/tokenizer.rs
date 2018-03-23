@@ -18,6 +18,7 @@ use nom;
 use nom::{alpha, digit, is_alphanumeric, multispace};
 use nom::{InputIter, InputLength, Slice};
 use ast::*;
+use error;
 use std;
 use std::result::Result;
 
@@ -327,8 +328,6 @@ named!(token( Span ) -> Token,
         end_of_input)
 );
 
-// TODO(jwall): This should return a ParseError instead.
-
 /// Consumes an input Span and returns either a Vec<Token> or a nom::ErrorKind.
 pub fn tokenize(input: Span) -> Result<Vec<Token>, (Position, nom::ErrorKind)> {
     let mut out = Vec::new();
@@ -378,7 +377,7 @@ pub fn tokenize(input: Span) -> Result<Vec<Token>, (Position, nom::ErrorKind)> {
     Ok(out)
 }
 
-pub fn token_clone(t: &Token) -> Result<Token, ParseError> {
+pub fn token_clone(t: &Token) -> Result<Token, error::Error> {
     Ok(t.clone())
 }
 
@@ -448,10 +447,10 @@ macro_rules! match_type {
             use std::convert::Into;
             if i_.input_len() == 0 {
                 nom::IResult::Error(
-                        nom::ErrorKind::Custom(ParseError{
-                            description: format!("End of Input! {}", $msg),
-                            pos: Position{line: 0, column: 0}
-                        }))
+                        nom::ErrorKind::Custom(error::Error::new(
+                            format!("End of Input! {}", $msg),
+                            error::ErrorType::IncompleteParsing,
+                            Position{line: 0, column: 0})))
             } else {
                 let tok = &(i_[0]);
                 if tok.typ == $t {
@@ -461,9 +460,10 @@ macro_rules! match_type {
                             nom::ErrorKind::Custom(e.into())),
                     }
                 } else {
-                    nom::IResult::Error(nom::ErrorKind::Custom(ParseError{
-                        description: $msg.to_string(),
-                        pos: tok.pos.clone()}))
+                    nom::IResult::Error(nom::ErrorKind::Custom(error::Error::new(
+                        $msg.to_string(),
+                        error::ErrorType::UnexpectedToken,
+                        tok.pos.clone())))
                 }
             }
         }
@@ -502,9 +502,10 @@ macro_rules! match_token {
                         nom::ErrorKind::Custom(e.into())),
                 }
             } else {
-                nom::IResult::Error(nom::ErrorKind::Custom(ParseError{
-                    description: format!("{} Instead is ({})", $msg, tok.fragment),
-                    pos: tok.pos.clone()}))
+                nom::IResult::Error(nom::ErrorKind::Custom(error::Error::new(
+                    format!("{} Instead is ({})", $msg, tok.fragment),
+                    error::ErrorType::UnexpectedToken,
+                    tok.pos.clone())))
             }
         }
     };
@@ -525,7 +526,7 @@ macro_rules! word {
 }
 
 /// pos gets the current position from a TokenIter input without consuming it.
-pub fn pos(i: TokenIter) -> nom::IResult<TokenIter, Position, ParseError> {
+pub fn pos(i: TokenIter) -> nom::IResult<TokenIter, Position, error::Error> {
     let tok = &i[0];
     let line = tok.pos.line;
     let column = tok.pos.column;

@@ -24,29 +24,6 @@ use std::cmp::PartialEq;
 use std::hash::Hasher;
 use std::hash::Hash;
 
-/// Encodes a parsing error with position information and a helpful description.
-#[derive(Debug, PartialEq)]
-pub struct ParseError {
-    pub pos: Position,
-    pub description: String,
-}
-
-impl std::fmt::Display for ParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        write!(
-            f,
-            "Parsing Error {} at line: {} column: {}",
-            self.description, self.pos.line, self.pos.column
-        )
-    }
-}
-
-impl std::error::Error for ParseError {
-    fn description(&self) -> &str {
-        &self.description
-    }
-}
-
 macro_rules! enum_type_equality {
     ( $slf:ident, $r:expr, $( $l:pat ),* ) => {
         match $slf {

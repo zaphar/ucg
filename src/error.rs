@@ -18,6 +18,8 @@ use std::fmt;
 
 use ast::*;
 
+use nom;
+
 /// ErrorType defines the various types of errors that can result from compiling UCG into an
 /// output format.
 pub enum ErrorType {
@@ -32,6 +34,7 @@ pub enum ErrorType {
     // Parsing Errors
     UnexpectedToken,
     EmptyExpression,
+    ParseError,
 }
 
 impl fmt::Display for ErrorType {
@@ -46,6 +49,7 @@ impl fmt::Display for ErrorType {
             &ErrorType::FormatError => "FormatError",
             &ErrorType::UnexpectedToken => "UnexpectedToken",
             &ErrorType::EmptyExpression => "EmptyExpression",
+            &ErrorType::ParseError => "ParseError",
         };
         w.write_str(name)
     }
@@ -56,6 +60,7 @@ pub struct Error {
     pub err_type: ErrorType,
     pub pos: Position,
     pub msg: String,
+    pub cause: Option<Box<Error>>,
     _pkgonly: (),
 }
 
@@ -65,7 +70,32 @@ impl Error {
             err_type: t,
             pos: pos,
             msg: msg.into(),
+            cause: None,
             _pkgonly: (),
+        }
+    }
+
+    pub fn new_with_cause<S: Into<String>>(
+        msg: S,
+        t: ErrorType,
+        pos: Position,
+        cause: Error,
+    ) -> Self {
+        let mut e = Self::new(msg, t, pos);
+        e.cause = Some(Box::new(cause));
+        return e;
+    }
+
+    pub fn new_with_errorkind<S: Into<String>>(
+        msg: S,
+        t: ErrorType,
+        pos: Position,
+        cause: nom::ErrorKind<Error>,
+    ) -> Self {
+        match cause {
+            nom::ErrorKind::Custom(e) => Self::new_with_cause(msg, t, pos, e),
+            // TODO(jwall): We could get more creative here with our messaging.
+            _ => Self::new(msg, t, pos),
         }
     }
 }
@@ -74,7 +104,7 @@ impl fmt::Debug for Error {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
         write!(
             w,
-            "{}: \"{}\" {}:{}",
+            "{}: \"{}\" at line: {} column: {}",
             self.err_type, self.msg, self.pos.line, self.pos.column
         )
     }
@@ -84,7 +114,7 @@ impl fmt::Display for Error {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
         write!(
             w,
-            "{}: \"{}\" {}:{}",
+            "{}: \"{}\" at line: {} column: {}",
             self.err_type, self.msg, self.pos.line, self.pos.column
         )
     }
