@@ -19,9 +19,10 @@ organiztion for a given configuration structure (i.e. xml attribute or tag?).
 Some options here could be:
 
 * Simple data export (json) 
-* A Functional Transform similar to xslt or css transforms.
+* A Functional Transform similar to xslt or css transforms
 * A Templating language
-* Annotations.
+* DSL's
+* Annotations
 
 # Minor Fixes and Polish
 
