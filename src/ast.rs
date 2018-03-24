@@ -74,8 +74,6 @@ pub enum TokenType {
     PUNCT,
 }
 
-// FIXME(jwall): We should probably implement copy for this.
-
 /// Defines a Token representing a building block of UCG syntax.
 ///
 /// Token's are passed to the parser stage to be parsed into an AST.
@@ -604,6 +602,12 @@ pub enum BinaryExprType {
     Sub,
     Mul,
     Div,
+    Equal,
+    GT,
+    LT,
+    NotEqual,
+    GTEqual,
+    LTEqual,
 }
 
 /// Represents an expression with a left and a right side.

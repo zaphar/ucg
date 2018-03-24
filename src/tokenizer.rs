@@ -181,6 +181,32 @@ named!(pcttok( Span ) -> Token,
        do_tag_tok!(TokenType::PUNCT, "%")
 );
 
+// TODO(jwall): Comparison operators.
+
+named!(eqeqtok( Span ) -> Token,
+       do_tag_tok!(TokenType::PUNCT, "==")
+);
+
+named!(notequaltok( Span ) -> Token,
+       do_tag_tok!(TokenType::PUNCT, "!=")
+);
+
+named!(gttok( Span ) -> Token,
+       do_tag_tok!(TokenType::PUNCT, ">")
+);
+
+named!(gtequaltok( Span ) -> Token,
+       do_tag_tok!(TokenType::PUNCT, ">=")
+);
+
+named!(ltequaltok( Span ) -> Token,
+       do_tag_tok!(TokenType::PUNCT, "<=")
+);
+
+named!(lttok( Span ) -> Token,
+       do_tag_tok!(TokenType::PUNCT, "<")
+);
+
 named!(equaltok( Span ) -> Token,
        do_tag_tok!(TokenType::PUNCT, "=")
 );
@@ -310,6 +336,12 @@ named!(token( Span ) -> Token,
         comment | // Note comment must come before slashtok
         slashtok |
         pcttok |
+        eqeqtok |
+        notequaltok |
+        complete!(gtequaltok) |
+        complete!(ltequaltok) |
+        gttok |
+        lttok |
         fatcommatok | // Note fatcommatok must come before equaltok
         equaltok |
         semicolontok |
@@ -670,32 +702,68 @@ mod tokenizer_test {
         }
     }
 
-    #[test]
-    fn test_boolean() {
-        let result = token(LocatedSpan::new("true"));
+    macro_rules! assert_token {
+        ($input:expr, $typ:expr, $msg:expr) => {
+        let result = token(LocatedSpan::new($input));
         assert!(
             result.is_done(),
-            format!("result {:?} is not a boolean", result)
+            format!("result {:?} is not a {}", result, $msg)
         );
         if let nom::IResult::Done(_, tok) = result {
-            assert_eq!(tok.fragment, "true");
-            assert_eq!(tok.typ, TokenType::BOOLEAN);
+            assert_eq!(tok.fragment, $input);
+            assert_eq!(tok.typ, $typ);
         }
+        }
+    }
+
+    #[test]
+    fn test_boolean() {
+        assert_token!("true", TokenType::BOOLEAN, "boolean");
+    }
+
+    #[test]
+    fn test_eqeqtok() {
+        assert_token!("==", TokenType::PUNCT, "==");
+    }
+
+    #[test]
+    fn test_notequaltok() {
+        assert_token!("!=", TokenType::PUNCT, "!=");
+    }
+
+    #[test]
+    fn test_gttok() {
+        assert_token!(">", TokenType::PUNCT, ">");
+    }
+
+    #[test]
+    fn test_lttok() {
+        assert_token!("<", TokenType::PUNCT, "<");
+    }
+
+    #[test]
+    fn test_gteqtok() {
+        assert_token!(">=", TokenType::PUNCT, ">=");
+    }
+
+    #[test]
+    fn test_lteqtok() {
+        assert_token!("<=", TokenType::PUNCT, "<=");
     }
 
     #[test]
     fn test_tokenize_one_of_each() {
         let result = tokenize(LocatedSpan::new(
             "let import macro select as => [ ] { } ; = % / * \
-             + - . ( ) , 1 . foo \"bar\" // comment\n ; true false",
+             + - . ( ) , 1 . foo \"bar\" // comment\n ; true false == < > <= >= !=",
         ));
         assert!(result.is_ok(), format!("result {:?} is not ok", result));
         let v = result.unwrap();
         for (i, t) in v.iter().enumerate() {
             println!("{}: {:?}", i, t);
         }
-        assert_eq!(v.len(), 29);
-        assert_eq!(v[28].typ, TokenType::END);
+        assert_eq!(v.len(), 35);
+        assert_eq!(v[34].typ, TokenType::END);
     }
 
     #[test]

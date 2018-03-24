@@ -286,6 +286,30 @@ named!(div_expression<TokenIter, Expression, error::Error>,
        do_binary_expr!(punct!("/"), BinaryExprType::Div)
 );
 
+named!(eqeq_expression<TokenIter, Expression, error::Error>,
+       do_binary_expr!(punct!("=="), BinaryExprType::Equal)
+);
+
+named!(not_eqeq_expression<TokenIter, Expression, error::Error>,
+       do_binary_expr!(punct!("!="), BinaryExprType::NotEqual)
+);
+
+named!(lt_eqeq_expression<TokenIter, Expression, error::Error>,
+       do_binary_expr!(punct!("<="), BinaryExprType::LTEqual)
+);
+
+named!(gt_eqeq_expression<TokenIter, Expression, error::Error>,
+       do_binary_expr!(punct!(">="), BinaryExprType::GTEqual)
+);
+
+named!(gt_expression<TokenIter, Expression, error::Error>,
+       do_binary_expr!(punct!(">"), BinaryExprType::GT)
+);
+
+named!(lt_expression<TokenIter, Expression, error::Error>,
+       do_binary_expr!(punct!("<"), BinaryExprType::LT)
+);
+
 fn expression_to_grouped_expression(e: Expression) -> ParseResult<Expression> {
     Ok(Expression::Grouped(Box::new(e)))
 }
@@ -652,6 +676,12 @@ named!(expression<TokenIter, Expression, error::Error>,
            complete!(sub_expression) |
            complete!(mul_expression) |
            complete!(div_expression) |
+           complete!(eqeq_expression) |
+           complete!(not_eqeq_expression) |
+           complete!(lt_eqeq_expression) |
+           complete!(gt_eqeq_expression) |
+           complete!(gt_expression) |
+           complete!(lt_expression) |
            complete!(grouped_expression) |
            complete!(macro_expression) |
            complete!(format_expression) |
@@ -1135,7 +1165,42 @@ mod test {
                 pos: Position::new(1, 1),
             })
         );
-
+        assert_parse!(
+            expression("1 > 1"),
+            Expression::Binary(BinaryOpDef {
+                kind: BinaryExprType::GT,
+                left: Value::Int(value_node!(1, 1, 1)),
+                right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 5)))),
+                pos: Position::new(1, 1),
+            })
+        );
+        assert_parse!(
+            expression("1 < 1"),
+            Expression::Binary(BinaryOpDef {
+                kind: BinaryExprType::LT,
+                left: Value::Int(value_node!(1, 1, 1)),
+                right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 5)))),
+                pos: Position::new(1, 1),
+            })
+        );
+        assert_parse!(
+            expression("1 <= 1"),
+            Expression::Binary(BinaryOpDef {
+                kind: BinaryExprType::LTEqual,
+                left: Value::Int(value_node!(1, 1, 1)),
+                right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 5)))),
+                pos: Position::new(1, 1),
+            })
+        );
+        assert_parse!(
+            expression("1 >= 1"),
+            Expression::Binary(BinaryOpDef {
+                kind: BinaryExprType::GTEqual,
+                left: Value::Int(value_node!(1, 1, 1)),
+                right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 5)))),
+                pos: Position::new(1, 1),
+            })
+        );
         assert_parse!(
             expression("1+1"),
             Expression::Binary(BinaryOpDef {

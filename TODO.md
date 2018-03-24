@@ -2,9 +2,7 @@
 
 ## Boolean operations and type
 
-* equality (for everything)
 * contains (for lists or strings)
-* less than or greater than (for numeric types)
 
 ## Query Language (Experimental)
 
@@ -26,6 +24,7 @@ Some options here could be:
 
 # Minor Fixes and Polish
 
+* Casting between types?
 * Better error messages.
 * Allow trailing commas.
 * Flags should allow different seperators for prefixed flags.

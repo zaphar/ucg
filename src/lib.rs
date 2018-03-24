@@ -97,7 +97,7 @@
 //! character.
 //!
 //! ``` ucg
-//! "foo"; // a smiple string
+//! "foo"; // a simple string
 //! "I'm a \"fine\" looking string"; // escaped quotes in a string.
 //! ```
 //!
@@ -216,15 +216,74 @@
 //!
 //! #### Binary operators
 //!
-//! ucg supports the following operators, +, -, *, /; Each one is type safe and infers the types from the values they operate on.
-//! The operators expect both the left and right operands to be of the same type. All of the operators are valid on integers and floats.
-//! The + operator can additionally concatenate strings or arrays.
+//! ##### Numeric operators
+//!
+//! ucg supports the following numeric operators, `+`, `-`, `*`, `/` Each one is type safe and infers the types
+//! from the values they operate on. The operators expect both the left and right operands to be of the same
+//! type.
+//!
+//! ```ucg
+//! 1 + 1; // result is 2
+//! ```
+//!
+//! ##### Concatenation
+//!
+//! ucg supports concatenation using the `+` operator. It is typesafe expecting both sides to be of the same type.
+//! You can concatenate strings or lists but not tuples.
+//!
+//! ```ucg
+//! "foo " + "bar" // result is "foo bar"
+//! [1,2] + [3,4]; // result is [1,2,3,4]
+//! ```
+//!
+//! ##### Comparison
+//!
+//! ucg supports comparison using the `==`, `!=`, `>`, `<`, `>=`, `<=` operators. They are type safe and expect both
+//! sides to be of the same type.
+//!
+//! The `>`, `<`, `>=`, and `>=` operators are only supported on numeric types.
+//!
+//! ``ucg
+//! 1 > 2; // result is false
+//! 2 < 3; // result is true
+//! 10 > "9"; // This is a compile error.
+//! ```
+//!
+//! The equality operators `==` and `!=` are supported for all types and will perform deep equal comparisons on complex
+//! types.
+//!
+//! ```ucg
+//! let tpl1 = {
+//!   foo = "bar",
+//!   one = 1
+//! };
+//! let tpl2 = tpl1{}; // copy the tpl1 tuple
+//! tpl1 == tpl2; // returns true
+//! let tpl3 = tpl1{duck="quack"};
+//! tpl1 == tpl3; // returns false
+//! ```
+//!
+//! Note that tuple fields are ordered so a tuple will only be equal if the fields are both in the same order and
+//! have the same values in them.
+//!
+//! ##### Boolean
+//!
+//! ucg supports the following operators, `+`, `-`, `*`, `/`, `==`, `!=`, `>`, `<`, `>=`, `<=`, `&&`, `||` Each one is type safe and
+//! infers the types from the values they operate on. The operators expect both the left and right operands to be of the same
+//! type. All of the operators except `&&` and `||` are valid on integers and floats. The + operator can additionally concatenate
+//! strings or arrays. The `&&` and `||` operators are only valid on booleans.
 //!
 //! ```ucg
 //! 1 + 1; // result is 2
 //! "foo " + "bar" // result is "foo bar"
 //! [1,2] + [3,4]; // result is [1,2,3,4]
+//! 1 == 1; // result is true.
+//! 1 > 1; // result is false
+//! 1 >= 1; // result is true;
 //! ```
+//!
+//! The Equality comparison can be done on any type and will perform a deep equal comparison.
+//!
 //!
 //! #### Copy expressions
 //!

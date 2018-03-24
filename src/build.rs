@@ -113,6 +113,65 @@ impl Val {
         )
     }
 
+    // TODO(jwall): Unit Tests for this.
+    pub fn equal(&self, target: &Self, pos: Position) -> Result<bool, error::Error> {
+        // first we do a type equality comparison
+        match (self, target) {
+            // Empty values are always equal.
+            (&Val::Empty, &Val::Empty) => Ok(true),
+            (&Val::Int(ref i), &Val::Int(ref ii)) => Ok(i == ii),
+            (&Val::Float(ref f), &Val::Float(ref ff)) => Ok(f == ff),
+            (&Val::Boolean(ref b), &Val::Boolean(ref bb)) => Ok(b == bb),
+            (&Val::String(ref s), &Val::String(ref ss)) => Ok(s == ss),
+            (&Val::List(ref ldef), &Val::List(ref lldef)) => {
+                if ldef.len() != lldef.len() {
+                    Ok(false)
+                } else {
+                    for (i, v) in ldef.iter().enumerate() {
+                        // TODO(jwall): We should probably do a slightly better error message here.
+                        try!(v.equal(lldef[i].as_ref(), pos.clone()));
+                    }
+                    Ok(true)
+                }
+            }
+            (&Val::Tuple(ref ldef), &Val::Tuple(ref lldef)) => {
+                if ldef.len() != lldef.len() {
+                    Ok(false)
+                } else {
+                    for (i, v) in ldef.iter().enumerate() {
+                        let field_target = &lldef[i];
+                        eprintln!(
+                            "left field: '{}', right field: '{}'",
+                            v.0.val, field_target.0.val
+                        );
+                        if v.0.val != field_target.0.val {
+                            // field name equality
+                            eprintln!("Field Not equal!!!");
+                            return Ok(false);
+                        } else {
+                            eprintln!("Field Equal!!!");
+                            // field value equality.
+                            if !try!(v.1.equal(field_target.1.as_ref(), v.0.pos.clone())) {
+                                return Ok(false);
+                            }
+                        }
+                    }
+                    Ok(true)
+                }
+            }
+            (&Val::Macro(_), &Val::Macro(_)) => Err(error::Error::new(
+                "Macros are not comparable",
+                error::ErrorType::TypeFail,
+                pos,
+            )),
+            (me, tgt) => Err(error::Error::new(
+                format!("Types differ for {}, {}", me, tgt),
+                error::ErrorType::TypeFail,
+                pos,
+            )),
+        }
+    }
+
     /// Returns the fields if this Val is a tuple. None otherwise.
     pub fn get_fields(&self) -> Option<&Vec<(Positioned<String>, Rc<Val>)>> {
         if let &Val::Tuple(ref fs) = self {
@@ -676,6 +735,128 @@ impl Builder {
         }
     }
 
+    fn do_deep_equal(
+        &self,
+        pos: &Position,
+        left: Rc<Val>,
+        right: Rc<Val>,
+    ) -> Result<Rc<Val>, Box<Error>> {
+        Ok(Rc::new(Val::Boolean(try!(
+            left.equal(right.as_ref(), pos.clone())
+        ))))
+    }
+
+    fn do_not_deep_equal(
+        &self,
+        pos: &Position,
+        left: Rc<Val>,
+        right: Rc<Val>,
+    ) -> Result<Rc<Val>, Box<Error>> {
+        Ok(Rc::new(Val::Boolean(!try!(
+            left.equal(right.as_ref(), pos.clone())
+        ))))
+    }
+
+    fn do_gt(&self, pos: &Position, left: Rc<Val>, right: Rc<Val>) -> Result<Rc<Val>, Box<Error>> {
+        // first ensure that left and right are numeric vals of the same type.
+        if let &Val::Int(ref l) = left.as_ref() {
+            if let &Val::Int(ref r) = right.as_ref() {
+                return Ok(Rc::new(Val::Boolean(l > r)));
+            }
+        }
+        if let &Val::Float(ref l) = left.as_ref() {
+            if let &Val::Float(ref r) = right.as_ref() {
+                return Ok(Rc::new(Val::Boolean(l > r)));
+            }
+        }
+        Err(Box::new(error::Error::new(
+            format!(
+                "Incompatible types for numeric comparison {} with {}",
+                left.type_name(),
+                right.type_name()
+            ),
+            error::ErrorType::TypeFail,
+            pos.clone(),
+        )))
+    }
+
+    fn do_lt(&self, pos: &Position, left: Rc<Val>, right: Rc<Val>) -> Result<Rc<Val>, Box<Error>> {
+        // first ensure that left and right are numeric vals of the same type.
+        if let &Val::Int(ref l) = left.as_ref() {
+            if let &Val::Int(ref r) = right.as_ref() {
+                return Ok(Rc::new(Val::Boolean(l < r)));
+            }
+        }
+        if let &Val::Float(ref l) = left.as_ref() {
+            if let &Val::Float(ref r) = right.as_ref() {
+                return Ok(Rc::new(Val::Boolean(l < r)));
+            }
+        }
+        Err(Box::new(error::Error::new(
+            format!(
+                "Incompatible types for numeric comparison {} with {}",
+                left.type_name(),
+                right.type_name()
+            ),
+            error::ErrorType::TypeFail,
+            pos.clone(),
+        )))
+    }
+
+    fn do_ltequal(
+        &self,
+        pos: &Position,
+        left: Rc<Val>,
+        right: Rc<Val>,
+    ) -> Result<Rc<Val>, Box<Error>> {
+        if let &Val::Int(ref l) = left.as_ref() {
+            if let &Val::Int(ref r) = right.as_ref() {
+                return Ok(Rc::new(Val::Boolean(l <= r)));
+            }
+        }
+        if let &Val::Float(ref l) = left.as_ref() {
+            if let &Val::Float(ref r) = right.as_ref() {
+                return Ok(Rc::new(Val::Boolean(l <= r)));
+            }
+        }
+        Err(Box::new(error::Error::new(
+            format!(
+                "Incompatible types for numeric comparison {} with {}",
+                left.type_name(),
+                right.type_name()
+            ),
+            error::ErrorType::TypeFail,
+            pos.clone(),
+        )))
+    }
+
+    fn do_gtequal(
+        &self,
+        pos: &Position,
+        left: Rc<Val>,
+        right: Rc<Val>,
+    ) -> Result<Rc<Val>, Box<Error>> {
+        if let &Val::Int(ref l) = left.as_ref() {
+            if let &Val::Int(ref r) = right.as_ref() {
+                return Ok(Rc::new(Val::Boolean(l >= r)));
+            }
+        }
+        if let &Val::Float(ref l) = left.as_ref() {
+            if let &Val::Float(ref r) = right.as_ref() {
+                return Ok(Rc::new(Val::Boolean(l >= r)));
+            }
+        }
+        Err(Box::new(error::Error::new(
+            format!(
+                "Incompatible types for numeric comparison {} with {}",
+                left.type_name(),
+                right.type_name()
+            ),
+            error::ErrorType::TypeFail,
+            pos.clone(),
+        )))
+    }
+
     fn eval_binary(&self, def: &BinaryOpDef) -> Result<Rc<Val>, Box<Error>> {
         let kind = &def.kind;
         let v = &def.left;
@@ -687,6 +868,12 @@ impl Builder {
             &BinaryExprType::Sub => self.subtract_vals(&def.pos, left, right),
             &BinaryExprType::Mul => self.multiply_vals(&def.pos, left, right),
             &BinaryExprType::Div => self.divide_vals(&def.pos, left, right),
+            &BinaryExprType::Equal => self.do_deep_equal(&def.pos, left, right),
+            &BinaryExprType::GT => self.do_gt(&def.pos, left, right),
+            &BinaryExprType::LT => self.do_lt(&def.pos, left, right),
+            &BinaryExprType::GTEqual => self.do_gtequal(&def.pos, left, right),
+            &BinaryExprType::LTEqual => self.do_ltequal(&def.pos, left, right),
+            &BinaryExprType::NotEqual => self.do_not_deep_equal(&def.pos, left, right),
         }
     }
 
@@ -1141,6 +1328,223 @@ mod test {
                         pos: Position::new(1, 0),
                     }),
                     Val::Float(1.0),
+                ),
+            ],
+            b,
+        );
+    }
+
+    #[test]
+    fn test_eval_equal_exprs() {
+        let b = Builder::new();
+        test_expr_to_val(
+            vec![
+                (
+                    Expression::Binary(BinaryOpDef {
+                        kind: BinaryExprType::Equal,
+                        left: Value::Int(value_node!(2, 1, 1)),
+                        right: Box::new(Expression::Simple(Value::Int(value_node!(2, 1, 1)))),
+                        pos: Position::new(1, 0),
+                    }),
+                    Val::Boolean(true),
+                ),
+                (
+                    Expression::Binary(BinaryOpDef {
+                        kind: BinaryExprType::Equal,
+                        left: Value::Float(value_node!(2.0, 1, 1)),
+                        right: Box::new(Expression::Simple(Value::Float(value_node!(2.0, 1, 1)))),
+                        pos: Position::new(1, 0),
+                    }),
+                    Val::Boolean(true),
+                ),
+                (
+                    Expression::Binary(BinaryOpDef {
+                        kind: BinaryExprType::Equal,
+                        left: Value::String(value_node!("foo".to_string(), 1, 1)),
+                        right: Box::new(Expression::Simple(Value::String(value_node!(
+                            "foo".to_string(),
+                            1,
+                            1
+                        )))),
+                        pos: Position::new(1, 0),
+                    }),
+                    Val::Boolean(true),
+                ),
+                (
+                    Expression::Binary(BinaryOpDef {
+                        kind: BinaryExprType::Equal,
+                        left: Value::Tuple(value_node!(
+                            vec![
+                                (
+                                    make_tok!("bar", 1, 1),
+                                    Expression::Simple(Value::Int(value_node!(1, 1, 1))),
+                                ),
+                                (
+                                    make_tok!("foo", 1, 1),
+                                    Expression::Simple(Value::String(value_node!(
+                                        "blah".to_string(),
+                                        1,
+                                        1
+                                    ))),
+                                ),
+                            ],
+                            1,
+                            1
+                        )),
+                        right: Box::new(Expression::Simple(Value::Tuple(value_node!(
+                            vec![
+                                (
+                                    make_tok!("bar", 1, 1),
+                                    Expression::Simple(Value::Int(value_node!(1, 1, 1))),
+                                ),
+                                (
+                                    make_tok!("foo", 1, 1),
+                                    Expression::Simple(Value::String(value_node!(
+                                        "blah".to_string(),
+                                        1,
+                                        1
+                                    ))),
+                                ),
+                            ],
+                            1,
+                            1
+                        )))),
+                        pos: Position::new(1, 0),
+                    }),
+                    Val::Boolean(true),
+                ),
+                (
+                    Expression::Binary(BinaryOpDef {
+                        kind: BinaryExprType::Equal,
+                        left: Value::Tuple(value_node!(
+                            vec![
+                                (
+                                    make_tok!("bar", 1, 1),
+                                    Expression::Simple(Value::Int(value_node!(1, 1, 1))),
+                                ),
+                                (
+                                    make_tok!("foo", 1, 1),
+                                    Expression::Simple(Value::String(value_node!(
+                                        "blah".to_string(),
+                                        1,
+                                        1
+                                    ))),
+                                ),
+                            ],
+                            1,
+                            1
+                        )),
+                        right: Box::new(Expression::Simple(Value::Tuple(value_node!(
+                            vec![
+                                (
+                                    make_tok!("bar", 1, 1),
+                                    Expression::Simple(Value::Int(value_node!(1, 1, 1))),
+                                ),
+                                (
+                                    make_tok!("foo", 1, 1),
+                                    Expression::Simple(Value::String(value_node!(
+                                        "blush".to_string(),
+                                        1,
+                                        1
+                                    ))),
+                                ),
+                            ],
+                            1,
+                            1
+                        )))),
+                        pos: Position::new(1, 0),
+                    }),
+                    Val::Boolean(false),
+                ),
+                (
+                    Expression::Binary(BinaryOpDef {
+                        kind: BinaryExprType::Equal,
+                        left: Value::Tuple(value_node!(
+                            vec![
+                                (
+                                    make_tok!("bar", 1, 1),
+                                    Expression::Simple(Value::Int(value_node!(1, 1, 1))),
+                                ),
+                                (
+                                    make_tok!("foo", 1, 1),
+                                    Expression::Simple(Value::String(value_node!(
+                                        "blah".to_string(),
+                                        1,
+                                        1
+                                    ))),
+                                ),
+                            ],
+                            1,
+                            1
+                        )),
+                        right: Box::new(Expression::Simple(Value::Tuple(value_node!(
+                            vec![
+                                (
+                                    make_tok!("bosh", 1, 1),
+                                    Expression::Simple(Value::Int(value_node!(1, 1, 1))),
+                                ),
+                                (
+                                    make_tok!("foo", 1, 1),
+                                    Expression::Simple(Value::String(value_node!(
+                                        "blah".to_string(),
+                                        1,
+                                        1
+                                    ))),
+                                ),
+                            ],
+                            1,
+                            1
+                        )))),
+                        pos: Position::new(1, 0),
+                    }),
+                    Val::Boolean(false),
+                ),
+                (
+                    Expression::Binary(BinaryOpDef {
+                        kind: BinaryExprType::Equal,
+                        left: Value::Tuple(value_node!(
+                            vec![
+                                (
+                                    make_tok!("bar", 1, 1),
+                                    Expression::Simple(Value::Int(value_node!(1, 1, 1))),
+                                ),
+                                (
+                                    make_tok!("foo", 1, 1),
+                                    Expression::Simple(Value::String(value_node!(
+                                        "blah".to_string(),
+                                        1,
+                                        1
+                                    ))),
+                                ),
+                            ],
+                            1,
+                            1
+                        )),
+                        right: Box::new(Expression::Simple(Value::Tuple(value_node!(
+                            vec![
+                                (
+                                    make_tok!("bash", 1, 1),
+                                    Expression::Simple(Value::Int(value_node!(1, 1, 1))),
+                                ),
+                                (
+                                    make_tok!("bar", 1, 1),
+                                    Expression::Simple(Value::Int(value_node!(1, 1, 1))),
+                                ),
+                                (
+                                    make_tok!("foo", 1, 1),
+                                    Expression::Simple(Value::String(value_node!(
+                                        "blah".to_string(),
+                                        1,
+                                        1
+                                    ))),
+                                ),
+                            ],
+                            1,
+                            1
+                        )))),
+                        pos: Position::new(1, 0),
+                    }),
+                    Val::Boolean(false),
                 ),
             ],
             b,
