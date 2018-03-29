@@ -29,3 +29,4 @@ Some options here could be:
 * Allow trailing commas.
 * Flags should allow different seperators for prefixed flags.
 * YAML export
+* Integration Testing framework
