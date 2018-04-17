@@ -1,4 +1,4 @@
-// Copyright 2017 Jeremy Wall <jeremy@marzhillstudios.com>
+// Copyright 2018 Jeremy Wall <jeremy@marzhillstudios.com>
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -11,9 +11,12 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
+use std::error;
 
-//! The definitions of the ucg AST and Tokens.
+use ast::tree;
 
-#[macro_use]
-pub mod tree;
-pub mod walk;
+pub trait Visit {
+    fn stmt(&self, stmt: &tree::Statement) -> Result<(), Box<error::Error>>;
+    fn expr(&self, expr: &tree::Expression) -> Result<(), Box<error::Error>>;
+    fn val(&self, expr: &tree::Value) -> Result<(), Box<error::Error>>;
+}
