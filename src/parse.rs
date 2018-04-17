@@ -21,7 +21,7 @@ use nom;
 use nom::InputLength;
 use nom::IResult;
 
-use ast::*;
+use ast::tree::*;
 use tokenizer::*;
 use error;
 

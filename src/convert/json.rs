@@ -36,7 +36,7 @@ impl JsonConverter {
 
     fn convert_tuple(
         &self,
-        items: &Vec<(ast::Positioned<String>, Rc<Val>)>,
+        items: &Vec<(ast::tree::Positioned<String>, Rc<Val>)>,
     ) -> Result<serde_json::Value> {
         let mut mp = serde_json::Map::new();
         for &(ref k, ref v) in items.iter() {

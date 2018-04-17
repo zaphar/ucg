@@ -17,7 +17,7 @@ use std::rc::Rc;
 use std::io::Write;
 use std::io::Result;
 
-use ast;
+use ast::tree::*;
 use build::Val;
 use convert::traits::Converter;
 
@@ -31,7 +31,7 @@ impl EnvConverter {
 
     fn convert_tuple(
         &self,
-        flds: &Vec<(ast::Positioned<String>, Rc<Val>)>,
+        flds: &Vec<(Positioned<String>, Rc<Val>)>,
         w: &mut Write,
     ) -> Result<()> {
         for &(ref name, ref val) in flds.iter() {

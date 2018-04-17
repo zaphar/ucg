@@ -26,7 +26,7 @@ use std::rc::Rc;
 use std::convert::From;
 
 use tokenizer::Span;
-use ast::*;
+use ast::tree::*;
 use format;
 use parse::parse;
 use error;
@@ -295,18 +295,20 @@ pub struct Builder {
 }
 
 macro_rules! eval_binary_expr {
-    ($case:pat, $pos:ident, $rside:ident, $result:expr, $msg:expr) => {
+    ($case: pat, $pos: ident, $rside: ident, $result: expr, $msg: expr) => {
         match $rside.as_ref() {
             $case => {
                 return Ok(Rc::new($result));
-            },
+            }
             val => {
-                return Err(Box::new(
-                    error::Error::new(
-                        format!("Expected {} but got {}", $msg, val), error::ErrorType::TypeFail, $pos.clone())));
+                return Err(Box::new(error::Error::new(
+                    format!("Expected {} but got {}", $msg, val),
+                    error::ErrorType::TypeFail,
+                    $pos.clone(),
+                )));
             }
         }
-    }
+    };
 }
 
 impl Builder {
@@ -390,17 +392,26 @@ impl Builder {
         Ok(())
     }
 
-    /// Builds a string of ucg syntax.
-    pub fn build_file_string(&mut self, input: String) -> BuildResult {
-        match parse(Span::new(&input)) {
+    pub fn eval_string(&mut self, input: &str) -> Result<Rc<Val>, Box<Error>> {
+        match parse(Span::new(input)) {
             Ok(stmts) => {
+                let mut out: Option<Rc<Val>> = None;
                 for stmt in stmts.iter() {
-                    try!(self.build_stmt(stmt));
+                    out = Some(try!(self.build_stmt(stmt)));
                 }
-                Ok(())
+                match out {
+                    None => return Ok(Rc::new(Val::Empty)),
+                    Some(val) => Ok(val),
+                }
             }
             Err(err) => Err(Box::new(err)),
         }
+    }
+
+    /// Builds a string of ucg syntax.
+    pub fn build_file_string(&mut self, input: String) -> BuildResult {
+        self.last = Some(try!(self.eval_string(&input)));
+        Ok(())
     }
 
     /// Builds a ucg file at the named path.
@@ -412,11 +423,11 @@ impl Builder {
         self.build_file_string(s)
     }
 
-    fn build_import(&mut self, def: &ImportDef) -> BuildResult {
+    fn build_import(&mut self, def: &ImportDef) -> Result<Rc<Val>, Box<Error>> {
+        let sym = &def.name;
+        let positioned_sym = sym.into();
         if !self.files.contains(&def.path.fragment) {
             // Only parse the file once on import.
-            let sym = &def.name;
-            let positioned_sym = sym.into();
             if self.assets.get(&positioned_sym).is_none() {
                 let mut b = Self::new();
                 try!(b.build_file(&def.path.fragment));
@@ -424,15 +435,27 @@ impl Builder {
                 let result = Rc::new(Val::Tuple(fields));
                 self.assets.entry(positioned_sym).or_insert(result.clone());
                 self.files.insert(def.path.fragment.clone());
-                self.last = Some(result);
+                return Ok(result);
+            } else {
+                return Ok(self.assets.get(&positioned_sym).unwrap().clone());
             }
+        } else {
+            return match self.assets.get(&positioned_sym) {
+                None => {
+                    // some kind of error here I think.
+                    Err(Box::new(error::Error::new(
+                        "Unknown Error processing import",
+                        error::ErrorType::Unsupported,
+                        def.name.pos.clone(),
+                    )))
+                }
+                Some(val) => Ok(val.clone()),
+            };
         }
-        Ok(())
     }
 
-    fn build_let(&mut self, def: &LetDef) -> BuildResult {
+    fn build_let(&mut self, def: &LetDef) -> Result<Rc<Val>, Box<Error>> {
         let val = try!(self.eval_expr(&def.value));
-        self.last = Some(val.clone());
         let name = &def.name;
         match self.out.entry(name.into()) {
             Entry::Occupied(e) => {
@@ -448,25 +471,18 @@ impl Builder {
                 )));
             }
             Entry::Vacant(e) => {
-                e.insert(val);
+                e.insert(val.clone());
             }
         }
-        Ok(())
+        Ok(val)
     }
 
-    fn build_stmt(&mut self, stmt: &Statement) -> BuildResult {
+    fn build_stmt(&mut self, stmt: &Statement) -> Result<Rc<Val>, Box<Error>> {
         match stmt {
-            &Statement::Let(ref def) => {
-                try!(self.build_let(def));
-            }
-            &Statement::Import(ref def) => {
-                try!(self.build_import(def));
-            }
-            &Statement::Expression(ref expr) => {
-                self.last = Some(try!(self.eval_expr(expr)));
-            }
-        };
-        Ok(())
+            &Statement::Let(ref def) => self.build_let(def),
+            &Statement::Import(ref def) => self.build_import(def),
+            &Statement::Expression(ref expr) => self.eval_expr(expr),
+        }
     }
 
     fn lookup_sym(&self, sym: &Positioned<String>) -> Option<Rc<Val>> {
@@ -859,21 +875,27 @@ impl Builder {
 
     fn eval_binary(&self, def: &BinaryOpDef) -> Result<Rc<Val>, Box<Error>> {
         let kind = &def.kind;
-        let v = &def.left;
-        let expr = &def.right;
-        let right = try!(self.eval_expr(expr));
-        let left = try!(self.value_to_val(v));
+        let left = try!(self.eval_expr(&def.left));
+        let right = try!(self.eval_expr(&def.right));
         match kind {
             &BinaryExprType::Add => self.add_vals(&def.pos, left, right),
             &BinaryExprType::Sub => self.subtract_vals(&def.pos, left, right),
             &BinaryExprType::Mul => self.multiply_vals(&def.pos, left, right),
             &BinaryExprType::Div => self.divide_vals(&def.pos, left, right),
-            &BinaryExprType::Equal => self.do_deep_equal(&def.pos, left, right),
-            &BinaryExprType::GT => self.do_gt(&def.pos, left, right),
-            &BinaryExprType::LT => self.do_lt(&def.pos, left, right),
-            &BinaryExprType::GTEqual => self.do_gtequal(&def.pos, left, right),
-            &BinaryExprType::LTEqual => self.do_ltequal(&def.pos, left, right),
-            &BinaryExprType::NotEqual => self.do_not_deep_equal(&def.pos, left, right),
+        }
+    }
+
+    fn eval_compare(&self, def: &ComparisonDef) -> Result<Rc<Val>, Box<Error>> {
+        let kind = &def.kind;
+        let left = try!(self.eval_expr(&def.left));
+        let right = try!(self.eval_expr(&def.right));
+        match kind {
+            &CompareType::Equal => self.do_deep_equal(&def.pos, left, right),
+            &CompareType::GT => self.do_gt(&def.pos, left, right),
+            &CompareType::LT => self.do_lt(&def.pos, left, right),
+            &CompareType::GTEqual => self.do_gtequal(&def.pos, left, right),
+            &CompareType::LTEqual => self.do_ltequal(&def.pos, left, right),
+            &CompareType::NotEqual => self.do_not_deep_equal(&def.pos, left, right),
         }
     }
 
@@ -1020,7 +1042,7 @@ impl Builder {
                     return self.eval_expr(val_expr);
                 }
             }
-            // Otherwise return the default
+            // Otherwise return the default.
             return self.eval_expr(def_expr);
         } else {
             return Err(Box::new(error::Error::new(
@@ -1071,11 +1093,11 @@ impl Builder {
     // Evals a single Expression in the context of a running Builder.
     // It does not mutate the builders collected state at all.
     pub fn eval_expr(&self, expr: &Expression) -> Result<Rc<Val>, Box<Error>> {
-        // TODO(jwall): We probably don't want to consume these expressions.
-        //   Take a reference instead?
+        // TODO(jwall): We need a rewrite step to handle operator precendence order.
         match expr {
             &Expression::Simple(ref val) => self.value_to_val(val),
             &Expression::Binary(ref def) => self.eval_binary(def),
+            &Expression::Compare(ref def) => self.eval_compare(def),
             &Expression::Copy(ref def) => self.eval_copy(def),
             &Expression::Grouped(ref expr) => self.eval_expr(expr),
             &Expression::Format(ref def) => self.eval_format(def),
@@ -1084,6 +1106,95 @@ impl Builder {
             &Expression::Select(ref def) => self.eval_select(def),
             &Expression::ListOp(ref def) => self.eval_list_op(def),
         }
+    }
+}
+
+#[cfg(test)]
+mod compile_test {
+    use super::{Builder, Val};
+
+    fn assert_build<S: Into<String>>(input: S, assert: &str) {
+        let mut b = Builder::new();
+        b.build_file_string(input.into()).unwrap();
+        let result = b.eval_string(assert).unwrap();
+        if let &Val::Boolean(ok) = result.as_ref() {
+            assert!(ok, format!("'{}' is not true", assert));
+        } else {
+            assert!(
+                false,
+                format!("'{}' does not evaluate to a boolean: {:?}", assert, result)
+            );
+        }
+    }
+
+    #[test]
+    fn test_comparisons() {
+        let input = "
+        let one = 1;
+        let two = 2;
+        let foo = \"foo\";
+        let bar = \"bar\";
+        let tpl1 = {
+            foo = \"bar\",
+            one = 1
+        };
+        let tpl2 = tpl1{};
+        let tpl3 = {
+            bar = \"foo\",
+            two = 1
+        };
+        let list = [1, 2, 3];
+        let list2 = list;
+        let list3 = [1, 2];
+        ";
+        assert_build(input, "one == one;");
+        assert_build(input, "one >= one;");
+        assert_build(input, "two > one;");
+        assert_build(input, "two >= two;");
+        assert_build(input, "tpl1 == tpl2;");
+        assert_build(input, "tpl1 != tpl3;");
+        assert_build(input, "list == list2;");
+        assert_build(input, "list != list3;");
+    }
+
+    #[test]
+    fn test_deep_comparison() {
+        let input = "
+        let tpl1 = {
+            foo = \"bar\",
+            lst = [1, 2, 3],
+            inner = {
+                fld = \"value\"
+            }
+        };
+        let copy = tpl1;
+        let extra = tpl1{one = 1};
+        let less = {
+            foo = \"bar\"
+        };
+        ";
+
+        assert_build(input, "tpl1.inner == copy.inner;");
+        assert_build(input, "tpl1.inner.fld == copy.inner.fld;");
+        assert_build(input, "tpl1.lst == copy.lst;");
+        assert_build(input, "tpl1.foo == copy.foo;");
+        assert_build(input, "tpl1 == copy;");
+        assert_build(input, "tpl1 != extra;");
+        assert_build(input, "tpl1 != less;");
+    }
+
+    #[test]
+    fn test_expression_comparisons() {
+        assert_build("", "2 == 1+1;");
+        assert_build("", "(1+1) == 2;");
+        assert_build("", "(1+1) == (1+1);");
+        assert_build("", "(\"foo\" + \"bar\") == \"foobar\";");
+    }
+
+    #[test]
+    fn test_binary_operator_precedence() {
+        assert_build("let result = 2 * 2 + 1;", "result == 6;");
+        assert_build("let result = (2 * 2) + 1;", "result == 5;");
     }
 }
 
@@ -1107,7 +1218,7 @@ mod test {
                 (
                     Expression::Binary(BinaryOpDef {
                         kind: BinaryExprType::Div,
-                        left: Value::Int(value_node!(2, 1, 1)),
+                        left: Box::new(Expression::Simple(Value::Int(value_node!(2, 1, 1)))),
                         right: Box::new(Expression::Simple(Value::Int(value_node!(2, 1, 1)))),
                         pos: Position::new(1, 0),
                     }),
@@ -1116,7 +1227,7 @@ mod test {
                 (
                     Expression::Binary(BinaryOpDef {
                         kind: BinaryExprType::Div,
-                        left: Value::Float(value_node!(2.0, 1, 1)),
+                        left: Box::new(Expression::Simple(Value::Float(value_node!(2.0, 1, 1)))),
                         right: Box::new(Expression::Simple(Value::Float(value_node!(2.0, 1, 1)))),
                         pos: Position::new(1, 0),
                     }),
@@ -1136,7 +1247,7 @@ mod test {
                 (
                     Expression::Binary(BinaryOpDef {
                         kind: BinaryExprType::Div,
-                        left: Value::Float(value_node!(2.0, 1, 1)),
+                        left: Box::new(Expression::Simple(Value::Float(value_node!(2.0, 1, 1)))),
                         right: Box::new(Expression::Simple(Value::Int(value_node!(2, 1, 1)))),
                         pos: Position::new(1, 0),
                     }),
@@ -1155,7 +1266,7 @@ mod test {
                 (
                     Expression::Binary(BinaryOpDef {
                         kind: BinaryExprType::Mul,
-                        left: Value::Int(value_node!(2, 1, 1)),
+                        left: Box::new(Expression::Simple(Value::Int(value_node!(2, 1, 1)))),
                         right: Box::new(Expression::Simple(Value::Int(value_node!(2, 1, 1)))),
                         pos: Position::new(1, 0),
                     }),
@@ -1164,7 +1275,7 @@ mod test {
                 (
                     Expression::Binary(BinaryOpDef {
                         kind: BinaryExprType::Mul,
-                        left: Value::Float(value_node!(2.0, 1, 1)),
+                        left: Box::new(Expression::Simple(Value::Float(value_node!(2.0, 1, 1)))),
                         right: Box::new(Expression::Simple(Value::Float(value_node!(2.0, 1, 1)))),
                         pos: Position::new(1, 0),
                     }),
@@ -1184,7 +1295,7 @@ mod test {
                 (
                     Expression::Binary(BinaryOpDef {
                         kind: BinaryExprType::Mul,
-                        left: Value::Float(value_node!(2.0, 1, 1)),
+                        left: Box::new(Expression::Simple(Value::Float(value_node!(2.0, 1, 1)))),
                         right: Box::new(Expression::Simple(Value::Int(value_node!(20, 1, 1)))),
                         pos: Position::new(1, 0),
                     }),
@@ -1203,7 +1314,7 @@ mod test {
                 (
                     Expression::Binary(BinaryOpDef {
                         kind: BinaryExprType::Sub,
-                        left: Value::Int(value_node!(2, 1, 1)),
+                        left: Box::new(Expression::Simple(Value::Int(value_node!(2, 1, 1)))),
                         right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
                         pos: Position::new(1, 0),
                     }),
@@ -1212,7 +1323,7 @@ mod test {
                 (
                     Expression::Binary(BinaryOpDef {
                         kind: BinaryExprType::Sub,
-                        left: Value::Float(value_node!(2.0, 1, 1)),
+                        left: Box::new(Expression::Simple(Value::Float(value_node!(2.0, 1, 1)))),
                         right: Box::new(Expression::Simple(Value::Float(value_node!(1.0, 1, 1)))),
                         pos: Position::new(1, 0),
                     }),
@@ -1232,7 +1343,7 @@ mod test {
                 (
                     Expression::Binary(BinaryOpDef {
                         kind: BinaryExprType::Sub,
-                        left: Value::Float(value_node!(2.0, 1, 1)),
+                        left: Box::new(Expression::Simple(Value::Float(value_node!(2.0, 1, 1)))),
                         right: Box::new(Expression::Simple(Value::Int(value_node!(2, 1, 1)))),
                         pos: Position::new(1, 0),
                     }),
@@ -1251,7 +1362,7 @@ mod test {
                 (
                     Expression::Binary(BinaryOpDef {
                         kind: BinaryExprType::Add,
-                        left: Value::Int(value_node!(1, 1, 1)),
+                        left: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
                         right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
                         pos: Position::new(1, 0),
                     }),
@@ -1260,7 +1371,7 @@ mod test {
                 (
                     Expression::Binary(BinaryOpDef {
                         kind: BinaryExprType::Add,
-                        left: Value::Float(value_node!(1.0, 1, 1)),
+                        left: Box::new(Expression::Simple(Value::Float(value_node!(1.0, 1, 1)))),
                         right: Box::new(Expression::Simple(Value::Float(value_node!(1.0, 1, 1)))),
                         pos: Position::new(1, 0),
                     }),
@@ -1269,7 +1380,11 @@ mod test {
                 (
                     Expression::Binary(BinaryOpDef {
                         kind: BinaryExprType::Add,
-                        left: Value::String(value_node!("foo".to_string(), 1, 1)),
+                        left: Box::new(Expression::Simple(Value::String(value_node!(
+                            "foo".to_string(),
+                            1,
+                            1
+                        )))),
                         right: Box::new(Expression::Simple(Value::String(value_node!(
                             "bar".to_string(),
                             1,
@@ -1282,7 +1397,7 @@ mod test {
                 (
                     Expression::Binary(BinaryOpDef {
                         kind: BinaryExprType::Add,
-                        left: Value::List(ListDef {
+                        left: Box::new(Expression::Simple(Value::List(ListDef {
                             elems: vec![
                                 Expression::Simple(Value::String(value_node!(
                                     "foo".to_string(),
@@ -1291,7 +1406,7 @@ mod test {
                                 ))),
                             ],
                             pos: Position::new(1, 1),
-                        }),
+                        }))),
                         right: Box::new(Expression::Simple(Value::List(ListDef {
                             elems: vec![
                                 Expression::Simple(Value::String(value_node!(
@@ -1323,228 +1438,11 @@ mod test {
                 (
                     Expression::Binary(BinaryOpDef {
                         kind: BinaryExprType::Add,
-                        left: Value::Float(value_node!(2.0, 1, 1)),
+                        left: Box::new(Expression::Simple(Value::Float(value_node!(2.0, 1, 1)))),
                         right: Box::new(Expression::Simple(Value::Int(value_node!(2, 1, 1)))),
                         pos: Position::new(1, 0),
                     }),
                     Val::Float(1.0),
-                ),
-            ],
-            b,
-        );
-    }
-
-    #[test]
-    fn test_eval_equal_exprs() {
-        let b = Builder::new();
-        test_expr_to_val(
-            vec![
-                (
-                    Expression::Binary(BinaryOpDef {
-                        kind: BinaryExprType::Equal,
-                        left: Value::Int(value_node!(2, 1, 1)),
-                        right: Box::new(Expression::Simple(Value::Int(value_node!(2, 1, 1)))),
-                        pos: Position::new(1, 0),
-                    }),
-                    Val::Boolean(true),
-                ),
-                (
-                    Expression::Binary(BinaryOpDef {
-                        kind: BinaryExprType::Equal,
-                        left: Value::Float(value_node!(2.0, 1, 1)),
-                        right: Box::new(Expression::Simple(Value::Float(value_node!(2.0, 1, 1)))),
-                        pos: Position::new(1, 0),
-                    }),
-                    Val::Boolean(true),
-                ),
-                (
-                    Expression::Binary(BinaryOpDef {
-                        kind: BinaryExprType::Equal,
-                        left: Value::String(value_node!("foo".to_string(), 1, 1)),
-                        right: Box::new(Expression::Simple(Value::String(value_node!(
-                            "foo".to_string(),
-                            1,
-                            1
-                        )))),
-                        pos: Position::new(1, 0),
-                    }),
-                    Val::Boolean(true),
-                ),
-                (
-                    Expression::Binary(BinaryOpDef {
-                        kind: BinaryExprType::Equal,
-                        left: Value::Tuple(value_node!(
-                            vec![
-                                (
-                                    make_tok!("bar", 1, 1),
-                                    Expression::Simple(Value::Int(value_node!(1, 1, 1))),
-                                ),
-                                (
-                                    make_tok!("foo", 1, 1),
-                                    Expression::Simple(Value::String(value_node!(
-                                        "blah".to_string(),
-                                        1,
-                                        1
-                                    ))),
-                                ),
-                            ],
-                            1,
-                            1
-                        )),
-                        right: Box::new(Expression::Simple(Value::Tuple(value_node!(
-                            vec![
-                                (
-                                    make_tok!("bar", 1, 1),
-                                    Expression::Simple(Value::Int(value_node!(1, 1, 1))),
-                                ),
-                                (
-                                    make_tok!("foo", 1, 1),
-                                    Expression::Simple(Value::String(value_node!(
-                                        "blah".to_string(),
-                                        1,
-                                        1
-                                    ))),
-                                ),
-                            ],
-                            1,
-                            1
-                        )))),
-                        pos: Position::new(1, 0),
-                    }),
-                    Val::Boolean(true),
-                ),
-                (
-                    Expression::Binary(BinaryOpDef {
-                        kind: BinaryExprType::Equal,
-                        left: Value::Tuple(value_node!(
-                            vec![
-                                (
-                                    make_tok!("bar", 1, 1),
-                                    Expression::Simple(Value::Int(value_node!(1, 1, 1))),
-                                ),
-                                (
-                                    make_tok!("foo", 1, 1),
-                                    Expression::Simple(Value::String(value_node!(
-                                        "blah".to_string(),
-                                        1,
-                                        1
-                                    ))),
-                                ),
-                            ],
-                            1,
-                            1
-                        )),
-                        right: Box::new(Expression::Simple(Value::Tuple(value_node!(
-                            vec![
-                                (
-                                    make_tok!("bar", 1, 1),
-                                    Expression::Simple(Value::Int(value_node!(1, 1, 1))),
-                                ),
-                                (
-                                    make_tok!("foo", 1, 1),
-                                    Expression::Simple(Value::String(value_node!(
-                                        "blush".to_string(),
-                                        1,
-                                        1
-                                    ))),
-                                ),
-                            ],
-                            1,
-                            1
-                        )))),
-                        pos: Position::new(1, 0),
-                    }),
-                    Val::Boolean(false),
-                ),
-                (
-                    Expression::Binary(BinaryOpDef {
-                        kind: BinaryExprType::Equal,
-                        left: Value::Tuple(value_node!(
-                            vec![
-                                (
-                                    make_tok!("bar", 1, 1),
-                                    Expression::Simple(Value::Int(value_node!(1, 1, 1))),
-                                ),
-                                (
-                                    make_tok!("foo", 1, 1),
-                                    Expression::Simple(Value::String(value_node!(
-                                        "blah".to_string(),
-                                        1,
-                                        1
-                                    ))),
-                                ),
-                            ],
-                            1,
-                            1
-                        )),
-                        right: Box::new(Expression::Simple(Value::Tuple(value_node!(
-                            vec![
-                                (
-                                    make_tok!("bosh", 1, 1),
-                                    Expression::Simple(Value::Int(value_node!(1, 1, 1))),
-                                ),
-                                (
-                                    make_tok!("foo", 1, 1),
-                                    Expression::Simple(Value::String(value_node!(
-                                        "blah".to_string(),
-                                        1,
-                                        1
-                                    ))),
-                                ),
-                            ],
-                            1,
-                            1
-                        )))),
-                        pos: Position::new(1, 0),
-                    }),
-                    Val::Boolean(false),
-                ),
-                (
-                    Expression::Binary(BinaryOpDef {
-                        kind: BinaryExprType::Equal,
-                        left: Value::Tuple(value_node!(
-                            vec![
-                                (
-                                    make_tok!("bar", 1, 1),
-                                    Expression::Simple(Value::Int(value_node!(1, 1, 1))),
-                                ),
-                                (
-                                    make_tok!("foo", 1, 1),
-                                    Expression::Simple(Value::String(value_node!(
-                                        "blah".to_string(),
-                                        1,
-                                        1
-                                    ))),
-                                ),
-                            ],
-                            1,
-                            1
-                        )),
-                        right: Box::new(Expression::Simple(Value::Tuple(value_node!(
-                            vec![
-                                (
-                                    make_tok!("bash", 1, 1),
-                                    Expression::Simple(Value::Int(value_node!(1, 1, 1))),
-                                ),
-                                (
-                                    make_tok!("bar", 1, 1),
-                                    Expression::Simple(Value::Int(value_node!(1, 1, 1))),
-                                ),
-                                (
-                                    make_tok!("foo", 1, 1),
-                                    Expression::Simple(Value::String(value_node!(
-                                        "blah".to_string(),
-                                        1,
-                                        1
-                                    ))),
-                                ),
-                            ],
-                            1,
-                            1
-                        )))),
-                        pos: Position::new(1, 0),
-                    }),
-                    Val::Boolean(false),
                 ),
             ],
             b,

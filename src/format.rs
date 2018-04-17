@@ -16,7 +16,7 @@
 use std::clone::Clone;
 use std::error::Error;
 
-use ast::*;
+use ast::tree::*;
 use error;
 
 /// Implements the logic for format strings in UCG format expressions.

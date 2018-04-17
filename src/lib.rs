@@ -243,11 +243,13 @@
 //!
 //! The `>`, `<`, `>=`, and `>=` operators are only supported on numeric types.
 //!
-//! ``ucg
+//! ```ucg
 //! 1 > 2; // result is false
 //! 2 < 3; // result is true
 //! 10 > "9"; // This is a compile error.
+//! (1+2) == 3
 //! ```
+//! The comparison operators expect either a simple value or a grouped expression as their left operand.
 //!
 //! The equality operators `==` and `!=` are supported for all types and will perform deep equal comparisons on complex
 //! types.
@@ -266,24 +268,17 @@
 //! Note that tuple fields are ordered so a tuple will only be equal if the fields are both in the same order and
 //! have the same values in them.
 //!
-//! ##### Boolean
+//! ##### Operator Precedence
 //!
-//! ucg supports the following operators, `+`, `-`, `*`, `/`, `==`, `!=`, `>`, `<`, `>=`, `<=`, `&&`, `||` Each one is type safe and
-//! infers the types from the values they operate on. The operators expect both the left and right operands to be of the same
-//! type. All of the operators except `&&` and `||` are valid on integers and floats. The + operator can additionally concatenate
-//! strings or arrays. The `&&` and `||` operators are only valid on booleans.
+//! ucg operators evaluate the right side first. If you want to enforce a different
+//! order of operations you will need to use parentheses to group them. This is
+//! most evident when mixing numeric and comparison operators.
 //!
 //! ```ucg
-//! 1 + 1; // result is 2
-//! "foo " + "bar" // result is "foo bar"
-//! [1,2] + [3,4]; // result is [1,2,3,4]
-//! 1 == 1; // result is true.
-//! 1 > 1; // result is false
-//! 1 >= 1; // result is true;
+//! 1+1 == 2; // this will be a type error. The + expects an integer but it has a boolean expression
+//!           // on the right.
+//! (1+1) == 2; // this succeeds because the parentheses force evaluation of the addition first.
 //! ```
-//!
-//! The Equality comparison can be done on any type and will perform a deep equal comparison.
-//!
 //!
 //! #### Copy expressions
 //!
@@ -421,9 +416,9 @@ pub mod error;
 
 mod format;
 
-pub use ast::Value;
-pub use ast::Expression;
-pub use ast::Statement;
+pub use ast::tree::Value;
+pub use ast::tree::Expression;
+pub use ast::tree::Statement;
 
 pub use parse::parse;
 pub use build::Builder;

@@ -11,8 +11,6 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
-
-//! The definitions of the ucg AST and Tokens.
 use std;
 use std::collections::HashSet;
 use std::borrow::Borrow;
@@ -108,10 +106,10 @@ impl Borrow<str> for Token {
 
 /// Helper macro for making a Positioned Value.
 macro_rules! value_node {
-    ($v:expr, $p:expr) => {
+    ($v: expr, $p: expr) => {
         Positioned::new_with_pos($v, $p)
     };
-    ($v:expr, $l:expr, $c:expr) => {
+    ($v: expr, $l: expr, $c: expr) => {
         Positioned::new($v, $l, $c)
     };
 }
@@ -119,31 +117,31 @@ macro_rules! value_node {
 /// Helper macro for making a Token.
 #[allow(unused_macros)]
 macro_rules! make_tok {
-    ( EOF => $l:expr, $c:expr  ) => {
+    (EOF => $l: expr, $c: expr) => {
         Token::new("", TokenType::END, $l, $c)
     };
 
-    ( WS => $l:expr, $c:expr  ) => {
+    (WS => $l: expr, $c: expr) => {
         Token::new("", TokenType::WS, $l, $c)
     };
 
-    ( CMT => $e:expr, $l:expr, $c:expr  ) => {
+    (CMT => $e: expr, $l: expr, $c: expr) => {
         Token::new($e, TokenType::COMMENT, $l, $c)
     };
 
-    ( QUOT => $e:expr, $l:expr, $c:expr  ) => {
+    (QUOT => $e: expr, $l: expr, $c: expr) => {
         Token::new($e, TokenType::QUOTED, $l, $c)
     };
 
-    ( PUNCT => $e:expr, $l:expr, $c:expr  ) => {
+    (PUNCT => $e: expr, $l: expr, $c: expr) => {
         Token::new($e, TokenType::PUNCT, $l, $c)
     };
 
-    ( DIGIT => $e:expr, $l:expr, $c:expr  ) => {
+    (DIGIT => $e: expr, $l: expr, $c: expr) => {
         Token::new($e, TokenType::DIGIT, $l, $c)
     };
 
-    ( $e:expr, $l:expr, $c:expr ) => {
+    ($e: expr, $l: expr, $c: expr) => {
         Token::new($e, TokenType::BAREWORD, $l, $c)
     };
 }
@@ -151,15 +149,15 @@ macro_rules! make_tok {
 /// Helper macro for making expressions.
 #[allow(unused_macros)]
 macro_rules! make_expr {
-    ( $e:expr ) => {
+    ($e: expr) => {
         make_expr!($e, 1, 1)
     };
 
-    ( $e:expr, $l:expr, $c:expr ) => {
+    ($e: expr, $l: expr, $c: expr) => {
         Expression::Simple(Value::Symbol(Positioned::new($e.to_string(), $l, $c)))
     };
 
-    ( $e:expr => int, $l:expr, $c:expr ) => {
+    ($e: expr => int, $l: expr, $c: expr) => {
         Expression::Simple(Value::Int(Positioned::new($e, $l, $c)))
     };
 }
@@ -543,9 +541,12 @@ impl MacroDef {
             while stack.len() > 0 {
                 match stack.pop().unwrap() {
                     &Expression::Binary(ref bexpr) => {
-                        let mut syms_set = self.validate_value_symbols(&mut stack, &bexpr.left);
-                        bad_symbols.extend(syms_set.drain());
+                        stack.push(&bexpr.left);
                         stack.push(&bexpr.right);
+                    }
+                    &Expression::Compare(ref cexpr) => {
+                        stack.push(&cexpr.left);
+                        stack.push(&cexpr.right);
                     }
                     &Expression::Grouped(ref expr) => {
                         stack.push(expr);
@@ -602,6 +603,10 @@ pub enum BinaryExprType {
     Sub,
     Mul,
     Div,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum CompareType {
     Equal,
     GT,
     LT,
@@ -610,11 +615,19 @@ pub enum BinaryExprType {
     LTEqual,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct ComparisonDef {
+    pub kind: CompareType,
+    pub left: Box<Expression>,
+    pub right: Box<Expression>,
+    pub pos: Position,
+}
+
 /// Represents an expression with a left and a right side.
 #[derive(Debug, PartialEq, Clone)]
 pub struct BinaryOpDef {
     pub kind: BinaryExprType,
-    pub left: Value,
+    pub left: Box<Expression>,
     pub right: Box<Expression>,
     pub pos: Position,
 }
@@ -665,6 +678,7 @@ pub enum Expression {
 
     // Binary expressions
     Binary(BinaryOpDef),
+    Compare(ComparisonDef),
 
     // Complex Expressions
     Copy(CopyDef),
@@ -682,6 +696,7 @@ impl Expression {
         match self {
             &Expression::Simple(ref v) => v.pos(),
             &Expression::Binary(ref def) => &def.pos,
+            &Expression::Compare(ref def) => &def.pos,
             &Expression::Copy(ref def) => &def.pos,
             &Expression::Grouped(ref expr) => expr.pos(),
             &Expression::Format(ref def) => &def.pos,
@@ -733,7 +748,11 @@ mod ast_test {
                     make_tok!("f1", 1, 1),
                     Expression::Binary(BinaryOpDef {
                         kind: BinaryExprType::Add,
-                        left: Value::Symbol(value_node!("foo".to_string(), 1, 1)),
+                        left: Box::new(Expression::Simple(Value::Symbol(value_node!(
+                            "foo".to_string(),
+                            1,
+                            1
+                        )))),
                         right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
                         pos: Position::new(1, 0),
                     }),
@@ -753,7 +772,11 @@ mod ast_test {
                     make_tok!("f1", 1, 1),
                     Expression::Binary(BinaryOpDef {
                         kind: BinaryExprType::Add,
-                        left: Value::Symbol(value_node!("bar".to_string(), 1, 1)),
+                        left: Box::new(Expression::Simple(Value::Symbol(value_node!(
+                            "bar".to_string(),
+                            1,
+                            1
+                        )))),
                         right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
                         pos: Position::new(1, 0),
                     }),
@@ -775,8 +798,10 @@ mod ast_test {
                     make_tok!("f1", 1, 1),
                     Expression::Binary(BinaryOpDef {
                         kind: BinaryExprType::Add,
-                        left: Value::Selector(make_selector!(make_expr!("foo", 1, 1) => [
-                        make_tok!("quux", 1, 1) ] => 1, 1)),
+                        left: Box::new(Expression::Simple(Value::Selector(
+                            make_selector!(make_expr!("foo", 1, 1) => [
+                        make_tok!("quux", 1, 1) ] => 1, 1),
+                        ))),
                         right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
                         pos: Position::new(1, 0),
                     }),
@@ -796,8 +821,10 @@ mod ast_test {
                     make_tok!("f1", 1, 1),
                     Expression::Binary(BinaryOpDef {
                         kind: BinaryExprType::Add,
-                        left: Value::Selector(make_selector!(make_expr!("bar", 1, 1) => [
-                        make_tok!("quux", 1, 1) ] => 1, 1)),
+                        left: Box::new(Expression::Simple(Value::Selector(
+                            make_selector!(make_expr!("bar", 1, 1) => [
+                        make_tok!("quux", 1, 1) ] => 1, 1),
+                        ))),
                         right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
                         pos: Position::new(1, 0),
                     }),
