@@ -1201,7 +1201,7 @@ mod compile_test {
 #[cfg(test)]
 mod test {
     use super::{Builder, CallDef, MacroDef, SelectDef, Val};
-    use ast::*;
+    use ast::tree::*;
     use std::rc::Rc;
 
     fn test_expr_to_val(mut cases: Vec<(Expression, Val)>, b: Builder) {

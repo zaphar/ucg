@@ -77,7 +77,7 @@ impl<V: Into<String> + Clone> Formatter<V> {
 #[cfg(test)]
 mod test {
     use super::Formatter;
-    use ast::Position;
+    use ast::tree::Position;
 
     #[test]
     fn test_format_happy_path() {
