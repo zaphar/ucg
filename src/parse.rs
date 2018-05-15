@@ -249,14 +249,25 @@ fn tuple_to_binary_expression(
     }))
 }
 
+/// do_binary_expr implements precedence based parsing where the more tightly bound parsers
+/// are passed in as lowerrule parsers. We default to grouped_expression and simple_expression as
+/// the most tightly bound expressions.
 macro_rules! do_binary_expr {
-    ($i:expr, $subrule:ident!( $($args:tt)* ), $typ:expr) => {
+    ($i:expr, $oprule:ident!( $($args:tt)* ), $typ:expr) => {
+        do_binary_expr!($i, $oprule!($($args)*), $typ, alt!(grouped_expression | simple_expression))
+    };
+    
+    ($i:expr, $oprule:ident!( $($args:tt)* ), $typ:expr, $lowerrule:ident) => {
+        do_binary_expr!($i, $oprule!($($args)*), $typ, call!($lowerrule))
+    };
+
+    ($i:expr, $oprule:ident!( $($args:tt)* ), $typ:expr, $lowerrule:ident!( $($lowerargs:tt)* )) => {
         map_res!($i,
             do_parse!(
                 pos: pos >>
-                left: alt!(simple_expression | grouped_expression) >>
-                    $subrule!($($args)*) >>
-                    right: expression >>
+                left: $lowerrule!($($lowerargs)*) >>
+                    $oprule!($($args)*) >>
+                    right: $lowerrule!($($lowerargs)*) >>
                     (pos, $typ, left, right)
             ),
             tuple_to_binary_expression
@@ -264,14 +275,26 @@ macro_rules! do_binary_expr {
     };
 }
 
+named!(math_expression<TokenIter, Expression, error::Error>,
+    alt!(sum_expression | product_expression)
+);
+
+named!(sum_expression<TokenIter, Expression, error::Error>,
+    alt!(add_expression | sub_expression)
+);
+
 // trace_macros!(true);
 named!(add_expression<TokenIter, Expression, error::Error>,
-       do_binary_expr!(punct!("+"), BinaryExprType::Add)
+       do_binary_expr!(punct!("+"), BinaryExprType::Add, alt!(product_expression | simple_expression | grouped_expression))
 );
 // trace_macros!(false);
 
 named!(sub_expression<TokenIter, Expression, error::Error>,
-       do_binary_expr!(punct!("-"), BinaryExprType::Sub)
+       do_binary_expr!(punct!("-"), BinaryExprType::Sub,  alt!(product_expression | simple_expression | grouped_expression))
+);
+
+named!(product_expression<TokenIter, Expression, error::Error>,
+    alt!(mul_expression | div_expression)
 );
 
 named!(mul_expression<TokenIter, Expression, error::Error>,
@@ -282,6 +305,7 @@ named!(div_expression<TokenIter, Expression, error::Error>,
        do_binary_expr!(punct!("/"), BinaryExprType::Div)
 );
 
+// TODO(jwall): Change comparison operators to use the do_binary_expr! with precedence?
 fn tuple_to_compare_expression(
     tpl: (Position, CompareType, Expression, Expression),
 ) -> ParseResult<Expression> {
@@ -298,7 +322,7 @@ macro_rules! do_compare_expr {
         map_res!($i,
             do_parse!(
                 pos: pos >>
-                left: alt!(simple_expression | grouped_expression) >>
+                left: alt!(simple_expression | grouped_expression | math_expression) >>
                     $subrule!($($args)*) >>
                     right: expression >>
                     (pos, $typ, left, right)
@@ -694,22 +718,19 @@ named!(expression<TokenIter, Expression, error::Error>,
     do_parse!(
         expr: alt!(
            complete!(list_op_expression) |
-           complete!(add_expression) |
-           complete!(sub_expression) |
-           complete!(mul_expression) |
-           complete!(div_expression) |
+           complete!(math_expression) |
            complete!(eqeq_expression) |
            complete!(not_eqeq_expression) |
            complete!(lt_eqeq_expression) |
            complete!(gt_eqeq_expression) |
            complete!(gt_expression) |
            complete!(lt_expression) |
-           complete!(grouped_expression) |
            complete!(macro_expression) |
            complete!(format_expression) |
            complete!(select_expression) |
            complete!(call_expression) |
            complete!(copy_expression) |
+           complete!(grouped_expression) |
            simple_expression
        ) >>
        (expr)
@@ -974,6 +995,62 @@ mod test {
         );
 
         assert_parse!(
+            statement("let foo = 1 + 1 * 2;"),
+            Statement::Let(LetDef {
+                name: make_tok!("foo", 1, 5),
+                value: Expression::Binary(BinaryOpDef {
+                    kind: BinaryExprType::Add,
+                    left: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 11)))),
+                    right: Box::new(Expression::Binary(BinaryOpDef {
+                        kind: BinaryExprType::Mul,
+                        left: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 15)))),
+                        right: Box::new(Expression::Simple(Value::Int(value_node!(2, 1, 19)))),
+                        pos: Position::new(1, 15),
+                    })),
+                    pos: Position::new(1, 11),
+                }),
+            })
+        );
+
+        assert_parse!(
+            statement("let foo = (1 + 1) * 2;"),
+            Statement::Let(LetDef {
+                name: make_tok!("foo", 1, 5),
+                value: Expression::Binary(BinaryOpDef {
+                    kind: BinaryExprType::Mul,
+                    left: Box::new(Expression::Grouped(Box::new(Expression::Binary(
+                        BinaryOpDef {
+                            kind: BinaryExprType::Add,
+                            left: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 12)))),
+                            right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 16)))),
+                            pos: Position::new(1, 12),
+                        },
+                    )))),
+                    right: Box::new(Expression::Simple(Value::Int(value_node!(2, 1, 21)))),
+                    pos: Position::new(1, 11),
+                }),
+            })
+        );
+
+        assert_parse!(
+            statement("let foo = 1 * 1 + 2;"),
+            Statement::Let(LetDef {
+                name: make_tok!("foo", 1, 5),
+                value: Expression::Binary(BinaryOpDef {
+                    kind: BinaryExprType::Add,
+                    left: Box::new(Expression::Binary(BinaryOpDef {
+                        kind: BinaryExprType::Mul,
+                        left: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 11)))),
+                        right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 15)))),
+                        pos: Position::new(1, 11),
+                    })),
+                    right: Box::new(Expression::Simple(Value::Int(value_node!(2, 1, 19)))),
+                    pos: Position::new(1, 11),
+                }),
+            })
+        );
+
+        assert_parse!(
             statement("// comment\nlet foo = 1.0 ;"),
             Statement::Let(LetDef {
                 name: make_tok!("foo", 2, 5),
@@ -1150,7 +1227,7 @@ mod test {
                                                                  1, 1)))
         );
         assert_parse!(
-            expression("1 + 1"),
+            math_expression("1 + 1"),
             Expression::Binary(BinaryOpDef {
                 kind: BinaryExprType::Add,
                 left: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
@@ -1182,6 +1259,45 @@ mod test {
                 kind: BinaryExprType::Div,
                 left: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
                 right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 5)))),
+                pos: Position::new(1, 1),
+            })
+        );
+        assert_parse!(
+            expression("(1 / 1)"),
+            Expression::Grouped(Box::new(Expression::Binary(BinaryOpDef {
+                kind: BinaryExprType::Div,
+                left: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 2)))),
+                right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 6)))),
+                pos: Position::new(1, 2),
+            })))
+        );
+        assert_parse!(
+            expression("1 / 1 + 1"),
+            Expression::Binary(BinaryOpDef {
+                kind: BinaryExprType::Add,
+                left: Box::new(Expression::Binary(BinaryOpDef {
+                    kind: BinaryExprType::Div,
+                    left: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
+                    right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 5)))),
+                    pos: Position::new(1, 1),
+                })),
+                right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 9)))),
+                pos: Position::new(1, 1),
+            })
+        );
+        assert_parse!(
+            expression("(1 + 1) * 1"),
+            Expression::Binary(BinaryOpDef {
+                kind: BinaryExprType::Mul,
+                left: Box::new(Expression::Grouped(Box::new(Expression::Binary(
+                    BinaryOpDef {
+                        kind: BinaryExprType::Add,
+                        left: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 2)))),
+                        right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 6)))),
+                        pos: Position::new(1, 2),
+                    }
+                )))),
+                right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 11)))),
                 pos: Position::new(1, 1),
             })
         );
