@@ -273,12 +273,6 @@
 //! UCG binary operators follow the typical operator precedence for math. `*` and `/` are higher precendence than
 //! `+` and `-` which are higher precedence than any of the comparison operators. 
 //!
-//! ```ucg
-//! 1+1 == 2; // this will be a type error. The + expects an integer but it has a boolean expression
-//!           // on the right.
-//! (1+1) == 2; // this succeeds because the parentheses force evaluation of the addition first.
-//! ```
-//!
 //! #### Copy expressions
 //!
 //! ucg Tuples support a form of reuse with copy on write semantics. You can copy a tuple and selectively overwrite fields or add new
