@@ -13,23 +13,23 @@
 //  limitations under the License.
 
 //! The build stage of the ucg compiler.
-use std::env;
-use std::fs::File;
-use std::io::Read;
-use std::error::Error;
-use std::collections::{HashMap, HashSet, VecDeque};
 use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::convert::From;
+use std::env;
+use std::error::Error;
 use std::fmt;
 use std::fmt::{Display, Formatter};
+use std::fs::File;
+use std::io::Read;
 use std::ops::Deref;
 use std::rc::Rc;
-use std::convert::From;
 
-use tokenizer::Span;
 use ast::tree::*;
+use error;
 use format;
 use parse::parse;
-use error;
+use tokenizer::Span;
 
 impl MacroDef {
     /// Expands a ucg Macro using the given arguments into a new Tuple.
@@ -295,7 +295,7 @@ pub struct Builder {
 }
 
 macro_rules! eval_binary_expr {
-    ($case: pat, $pos: ident, $rside: ident, $result: expr, $msg: expr) => {
+    ($case:pat, $pos:ident, $rside:ident, $result:expr, $msg:expr) => {
         match $rside.as_ref() {
             $case => {
                 return Ok(Rc::new($result));

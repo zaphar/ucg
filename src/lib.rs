@@ -409,17 +409,17 @@ extern crate serde_json;
 pub mod ast;
 #[macro_use]
 pub mod tokenizer;
-pub mod parse;
 pub mod build;
 pub mod convert;
 pub mod error;
+pub mod parse;
 
 mod format;
 
-pub use ast::tree::Value;
 pub use ast::tree::Expression;
 pub use ast::tree::Statement;
+pub use ast::tree::Value;
 
-pub use parse::parse;
 pub use build::Builder;
 pub use build::Val;
+pub use parse::parse;

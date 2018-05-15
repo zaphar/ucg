@@ -13,9 +13,9 @@
 //  limitations under the License.
 
 //! Contains code for converting a UCG Val into the command line flag output target.
-use std::rc::Rc;
-use std::io::Write;
 use std::io::Result;
+use std::io::Write;
+use std::rc::Rc;
 
 use build::Val;
 use convert::traits::Converter;

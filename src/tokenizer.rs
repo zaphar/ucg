@@ -13,12 +13,12 @@
 //  limitations under the License.
 
 //! The tokenization stage of the ucg compiler.
-use nom_locate::LocatedSpan;
-use nom;
-use nom::{alpha, digit, is_alphanumeric, multispace};
-use nom::{InputIter, InputLength, Slice};
 use ast::tree::*;
 use error;
+use nom;
+use nom::{InputIter, InputLength, Slice};
+use nom::{alpha, digit, is_alphanumeric, multispace};
+use nom_locate::LocatedSpan;
 use std;
 use std::result::Result;
 
@@ -121,16 +121,15 @@ macro_rules! do_tag_tok {
     // paramater even though we don't explicitely pass it below. I don't
     // particularly like this but I'm living with it for now.
     ($i:expr, $type:expr, $tag:expr) => {
-       do_parse!($i,
-           span: position!() >>
-           frag: tag!($tag) >>
-           (Token{
-               typ: $type,
-               pos: Position::from(span),
-               fragment: frag.fragment.to_string(),
-           })
-       )
-    }
+        do_parse!(
+            $i,
+            span: position!() >> frag: tag!($tag) >> (Token {
+                typ: $type,
+                pos: Position::from(span),
+                fragment: frag.fragment.to_string(),
+            })
+        )
+    };
 }
 
 named!(emptytok( Span ) -> Token,
@@ -416,131 +415,133 @@ pub fn token_clone(t: &Token) -> Result<Token, error::Error> {
 /// nom macro that matches a Token by type and uses an optional conversion handler
 /// for the matched Token.
 macro_rules! match_type {
-    ($i:expr, BOOLEAN => $h:expr) => {
+    ($i:expr,BOOLEAN => $h:expr) => {
         match_type!($i, TokenType::BOOLEAN, "Not a Boolean", $h)
     };
 
-    ($i:expr, BOOLEAN) => {
+    ($i:expr,BOOLEAN) => {
         match_type!($i, BOOLEAN => token_clone)
     };
 
-    ($i:expr, COMMENT => $h:expr) => {
+    ($i:expr,COMMENT => $h:expr) => {
         match_type!($i, TokenType::COMMENT, "Not a Comment", $h)
     };
 
-    ($i:expr, COMMENT) => {
+    ($i:expr,COMMENT) => {
         match_type!($i, COMMENT => token_clone)
     };
 
-    ($i:expr, BAREWORD => $h:expr) => {
+    ($i:expr,BAREWORD => $h:expr) => {
         match_type!($i, TokenType::BAREWORD, "Not a Bareword", $h)
     };
 
-    ($i:expr, BAREWORD) => {
+    ($i:expr,BAREWORD) => {
         match_type!($i, BAREWORD => token_clone)
     };
 
-    ($i:expr, EMPTY => $h:expr) => {
+    ($i:expr,EMPTY => $h:expr) => {
         match_type!($i, TokenType::EMPTY, "Not NULL", $h)
     };
 
-    ($i:expr, EMPTY) => {
+    ($i:expr,EMPTY) => {
         match_type!($i, EMPTY => token_clone)
     };
 
-    ($i:expr, STR => $h:expr) => {
+    ($i:expr,STR => $h:expr) => {
         match_type!($i, TokenType::QUOTED, "Not a String", $h)
     };
 
-    ($i:expr, STR) => {
+    ($i:expr,STR) => {
         match_type!($i, STR => token_clone)
     };
 
-    ($i:expr, DIGIT => $h:expr) => {
+    ($i:expr,DIGIT => $h:expr) => {
         match_type!($i, TokenType::DIGIT, "Not a DIGIT", $h)
     };
 
-    ($i:expr, DIGIT) => {
+    ($i:expr,DIGIT) => {
         match_type!($i, DIGIT => token_clone)
     };
 
-    ($i:expr, PUNCT => $h:expr) => {
+    ($i:expr,PUNCT => $h:expr) => {
         match_type!($i, TokenType::PUNCT, "Not PUNCTUATION", $h)
     };
 
-    ($i:expr, PUNCT) => {
+    ($i:expr,PUNCT) => {
         match_type!($i, PUNCT => token_clone)
     };
 
-    ($i:expr, $t:expr, $msg:expr, $h:expr) => {
-        {
-            let i_ = $i.clone();
-            use nom::Slice;
-            use std::convert::Into;
-            if i_.input_len() == 0 {
-                nom::IResult::Error(
-                        nom::ErrorKind::Custom(error::Error::new(
-                            format!("End of Input! {}", $msg),
-                            error::ErrorType::IncompleteParsing,
-                            Position{line: 0, column: 0})))
-            } else {
-                let tok = &(i_[0]);
-                if tok.typ == $t {
-                    match $h(tok) {
-                        Result::Ok(v) => nom::IResult::Done($i.slice(1..), v),
-                        Result::Err(e) => nom::IResult::Error(
-                            nom::ErrorKind::Custom(e.into())),
-                    }
-                } else {
-                    nom::IResult::Error(nom::ErrorKind::Custom(error::Error::new(
-                        $msg.to_string(),
-                        error::ErrorType::UnexpectedToken,
-                        tok.pos.clone())))
+    ($i:expr, $t:expr, $msg:expr, $h:expr) => {{
+        let i_ = $i.clone();
+        use nom::Slice;
+        use std::convert::Into;
+        if i_.input_len() == 0 {
+            nom::IResult::Error(nom::ErrorKind::Custom(error::Error::new(
+                format!("End of Input! {}", $msg),
+                error::ErrorType::IncompleteParsing,
+                Position { line: 0, column: 0 },
+            )))
+        } else {
+            let tok = &(i_[0]);
+            if tok.typ == $t {
+                match $h(tok) {
+                    Result::Ok(v) => nom::IResult::Done($i.slice(1..), v),
+                    Result::Err(e) => nom::IResult::Error(nom::ErrorKind::Custom(e.into())),
                 }
+            } else {
+                nom::IResult::Error(nom::ErrorKind::Custom(error::Error::new(
+                    $msg.to_string(),
+                    error::ErrorType::UnexpectedToken,
+                    tok.pos.clone(),
+                )))
             }
         }
-    };
+    }};
 }
 
 /// nom style macro that matches various Tokens by type and value and allows optional
 /// conversion handlers for the matched Token.
 macro_rules! match_token {
-    ($i:expr, PUNCT => $f:expr) => {
+    ($i:expr,PUNCT => $f:expr) => {
         match_token!($i, PUNCT => $f, token_clone)
     };
 
-    ($i:expr, PUNCT => $f:expr, $h:expr) => {
+    ($i:expr,PUNCT => $f:expr, $h:expr) => {
         match_token!($i, TokenType::PUNCT, $f, format!("Not PUNCT ({})", $f), $h)
     };
 
-    ($i:expr, BAREWORD => $f:expr) => {
+    ($i:expr,BAREWORD => $f:expr) => {
         match_token!($i, BAREWORD => $f, token_clone)
     };
 
-    ($i:expr, BAREWORD => $f:expr, $h:expr) => {
-        match_token!($i, TokenType::BAREWORD, $f, format!("Not a BAREWORD ({})", $f), $h)
+    ($i:expr,BAREWORD => $f:expr, $h:expr) => {
+        match_token!(
+            $i,
+            TokenType::BAREWORD,
+            $f,
+            format!("Not a BAREWORD ({})", $f),
+            $h
+        )
     };
 
-    ($i:expr, $t:expr, $f:expr, $msg:expr, $h:expr) => {
-        {
-            let i_ = $i.clone();
-            use nom::Slice;
-            use std::convert::Into;
-            let tok = &(i_[0]);
-            if tok.typ == $t && &tok.fragment == $f {
-                match $h(tok) {
-                    Result::Ok(v) => nom::IResult::Done($i.slice(1..), v),
-                    Result::Err(e) => nom::IResult::Error(
-                        nom::ErrorKind::Custom(e.into())),
-                }
-            } else {
-                nom::IResult::Error(nom::ErrorKind::Custom(error::Error::new(
-                    format!("{} Instead is ({})", $msg, tok.fragment),
-                    error::ErrorType::UnexpectedToken,
-                    tok.pos.clone())))
+    ($i:expr, $t:expr, $f:expr, $msg:expr, $h:expr) => {{
+        let i_ = $i.clone();
+        use nom::Slice;
+        use std::convert::Into;
+        let tok = &(i_[0]);
+        if tok.typ == $t && &tok.fragment == $f {
+            match $h(tok) {
+                Result::Ok(v) => nom::IResult::Done($i.slice(1..), v),
+                Result::Err(e) => nom::IResult::Error(nom::ErrorKind::Custom(e.into())),
             }
+        } else {
+            nom::IResult::Error(nom::ErrorKind::Custom(error::Error::new(
+                format!("{} Instead is ({})", $msg, tok.fragment),
+                error::ErrorType::UnexpectedToken,
+                tok.pos.clone(),
+            )))
         }
-    };
+    }};
 }
 
 /// nom style macro that matches punctuation Tokens.
@@ -599,7 +600,7 @@ macro_rules! impl_token_iter_slice {
                 }
             }
         }
-    }
+    };
 }
 
 impl_token_iter_slice!(std::ops::Range<usize>);
@@ -704,16 +705,16 @@ mod tokenizer_test {
 
     macro_rules! assert_token {
         ($input:expr, $typ:expr, $msg:expr) => {
-        let result = token(LocatedSpan::new($input));
-        assert!(
-            result.is_done(),
-            format!("result {:?} is not a {}", result, $msg)
-        );
-        if let nom::IResult::Done(_, tok) = result {
-            assert_eq!(tok.fragment, $input);
-            assert_eq!(tok.typ, $typ);
-        }
-        }
+            let result = token(LocatedSpan::new($input));
+            assert!(
+                result.is_done(),
+                format!("result {:?} is not a {}", result, $msg)
+            );
+            if let nom::IResult::Done(_, tok) = result {
+                assert_eq!(tok.fragment, $input);
+                assert_eq!(tok.typ, $typ);
+            }
+        };
     }
 
     #[test]

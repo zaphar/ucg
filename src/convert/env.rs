@@ -13,9 +13,9 @@
 //  limitations under the License.
 
 //! An environment variable converter.
-use std::rc::Rc;
-use std::io::Write;
 use std::io::Result;
+use std::io::Write;
+use std::rc::Rc;
 
 use ast::tree::*;
 use build::Val;

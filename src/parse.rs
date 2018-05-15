@@ -13,17 +13,17 @@
 //  limitations under the License.
 
 //! The Parsing stage of the ucg compiler.
-use std::str::FromStr;
 use std::borrow::Borrow;
+use std::str::FromStr;
 
-use nom_locate::LocatedSpan;
 use nom;
-use nom::InputLength;
 use nom::IResult;
+use nom::InputLength;
+use nom_locate::LocatedSpan;
 
 use ast::tree::*;
-use tokenizer::*;
 use error;
+use tokenizer::*;
 
 type NomResult<'a, O> = nom::IResult<TokenIter<'a>, O, error::Error>;
 
@@ -844,14 +844,14 @@ mod test {
     use super::*;
     use tokenizer::{tokenize, TokenIter};
 
-    use nom_locate::LocatedSpan;
     use nom::IResult;
+    use nom_locate::LocatedSpan;
 
     macro_rules! assert_parse {
-        ($parsemac: ident($i: expr), $out: expr) => {
+        ($parsemac:ident($i:expr), $out:expr) => {
             assert_parse!($i, $parsemac, $out)
         };
-        ($i: expr, $f: expr, $out: expr) => {{
+        ($i:expr, $f:expr, $out:expr) => {{
             let input = LocatedSpan::new($i);
             match tokenize(input) {
                 Err(e) => assert!(false, format!("Tokenizer Error: {:?}", e)),
@@ -866,10 +866,10 @@ mod test {
     }
 
     macro_rules! assert_error {
-        ($parsemac: ident($i: expr)) => {
+        ($parsemac:ident($i:expr)) => {
             assert_error!($i, $parsemac)
         };
-        ($i: expr, $f: expr) => {{
+        ($i:expr, $f:expr) => {{
             let input = LocatedSpan::new($i);
             match tokenize(input) {
                 Err(_) => assert!(true),
@@ -1801,7 +1801,7 @@ mod test {
             (
                 make_tok!("foo", 1, 1),
                 Expression::Simple(Value::Selector(
-                    make_selector!(make_expr!("bar", 1, 7) => [ make_tok!("baz", 1, 11) ] => 1, 7)
+                    make_selector!(make_expr!("bar", 1, 7) => [ make_tok!("baz", 1, 11) ] => 1, 7),
                 ))
             )
         );

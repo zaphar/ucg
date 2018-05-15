@@ -12,15 +12,15 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 use std;
-use std::collections::HashSet;
 use std::borrow::Borrow;
-use std::convert::Into;
-use std::cmp::Ordering;
-use std::cmp::PartialOrd;
 use std::cmp::Eq;
+use std::cmp::Ordering;
 use std::cmp::PartialEq;
-use std::hash::Hasher;
+use std::cmp::PartialOrd;
+use std::collections::HashSet;
+use std::convert::Into;
 use std::hash::Hash;
+use std::hash::Hasher;
 
 macro_rules! enum_type_equality {
     ( $slf:ident, $r:expr, $( $l:pat ),* ) => {
@@ -106,10 +106,10 @@ impl Borrow<str> for Token {
 
 /// Helper macro for making a Positioned Value.
 macro_rules! value_node {
-    ($v: expr, $p: expr) => {
+    ($v:expr, $p:expr) => {
         Positioned::new_with_pos($v, $p)
     };
-    ($v: expr, $l: expr, $c: expr) => {
+    ($v:expr, $l:expr, $c:expr) => {
         Positioned::new($v, $l, $c)
     };
 }
@@ -117,31 +117,31 @@ macro_rules! value_node {
 /// Helper macro for making a Token.
 #[allow(unused_macros)]
 macro_rules! make_tok {
-    (EOF => $l: expr, $c: expr) => {
+    (EOF => $l:expr, $c:expr) => {
         Token::new("", TokenType::END, $l, $c)
     };
 
-    (WS => $l: expr, $c: expr) => {
+    (WS => $l:expr, $c:expr) => {
         Token::new("", TokenType::WS, $l, $c)
     };
 
-    (CMT => $e: expr, $l: expr, $c: expr) => {
+    (CMT => $e:expr, $l:expr, $c:expr) => {
         Token::new($e, TokenType::COMMENT, $l, $c)
     };
 
-    (QUOT => $e: expr, $l: expr, $c: expr) => {
+    (QUOT => $e:expr, $l:expr, $c:expr) => {
         Token::new($e, TokenType::QUOTED, $l, $c)
     };
 
-    (PUNCT => $e: expr, $l: expr, $c: expr) => {
+    (PUNCT => $e:expr, $l:expr, $c:expr) => {
         Token::new($e, TokenType::PUNCT, $l, $c)
     };
 
-    (DIGIT => $e: expr, $l: expr, $c: expr) => {
+    (DIGIT => $e:expr, $l:expr, $c:expr) => {
         Token::new($e, TokenType::DIGIT, $l, $c)
     };
 
-    ($e: expr, $l: expr, $c: expr) => {
+    ($e:expr, $l:expr, $c:expr) => {
         Token::new($e, TokenType::BAREWORD, $l, $c)
     };
 }
@@ -149,15 +149,15 @@ macro_rules! make_tok {
 /// Helper macro for making expressions.
 #[allow(unused_macros)]
 macro_rules! make_expr {
-    ($e: expr) => {
+    ($e:expr) => {
         make_expr!($e, 1, 1)
     };
 
-    ($e: expr, $l: expr, $c: expr) => {
+    ($e:expr, $l:expr, $c:expr) => {
         Expression::Simple(Value::Symbol(Positioned::new($e.to_string(), $l, $c)))
     };
 
-    ($e: expr => int, $l: expr, $c: expr) => {
+    ($e:expr => int, $l:expr, $c:expr) => {
         Expression::Simple(Value::Int(Positioned::new($e, $l, $c)))
     };
 }

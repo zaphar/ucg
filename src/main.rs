@@ -16,12 +16,12 @@ extern crate clap;
 extern crate ucglib;
 
 use std::fs::File;
-use std::rc::Rc;
 use std::io;
 use std::process;
+use std::rc::Rc;
 
-use ucglib::build::Val;
 use ucglib::build;
+use ucglib::build::Val;
 use ucglib::convert::ConverterRunner;
 
 // TODO(jwall): List the target output types automatically.

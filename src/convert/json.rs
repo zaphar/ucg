@@ -8,9 +8,9 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 //! Flags contains code for converting a UCG Val into the json output target.
-use std::rc::Rc;
-use std::io::Write;
 use std::io::Result;
+use std::io::Write;
+use std::rc::Rc;
 
 use serde_json;
 

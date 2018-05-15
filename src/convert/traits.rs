@@ -13,9 +13,9 @@
 //  limitations under the License.
 
 //! The traits used by the ucg compiler for converting Val intermediate format into the output formats..
-use std::rc::Rc;
-use std::io::Write;
 use std::io::Result;
+use std::io::Write;
+use std::rc::Rc;
 
 use build::Val;
 

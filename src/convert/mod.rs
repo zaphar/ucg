@@ -13,9 +13,9 @@
 //  limitations under the License.
 
 //! The conversion stage of the ucg compiler.
+pub mod env;
 pub mod flags;
 pub mod json;
-pub mod env;
 pub mod traits;
 
 use std::io;
