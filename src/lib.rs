@@ -270,9 +270,8 @@
 //!
 //! ##### Operator Precedence
 //!
-//! ucg operators evaluate the right side first. If you want to enforce a different
-//! order of operations you will need to use parentheses to group them. This is
-//! most evident when mixing numeric and comparison operators.
+//! UCG binary operators follow the typical operator precedence for math. `*` and `/` are higher precendence than
+//! `+` and `-` which are higher precedence than any of the comparison operators. 
 //!
 //! ```ucg
 //! 1+1 == 2; // this will be a type error. The + expects an integer but it has a boolean expression
