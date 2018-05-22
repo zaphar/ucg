@@ -271,7 +271,7 @@
 //! ##### Operator Precedence
 //!
 //! UCG binary operators follow the typical operator precedence for math. `*` and `/` are higher precendence than
-//! `+` and `-` which are higher precedence than any of the comparison operators. 
+//! `+` and `-` which are higher precedence than any of the comparison operators.
 //!
 //! #### Copy expressions
 //!
@@ -409,9 +409,9 @@ pub mod parse;
 
 mod format;
 
-pub use ast::tree::Expression;
-pub use ast::tree::Statement;
-pub use ast::tree::Value;
+pub use ast::Expression;
+pub use ast::Statement;
+pub use ast::Value;
 
 pub use build::Builder;
 pub use build::Val;

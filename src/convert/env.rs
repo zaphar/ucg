@@ -17,7 +17,7 @@ use std::io::Result;
 use std::io::Write;
 use std::rc::Rc;
 
-use ast::tree::*;
+use ast::*;
 use build::Val;
 use convert::traits::Converter;
 

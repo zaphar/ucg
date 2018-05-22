@@ -16,7 +16,7 @@
 use std::clone::Clone;
 use std::error::Error;
 
-use ast::tree::*;
+use ast::*;
 use error;
 
 /// Implements the logic for format strings in UCG format expressions.
@@ -77,7 +77,7 @@ impl<V: Into<String> + Clone> Formatter<V> {
 #[cfg(test)]
 mod test {
     use super::Formatter;
-    use ast::tree::Position;
+    use ast::Position;
 
     #[test]
     fn test_format_happy_path() {

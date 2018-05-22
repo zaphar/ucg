@@ -16,7 +16,7 @@
 use std::error;
 use std::fmt;
 
-use ast::tree::*;
+use ast::*;
 
 use nom;
 
