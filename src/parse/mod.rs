@@ -755,17 +755,29 @@ fn tuple_to_let(t: (Token, Expression)) -> ParseResult<Statement> {
     }))
 }
 
-named!(let_statement<TokenIter, Statement, error::Error>,
+named!(let_stmt_body<TokenIter, Statement, error::Error>,
     map_res!(
         do_parse!(
-            word!("let") >>
             name: match_type!(BAREWORD) >>
             punct!("=") >>
             val: expression >>
             punct!(";") >>
-            (name, val)
-        ),
+            (name, val)),
         tuple_to_let
+    )
+);
+
+named!(let_statement<TokenIter, Statement, error::Error>,
+    do_parse!(
+        word!("let") >>
+        pos: pos >>
+        stmt: add_return_error!(
+            nom::ErrorKind::Custom(
+                error::Error::new(
+                    "Invalid syntax for let binding",
+                    error::ErrorType::ParseError, pos)),
+            let_stmt_body) >>
+        (stmt)
     )
 );
 
@@ -776,17 +788,30 @@ fn tuple_to_import(t: (Token, Token)) -> ParseResult<Statement> {
     }))
 }
 
-named!(import_statement<TokenIter, Statement, error::Error>,
+named!(import_stmt_body<TokenIter, Statement, error::Error>,
     map_res!(
-       do_parse!(
-           word!("import") >>
-               path: match_type!(STR) >>
-               word!("as") >>
-               name: match_type!(BAREWORD) >>
-               punct!(";") >>
-               (path, name)
-       ),
+        do_parse!(
+             path: match_type!(STR) >>
+             word!("as") >>
+             name: match_type!(BAREWORD) >>
+             punct!(";") >>
+             (path, name)),
        tuple_to_import
+    )
+);
+
+named!(import_statement<TokenIter, Statement, error::Error>,
+    do_parse!(
+        word!("import") >>
+        // past this point we know this is supposed to be an import statement.
+        pos: pos >>
+        stmt: add_return_error!(
+            nom::ErrorKind::Custom(
+                error::Error::new(
+                    "Invalid syntax for import",
+                    error::ErrorType::ParseError, pos)),
+            import_stmt_body) >>
+        (stmt)
     )
 );
 
