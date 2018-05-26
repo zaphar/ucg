@@ -363,7 +363,7 @@ fn test_expression_parse() {
                                                              1, 1)))
     );
     assert_parse!(
-        math_expression("1 + 1"),
+        expression("1 + 1"),
         Expression::Binary(BinaryOpDef {
             kind: BinaryExprType::Add,
             left: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
@@ -381,7 +381,7 @@ fn test_expression_parse() {
         })
     );
     assert_parse!(
-        expression("1 * 1"),
+        mul_expression("1 * 1"),
         Expression::Binary(BinaryOpDef {
             kind: BinaryExprType::Mul,
             left: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),

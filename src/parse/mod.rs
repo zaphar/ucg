@@ -254,7 +254,7 @@ fn tuple_to_binary_expression(
 /// the most tightly bound expressions.
 macro_rules! do_binary_expr {
     ($i:expr, $oprule:ident!( $($args:tt)* ), $typ:expr) => {
-        do_binary_expr!($i, $oprule!($($args)*), $typ, alt!(grouped_expression | simple_expression))
+        do_binary_expr!($i, $oprule!($($args)*), $typ, non_op_expression)
     };
 
     ($i:expr, $oprule:ident!( $($args:tt)* ), $typ:expr, $lowerrule:ident) => {
@@ -275,14 +275,6 @@ macro_rules! do_binary_expr {
     };
 }
 
-named!(math_expression<TokenIter, Expression, error::Error>,
-    alt!(sum_expression | product_expression)
-);
-
-named!(sum_expression<TokenIter, Expression, error::Error>,
-    alt!(add_expression | sub_expression)
-);
-
 // trace_macros!(true);
 named!(add_expression<TokenIter, Expression, error::Error>,
        do_binary_expr!(punct!("+"), BinaryExprType::Add, alt!(product_expression | simple_expression | grouped_expression))
@@ -293,8 +285,8 @@ named!(sub_expression<TokenIter, Expression, error::Error>,
        do_binary_expr!(punct!("-"), BinaryExprType::Sub,  alt!(product_expression | simple_expression | grouped_expression))
 );
 
-named!(product_expression<TokenIter, Expression, error::Error>,
-    alt!(mul_expression | div_expression)
+named!(sum_expression<TokenIter, Expression, error::Error>,
+    alt!(add_expression | sub_expression)
 );
 
 named!(mul_expression<TokenIter, Expression, error::Error>,
@@ -303,6 +295,14 @@ named!(mul_expression<TokenIter, Expression, error::Error>,
 
 named!(div_expression<TokenIter, Expression, error::Error>,
        do_binary_expr!(punct!("/"), BinaryExprType::Div)
+);
+
+named!(product_expression<TokenIter, Expression, error::Error>,
+    alt!(mul_expression | div_expression)
+);
+
+named!(math_expression<TokenIter, Expression, error::Error>,
+    alt!(sum_expression | product_expression)
 );
 
 // TODO(jwall): Change comparison operators to use the do_binary_expr! with precedence?
@@ -354,6 +354,20 @@ named!(gt_expression<TokenIter, Expression, error::Error>,
 
 named!(lt_expression<TokenIter, Expression, error::Error>,
        do_compare_expr!(punct!("<"), CompareType::LT)
+);
+
+named!(compare_expression<TokenIter, Expression, error::Error>,
+    alt!(
+        eqeq_expression |
+        not_eqeq_expression |
+        lt_eqeq_expression |
+        gt_eqeq_expression |
+        lt_expression |
+        gt_expression)
+);
+
+named!(op_expression<TokenIter, Expression, error::Error>,
+    alt!(math_expression | compare_expression)
 );
 
 fn expression_to_grouped_expression(e: Expression) -> ParseResult<Expression> {
@@ -704,6 +718,17 @@ named!(list_op_expression<TokenIter, Expression, error::Error>,
     )
 );
 
+named!(non_op_expression<TokenIter, Expression, error::Error>,
+    alt!(list_op_expression |
+         macro_expression |
+         format_expression |
+         select_expression |
+         call_expression |
+         copy_expression |
+         grouped_expression |
+         simple_expression)
+);
+
 // NOTE(jwall): HERE THERE BE DRAGONS. The order for these matters
 // a lot. We need to process alternatives in order of decreasing
 // specificity.  Unfortunately this means we are required to go in a
@@ -715,26 +740,7 @@ named!(list_op_expression<TokenIter, Expression, error::Error>,
 // It also means this combinator is risky when used with partial
 // inputs. So handle with care.
 named!(expression<TokenIter, Expression, error::Error>,
-    do_parse!(
-        expr: alt!(
-           complete!(list_op_expression) |
-           complete!(math_expression) |
-           complete!(eqeq_expression) |
-           complete!(not_eqeq_expression) |
-           complete!(lt_eqeq_expression) |
-           complete!(gt_eqeq_expression) |
-           complete!(gt_expression) |
-           complete!(lt_expression) |
-           complete!(macro_expression) |
-           complete!(format_expression) |
-           complete!(select_expression) |
-           complete!(call_expression) |
-           complete!(copy_expression) |
-           complete!(grouped_expression) |
-           simple_expression
-       ) >>
-       (expr)
-    )
+    alt!(complete!(op_expression) | complete!(non_op_expression))
 );
 
 fn expression_to_statement(v: Expression) -> ParseResult<Statement> {
