@@ -597,7 +597,7 @@ fn test_expression_parse() {
             kind: BinaryExprType::Add,
             left: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 2)))),
             right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 6)))),
-            pos: Position::new(1, 2), // FIXME(jwall): grouped expressions appear to be getting positioned wrong
+            pos: Position::new(1, 2),
         })))
     );
     assert_parse!(

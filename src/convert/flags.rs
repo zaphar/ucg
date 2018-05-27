@@ -79,7 +79,6 @@ impl FlagConverter {
                 try!(write!(w, "'{}' ", s));
             }
             &Val::List(ref _def) => {
-                // FIXME(jwall): Fill this in?
                 eprintln!("Skipping List...");
             }
             &Val::Tuple(ref flds) => for &(ref name, ref val) in flds.iter() {

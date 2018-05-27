@@ -1057,7 +1057,6 @@ impl Builder {
         }
     }
 
-    // FIXME(jwall): We still need to write unit tests for these.
     fn eval_list_op(&self, def: &ListOpDef) -> Result<Rc<Val>, Box<Error>> {
         let l = &def.target.elems;
         let mac = &def.mac;

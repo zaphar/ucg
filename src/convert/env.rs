@@ -17,7 +17,7 @@ use std::io::Result;
 use std::io::Write;
 use std::rc::Rc;
 
-use ast::*;
+use ast::Positioned;
 use build::Val;
 use convert::traits::Converter;
 
@@ -51,7 +51,6 @@ impl EnvConverter {
     }
 
     fn convert_list(&self, _items: &Vec<Rc<Val>>, _w: &mut Write) -> Result<()> {
-        // FIXME(jwall): Fill this in?
         // TODO(jwall)
         eprintln!("Skipping List...");
         Ok(())
