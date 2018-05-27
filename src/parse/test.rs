@@ -363,6 +363,37 @@ fn test_expression_parse() {
                                                              1, 1)))
     );
     assert_parse!(
+        expression("{foo=1}.foo "),
+        Expression::Simple(Value::Selector(
+            make_selector!(Expression::Simple(Value::Tuple(
+            value_node!(vec![
+                    (
+                    make_tok!("foo", 1, 2),
+                    Expression::Simple(Value::Int(value_node!(1, 1, 6))),
+                    ),
+                ],
+                1, 1),
+        )) =>
+        [ make_tok!("foo", 1, 9) ] =>
+        1, 1)
+        ))
+    );
+    assert_parse!(
+        expression("[1, 2].1 "),
+        Expression::Simple(Value::Selector(
+            make_selector!(Expression::Simple(Value::List(
+            ListDef{
+                elems: vec![
+                    Expression::Simple(Value::Int(value_node!(1, 1, 2))),
+                    Expression::Simple(Value::Int(value_node!(2, 1, 5))),
+                ],
+                pos: Position::new(1, 1),
+            })) =>
+            [ make_tok!(DIGIT => "1", 1, 8) ] =>
+            1, 1)
+        ))
+    );
+    assert_parse!(
         expression("1 + 1"),
         Expression::Binary(BinaryOpDef {
             kind: BinaryExprType::Add,

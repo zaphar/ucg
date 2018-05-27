@@ -216,15 +216,25 @@ named!(empty_value<TokenIter, Value, error::Error>,
     )
 );
 
-named!(value<TokenIter, Value, error::Error>,
+named!(compound_value<TokenIter, Value, error::Error>,
+    alt!(list_value | tuple)
+);
+
+named!(scalar_value<TokenIter, Value, error::Error>,
     alt!(
         boolean_value |
         empty_value |
         number |
-        quoted_value |
-        list_value |
-        tuple |
-        selector_value )
+        quoted_value
+    )
+);
+
+named!(value<TokenIter, Value, error::Error>,
+    alt!(
+        selector_value
+        | compound_value
+        | scalar_value
+    )
  );
 
 fn value_to_expression(v: Value) -> ParseResult<Expression> {
@@ -382,18 +392,38 @@ named!(grouped_expression<TokenIter, Expression, error::Error>,
 );
 
 fn symbol_or_expression(input: TokenIter) -> NomResult<Expression> {
-    let sym = do_parse!(input, sym: symbol >> (sym));
+    let scalar_head = do_parse!(input, sym: alt!(symbol | compound_value) >> (sym));
 
-    match sym {
-        IResult::Incomplete(i) => {
-            return IResult::Incomplete(i);
-        }
-        IResult::Error(_) => {
-            // TODO(jwall): Still missing some. But we need to avoid recursion
-            return grouped_expression(input);
-        }
+    match scalar_head {
+        IResult::Incomplete(i) => IResult::Incomplete(i),
+        IResult::Error(_) => grouped_expression(input),
         IResult::Done(rest, val) => {
-            return IResult::Done(rest, Expression::Simple(val));
+            let res = peek!(rest.clone(), punct!("."));
+            match val {
+                Value::Tuple(_) => {
+                    if res.is_done() {
+                        IResult::Done(rest, Expression::Simple(val))
+                    } else {
+                        return IResult::Error(nom::ErrorKind::Custom(error::Error::new(
+                            "Expected (.) but no dot found".to_string(),
+                            error::ErrorType::IncompleteParsing,
+                            val.pos().clone(),
+                        )));
+                    }
+                }
+                Value::List(_) => {
+                    if res.is_done() {
+                        IResult::Done(rest, Expression::Simple(val))
+                    } else {
+                        return IResult::Error(nom::ErrorKind::Custom(error::Error::new(
+                            "Expected (.) but no dot found".to_string(),
+                            error::ErrorType::IncompleteParsing,
+                            val.pos().clone(),
+                        )));
+                    }
+                }
+                _ => IResult::Done(rest, Expression::Simple(val)),
+            }
         }
     }
 }
