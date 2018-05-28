@@ -80,7 +80,7 @@ fn test_expression_comparisons() {
 
 #[test]
 fn test_binary_operator_precedence() {
-    //assert_build("let result = 2 * 2 + 1;", "result == 6;");
-    assert_build("let result = 2 + 2 * 1;", "result == 4;");
-    assert_build("let result = (2 * 2) + 1;", "result == 5;");
+    assert_build("let result = 2 * 2 + 1;", "result == 5;");
+    assert_build("let result = 2 + 2 * 3;", "result == 8;");
+    assert_build("let result = 2 * (2 + 1);", "result == 6;");
 }
