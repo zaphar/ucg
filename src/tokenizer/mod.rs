@@ -116,9 +116,9 @@ named!(booleantok( Span ) -> Token,
 /// less code.
 macro_rules! do_tag_tok {
     // NOTE(jwall): Nom macros do magic with their inputs. They in fact
-    // rewrite your macro argumets for you. Which means we require this $i
-    // paramater even though we don't explicitely pass it below. I don't
-    // particularly like this but I'm living with it for now.
+    // rewrite your macro argumets for you by adding an initial argument
+    // for all their sub-macros. Which means we require this $i paramater
+    // on the first macro invocation but not the rest.
     ($i:expr, $type:expr, $tag:expr) => {
         do_parse!(
             $i,

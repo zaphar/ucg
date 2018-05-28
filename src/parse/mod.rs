@@ -132,8 +132,6 @@ named!(number<TokenIter, Value, error::Error>,
            )) |
            do_parse!( // 1
                prefix: match_type!(DIGIT) >>
-// The peek!(not!(..)) make this whole combinator slightly
-// safer for partial inputs.
                (Some(prefix.clone()), None, None)
            )),
            triple_to_number
@@ -754,16 +752,6 @@ named!(non_op_expression<TokenIter, Expression, error::Error>,
          simple_expression)
 );
 
-// NOTE(jwall): HERE THERE BE DRAGONS. The order for these matters
-// a lot. We need to process alternatives in order of decreasing
-// specificity.  Unfortunately this means we are required to go in a
-// decreasing size order which messes with alt!'s completion logic. To
-// work around this we have to force Incomplete to be Error so that
-// alt! will try the next in the series instead of aborting.
-//
-// *IMPORTANT*
-// It also means this combinator is risky when used with partial
-// inputs. So handle with care.
 named!(expression<TokenIter, Expression, error::Error>,
     alt!(complete!(op_expression) | complete!(non_op_expression))
 );
