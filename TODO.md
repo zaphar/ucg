@@ -24,6 +24,7 @@ Some options here could be:
 
 # Minor Fixes and Polish
 
+* Streaming Parsing
 * Casting between types?
 * Better error messages.
 * Allow trailing commas.

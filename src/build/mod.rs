@@ -113,7 +113,6 @@ impl Val {
         )
     }
 
-    // TODO(jwall): Unit Tests for this.
     pub fn equal(&self, target: &Self, pos: Position) -> Result<bool, error::Error> {
         // first we do a type equality comparison
         match (self, target) {
@@ -128,7 +127,6 @@ impl Val {
                     Ok(false)
                 } else {
                     for (i, v) in ldef.iter().enumerate() {
-                        // TODO(jwall): We should probably do a slightly better error message here.
                         try!(v.equal(lldef[i].as_ref(), pos.clone()));
                     }
                     Ok(true)
@@ -140,16 +138,10 @@ impl Val {
                 } else {
                     for (i, v) in ldef.iter().enumerate() {
                         let field_target = &lldef[i];
-                        eprintln!(
-                            "left field: '{}', right field: '{}'",
-                            v.0.val, field_target.0.val
-                        );
                         if v.0.val != field_target.0.val {
                             // field name equality
-                            eprintln!("Field Not equal!!!");
                             return Ok(false);
                         } else {
-                            eprintln!("Field Equal!!!");
                             // field value equality.
                             if !try!(v.1.equal(field_target.1.as_ref(), v.0.pos.clone())) {
                                 return Ok(false);
@@ -353,7 +345,6 @@ impl Builder {
 
     /// Constructs a new Builder.
     pub fn new() -> Self {
-        // TODO(jwall): Construct a map with the environment variables in it.
         Self::new_with_scope(HashMap::new())
     }
 
@@ -418,7 +409,6 @@ impl Builder {
     pub fn build_file(&mut self, name: &str) -> BuildResult {
         let mut f = try!(File::open(name));
         let mut s = String::new();
-        // TODO(jwall): It would be nice to be able to do this while streaming
         try!(f.read_to_string(&mut s));
         self.build_file_string(s)
     }
@@ -519,7 +509,6 @@ impl Builder {
         if let Some(vv) = Self::find_in_fieldlist(next.1, fs) {
             stack.push_back(vv.clone());
         } else {
-            // TODO(jwall): A better error for this would be nice.
             return Err(Box::new(error::Error::new(
                 format!(
                     "Unable to \
@@ -541,12 +530,10 @@ impl Builder {
         next: (&Position, &str),
         elems: &Vec<Rc<Val>>,
     ) -> Result<(), Box<Error>> {
-        // TODO(jwall): better error reporting here would probably be good.
         let idx = try!(next.1.parse::<usize>());
         if idx < elems.len() {
             stack.push_back(elems[idx].clone());
         } else {
-            // TODO(jwall): A better error for this would be nice.
             return Err(Box::new(error::Error::new(
                 format!(
                     "Unable to \
@@ -563,7 +550,6 @@ impl Builder {
 
     fn lookup_selector(&self, sl: &SelectorList) -> Result<Rc<Val>, Box<Error>> {
         let first = try!(self.eval_expr(&sl.head));
-        // TODO(jwall): Handle environment lookups.
         // First we ensure that the result is a tuple or a list.
         let mut stack = VecDeque::new();
         match first.as_ref() {
@@ -904,7 +890,6 @@ impl Builder {
         if let Val::Tuple(ref src_fields) = *v {
             let mut m = HashMap::<Positioned<String>, (i32, Rc<Val>)>::new();
             // loop through fields and build  up a hashmap
-            // TODO(jwall): Maintain field order here.
             let mut count = 0;
             for &(ref key, ref val) in src_fields.iter() {
                 if let Entry::Vacant(v) = m.entry(key.clone()) {
@@ -925,7 +910,6 @@ impl Builder {
             }
             for &(ref key, ref val) in def.fields.iter() {
                 let expr_result = try!(self.eval_expr(val));
-                // TODO(jwall): Maintain field order here.
                 match m.entry(key.into()) {
                     // brand new field here.
                     Entry::Vacant(v) => {
@@ -1092,7 +1076,6 @@ impl Builder {
     // Evals a single Expression in the context of a running Builder.
     // It does not mutate the builders collected state at all.
     pub fn eval_expr(&self, expr: &Expression) -> Result<Rc<Val>, Box<Error>> {
-        // TODO(jwall): We need a rewrite step to handle operator precendence order.
         match expr {
             &Expression::Simple(ref val) => self.value_to_val(val),
             &Expression::Binary(ref def) => self.eval_binary(def),

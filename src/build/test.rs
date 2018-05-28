@@ -377,7 +377,6 @@ fn test_eval_selector_list_expr() {
                 (value_node!("var2".to_string(), 1, 1), Rc::new(Val::Int(1))),
             ])),
         ])));
-    // TODO(jwall): Assert that we can index into lists using dot syntax.
 
     test_expr_to_val(
         vec![

@@ -416,8 +416,6 @@ pub struct SelectDef {
     pub pos: Position,
 }
 
-// TODO(jwall): This should have a way of rendering with position information.
-
 /// Adds position information to any type `T`.
 #[derive(Debug, Clone)]
 pub struct Positioned<T> {

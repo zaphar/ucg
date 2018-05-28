@@ -94,7 +94,6 @@ impl Error {
     ) -> Self {
         match cause {
             nom::ErrorKind::Custom(e) => Self::new_with_cause(msg, t, pos, e),
-            // TODO(jwall): We could get more creative here with our messaging.
             _ => Self::new(msg, t, pos),
         }
     }

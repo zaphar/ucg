@@ -68,8 +68,6 @@ impl JsonConverter {
             }
             &Val::String(ref s) => serde_json::Value::String(s.clone()),
             &Val::Macro(_) => {
-                // TODO(jwall): We probably want to actually skip this but for now
-                // we'll use null
                 eprintln!("Skipping macro encoding as null...");
                 serde_json::Value::Null
             }

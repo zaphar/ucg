@@ -54,7 +54,6 @@ fn run_converter(c: ConverterRunner, v: Rc<Val>, f: Option<&str>) -> io::Result<
 }
 
 fn main() {
-    // TODO(jwall): Read and build an actual file.
     let app = do_flags();
     if let Some(matches) = app.subcommand_matches("build") {
         let file = matches.value_of("INPUT").unwrap();

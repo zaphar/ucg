@@ -519,7 +519,6 @@ fn tuple_to_macro(mut t: (Position, Vec<Value>, Value)) -> ParseResult<Expressio
             fields: v.val,
             pos: t.0,
         })),
-        // TODO(jwall): Show a better version of the unexpected parsed value.
         val => Err(error::Error::new(
             format!("Expected Tuple Got {:?}", val),
             error::ErrorType::UnexpectedToken,
@@ -651,20 +650,17 @@ fn symbol_or_list(input: TokenIter) -> NomResult<Value> {
         IResult::Incomplete(i) => {
             return IResult::Incomplete(i);
         }
-        IResult::Error(_) => {
-            // TODO(jwall): Still missing some. But we need to avoid recursion
-            match list_value(input) {
-                IResult::Incomplete(i) => {
-                    return IResult::Incomplete(i);
-                }
-                IResult::Error(e) => {
-                    return IResult::Error(e);
-                }
-                IResult::Done(i, val) => {
-                    return IResult::Done(i, val);
-                }
+        IResult::Error(_) => match list_value(input) {
+            IResult::Incomplete(i) => {
+                return IResult::Incomplete(i);
             }
-        }
+            IResult::Error(e) => {
+                return IResult::Error(e);
+            }
+            IResult::Done(i, val) => {
+                return IResult::Done(i, val);
+            }
+        },
         IResult::Done(rest, val) => {
             return IResult::Done(rest, val);
         }
@@ -721,15 +717,14 @@ fn tuple_to_list_op(tpl: (Position, Token, Value, Value)) -> ParseResult<Express
                 pos: pos,
             }));
         }
-        // TODO(jwall): We should print a pretter message than debug formatting here.
         return Err(error::Error::new(
-            format!("Expected a list but got {:?}", list),
+            format!("Expected a list but got {}", list.type_name()),
             error::ErrorType::UnexpectedToken,
             pos,
         ));
     }
     return Err(error::Error::new(
-        format!("Expected a selector but got {:?}", macroname),
+        format!("Expected a selector but got {}", macroname.type_name()),
         error::ErrorType::UnexpectedToken,
         pos,
     ));

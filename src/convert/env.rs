@@ -35,7 +35,6 @@ impl EnvConverter {
         w: &mut Write,
     ) -> Result<()> {
         for &(ref name, ref val) in flds.iter() {
-            // TODO(jwall): What if the value is a tuple?
             if val.is_tuple() {
                 eprintln!("Skipping embedded tuple...");
                 return Ok(());
@@ -51,7 +50,6 @@ impl EnvConverter {
     }
 
     fn convert_list(&self, _items: &Vec<Rc<Val>>, _w: &mut Write) -> Result<()> {
-        // TODO(jwall)
         eprintln!("Skipping List...");
         Ok(())
     }

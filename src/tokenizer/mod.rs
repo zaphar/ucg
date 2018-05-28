@@ -59,7 +59,6 @@ fn escapequoted(input: Span) -> nom::IResult<Span, String> {
     return nom::IResult::Incomplete(nom::Needed::Unknown);
 }
 
-// TODO(jwall): Handle escapes
 named!(strtok( Span ) -> Token,
        do_parse!(
            span: position!() >>
@@ -179,8 +178,6 @@ named!(slashtok( Span ) -> Token,
 named!(pcttok( Span ) -> Token,
        do_tag_tok!(TokenType::PUNCT, "%")
 );
-
-// TODO(jwall): Comparison operators.
 
 named!(eqeqtok( Span ) -> Token,
        do_tag_tok!(TokenType::PUNCT, "==")
