@@ -180,6 +180,7 @@ named!(
             pos: pos >>
             punct!("{") >>
             v: field_list >>
+            opt_res!(punct!(",")) >> // nom's opt! macro doesn't preserve error types properly but this one does.
             punct!("}") >>
             (pos, Some(v))
         ),
@@ -199,6 +200,7 @@ named!(list_value<TokenIter, Value, error::Error>,
            do_parse!(
                start: punct!("[") >>
                elements: separated_list!(punct!(","), expression) >>
+               opt_res!(punct!(",")) >> // nom's opt! macro doesn't preserve error types properly but this one does.
                punct!("]") >>
                (start.pos, elements)
            ),
@@ -497,6 +499,7 @@ named!(copy_expression<TokenIter, Expression, error::Error>,
             selector: selector_list >>
             punct!("{") >>
             fields: field_list >>
+            opt_res!(punct!(",")) >> // noms opt! macro does not preserve error types properly but this one does.
             punct!("}") >>
             (SelectorDef::new(selector, pos.line, pos.column as usize), fields)
         ),

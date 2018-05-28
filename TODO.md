@@ -22,13 +22,18 @@ Some options here could be:
 * DSL's
 * Annotations
 
+## Built In testing as a part of the language
+
+* A DSL for assertions.
+* A DSL for identifying tests.
+* A way to run tests only during validation stage.
+
 # Minor Fixes and Polish
 
+* Strings as tuple fields?
 * Streaming Parsing
 * Casting between types?
 * Better error messages.
-* Allow trailing commas.
 * Flags should allow different seperators for prefixed flags.
 * YAML export
 * HCL export
-* Integration Testing framework

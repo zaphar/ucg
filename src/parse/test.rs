@@ -768,6 +768,19 @@ fn test_copy_parse() {
             pos: Position::new(1, 1),
         })
     );
+    assert_parse!(
+        copy_expression("foo{bar=1,}"),
+        Expression::Copy(CopyDef {
+            selector: make_selector!(make_expr!("foo", 1, 1), 1, 1),
+            fields: vec![
+                (
+                    make_tok!("bar", 1, 5),
+                    Expression::Simple(Value::Int(value_node!(1, 1, 9))),
+                ),
+            ],
+            pos: Position::new(1, 1),
+        })
+    );
 }
 
 #[test]
@@ -813,6 +826,17 @@ fn test_list_value_parse() {
 
     assert_parse!(
         list_value("[1, 1]"),
+        Value::List(ListDef {
+            elems: vec![
+                Expression::Simple(Value::Int(value_node!(1, 1, 2))),
+                Expression::Simple(Value::Int(value_node!(1, 1, 5))),
+            ],
+            pos: Position::new(1, 1),
+        })
+    );
+
+    assert_parse!(
+        list_value("[1, 1,]"),
         Value::List(ListDef {
             elems: vec![
                 Expression::Simple(Value::Int(value_node!(1, 1, 2))),
@@ -977,6 +1001,23 @@ fn test_tuple_parse() {
     );
     assert_parse!(
         tuple("{ foo = 1, bar = {} }"),
+        Value::Tuple(value_node!(
+            vec![
+                (
+                    make_tok!("foo", 1, 3),
+                    Expression::Simple(Value::Int(value_node!(1, Position::new(1, 9)))),
+                ),
+                (
+                    make_tok!("bar", 1, 12),
+                    Expression::Simple(Value::Tuple(value_node!(Vec::new(), Position::new(1, 17)))),
+                ),
+            ],
+            1,
+            1
+        ))
+    );
+    assert_parse!(
+        tuple("{ foo = 1, bar = {}, }"),
         Value::Tuple(value_node!(
             vec![
                 (

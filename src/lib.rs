@@ -115,7 +115,8 @@
 //!
 //! #### Lists
 //!
-//! Lists are surrounded with square brackets `[ ]` and have comma separated elements.
+//! Lists are surrounded with square brackets `[ ]` and have comma separated elements. Trailing
+//! commas are permitted in lists.
 //!
 //! ```ucg
 //! [1, 2, 3]; // A simple list of numbers.
