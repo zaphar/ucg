@@ -1,7 +1,8 @@
 use super::{Builder, Val};
+use std;
 
 fn assert_build<S: Into<String>>(input: S, assert: &str) {
-    let mut b = Builder::new();
+    let mut b = Builder::new(std::env::current_dir().unwrap());
     b.build_file_string(input.into()).unwrap();
     let result = b.eval_string(assert).unwrap();
     if let &Val::Boolean(ok) = result.as_ref() {

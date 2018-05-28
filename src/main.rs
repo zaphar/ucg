@@ -60,7 +60,7 @@ fn main() {
         let out = matches.value_of("out");
         let sym = matches.value_of("sym");
         let target = matches.value_of("target").unwrap();
-        let mut builder = build::Builder::new();
+        let mut builder = build::Builder::new(std::env::current_dir().unwrap());
         match ConverterRunner::new(target) {
             Ok(converter) => {
                 let result = builder.build_file(file);
@@ -91,7 +91,7 @@ fn main() {
         }
     } else if let Some(matches) = app.subcommand_matches("validate") {
         let file = matches.value_of("INPUT").unwrap();
-        let mut builder = build::Builder::new();
+        let mut builder = build::Builder::new(std::env::current_dir().unwrap());
         builder.build_file(file).unwrap();
         println!("File Validates");
         process::exit(0);

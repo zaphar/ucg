@@ -23,7 +23,9 @@ use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::Read;
 use std::ops::Deref;
+use std::path::PathBuf;
 use std::rc::Rc;
+use std::string::ToString;
 
 use ast::*;
 use error;
@@ -35,6 +37,8 @@ impl MacroDef {
     /// Expands a ucg Macro using the given arguments into a new Tuple.
     pub fn eval(
         &self,
+        root: PathBuf,
+        env: Rc<Val>,
         mut args: Vec<Rc<Val>>,
     ) -> Result<Vec<(Positioned<String>, Rc<Val>)>, Box<Error>> {
         // Error conditions. If the args don't match the length and types of the argdefs then this is
@@ -54,7 +58,7 @@ impl MacroDef {
         for (i, arg) in args.drain(0..).enumerate() {
             scope.entry(self.argdefs[i].clone()).or_insert(arg.clone());
         }
-        let b = Builder::new_with_scope(scope);
+        let b = Builder::new_with_env_and_scope(root, scope, env);
         let mut result: Vec<(Positioned<String>, Rc<Val>)> = Vec::new();
         for &(ref key, ref expr) in self.fields.iter() {
             // We clone the expressions here because this macro may be consumed
@@ -272,6 +276,7 @@ type ValueMap = HashMap<Positioned<String>, Rc<Val>>;
 
 /// Handles building ucg code.
 pub struct Builder {
+    root: PathBuf,
     env: Rc<Val>,
     /// assets are other parsed files from import statements. They
     /// are keyed by the normalized import path. This acts as a cache
@@ -344,21 +349,26 @@ impl Builder {
     }
 
     /// Constructs a new Builder.
-    pub fn new() -> Self {
-        Self::new_with_scope(HashMap::new())
+    pub fn new<P: Into<PathBuf>>(root: P) -> Self {
+        Self::new_with_scope(root, HashMap::new())
     }
 
     /// Constructs a new Builder with a provided scope.
-    pub fn new_with_scope(scope: ValueMap) -> Self {
+    pub fn new_with_scope<P: Into<PathBuf>>(root: P, scope: ValueMap) -> Self {
         let env_vars: Vec<(Positioned<String>, Rc<Val>)> = env::vars()
             .map(|t| (Positioned::new(t.0, 0, 0), Rc::new(t.1.into())))
             .collect();
-        Self::new_with_env_and_scope(scope, Val::Tuple(env_vars))
+        Self::new_with_env_and_scope(root, scope, Rc::new(Val::Tuple(env_vars)))
     }
 
-    pub fn new_with_env_and_scope(scope: ValueMap, env: Val) -> Self {
+    pub fn new_with_env_and_scope<P: Into<PathBuf>>(
+        root: P,
+        scope: ValueMap,
+        env: Rc<Val>,
+    ) -> Self {
         Builder {
-            env: Rc::new(env),
+            root: root.into(),
+            env: env,
             assets: HashMap::new(),
             files: HashSet::new(),
             out: scope,
@@ -416,10 +426,13 @@ impl Builder {
     fn build_import(&mut self, def: &ImportDef) -> Result<Rc<Val>, Box<Error>> {
         let sym = &def.name;
         let positioned_sym = sym.into();
-        if !self.files.contains(&def.path.fragment) {
+        let mut normalized = self.root.to_path_buf();
+        normalized.push(&def.path.fragment);
+        let key = normalized.to_str().unwrap().to_string();
+        if !self.files.contains(&key) {
             // Only parse the file once on import.
             if self.assets.get(&positioned_sym).is_none() {
-                let mut b = Self::new();
+                let mut b = Self::new(normalized);
                 try!(b.build_file(&def.path.fragment));
                 let fields: Vec<(Positioned<String>, Rc<Val>)> = b.out.drain().collect();
                 let result = Rc::new(Val::Tuple(fields));
@@ -985,7 +998,7 @@ impl Builder {
             for arg in args.iter() {
                 argvals.push(try!(self.eval_expr(arg)));
             }
-            let fields = try!(m.eval(argvals));
+            let fields = try!(m.eval(self.root.clone(), self.env.clone(), argvals));
             return Ok(Rc::new(Val::Tuple(fields)));
         }
         Err(Box::new(error::Error::new(
@@ -1048,7 +1061,7 @@ impl Builder {
             let mut out = Vec::new();
             for expr in l.iter() {
                 let argvals = vec![try!(self.eval_expr(expr))];
-                let fields = try!(macdef.eval(argvals));
+                let fields = try!(macdef.eval(self.root.clone(), self.env.clone(), argvals));
                 if let Some(v) = Self::find_in_fieldlist(&def.field, &fields) {
                     match def.typ {
                         ListOpType::Map => {

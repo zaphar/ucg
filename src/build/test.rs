@@ -1,5 +1,7 @@
 use super::{Builder, CallDef, MacroDef, SelectDef, Val};
 use ast::*;
+
+use std;
 use std::rc::Rc;
 
 fn test_expr_to_val(mut cases: Vec<(Expression, Val)>, b: Builder) {
@@ -10,7 +12,7 @@ fn test_expr_to_val(mut cases: Vec<(Expression, Val)>, b: Builder) {
 
 #[test]
 fn test_eval_div_expr() {
-    let b = Builder::new();
+    let b = Builder::new(std::env::current_dir().unwrap());
     test_expr_to_val(
         vec![
             (
@@ -39,7 +41,7 @@ fn test_eval_div_expr() {
 #[test]
 #[should_panic(expected = "Expected Float")]
 fn test_eval_div_expr_fail() {
-    let b = Builder::new();
+    let b = Builder::new(std::env::current_dir().unwrap());
     test_expr_to_val(
         vec![
             (
@@ -58,7 +60,7 @@ fn test_eval_div_expr_fail() {
 
 #[test]
 fn test_eval_mul_expr() {
-    let b = Builder::new();
+    let b = Builder::new(std::env::current_dir().unwrap());
     test_expr_to_val(
         vec![
             (
@@ -87,7 +89,7 @@ fn test_eval_mul_expr() {
 #[test]
 #[should_panic(expected = "Expected Float")]
 fn test_eval_mul_expr_fail() {
-    let b = Builder::new();
+    let b = Builder::new(std::env::current_dir().unwrap());
     test_expr_to_val(
         vec![
             (
@@ -106,7 +108,7 @@ fn test_eval_mul_expr_fail() {
 
 #[test]
 fn test_eval_subtract_expr() {
-    let b = Builder::new();
+    let b = Builder::new(std::env::current_dir().unwrap());
     test_expr_to_val(
         vec![
             (
@@ -135,7 +137,7 @@ fn test_eval_subtract_expr() {
 #[test]
 #[should_panic(expected = "Expected Float")]
 fn test_eval_subtract_expr_fail() {
-    let b = Builder::new();
+    let b = Builder::new(std::env::current_dir().unwrap());
     test_expr_to_val(
         vec![
             (
@@ -154,7 +156,7 @@ fn test_eval_subtract_expr_fail() {
 
 #[test]
 fn test_eval_add_expr() {
-    let b = Builder::new();
+    let b = Builder::new(std::env::current_dir().unwrap());
     test_expr_to_val(
         vec![
             (
@@ -222,7 +224,7 @@ fn test_eval_add_expr() {
 #[test]
 #[should_panic(expected = "Expected Float")]
 fn test_eval_add_expr_fail() {
-    let b = Builder::new();
+    let b = Builder::new(std::env::current_dir().unwrap());
     test_expr_to_val(
         vec![
             (
@@ -271,13 +273,13 @@ fn test_eval_simple_expr() {
                 ]),
             ),
         ],
-        Builder::new(),
+        Builder::new(std::env::current_dir().unwrap()),
     );
 }
 
 #[test]
 fn test_eval_simple_lookup_expr() {
-    let mut b = Builder::new();
+    let mut b = Builder::new(std::env::current_dir().unwrap());
     b.out
         .entry(value_node!("var1".to_string(), 1, 0))
         .or_insert(Rc::new(Val::Int(1)));
@@ -294,7 +296,7 @@ fn test_eval_simple_lookup_expr() {
 
 #[test]
 fn test_eval_simple_lookup_error() {
-    let mut b = Builder::new();
+    let mut b = Builder::new(std::env::current_dir().unwrap());
     b.out
         .entry(value_node!("var1".to_string(), 1, 0))
         .or_insert(Rc::new(Val::Int(1)));
@@ -304,7 +306,7 @@ fn test_eval_simple_lookup_error() {
 
 #[test]
 fn test_eval_selector_expr() {
-    let mut b = Builder::new();
+    let mut b = Builder::new(std::env::current_dir().unwrap());
     b.out
         .entry(value_node!("var1".to_string(), 1, 0))
         .or_insert(Rc::new(Val::Tuple(vec![
@@ -368,7 +370,7 @@ fn test_eval_selector_expr() {
 
 #[test]
 fn test_eval_selector_list_expr() {
-    let mut b = Builder::new();
+    let mut b = Builder::new(std::env::current_dir().unwrap());
     b.out
         .entry(value_node!("var1".to_string(), 1, 1))
         .or_insert(Rc::new(Val::List(vec![
@@ -394,7 +396,7 @@ fn test_eval_selector_list_expr() {
 #[test]
 #[should_panic(expected = "Unable to find tpl1")]
 fn test_expr_copy_no_such_tuple() {
-    let b = Builder::new();
+    let b = Builder::new(std::env::current_dir().unwrap());
     test_expr_to_val(
         vec![
             (
@@ -413,7 +415,7 @@ fn test_expr_copy_no_such_tuple() {
 #[test]
 #[should_panic(expected = "Expected Tuple got Int(1)")]
 fn test_expr_copy_not_a_tuple() {
-    let mut b = Builder::new();
+    let mut b = Builder::new(std::env::current_dir().unwrap());
     b.out
         .entry(value_node!("tpl1".to_string(), 1, 0))
         .or_insert(Rc::new(Val::Int(1)));
@@ -435,7 +437,7 @@ fn test_expr_copy_not_a_tuple() {
 #[test]
 #[should_panic(expected = "Expected type Integer for field fld1 but got String")]
 fn test_expr_copy_field_type_error() {
-    let mut b = Builder::new();
+    let mut b = Builder::new(std::env::current_dir().unwrap());
     b.out
         .entry(value_node!("tpl1".to_string(), 1, 0))
         .or_insert(Rc::new(Val::Tuple(vec![
@@ -468,7 +470,7 @@ fn test_expr_copy_field_type_error() {
 
 #[test]
 fn test_expr_copy() {
-    let mut b = Builder::new();
+    let mut b = Builder::new(std::env::current_dir().unwrap());
     b.out
         .entry(value_node!("tpl1".to_string(), 1, 0))
         .or_insert(Rc::new(Val::Tuple(vec![
@@ -539,7 +541,7 @@ fn test_expr_copy() {
 
 #[test]
 fn test_macro_call() {
-    let mut b = Builder::new();
+    let mut b = Builder::new(std::env::current_dir().unwrap());
     b.out
         .entry(value_node!("tstmac".to_string(), 1, 0))
         .or_insert(Rc::new(Val::Macro(MacroDef {
@@ -577,7 +579,7 @@ fn test_macro_call() {
 #[test]
 #[should_panic(expected = "Unable to find arg1")]
 fn test_macro_hermetic() {
-    let mut b = Builder::new();
+    let mut b = Builder::new(std::env::current_dir().unwrap());
     b.out
         .entry(value_node!("arg1".to_string(), 1, 0))
         .or_insert(Rc::new(Val::String("bar".to_string())));
@@ -617,7 +619,7 @@ fn test_macro_hermetic() {
 
 #[test]
 fn test_select_expr() {
-    let mut b = Builder::new();
+    let mut b = Builder::new(std::env::current_dir().unwrap());
     b.out
         .entry(value_node!("foo".to_string(), 1, 0))
         .or_insert(Rc::new(Val::String("bar".to_string())));
@@ -679,7 +681,7 @@ fn test_select_expr() {
 #[test]
 #[should_panic(expected = "Expected String but got Integer in Select expression")]
 fn test_select_expr_not_a_string() {
-    let mut b = Builder::new();
+    let mut b = Builder::new(std::env::current_dir().unwrap());
     b.out
         .entry(value_node!("foo".to_string(), 1, 0))
         .or_insert(Rc::new(Val::Int(4)));
@@ -714,7 +716,7 @@ fn test_select_expr_not_a_string() {
 
 #[test]
 fn test_let_statement() {
-    let mut b = Builder::new();
+    let mut b = Builder::new(std::env::current_dir().unwrap());
     let stmt = Statement::Let(LetDef {
         name: make_tok!("foo", 1, 1),
         value: Expression::Simple(Value::String(value_node!("bar".to_string(), 1, 1))),
@@ -733,7 +735,7 @@ fn test_let_statement() {
 
 #[test]
 fn test_build_file_string() {
-    let mut b = Builder::new();
+    let mut b = Builder::new(std::env::current_dir().unwrap());
     b.build_file_string("let foo = 1;".to_string()).unwrap();
     let key = value_node!("foo".to_string(), 1, 0);
     assert!(b.out.contains_key(&key));
@@ -741,7 +743,7 @@ fn test_build_file_string() {
 
 #[test]
 fn test_asset_symbol_lookups() {
-    let mut b = Builder::new();
+    let mut b = Builder::new(std::env::current_dir().unwrap());
     b.assets
         .entry(value_node!("foo".to_string(), 1, 0))
         .or_insert(Rc::new(Val::Tuple(vec![
