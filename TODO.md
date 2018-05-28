@@ -30,6 +30,7 @@ Some options here could be:
 
 # Minor Fixes and Polish
 
+* Compiler caching?
 * Strings as tuple fields?
 * Streaming Parsing
 * Casting between types?
