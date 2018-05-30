@@ -547,16 +547,14 @@ fn test_expression_parse() {
                 value_node!("arg1".to_string(), 1, 8),
                 value_node!("arg2".to_string(), 1, 14),
             ],
-            fields: vec![
-                (
-                    make_tok!("foo", 1, 25),
-                    Expression::Simple(Value::Selector(make_selector!(
-                        make_expr!("arg1", 1, 31),
-                        1,
-                        31
-                    ))),
-                ),
-            ],
+            fields: vec![(
+                make_tok!("foo", 1, 25),
+                Expression::Simple(Value::Selector(make_selector!(
+                    make_expr!("arg1", 1, 31),
+                    1,
+                    31
+                ))),
+            )],
             pos: Position::new(1, 1),
         })
     );
@@ -569,12 +567,10 @@ fn test_expression_parse() {
                 8
             )))),
             default: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 13)))),
-            tuple: vec![
-                (
-                    make_tok!("foo", 1, 18),
-                    Expression::Simple(Value::Int(value_node!(2, 1, 24))),
-                ),
-            ],
+            tuple: vec![(
+                make_tok!("foo", 1, 18),
+                Expression::Simple(Value::Int(value_node!(2, 1, 24))),
+            )],
             pos: Position::new(1, 1),
         })
     );
@@ -693,12 +689,10 @@ fn test_select_parse() {
                 8
             )))),
             default: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 13)))),
-            tuple: vec![
-                (
-                    make_tok!("foo", 1, 18),
-                    Expression::Simple(Value::Int(value_node!(2, 1, 24))),
-                ),
-            ],
+            tuple: vec![(
+                make_tok!("foo", 1, 18),
+                Expression::Simple(Value::Int(value_node!(2, 1, 24))),
+            )],
             pos: Position::new(1, 1),
         })
     );
@@ -759,12 +753,10 @@ fn test_copy_parse() {
         copy_expression("foo{bar=1}"),
         Expression::Copy(CopyDef {
             selector: make_selector!(make_expr!("foo", 1, 1), 1, 1),
-            fields: vec![
-                (
-                    make_tok!("bar", 1, 5),
-                    Expression::Simple(Value::Int(value_node!(1, 1, 9))),
-                ),
-            ],
+            fields: vec![(
+                make_tok!("bar", 1, 5),
+                Expression::Simple(Value::Int(value_node!(1, 1, 9))),
+            )],
             pos: Position::new(1, 1),
         })
     );
@@ -772,12 +764,10 @@ fn test_copy_parse() {
         copy_expression("foo{bar=1,}"),
         Expression::Copy(CopyDef {
             selector: make_selector!(make_expr!("foo", 1, 1), 1, 1),
-            fields: vec![
-                (
-                    make_tok!("bar", 1, 5),
-                    Expression::Simple(Value::Int(value_node!(1, 1, 9))),
-                ),
-            ],
+            fields: vec![(
+                make_tok!("bar", 1, 5),
+                Expression::Simple(Value::Int(value_node!(1, 1, 9))),
+            )],
             pos: Position::new(1, 1),
         })
     );
@@ -813,13 +803,11 @@ fn test_list_value_parse() {
     assert_parse!(
         list_value("[foo]"),
         Value::List(ListDef {
-            elems: vec![
-                Expression::Simple(Value::Selector(make_selector!(
-                    make_expr!("foo", 1, 2),
-                    1,
-                    2
-                ))),
-            ],
+            elems: vec![Expression::Simple(Value::Selector(make_selector!(
+                make_expr!("foo", 1, 2),
+                1,
+                2
+            )))],
             pos: Position::new(1, 1),
         })
     );
@@ -906,12 +894,10 @@ fn test_tuple_parse() {
     assert_parse!(
         tuple("{ foo = 1 }"),
         Value::Tuple(value_node!(
-            vec![
-                (
-                    make_tok!("foo", 1, 3),
-                    Expression::Simple(Value::Int(value_node!(1, 1, 9))),
-                ),
-            ],
+            vec![(
+                make_tok!("foo", 1, 3),
+                Expression::Simple(Value::Int(value_node!(1, 1, 9))),
+            )],
             1,
             1
         ))
@@ -920,12 +906,10 @@ fn test_tuple_parse() {
     assert_parse!(
         tuple("// comment\n{ foo = 1 }"),
         Value::Tuple(value_node!(
-            vec![
-                (
-                    make_tok!("foo", 2, 3),
-                    Expression::Simple(Value::Int(value_node!(1, 2, 9))),
-                ),
-            ],
+            vec![(
+                make_tok!("foo", 2, 3),
+                Expression::Simple(Value::Int(value_node!(1, 2, 9))),
+            )],
             1,
             1
         ))
@@ -934,12 +918,10 @@ fn test_tuple_parse() {
     assert_parse!(
         tuple("{// comment\n foo = 1 }"),
         Value::Tuple(value_node!(
-            vec![
-                (
-                    make_tok!("foo", 2, 2),
-                    Expression::Simple(Value::Int(value_node!(1, 2, 8))),
-                ),
-            ],
+            vec![(
+                make_tok!("foo", 2, 2),
+                Expression::Simple(Value::Int(value_node!(1, 2, 8))),
+            )],
             1,
             1
         ))
@@ -948,12 +930,10 @@ fn test_tuple_parse() {
     assert_parse!(
         tuple("{ foo = 1// comment\n }"),
         Value::Tuple(value_node!(
-            vec![
-                (
-                    make_tok!("foo", 1, 3),
-                    Expression::Simple(Value::Int(value_node!(1, 1, 9))),
-                ),
-            ],
+            vec![(
+                make_tok!("foo", 1, 3),
+                Expression::Simple(Value::Int(value_node!(1, 1, 9))),
+            )],
             1,
             1
         ))

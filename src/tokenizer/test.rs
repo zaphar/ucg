@@ -170,13 +170,11 @@ fn test_parse_comment() {
 
 #[test]
 fn test_match_word() {
-    let input = vec![
-        Token {
-            fragment: "foo".to_string(),
-            typ: TokenType::BAREWORD,
-            pos: Position { line: 1, column: 1 },
-        },
-    ];
+    let input = vec![Token {
+        fragment: "foo".to_string(),
+        typ: TokenType::BAREWORD,
+        pos: Position { line: 1, column: 1 },
+    }];
     let result = word!(
         TokenIter {
             source: input.as_slice(),
@@ -191,13 +189,11 @@ fn test_match_word() {
 
 #[test]
 fn test_match_word_empty_input() {
-    let input = vec![
-        Token {
-            fragment: "".to_string(),
-            typ: TokenType::END,
-            pos: Position { line: 1, column: 1 },
-        },
-    ];
+    let input = vec![Token {
+        fragment: "".to_string(),
+        typ: TokenType::END,
+        pos: Position { line: 1, column: 1 },
+    }];
     let result = word!(
         TokenIter {
             source: input.as_slice(),
@@ -217,13 +213,11 @@ fn test_match_word_empty_input() {
 
 #[test]
 fn test_match_punct() {
-    let input = vec![
-        Token {
-            fragment: "!".to_string(),
-            typ: TokenType::PUNCT,
-            pos: Position { line: 1, column: 1 },
-        },
-    ];
+    let input = vec![Token {
+        fragment: "!".to_string(),
+        typ: TokenType::PUNCT,
+        pos: Position { line: 1, column: 1 },
+    }];
     let result = punct!(
         TokenIter {
             source: input.as_slice(),
@@ -238,13 +232,11 @@ fn test_match_punct() {
 
 #[test]
 fn test_match_type() {
-    let input = vec![
-        Token {
-            fragment: "foo".to_string(),
-            typ: TokenType::BAREWORD,
-            pos: Position { line: 1, column: 1 },
-        },
-    ];
+    let input = vec![Token {
+        fragment: "foo".to_string(),
+        typ: TokenType::BAREWORD,
+        pos: Position { line: 1, column: 1 },
+    }];
     let result = match_type!(
         TokenIter {
             source: input.as_slice(),

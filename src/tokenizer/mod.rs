@@ -16,8 +16,8 @@
 use ast::*;
 use error;
 use nom;
-use nom::{InputIter, InputLength, Slice};
 use nom::{alpha, digit, is_alphanumeric, multispace};
+use nom::{InputIter, InputLength, Slice};
 use nom_locate::LocatedSpan;
 use std;
 use std::result::Result;
