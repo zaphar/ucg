@@ -45,7 +45,10 @@ impl MacroDef {
         // macro call error.
         if args.len() > self.argdefs.len() {
             return Err(Box::new(error::Error::new(
-                "Macro called with too many args",
+                format!(
+                    "Macro called with too many args in file: {}",
+                    root.to_string_lossy()
+                ),
                 error::ErrorType::BadArgLen,
                 self.pos.clone(),
             )));
@@ -117,7 +120,12 @@ impl Val {
         )
     }
 
-    pub fn equal(&self, target: &Self, pos: Position) -> Result<bool, error::Error> {
+    pub fn equal(
+        &self,
+        target: &Self,
+        file_name: &str,
+        pos: Position,
+    ) -> Result<bool, error::Error> {
         // first we do a type equality comparison
         match (self, target) {
             // Empty values are always equal.
@@ -131,7 +139,7 @@ impl Val {
                     Ok(false)
                 } else {
                     for (i, v) in ldef.iter().enumerate() {
-                        try!(v.equal(lldef[i].as_ref(), pos.clone()));
+                        try!(v.equal(lldef[i].as_ref(), file_name, pos.clone()));
                     }
                     Ok(true)
                 }
@@ -147,7 +155,10 @@ impl Val {
                             return Ok(false);
                         } else {
                             // field value equality.
-                            if !try!(v.1.equal(field_target.1.as_ref(), v.0.pos.clone())) {
+                            if !try!(
+                                v.1
+                                    .equal(field_target.1.as_ref(), file_name, v.0.pos.clone())
+                            ) {
                                 return Ok(false);
                             }
                         }
@@ -156,12 +167,12 @@ impl Val {
                 }
             }
             (&Val::Macro(_), &Val::Macro(_)) => Err(error::Error::new(
-                "Macros are not comparable",
+                format!("Macros are not comparable in file: {}", file_name),
                 error::ErrorType::TypeFail,
                 pos,
             )),
             (me, tgt) => Err(error::Error::new(
-                format!("Types differ for {}, {}", me, tgt),
+                format!("Types differ for {}, {} in file: {}", me, tgt, file_name),
                 error::ErrorType::TypeFail,
                 pos,
             )),
@@ -335,7 +346,11 @@ impl Builder {
             &Value::String(ref s) => Ok(Rc::new(Val::String(s.val.to_string()))),
             &Value::Symbol(ref s) => self.lookup_sym(&(s.into())).ok_or(Box::new(
                 error::Error::new(
-                    format!("Unable to find {}", s.val),
+                    format!(
+                        "Unable to find {} in file: {}",
+                        s.val,
+                        self.root.to_string_lossy()
+                    ),
                     error::ErrorType::NoSuchSymbol,
                     v.pos().clone(),
                 ),
@@ -405,7 +420,11 @@ impl Builder {
                     Some(val) => Ok(val),
                 }
             }
-            Err(err) => Err(Box::new(err)),
+            Err(err) => Err(Box::new(error::Error::new_with_cause(
+                format!("Error while parsing file: {}", self.root.to_string_lossy()),
+                error::ErrorType::ParseError,
+                err,
+            ))),
         }
     }
 
@@ -447,7 +466,10 @@ impl Builder {
                 None => {
                     // some kind of error here I think.
                     Err(Box::new(error::Error::new(
-                        "Unknown Error processing import",
+                        format!(
+                            "Unknown Error processing import in file: {}",
+                            self.root.to_string_lossy()
+                        ),
                         error::ErrorType::Unsupported,
                         def.name.pos.clone(),
                     )))
@@ -466,8 +488,9 @@ impl Builder {
                     format!(
                         "Let binding \
                          for {:?} already \
-                         exists",
-                        e.key()
+                         exists in file: {}",
+                        e.key(),
+                        self.root.to_string_lossy(),
                     ),
                     error::ErrorType::DuplicateBinding,
                     def.name.pos.clone(),
@@ -526,8 +549,9 @@ impl Builder {
                 format!(
                     "Unable to \
                      match selector \
-                     path {:?}",
-                    sl
+                     path {:?} in file: {}",
+                    sl,
+                    self.root.to_string_lossy(),
                 ),
                 error::ErrorType::NoSuchSymbol,
                 next.0.clone(),
@@ -551,8 +575,9 @@ impl Builder {
                 format!(
                     "Unable to \
                      match selector \
-                     path {:?}",
-                    sl
+                     path {:?} in file: {}",
+                    sl,
+                    self.root.to_string_lossy(),
                 ),
                 error::ErrorType::NoSuchSymbol,
                 next.0.clone(),
@@ -757,7 +782,7 @@ impl Builder {
         right: Rc<Val>,
     ) -> Result<Rc<Val>, Box<Error>> {
         Ok(Rc::new(Val::Boolean(try!(
-            left.equal(right.as_ref(), pos.clone())
+            left.equal(right.as_ref(), &self.root.to_string_lossy(), pos.clone())
         ))))
     }
 
@@ -768,7 +793,7 @@ impl Builder {
         right: Rc<Val>,
     ) -> Result<Rc<Val>, Box<Error>> {
         Ok(Rc::new(Val::Boolean(!try!(
-            left.equal(right.as_ref(), pos.clone())
+            left.equal(right.as_ref(), &self.root.to_string_lossy(), pos.clone())
         ))))
     }
 

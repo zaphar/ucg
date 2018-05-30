@@ -75,13 +75,8 @@ impl Error {
         }
     }
 
-    pub fn new_with_cause<S: Into<String>>(
-        msg: S,
-        t: ErrorType,
-        pos: Position,
-        cause: Error,
-    ) -> Self {
-        let mut e = Self::new(msg, t, pos);
+    pub fn new_with_cause<S: Into<String>>(msg: S, t: ErrorType, cause: Error) -> Self {
+        let mut e = Self::new(msg, t, cause.pos.clone());
         e.cause = Some(Box::new(cause));
         return e;
     }
@@ -93,7 +88,7 @@ impl Error {
         cause: nom::ErrorKind<Error>,
     ) -> Self {
         match cause {
-            nom::ErrorKind::Custom(e) => Self::new_with_cause(msg, t, pos, e),
+            nom::ErrorKind::Custom(e) => Self::new_with_cause(msg, t, e),
             _ => Self::new(msg, t, pos),
         }
     }
