@@ -92,25 +92,29 @@ impl Error {
             _ => Self::new(msg, t, pos),
         }
     }
+
+    fn render(&self, w: &mut fmt::Formatter) -> fmt::Result {
+        try!(write!(
+            w,
+            "{}: \"{}\" at line: {} column: {}",
+            self.err_type, self.msg, self.pos.line, self.pos.column
+        ));
+        if let Some(ref cause) = self.cause {
+            try!(write!(w, "\n\tCaused By: {}", cause));
+        }
+        Ok(())
+    }
 }
 
 impl fmt::Debug for Error {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            w,
-            "{}: \"{}\" at line: {} column: {}",
-            self.err_type, self.msg, self.pos.line, self.pos.column
-        )
+        self.render(w)
     }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            w,
-            "{}: \"{}\" at line: {} column: {}",
-            self.err_type, self.msg, self.pos.line, self.pos.column
-        )
+        self.render(w)
     }
 }
 

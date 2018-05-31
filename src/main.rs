@@ -17,6 +17,7 @@ extern crate ucglib;
 
 use std::fs::File;
 use std::io;
+use std::path::PathBuf;
 use std::process;
 use std::rc::Rc;
 
@@ -60,12 +61,13 @@ fn main() {
         let out = matches.value_of("out");
         let sym = matches.value_of("sym");
         let target = matches.value_of("target").unwrap();
-        let mut builder = build::Builder::new(std::env::current_dir().unwrap());
+        let root = PathBuf::from(file);
+        let mut builder = build::Builder::new(root);
         match ConverterRunner::new(target) {
             Ok(converter) => {
                 let result = builder.build_file(file);
                 if !result.is_ok() {
-                    eprintln!("{:?}", result.err());
+                    eprintln!("{:?}", result.err().unwrap());
                     process::exit(1);
                 }
                 let val = match sym {

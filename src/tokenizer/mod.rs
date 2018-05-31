@@ -119,6 +119,16 @@ macro_rules! do_tag_tok {
     // rewrite your macro argumets for you by adding an initial argument
     // for all their sub-macros. Which means we require this $i paramater
     // on the first macro invocation but not the rest.
+    ($i:expr, $type:expr, $tag:expr,WS) => {
+        do_parse!(
+            $i,
+            span: position!() >> frag: tag!($tag) >> alt!(whitespace | comment) >> (Token {
+                typ: $type,
+                pos: Position::from(span),
+                fragment: frag.fragment.to_string(),
+            })
+        )
+    };
     ($i:expr, $type:expr, $tag:expr) => {
         do_parse!(
             $i,
@@ -224,31 +234,31 @@ named!(fatcommatok( Span ) -> Token,
 );
 
 named!(lettok( Span ) -> Token,
-       do_tag_tok!(TokenType::BAREWORD, "let")
+       do_tag_tok!(TokenType::BAREWORD, "let", WS)
 );
 
 named!(selecttok( Span ) -> Token,
-       do_tag_tok!(TokenType::BAREWORD, "select")
+       do_tag_tok!(TokenType::BAREWORD, "select", WS)
 );
 
 named!(macrotok( Span ) -> Token,
-       do_tag_tok!(TokenType::BAREWORD, "macro")
+       do_tag_tok!(TokenType::BAREWORD, "macro", WS)
 );
 
 named!(importtok( Span ) -> Token,
-       do_tag_tok!(TokenType::BAREWORD, "import")
+       do_tag_tok!(TokenType::BAREWORD, "import", WS)
 );
 
 named!(astok( Span ) -> Token,
-       do_tag_tok!(TokenType::BAREWORD, "as")
+       do_tag_tok!(TokenType::BAREWORD, "as", WS)
 );
 
 named!(maptok( Span ) -> Token,
-       do_tag_tok!(TokenType::BAREWORD, "map")
+       do_tag_tok!(TokenType::BAREWORD, "map", WS)
 );
 
 named!(filtertok( Span ) -> Token,
-       do_tag_tok!(TokenType::BAREWORD, "filter")
+       do_tag_tok!(TokenType::BAREWORD, "filter", WS)
 );
 
 fn end_of_input(input: Span) -> nom::IResult<Span, Token> {

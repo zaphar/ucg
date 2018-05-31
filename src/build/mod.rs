@@ -540,16 +540,15 @@ impl Builder {
         next: (&Position, &str),
         fs: &Vec<(Positioned<String>, Rc<Val>)>,
     ) -> Result<(), Box<Error>> {
-        // This unwrap is safe because we already checked for
-        // Tuple in the pattern match.
         if let Some(vv) = Self::find_in_fieldlist(next.1, fs) {
             stack.push_back(vv.clone());
         } else {
             return Err(Box::new(error::Error::new(
                 format!(
                     "Unable to \
-                     match selector \
-                     path {:?} in file: {}",
+                     match element {} in selector \
+                     path [{}] in file: {}",
+                    next.1,
                     sl,
                     self.root.to_string_lossy(),
                 ),
@@ -574,8 +573,9 @@ impl Builder {
             return Err(Box::new(error::Error::new(
                 format!(
                     "Unable to \
-                     match selector \
-                     path {:?} in file: {}",
+                     match element {} in selector \
+                     path [{}] in file: {}",
+                    next.1,
                     sl,
                     self.root.to_string_lossy(),
                 ),
@@ -597,8 +597,7 @@ impl Builder {
             &Val::List(_) => {
                 stack.push_back(first.clone());
             }
-            val => {
-                eprintln!("Not a tuple or list! {:?}", val)
+            _ => {
                 // noop
             }
         }

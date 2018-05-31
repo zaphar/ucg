@@ -25,6 +25,8 @@ use std::convert::Into;
 use std::hash::Hash;
 use std::hash::Hasher;
 
+use std::fmt;
+
 macro_rules! enum_type_equality {
     ( $slf:ident, $r:expr, $( $l:pat ),* ) => {
         match $slf {
@@ -267,7 +269,7 @@ macro_rules! make_selector {
 /// let berry = {best = "strawberry", unique = "acai"}.best;
 /// let third = ["uno", "dos", "tres"].1;
 /// '''
-#[derive(Debug, PartialEq, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct SelectorList {
     pub head: Box<Expression>,
     pub tail: Option<Vec<Token>>,
@@ -277,6 +279,24 @@ impl SelectorList {
     /// Returns a stringified version of a SelectorList.
     pub fn to_string(&self) -> String {
         "TODO".to_string()
+    }
+}
+
+impl fmt::Debug for SelectorList {
+    fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
+        write!(w, "Selector({})", self)
+    }
+}
+
+impl fmt::Display for SelectorList {
+    fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
+        try!(write!(w, "{}", self.head));
+        if let Some(ref tok_vec) = self.tail {
+            for t in tok_vec.iter() {
+                try!(write!(w, ".{}", t.fragment));
+            }
+        }
+        return Ok(());
     }
 }
 
@@ -706,6 +726,44 @@ impl Expression {
             &Expression::Select(ref def) => &def.pos,
             &Expression::ListOp(ref def) => &def.pos,
         }
+    }
+}
+
+impl fmt::Display for Expression {
+    fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &Expression::Simple(ref v) => {
+                try!(write!(w, "{}", v.to_string()));
+            }
+            &Expression::Binary(_) => {
+                try!(write!(w, "<Expr>"));
+            }
+            &Expression::Compare(_) => {
+                try!(write!(w, "<Expr>"));
+            }
+            &Expression::ListOp(_) => {
+                try!(write!(w, "<Expr>"));
+            }
+            &Expression::Copy(_) => {
+                try!(write!(w, "<Copy>"));
+            }
+            &Expression::Grouped(_) => {
+                try!(write!(w, "(<Expr>)"));
+            }
+            &Expression::Format(_) => {
+                try!(write!(w, "<Format Expr>"));
+            }
+            &Expression::Call(_) => {
+                try!(write!(w, "<MacroCall>"));
+            }
+            &Expression::Macro(_) => {
+                try!(write!(w, "<Macro>"));
+            }
+            &Expression::Select(_) => {
+                try!(write!(w, "<Select>"));
+            }
+        }
+        Ok(())
     }
 }
 
