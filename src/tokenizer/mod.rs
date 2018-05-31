@@ -142,7 +142,7 @@ macro_rules! do_tag_tok {
 }
 
 named!(emptytok( Span ) -> Token,
-       do_tag_tok!(TokenType::EMPTY, "NULL")
+       do_tag_tok!(TokenType::EMPTY, "NULL", WS)
 );
 
 named!(commatok( Span ) -> Token,
@@ -233,10 +233,6 @@ named!(fatcommatok( Span ) -> Token,
        do_tag_tok!(TokenType::PUNCT, "=>")
 );
 
-named!(lettok( Span ) -> Token,
-       do_tag_tok!(TokenType::BAREWORD, "let", WS)
-);
-
 named!(selecttok( Span ) -> Token,
        do_tag_tok!(TokenType::BAREWORD, "select", WS)
 );
@@ -245,8 +241,16 @@ named!(macrotok( Span ) -> Token,
        do_tag_tok!(TokenType::BAREWORD, "macro", WS)
 );
 
+named!(lettok( Span ) -> Token,
+       do_tag_tok!(TokenType::BAREWORD, "let", WS)
+);
+
 named!(importtok( Span ) -> Token,
        do_tag_tok!(TokenType::BAREWORD, "import", WS)
+);
+
+named!(asserttok( Span ) -> Token,
+       do_tag_tok!(TokenType::BAREWORD, "assert", WS)
 );
 
 named!(astok( Span ) -> Token,
@@ -356,6 +360,7 @@ named!(token( Span ) -> Token,
         booleantok |
         lettok |
         selecttok |
+        asserttok |
         macrotok |
         importtok |
         astok |

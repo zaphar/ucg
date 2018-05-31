@@ -896,9 +896,24 @@ named!(import_statement<TokenIter, Statement, error::Error>,
     )
 );
 
+named!(assert_statement<TokenIter, Statement, error::Error>,
+    do_parse!(
+        word!("assert") >>
+        pos: pos >>
+        expr: add_return_error!(
+            nom::ErrorKind::Custom(
+                error::Error::new(
+                    "Invalid syntax for assert",
+                    error::ErrorType::ParseError, pos)),
+            expression) >>
+        (Statement::Assert(expr))
+    )
+);
+
 //trace_macros!(true);
 fn statement(i: TokenIter) -> nom::IResult<TokenIter, Statement, error::Error> {
     return alt_peek!(i,
+           word!("assert") => assert_statement |
            word!("import") => import_statement |
            word!("let") => let_statement |
            expression_statement);

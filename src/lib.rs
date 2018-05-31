@@ -48,6 +48,7 @@
 //!
 //! The following words are reserved in ucg and can't be used as named bindings.
 //!
+//! * assert
 //! * true
 //! * false
 //! * let
@@ -371,7 +372,7 @@
 //!
 //!  * Let statements
 //!
-//! The let expression binds the result of any valid expression to a name. It starts with the `let` keyword and is followed by
+//! The let statement binds the result of any valid expression to a name. It starts with the `let` keyword and is followed by
 //! the name of the binding, an `=`, and a valid ucg expression.
 //!
 //! ```ucg
@@ -388,6 +389,20 @@
 //! import "dbconfigs.ucg" as dbconfigs;
 //!
 //! let mysqlconf = dbconfigs.mysql;
+//! ```
+//!
+//! * Assert statement
+//!
+//! The assert statement defines an expression that must evaluate to either true or false. Assert statements are noops except
+//! during a validation compile. They give you a way to assert certains properties about your data and can be used as a form
+//! of unit testting for your configurations. It starts with the assert keyword followed by a valid boolean ucg expression.
+//!
+//! ```ucg
+//! assert host == "www.example.com";
+//! assert select qa, 443, {
+//!   qa = 80,
+//!   prod = 443,
+//! } == 443;
 //! ```
 
 // The following is necessary to allow the macros in tokenizer and parse modules

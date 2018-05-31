@@ -4,11 +4,21 @@ use nom_locate::LocatedSpan;
 
 #[test]
 fn test_empty_token() {
-    let result = emptytok(LocatedSpan::new("NULL"));
+    let result = emptytok(LocatedSpan::new("NULL "));
     assert!(result.is_done(), format!("result {:?} is not done", result));
     if let nom::IResult::Done(_, tok) = result {
         assert_eq!(tok.fragment, "NULL");
         assert_eq!(tok.typ, TokenType::EMPTY);
+    }
+}
+
+#[test]
+fn test_assert_token() {
+    let result = asserttok(LocatedSpan::new("assert "));
+    assert!(result.is_done(), format!("result {:?} is not done", result));
+    if let nom::IResult::Done(_, tok) = result {
+        assert_eq!(tok.fragment, "assert");
+        assert_eq!(tok.typ, TokenType::BAREWORD);
     }
 }
 
@@ -93,7 +103,7 @@ fn test_lteqtok() {
 #[test]
 fn test_tokenize_one_of_each() {
     let result = tokenize(LocatedSpan::new(
-        "let import macro select as => [ ] { } ; = % / * \
+        "map filter assert let import macro select as => [ ] { } ; = % / * \
          + - . ( ) , 1 . foo \"bar\" // comment\n ; true false == < > <= >= !=",
     ));
     assert!(result.is_ok(), format!("result {:?} is not ok", result));
@@ -101,8 +111,8 @@ fn test_tokenize_one_of_each() {
     for (i, t) in v.iter().enumerate() {
         println!("{}: {:?}", i, t);
     }
-    assert_eq!(v.len(), 35);
-    assert_eq!(v[34].typ, TokenType::END);
+    assert_eq!(v.len(), 38);
+    assert_eq!(v[37].typ, TokenType::END);
 }
 
 #[test]
