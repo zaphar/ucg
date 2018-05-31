@@ -505,6 +505,7 @@ impl Builder {
 
     fn build_stmt(&mut self, stmt: &Statement) -> Result<Rc<Val>, Box<Error>> {
         match stmt {
+            &Statement::Assert(ref expr) => self.build_assert(expr),
             &Statement::Let(ref def) => self.build_let(def),
             &Statement::Import(ref def) => self.build_import(def),
             &Statement::Expression(ref expr) => self.eval_expr(expr),
@@ -1108,6 +1109,21 @@ impl Builder {
             error::ErrorType::TypeFail,
             def.pos.clone(),
         )));
+    }
+
+    fn build_assert(&self, expr: &Expression) -> Result<Rc<Val>, Box<Error>> {
+        let ok = try!(self.eval_expr(expr));
+        if let &Val::Boolean(b) = ok.as_ref() {
+            // record the assertion result.
+            if b {
+                // success!
+            } else {
+                // failure!
+            }
+        } else {
+            // record an assertion type-failure result.
+        }
+        Ok(ok)
     }
 
     // Evals a single Expression in the context of a running Builder.

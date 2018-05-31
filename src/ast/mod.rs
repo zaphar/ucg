@@ -792,6 +792,9 @@ pub enum Statement {
 
     // Import a file.
     Import(ImportDef),
+
+    // Assert statement
+    Assert(Expression),
 }
 
 #[cfg(test)]

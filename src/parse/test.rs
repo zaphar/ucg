@@ -42,7 +42,7 @@ macro_rules! assert_error {
 
 #[test]
 fn test_null_parsing() {
-    assert_parse!(empty_value("NULL"), Value::Empty(Position::new(1, 1)));
+    assert_parse!(empty_value("NULL "), Value::Empty(Position::new(1, 1)));
 }
 
 #[test]
@@ -337,7 +337,7 @@ fn test_expression_statement_parse() {
 #[test]
 fn test_expression_parse() {
     assert_parse!(
-        expression("NULL"),
+        expression("NULL "),
         Expression::Simple(Value::Empty(Position::new(1, 1)))
     );
     assert_parse!(
