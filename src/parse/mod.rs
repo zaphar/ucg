@@ -900,13 +900,14 @@ named!(assert_statement<TokenIter, Statement, error::Error>,
     do_parse!(
         word!("assert") >>
         pos: pos >>
-        expr: add_return_error!(
+        tok: add_return_error!(
             nom::ErrorKind::Custom(
                 error::Error::new(
                     "Invalid syntax for assert",
                     error::ErrorType::ParseError, pos)),
-            expression) >>
-        (Statement::Assert(expr))
+            match_type!(STR)) >>
+        punct!(";") >>
+        (Statement::Assert(tok.clone()))
     )
 );
 
@@ -939,7 +940,7 @@ pub fn parse(input: LocatedSpan<&str>) -> Result<Vec<Statement>, error::Error> {
                     }
                     IResult::Error(e) => {
                         return Err(error::Error::new_with_errorkind(
-                            format!("Statement Parse error: {:?} current token: {:?}", e, i_[0]),
+                            "Statement Parse error",
                             error::ErrorType::ParseError,
                             Position {
                                 line: i_[0].pos.line,

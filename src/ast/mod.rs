@@ -794,7 +794,7 @@ pub enum Statement {
     Import(ImportDef),
 
     // Assert statement
-    Assert(Expression),
+    Assert(Token),
 }
 
 #[cfg(test)]
