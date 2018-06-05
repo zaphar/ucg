@@ -100,6 +100,65 @@ fn triple_to_number(v: (Option<Token>, Option<Token>, Option<Token>)) -> ParseRe
     return Ok(Value::Float(value_node!(f, pref_pos)));
 }
 
+macro_rules! alt_peek {
+    (__inner $i:expr, $peekrule:ident!( $($peekargs:tt)* ) => $parserule:ident | $($rest:tt)* ) => (
+        alt_peek!(__inner $i, $peekrule!($($peekargs)*) => call!($parserule) | $($rest)* )
+    );
+    
+    (__inner $i:expr, $peekrule:ident => $($rest:tt)* ) => (
+        alt_peek!(__inner $i, call!($peek) => $($rest)* )
+    );
+    
+    (__inner $i:expr, $peekrule:ident!( $($peekargs:tt)* ) => $parserule:ident!( $($parseargs:tt)* ) | $($rest:tt)* ) => (
+        {
+            let _i = $i.clone();
+            let pre_res = peek!(_i, $peekrule!($($peekargs)*));
+            match pre_res {
+                // if the peek was incomplete then it might still match so return incomplete.
+                nom::IResult::Incomplete(i) => nom::IResult::Incomplete(i),
+                // If the peek was in error then try the next peek => parse pair.
+                nom::IResult::Error(_) =>  {
+                    alt_peek!(__inner $i, $($rest)*) 
+                },
+                // If the peek was successful then return the result of the parserule
+                // regardless of it's result.
+                nom::IResult::Done(_i, _) => {
+                    $parserule!(_i, $($parseargs)*)
+                },
+            }
+        }
+    );
+    
+    // These are our fallback termination cases.
+    (__inner $i:expr, $fallback:ident, __end) => (
+        {
+            let _i = $i.clone();
+            call!(_i, $fallback)
+        }
+    );
+    // In the case of a fallback rule with no peek we just return whatever
+    // the fallback rule returns.
+    (__inner $i:expr, $fallback:ident!( $($args:tt)* ), __end) => (
+        {
+            let _i = $i.clone();
+            $fallback(_i, $($args)*)
+        }
+    );
+    
+    // This is our default termination case.
+    // If there is no fallback then we return an Error.
+    (__inner $i:expr, __end) => {
+        // FIXME(jwall): We should do a better custom error here.
+        nom::IResult::Error(error_position!($crate::ErrorKind::Alt,$i))
+    };
+    
+    // alt_peek entry_point.
+    ($i:expr, $($rest:tt)*) => {
+        // We use __end to define the termination token the recursive rule should consume.
+        alt_peek!(__inner $i, $($rest)*, __end)
+    };
+}
+
 // trace_macros!(true);
 
 // NOTE(jwall): HERE THERE BE DRAGONS. The order for these matters
@@ -837,16 +896,14 @@ named!(import_statement<TokenIter, Statement, error::Error>,
     )
 );
 
-named!(statement<TokenIter, Statement, error::Error>,
-    do_parse!(
-       stmt: alt_complete!(
-           import_statement |
-           let_statement |
-           expression_statement
-       ) >>
-       (stmt)
-    )
-);
+//trace_macros!(true);
+fn statement(i: TokenIter) -> nom::IResult<TokenIter, Statement, error::Error> {
+    return alt_peek!(i,
+           word!("import") => import_statement |
+           word!("let") => let_statement |
+           expression_statement);
+}
+//trace_macros!(false);
 
 /// Parses a LocatedSpan into a list of Statements or an error::Error.
 pub fn parse(input: LocatedSpan<&str>) -> Result<Vec<Statement>, error::Error> {
