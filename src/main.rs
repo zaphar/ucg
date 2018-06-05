@@ -94,6 +94,7 @@ fn main() {
     } else if let Some(matches) = app.subcommand_matches("validate") {
         let file = matches.value_of("INPUT").unwrap();
         let mut builder = build::Builder::new(std::env::current_dir().unwrap());
+        builder.enable_validate_mode();
         builder.build_file(file).unwrap();
         println!("File Validates");
         process::exit(0);
