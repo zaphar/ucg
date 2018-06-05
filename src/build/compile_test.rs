@@ -2,7 +2,7 @@ use super::Builder;
 use std;
 
 fn assert_build(input: &str) {
-    let mut b = Builder::new(std::env::current_dir().unwrap());
+    let mut b = Builder::new("<Eval>");
     b.enable_validate_mode();
     b.eval_string(input).unwrap();
     if !b.assert_collector.success {
