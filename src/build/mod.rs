@@ -285,9 +285,17 @@ impl From<String> for Val {
 /// Defines a set of values in a parsed file.
 type ValueMap = HashMap<Positioned<String>, Rc<Val>>;
 
+pub struct AssertCollector {
+    pub success: bool,
+    pub summary: String,
+    pub failures: String,
+}
+
 /// Handles building ucg code.
 pub struct Builder {
     root: PathBuf,
+    validate_mode: bool,
+    assert_collector: AssertCollector,
     env: Rc<Val>,
     /// assets are other parsed files from import statements. They
     /// are keyed by the normalized import path. This acts as a cache
@@ -383,6 +391,12 @@ impl Builder {
     ) -> Self {
         Builder {
             root: root.into(),
+            validate_mode: false,
+            assert_collector: AssertCollector {
+                success: true,
+                summary: String::new(),
+                failures: String::new(),
+            },
             env: env,
             assets: HashMap::new(),
             files: HashSet::new(),
@@ -398,6 +412,14 @@ impl Builder {
             val: name.to_string(),
         };
         self.lookup_sym(&key)
+    }
+
+    /// Puts the builder in validation mode.
+    ///
+    /// Among other things this means that assertions will be evaluated and their results
+    /// will be saved in a report for later output.
+    pub fn enable_validate_mode(&mut self) {
+        self.validate_mode = true;
     }
 
     /// Builds a list of parsed UCG Statements.
@@ -505,7 +527,7 @@ impl Builder {
 
     fn build_stmt(&mut self, stmt: &Statement) -> Result<Rc<Val>, Box<Error>> {
         match stmt {
-            &Statement::Assert(ref expr) => self.build_assert(expr),
+            &Statement::Assert(ref expr) => self.build_assert(&expr),
             &Statement::Let(ref def) => self.build_let(def),
             &Statement::Import(ref def) => self.build_import(def),
             &Statement::Expression(ref expr) => self.eval_expr(expr),
@@ -1111,17 +1133,53 @@ impl Builder {
         )));
     }
 
-    fn build_assert(&self, expr: &Expression) -> Result<Rc<Val>, Box<Error>> {
-        let ok = try!(self.eval_expr(expr));
+    fn build_assert(&mut self, tok: &Token) -> Result<Rc<Val>, Box<Error>> {
+        if !self.validate_mode {
+            // we are not in validate_mode then build_asserts are noops.
+            return Ok(Rc::new(Val::Empty));
+        }
+        // FIXME(jwall): We need to append a semicolon to the expr.
+        let mut expr_as_stmt = String::new();
+        let expr = &tok.fragment;
+        expr_as_stmt.push_str(expr);
+        expr_as_stmt.push_str(";");
+        let ok = match self.eval_string(&expr_as_stmt) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(Box::new(error::Error::new(
+                    format!("Assertion Evaluation of [{}] failed: {}", expr, e),
+                    error::ErrorType::AssertError,
+                    tok.pos.clone(),
+                )));
+            }
+        };
+
         if let &Val::Boolean(b) = ok.as_ref() {
             // record the assertion result.
             if b {
                 // success!
+                let msg = format!(
+                    "OK - '{}' at line: {} column: {}\n",
+                    expr, tok.pos.line, tok.pos.column
+                );
+                self.assert_collector.summary.push_str(&msg);
             } else {
                 // failure!
+                let msg = format!(
+                    "NOT OK - '{}' at line: {} column: {}\n",
+                    expr, tok.pos.line, tok.pos.column
+                );
+                self.assert_collector.summary.push_str(&msg);
+                self.assert_collector.failures.push_str(&msg);
+                self.assert_collector.success = false;
             }
         } else {
             // record an assertion type-failure result.
+            let msg = format!(
+                "TYPE FAIL - '{}' at line: {} column: {}\n",
+                expr, tok.pos.line, tok.pos.column
+            );
+            self.assert_collector.summary.push_str(&msg);
         }
         Ok(ok)
     }

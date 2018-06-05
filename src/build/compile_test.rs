@@ -1,23 +1,19 @@
-use super::{Builder, Val};
+use super::Builder;
 use std;
 
-fn assert_build<S: Into<String>>(input: S, assert: &str) {
+fn assert_build(input: &str) {
     let mut b = Builder::new(std::env::current_dir().unwrap());
-    b.build_file_string(input.into()).unwrap();
-    let result = b.eval_string(assert).unwrap();
-    if let &Val::Boolean(ok) = result.as_ref() {
-        assert!(ok, format!("'{}' is not true", assert));
-    } else {
-        assert!(
-            false,
-            format!("'{}' does not evaluate to a boolean: {:?}", assert, result)
-        );
+    b.enable_validate_mode();
+    b.eval_string(input).unwrap();
+    if !b.assert_collector.success {
+        assert!(false, b.assert_collector.failures);
     }
 }
 
 #[test]
 fn test_comparisons() {
-    let input = "
+    assert_build(
+        "
     let one = 1;
     let two = 2;
     let foo = \"foo\";
@@ -34,15 +30,17 @@ fn test_comparisons() {
     let list = [1, 2, 3];
     let list2 = list;
     let list3 = [1, 2];
-    ";
-    assert_build(input, "one == one;");
-    assert_build(input, "one >= one;");
-    assert_build(input, "two > one;");
-    assert_build(input, "two >= two;");
-    assert_build(input, "tpl1 == tpl2;");
-    assert_build(input, "tpl1 != tpl3;");
-    assert_build(input, "list == list2;");
-    assert_build(input, "list != list3;");
+    assert \"one == one\";
+    assert \"one == one\";
+    assert \"one >= one\";
+    assert \"two > one\";
+    assert \"two >= two\";
+    assert \"tpl1 == tpl2\";
+    assert \"tpl1 != tpl3\";
+    assert \"list == list2\";
+    assert \"list != list3\";
+    ",
+    );
 }
 
 #[test]
@@ -60,28 +58,36 @@ fn test_deep_comparison() {
     let less = {
         foo = \"bar\"
     };
+    assert \"tpl1.inner == copy.inner\";
+    assert \"tpl1.inner.fld == copy.inner.fld\";
+    assert \"tpl1.lst == copy.lst\";
+    assert \"tpl1.foo == copy.foo\";
+    assert \"tpl1 == copy\";
+    assert \"tpl1 != extra\";
+    assert \"tpl1 != less\";
     ";
-
-    assert_build(input, "tpl1.inner == copy.inner;");
-    assert_build(input, "tpl1.inner.fld == copy.inner.fld;");
-    assert_build(input, "tpl1.lst == copy.lst;");
-    assert_build(input, "tpl1.foo == copy.foo;");
-    assert_build(input, "tpl1 == copy;");
-    assert_build(input, "tpl1 != extra;");
-    assert_build(input, "tpl1 != less;");
+    assert_build(input);
 }
 
 #[test]
 fn test_expression_comparisons() {
-    assert_build("", "2 == 1+1;");
-    assert_build("", "(1+1) == 2;");
-    assert_build("", "(1+1) == (1+1);");
-    assert_build("", "(\"foo\" + \"bar\") == \"foobar\";");
+    assert_build("assert \"2 == 1+1\";");
+    assert_build("assert \"(1+1) == 2\";");
+    assert_build("assert \"(1+1) == (1+1)\";");
 }
 
 #[test]
 fn test_binary_operator_precedence() {
-    assert_build("let result = 2 * 2 + 1;", "result == 5;");
-    assert_build("let result = 2 + 2 * 3;", "result == 8;");
-    assert_build("let result = 2 * (2 + 1);", "result == 6;");
+    assert_build(
+        "let result = 2 * 2 + 1;
+    assert \"result == 5\";",
+    );
+    assert_build(
+        "let result = 2 + 2 * 3;
+    assert \"result == 8\";",
+    );
+    assert_build(
+        "let result = 2 * (2 + 1);
+    assert \"result == 6\";",
+    );
 }

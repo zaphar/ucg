@@ -35,6 +35,7 @@ pub enum ErrorType {
     UnexpectedToken,
     EmptyExpression,
     ParseError,
+    AssertError,
 }
 
 impl fmt::Display for ErrorType {
@@ -50,6 +51,7 @@ impl fmt::Display for ErrorType {
             &ErrorType::UnexpectedToken => "UnexpectedToken",
             &ErrorType::EmptyExpression => "EmptyExpression",
             &ErrorType::ParseError => "ParseError",
+            &ErrorType::AssertError => "AssertError",
         };
         w.write_str(name)
     }
@@ -75,10 +77,14 @@ impl Error {
         }
     }
 
-    pub fn new_with_cause<S: Into<String>>(msg: S, t: ErrorType, cause: Error) -> Self {
+    pub fn new_with_boxed_cause<S: Into<String>>(msg: S, t: ErrorType, cause: Box<Self>) -> Self {
         let mut e = Self::new(msg, t, cause.pos.clone());
-        e.cause = Some(Box::new(cause));
+        e.cause = Some(cause);
         return e;
+    }
+
+    pub fn new_with_cause<S: Into<String>>(msg: S, t: ErrorType, cause: Self) -> Self {
+        Self::new_with_boxed_cause(msg, t, Box::new(cause))
     }
 
     pub fn new_with_errorkind<S: Into<String>>(
@@ -89,7 +95,11 @@ impl Error {
     ) -> Self {
         match cause {
             nom::ErrorKind::Custom(e) => Self::new_with_cause(msg, t, e),
-            _ => Self::new(msg, t, pos),
+            e => Self::new_with_cause(
+                msg,
+                t,
+                Error::new(format!("ErrorKind: {}", e), ErrorType::Unsupported, pos),
+            ),
         }
     }
 
