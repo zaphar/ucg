@@ -128,7 +128,7 @@ macro_rules! alt_peek {
             }
         }
     );
-    
+
     // These are our fallback termination cases.
     (__inner $i:expr, $fallback:ident, __end) => (
         {
@@ -144,14 +144,14 @@ macro_rules! alt_peek {
             $fallback(_i, $($args)*)
         }
     );
-    
+
     // This is our default termination case.
     // If there is no fallback then we return an Error.
     (__inner $i:expr, __end) => {
         // FIXME(jwall): We should do a better custom error here.
         nom::IResult::Error(error_position!($crate::ErrorKind::Alt,$i))
     };
-    
+
     // alt_peek entry_point.
     ($i:expr, $($rest:tt)*) => {
         // We use __end to define the termination token the recursive rule should consume.
