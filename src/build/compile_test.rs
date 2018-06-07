@@ -1,5 +1,4 @@
 use super::Builder;
-use std;
 
 fn assert_build(input: &str) {
     let mut b = Builder::new("<Eval>");
@@ -13,8 +12,7 @@ fn assert_build(input: &str) {
 #[test]
 fn test_comparisons() {
     assert_build(
-        "
-    let one = 1;
+        "let one = 1;
     let two = 2;
     let foo = \"foo\";
     let bar = \"bar\";
@@ -45,8 +43,8 @@ fn test_comparisons() {
 
 #[test]
 fn test_deep_comparison() {
-    let input = "
-    let tpl1 = {
+    assert_build(
+        "let tpl1 = {
         foo = \"bar\",
         lst = [1, 2, 3],
         inner = {
@@ -65,8 +63,8 @@ fn test_deep_comparison() {
     assert \"tpl1 == copy\";
     assert \"tpl1 != extra\";
     assert \"tpl1 != less\";
-    ";
-    assert_build(input);
+    ",
+    );
 }
 
 #[test]
@@ -74,6 +72,10 @@ fn test_expression_comparisons() {
     assert_build("assert \"2 == 1+1\";");
     assert_build("assert \"(1+1) == 2\";");
     assert_build("assert \"(1+1) == (1+1)\";");
+    assert_build(
+        "let want = \"foo\";
+    assert \"select want, 1, { foo=2, } == 2\";",
+    );
 }
 
 #[test]

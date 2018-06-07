@@ -386,14 +386,16 @@ fn tuple_to_compare_expression(
     }))
 }
 
+// This macro is much simpler than the math binary expressions since they are the
+// bottom of the precendence tree and we can hard code the precedence in here.
 macro_rules! do_compare_expr {
     ($i:expr, $subrule:ident!( $($args:tt)* ), $typ:expr) => {
         map_res!($i,
             do_parse!(
                 pos: pos >>
-                left: alt!(simple_expression | grouped_expression | math_expression) >>
+                left: alt!(math_expression | non_op_expression) >>
                     $subrule!($($args)*) >>
-                    right: expression >>
+                    right: alt!(math_expression | non_op_expression) >>
                     (pos, $typ, left, right)
             ),
             tuple_to_compare_expression
