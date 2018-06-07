@@ -333,6 +333,7 @@
 //! #### Macros
 //!
 //! Macros look like functions but they are resolved at compile time and configurations don't execute so they never appear in output.
+//! They can only reference the arguments in their arguments. They can't refer to bindings or other macros defined elsewhere.
 //! They are useful for constructing tuples of a certain shape or otherwise promoting data reuse. You define a macro with the `macro`
 //! keyword followed by the arguments in parentheses, a `=>`, and then a tuple.
 //!
