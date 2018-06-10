@@ -142,7 +142,7 @@ macro_rules! do_tag_tok {
 }
 
 named!(emptytok( Span ) -> Token,
-       do_tag_tok!(TokenType::EMPTY, "NULL", WS)
+       do_tag_tok!(TokenType::EMPTY, "NULL")
 );
 
 named!(commatok( Span ) -> Token,

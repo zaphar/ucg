@@ -42,13 +42,25 @@ fn test_comparisons() {
 }
 
 #[test]
+fn test_empty_value() {
+    assert_build(
+        "let empty = NULL;
+    let tpl = {
+        foo = NULL,
+     };
+     assert \"tpl.foo == empty\";
+     ",
+    );
+}
+
+#[test]
 fn test_deep_comparison() {
     assert_build(
         "let tpl1 = {
         foo = \"bar\",
         lst = [1, 2, 3],
         inner = {
-            fld = \"value\"
+            fld = \"value\",
         }
     };
     let copy = tpl1;

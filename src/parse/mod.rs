@@ -129,6 +129,31 @@ macro_rules! alt_peek {
         }
     );
 
+    // These are our no fallback termination cases.
+    (__inner $i:expr, $peekrule:ident!( $($peekargs:tt)* ) => $parserule:ident, __end ) => (
+        alt_peek!(__inner $i, $peekrule!($($peekargs)*) => call!($parserule), __end )
+    );
+    
+    (__inner $i:expr, $peekrule:ident!( $($peekargs:tt)* ) => $parserule:ident!( $($parseargs:tt)* ), __end ) => (
+        {
+            let _i = $i.clone();
+            let pre_res = peek!(_i, $peekrule!($($peekargs)*));
+            match pre_res {
+                // if the peek was incomplete then it might still match so return incomplete.
+                nom::IResult::Incomplete(i) => nom::IResult::Incomplete(i),
+                // If the peek was in error then try the next peek => parse pair.
+                nom::IResult::Error(_) =>  {
+                    alt_peek!(__inner $i, __end) 
+                },
+                // If the peek was successful then return the result of the parserule
+                // regardless of it's result.
+                nom::IResult::Done(_i, _) => {
+                    $parserule!(_i, $($parseargs)*)
+                },
+            }
+        }
+    );
+
     // These are our fallback termination cases.
     (__inner $i:expr, $fallback:ident, __end) => (
         {
@@ -149,7 +174,7 @@ macro_rules! alt_peek {
     // If there is no fallback then we return an Error.
     (__inner $i:expr, __end) => {
         // FIXME(jwall): We should do a better custom error here.
-        nom::IResult::Error(error_position!($crate::ErrorKind::Alt,$i))
+        nom::IResult::Error(error_position!(nom::ErrorKind::Alt,$i))
     };
 
     // alt_peek entry_point.
@@ -322,52 +347,53 @@ fn tuple_to_binary_expression(
 /// are passed in as lowerrule parsers. We default to grouped_expression and simple_expression as
 /// the most tightly bound expressions.
 macro_rules! do_binary_expr {
-    ($i:expr, $oprule:ident!( $($args:tt)* ), $typ:expr) => {
-        do_binary_expr!($i, $oprule!($($args)*), $typ, non_op_expression)
+    ($i:expr, $oprule:ident!( $($args:tt)* )) => {
+        do_binary_expr!($i, $oprule!($($args)*), non_op_expression)
     };
 
-    ($i:expr, $oprule:ident!( $($args:tt)* ), $typ:expr, $lowerrule:ident) => {
-        do_binary_expr!($i, $oprule!($($args)*), $typ, call!($lowerrule))
+    ($i:expr, $oprule:ident!( $($args:tt)* ), $lowerrule:ident) => {
+        do_binary_expr!($i, $oprule!($($args)*), call!($lowerrule))
     };
 
-    ($i:expr, $oprule:ident!( $($args:tt)* ), $typ:expr, $lowerrule:ident!( $($lowerargs:tt)* )) => {
+    ($i:expr, $oprule:ident!( $($args:tt)* ), $lowerrule:ident!( $($lowerargs:tt)* )) => {
         map_res!($i,
             do_parse!(
                 pos: pos >>
                 left: $lowerrule!($($lowerargs)*) >>
-                    $oprule!($($args)*) >>
+                    typ: $oprule!($($args)*) >>
                     right: $lowerrule!($($lowerargs)*) >>
-                    (pos, $typ, left, right)
+                    (pos, typ, left, right)
             ),
             tuple_to_binary_expression
         )
     };
 }
 
+// Matches an operator token to a BinaryExprType
+named!(math_op_type<TokenIter, BinaryExprType, error::Error>,
+    alt!(
+        do_parse!(punct!("+") >> (BinaryExprType::Add)) |
+        do_parse!(punct!("-") >> (BinaryExprType::Sub)) |
+        do_parse!(punct!("*") >> (BinaryExprType::Mul)) |
+        do_parse!(punct!("/") >> (BinaryExprType::Div))
+    )
+);
+
 // trace_macros!(true);
-named!(add_expression<TokenIter, Expression, error::Error>,
-       do_binary_expr!(punct!("+"), BinaryExprType::Add, alt!(product_expression | simple_expression | grouped_expression))
-);
-// trace_macros!(false);
-
-named!(sub_expression<TokenIter, Expression, error::Error>,
-       do_binary_expr!(punct!("-"), BinaryExprType::Sub,  alt!(product_expression | simple_expression | grouped_expression))
-);
-
 named!(sum_expression<TokenIter, Expression, error::Error>,
-    alt!(add_expression | sub_expression)
-);
-
-named!(mul_expression<TokenIter, Expression, error::Error>,
-       do_binary_expr!(punct!("*"), BinaryExprType::Mul)
-);
-
-named!(div_expression<TokenIter, Expression, error::Error>,
-       do_binary_expr!(punct!("/"), BinaryExprType::Div)
+    do_binary_expr!(
+        alt_peek!(
+            punct!("+") => math_op_type |
+            punct!("-") => math_op_type),
+        alt!(product_expression | simple_expression | grouped_expression))
 );
 
 named!(product_expression<TokenIter, Expression, error::Error>,
-    alt!(mul_expression | div_expression)
+    do_binary_expr!(
+       alt_peek!(
+       punct!("*") => math_op_type |
+       punct!("/") => math_op_type)
+    )
 );
 
 named!(math_expression<TokenIter, Expression, error::Error>,
@@ -386,57 +412,31 @@ fn tuple_to_compare_expression(
     }))
 }
 
-// This macro is much simpler than the math binary expressions since they are the
-// bottom of the precendence tree and we can hard code the precedence in here.
-macro_rules! do_compare_expr {
-    ($i:expr, $subrule:ident!( $($args:tt)* ), $typ:expr) => {
-        map_res!($i,
-            do_parse!(
-                pos: pos >>
-                left: alt!(math_expression | non_op_expression) >>
-                    $subrule!($($args)*) >>
-                    right: alt!(math_expression | non_op_expression) >>
-                    (pos, $typ, left, right)
-            ),
-            tuple_to_compare_expression
-        )
-    };
-}
-
-named!(eqeq_expression<TokenIter, Expression, error::Error>,
-       do_compare_expr!(punct!("=="), CompareType::Equal)
-);
-
-named!(not_eqeq_expression<TokenIter, Expression, error::Error>,
-       do_compare_expr!(punct!("!="), CompareType::NotEqual)
-);
-
-named!(lt_eqeq_expression<TokenIter, Expression, error::Error>,
-       do_compare_expr!(punct!("<="), CompareType::LTEqual)
-);
-
-named!(gt_eqeq_expression<TokenIter, Expression, error::Error>,
-       do_compare_expr!(punct!(">="), CompareType::GTEqual)
-);
-
-named!(gt_expression<TokenIter, Expression, error::Error>,
-       do_compare_expr!(punct!(">"), CompareType::GT)
-);
-
-named!(lt_expression<TokenIter, Expression, error::Error>,
-       do_compare_expr!(punct!("<"), CompareType::LT)
+named!(compare_op_type<TokenIter, CompareType, error::Error>,
+    alt!(
+        do_parse!(punct!("==") >> (CompareType::Equal)) |
+        do_parse!(punct!("!=") >> (CompareType::NotEqual)) |
+        do_parse!(punct!("<=") >> (CompareType::LTEqual)) |
+        do_parse!(punct!(">=") >> (CompareType::GTEqual)) |
+        do_parse!(punct!("<") >> (CompareType::LT)) |
+        do_parse!(punct!(">") >> (CompareType::GT))
+    )
 );
 
 named!(compare_expression<TokenIter, Expression, error::Error>,
-    alt!(
-        eqeq_expression |
-        not_eqeq_expression |
-        lt_eqeq_expression |
-        gt_eqeq_expression |
-        lt_expression |
-        gt_expression)
+    map_res!(
+        do_parse!(
+            pos: pos >>
+            left: alt!(math_expression | non_op_expression) >>
+                typ: compare_op_type >>
+                right: alt!(math_expression | non_op_expression) >>
+                (pos, typ, left, right)
+        ),
+        tuple_to_compare_expression
+    )
 );
 
+// FIXME(jwall): This is really *really* slow.
 named!(op_expression<TokenIter, Expression, error::Error>,
     alt!(math_expression | compare_expression)
 );
@@ -817,7 +817,7 @@ named!(non_op_expression<TokenIter, Expression, error::Error>,
 );
 
 named!(expression<TokenIter, Expression, error::Error>,
-    alt!(complete!(op_expression) | complete!(non_op_expression))
+    alt_complete!(op_expression | non_op_expression)
 );
 
 fn expression_to_statement(v: Expression) -> ParseResult<Statement> {

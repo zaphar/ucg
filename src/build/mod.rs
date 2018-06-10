@@ -134,31 +134,32 @@ impl Val {
             (&Val::Float(ref f), &Val::Float(ref ff)) => Ok(f == ff),
             (&Val::Boolean(ref b), &Val::Boolean(ref bb)) => Ok(b == bb),
             (&Val::String(ref s), &Val::String(ref ss)) => Ok(s == ss),
-            (&Val::List(ref ldef), &Val::List(ref lldef)) => {
-                if ldef.len() != lldef.len() {
+            (&Val::List(ref ldef), &Val::List(ref rdef)) => {
+                if ldef.len() != rdef.len() {
                     Ok(false)
                 } else {
-                    for (i, v) in ldef.iter().enumerate() {
-                        try!(v.equal(lldef[i].as_ref(), file_name, pos.clone()));
+                    for (i, lv) in ldef.iter().enumerate() {
+                        try!(lv.equal(rdef[i].as_ref(), file_name, pos.clone()));
                     }
                     Ok(true)
                 }
             }
-            (&Val::Tuple(ref ldef), &Val::Tuple(ref lldef)) => {
-                if ldef.len() != lldef.len() {
+            (&Val::Tuple(ref ldef), &Val::Tuple(ref rdef)) => {
+                if ldef.len() != rdef.len() {
                     Ok(false)
                 } else {
-                    for (i, v) in ldef.iter().enumerate() {
-                        let field_target = &lldef[i];
-                        if v.0.val != field_target.0.val {
+                    for (i, lv) in ldef.iter().enumerate() {
+                        let field_target = &rdef[i];
+                        if lv.0.val != field_target.0.val {
                             // field name equality
                             return Ok(false);
                         } else {
                             // field value equality.
-                            if !try!(
-                                v.1
-                                    .equal(field_target.1.as_ref(), file_name, v.0.pos.clone())
-                            ) {
+                            if !try!(lv.1.equal(
+                                field_target.1.as_ref(),
+                                file_name,
+                                lv.0.pos.clone()
+                            )) {
                                 return Ok(false);
                             }
                         }
@@ -328,6 +329,7 @@ macro_rules! eval_binary_expr {
 }
 
 impl Builder {
+    // FIXME(jwall): This needs some unit tests.
     fn tuple_to_val(&self, fields: &Vec<(Token, Expression)>) -> Result<Rc<Val>, Box<Error>> {
         let mut new_fields = Vec::<(Positioned<String>, Rc<Val>)>::new();
         for &(ref name, ref expr) in fields.iter() {
@@ -433,6 +435,7 @@ impl Builder {
     pub fn eval_string(&mut self, input: &str) -> Result<Rc<Val>, Box<Error>> {
         match parse(Span::new(input)) {
             Ok(stmts) => {
+                //panic!("Successfully parsed {}", input);
                 let mut out: Option<Rc<Val>> = None;
                 for stmt in stmts.iter() {
                     out = Some(try!(self.build_stmt(stmt)));

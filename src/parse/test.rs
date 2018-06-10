@@ -43,6 +43,15 @@ macro_rules! assert_error {
 #[test]
 fn test_null_parsing() {
     assert_parse!(empty_value("NULL "), Value::Empty(Position::new(1, 1)));
+    assert_parse!(value("NULL "), Value::Empty(Position::new(1, 1)));
+    assert_parse!(
+        simple_expression("NULL "),
+        Expression::Simple(Value::Empty(Position::new(1, 1)))
+    );
+    assert_parse!(
+        expression("NULL,"),
+        Expression::Simple(Value::Empty(Position::new(1, 1)))
+    );
 }
 
 #[test]
@@ -412,7 +421,7 @@ fn test_expression_parse() {
         })
     );
     assert_parse!(
-        mul_expression("1 * 1"),
+        product_expression("1 * 1"),
         Expression::Binary(BinaryOpDef {
             kind: BinaryExprType::Mul,
             left: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
@@ -1013,6 +1022,34 @@ fn test_tuple_parse() {
             1
         ))
     );
+
+    assert_parse!(
+        expression("{ foo = 1, lst = [1, 2, 3], }"),
+        Expression::Simple(Value::Tuple(value_node!(
+            vec![
+                (
+                    make_tok!("foo", 1, 3),
+                    Expression::Simple(Value::Int(value_node!(1, Position::new(1, 9)))),
+                ),
+                (
+                    make_tok!("lst", 1, 12),
+                    Expression::Simple(Value::List(ListDef {
+                        elems: vec![
+                            Expression::Simple(Value::Int(value_node!(1, Position::new(1, 19)))),
+                            Expression::Simple(Value::Int(value_node!(2, Position::new(1, 22)))),
+                            Expression::Simple(Value::Int(value_node!(3, Position::new(1, 25)))),
+                        ],
+                        pos: Position {
+                            line: 1,
+                            column: 18,
+                        },
+                    })),
+                ),
+            ],
+            1,
+            1
+        )))
+    );
 }
 
 #[test]
@@ -1041,6 +1078,23 @@ fn test_field_list_parse() {
         vec![
             (make_tok!("foo", 1, 1), make_expr!(1 => int, 1, 7)),
             (make_tok!("quux", 3, 1), make_expr!(2 => int, 3, 8)),
+        ]
+    );
+    f_list = "foo = 1,\nquux = [1, 2],";
+    assert_parse!(
+        field_list(f_list),
+        vec![
+            (make_tok!("foo", 1, 1), make_expr!(1 => int, 1, 7)),
+            (
+                make_tok!("quux", 2, 1),
+                Expression::Simple(Value::List(ListDef {
+                    elems: vec![
+                        Expression::Simple(Value::Int(value_node!(1, Position::new(2, 9)))),
+                        Expression::Simple(Value::Int(value_node!(2, Position::new(2, 12)))),
+                    ],
+                    pos: Position::new(2, 8),
+                })),
+            ),
         ]
     );
 }
@@ -1104,6 +1158,19 @@ fn test_field_value_parse() {
             Expression::Simple(Value::Selector(
                 make_selector!(make_expr!("bar", 1, 7) => [ make_tok!("baz", 1, 11) ] => 1, 7),
             ))
+        )
+    );
+    assert_parse!(
+        field_value("foo = [1,2], "),
+        (
+            make_tok!("foo", 1, 1),
+            Expression::Simple(Value::List(ListDef {
+                elems: vec![
+                    Expression::Simple(Value::Int(value_node!(1, Position::new(1, 8)))),
+                    Expression::Simple(Value::Int(value_node!(2, Position::new(1, 10)))),
+                ],
+                pos: Position::new(1, 7),
+            }))
         )
     );
 }

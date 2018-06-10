@@ -238,6 +238,87 @@ fn test_eval_add_expr_fail() {
 }
 
 #[test]
+fn test_eval_nested_tuple() {
+    test_expr_to_val(
+        vec![
+            (
+                Expression::Simple(Value::Tuple(value_node!(
+                    vec![(
+                        Token::new("foo", TokenType::BAREWORD, 1, 1),
+                        Expression::Simple(Value::Tuple(value_node!(Vec::new(), 1, 1))),
+                    )],
+                    1,
+                    1
+                ))),
+                Val::Tuple(vec![(
+                    Positioned::new("foo".to_string(), 1, 1),
+                    Rc::new(Val::Tuple(Vec::new())),
+                )]),
+            ),
+            (
+                Expression::Simple(Value::Tuple(value_node!(
+                    vec![(
+                        Token::new("foo", TokenType::BAREWORD, 1, 1),
+                        Expression::Simple(Value::Tuple(value_node!(
+                            vec![(
+                                Token::new("bar".to_string(), TokenType::BAREWORD, 1, 5),
+                                Expression::Simple(Value::Tuple(value_node!(vec![], 1, 10))),
+                            )],
+                            1,
+                            1
+                        ))),
+                    )],
+                    1,
+                    1
+                ))),
+                Val::Tuple(vec![(
+                    Positioned::new("foo".to_string(), 1, 1),
+                    Rc::new(Val::Tuple(vec![(
+                        Positioned::new("bar".to_string(), 1, 10),
+                        Rc::new(Val::Tuple(vec![])),
+                    )])),
+                )]),
+            ),
+            (
+                Expression::Simple(Value::Tuple(value_node!(
+                    vec![(
+                        Token::new("foo", TokenType::BAREWORD, 1, 1),
+                        Expression::Simple(Value::Tuple(value_node!(
+                            vec![(
+                                Token::new("bar".to_string(), TokenType::BAREWORD, 1, 5),
+                                Expression::Simple(Value::Tuple(value_node!(
+                                    vec![(
+                                        Token::new("quux".to_string(), TokenType::BAREWORD, 1, 1),
+                                        Expression::Simple(Value::Int(value_node!(3, 1, 1))),
+                                    )],
+                                    1,
+                                    10
+                                ))),
+                            )],
+                            1,
+                            1
+                        ))),
+                    )],
+                    1,
+                    1
+                ))),
+                Val::Tuple(vec![(
+                    Positioned::new("foo".to_string(), 1, 1),
+                    Rc::new(Val::Tuple(vec![(
+                        Positioned::new("bar".to_string(), 1, 10),
+                        Rc::new(Val::Tuple(vec![(
+                            Positioned::new("quux".to_string(), 1, 1),
+                            Rc::new(Val::Int(3)),
+                        )])),
+                    )])),
+                )]),
+            ),
+        ],
+        Builder::new(std::env::current_dir().unwrap()),
+    );
+}
+
+#[test]
 fn test_eval_simple_expr() {
     test_expr_to_val(
         vec![
@@ -385,6 +466,8 @@ fn test_eval_selector_list_expr() {
     );
 }
 
+// TODO(jwall): Eval for tuple and list.
+// Include nested for each.
 #[test]
 #[should_panic(expected = "Unable to find tpl1")]
 fn test_expr_copy_no_such_tuple() {

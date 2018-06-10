@@ -38,3 +38,11 @@ Some options here could be:
 * Flags should allow different seperators for prefixed flags.
 * YAML export
 * HCL export
+
+# Release Checklist
+
+* Cargo test
+* Cargo fmt
+* Update Cargo.toml version.
+* Tag git commit with version tag.
+* Cargo publish
