@@ -69,7 +69,7 @@ impl EnvConverter {
             &Val::Int(ref i) => {
                 try!(write!(w, "{} ", i));
             }
-            &Val::String(ref s) => {
+            &Val::Str(ref s) => {
                 try!(write!(w, "'{}' ", s));
             }
             &Val::List(ref items) => {

@@ -42,7 +42,7 @@ named!(symbol<TokenIter, Value, error::Error>,
 );
 
 fn str_to_value(s: &Token) -> ParseResult<Value> {
-    Ok(Value::String(value_node!(
+    Ok(Value::Str(value_node!(
         s.fragment.to_string(),
         s.pos.clone()
     )))

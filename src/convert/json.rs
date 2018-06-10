@@ -66,7 +66,7 @@ impl JsonConverter {
                 };
                 serde_json::Value::Number(n)
             }
-            &Val::String(ref s) => serde_json::Value::String(s.clone()),
+            &Val::Str(ref s) => serde_json::Value::String(s.clone()),
             &Val::Macro(_) => {
                 eprintln!("Skipping macro encoding as null...");
                 serde_json::Value::Null

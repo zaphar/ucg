@@ -319,7 +319,7 @@ fn test_expression_statement_parse() {
     );
     assert_parse!(
         expression_statement("\"foo\";"),
-        Statement::Expression(Expression::Simple(Value::String(value_node!(
+        Statement::Expression(Expression::Simple(Value::Str(value_node!(
             "foo".to_string(),
             1,
             1
@@ -327,7 +327,7 @@ fn test_expression_statement_parse() {
     );
     assert_parse!(
         expression_statement("\"foo\" ;"),
-        Statement::Expression(Expression::Simple(Value::String(value_node!(
+        Statement::Expression(Expression::Simple(Value::Str(value_node!(
             "foo".to_string(),
             1,
             1
@@ -335,7 +335,7 @@ fn test_expression_statement_parse() {
     );
     assert_parse!(
         expression_statement(" \"foo\";"),
-        Statement::Expression(Expression::Simple(Value::String(value_node!(
+        Statement::Expression(Expression::Simple(Value::Str(value_node!(
             "foo".to_string(),
             1,
             2
@@ -351,7 +351,7 @@ fn test_expression_parse() {
     );
     assert_parse!(
         expression("\"foo\""),
-        Expression::Simple(Value::String(value_node!("foo".to_string(), 1, 1)))
+        Expression::Simple(Value::Str(value_node!("foo".to_string(), 1, 1)))
     );
     assert_parse!(
         expression("1"),
@@ -591,7 +591,7 @@ fn test_expression_parse() {
                                      1, 1),
             arglist: vec![
                 Expression::Simple(Value::Int(value_node!(1, 1, 10))),
-                Expression::Simple(Value::String(value_node!("foo".to_string(), 1, 13))),
+                Expression::Simple(Value::Str(value_node!("foo".to_string(), 1, 13))),
             ],
             pos: Position::new(1, 1),
         })
@@ -663,7 +663,7 @@ fn test_call_parse() {
             macroref: make_selector!(make_expr!("foo", 1, 1), 1, 1),
             arglist: vec![
                 Expression::Simple(Value::Int(value_node!(1, 1, 6))),
-                Expression::Simple(Value::String(value_node!("foo".to_string(), 1, 9))),
+                Expression::Simple(Value::Str(value_node!("foo".to_string(), 1, 9))),
             ],
             pos: Position::new(1, 1),
         })
@@ -675,7 +675,7 @@ fn test_call_parse() {
             macroref: make_selector!(make_expr!("foo") => [ make_tok!("bar", 1, 5) ] => 1, 1),
             arglist: vec![
                 Expression::Simple(Value::Int(value_node!(1, 1, 10))),
-                Expression::Simple(Value::String(value_node!("foo".to_string(), 1, 13))),
+                Expression::Simple(Value::Str(value_node!("foo".to_string(), 1, 13))),
             ],
             pos: Position::new(1, 1),
         })
@@ -958,7 +958,7 @@ fn test_tuple_parse() {
                 ),
                 (
                     make_tok!("bar", 1, 12),
-                    Expression::Simple(Value::String(value_node!(
+                    Expression::Simple(Value::Str(value_node!(
                         "1".to_string(),
                         Position::new(1, 18)
                     ))),
@@ -978,7 +978,7 @@ fn test_tuple_parse() {
                 ),
                 (
                     make_tok!("bar", 2, 1),
-                    Expression::Simple(Value::String(value_node!(
+                    Expression::Simple(Value::Str(value_node!(
                         "1".to_string(),
                         Position::new(2, 7)
                     ))),
@@ -1137,7 +1137,7 @@ fn test_field_value_parse() {
         field_value("foo = \"1\""),
         (
             make_tok!("foo", 1, 1),
-            Expression::Simple(Value::String(value_node!("1".to_string(), 1, 7)))
+            Expression::Simple(Value::Str(value_node!("1".to_string(), 1, 7)))
         )
     );
     assert_parse!(

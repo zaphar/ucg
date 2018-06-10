@@ -83,7 +83,7 @@ pub enum Val {
     Boolean(bool),
     Int(i64),
     Float(f64),
-    String(String),
+    Str(String),
     List(Vec<Rc<Val>>),
     Tuple(Vec<(Positioned<String>, Rc<Val>)>),
     Macro(MacroDef),
@@ -97,7 +97,7 @@ impl Val {
             &Val::Boolean(_) => "Boolean".to_string(),
             &Val::Int(_) => "Integer".to_string(),
             &Val::Float(_) => "Float".to_string(),
-            &Val::String(_) => "String".to_string(),
+            &Val::Str(_) => "String".to_string(),
             &Val::List(_) => "List".to_string(),
             &Val::Tuple(_) => "Tuple".to_string(),
             &Val::Macro(_) => "Macro".to_string(),
@@ -113,7 +113,7 @@ impl Val {
             &Val::Boolean(_),
             &Val::Int(_),
             &Val::Float(_),
-            &Val::String(_),
+            &Val::Str(_),
             &Val::List(_),
             &Val::Tuple(_),
             &Val::Macro(_)
@@ -133,7 +133,7 @@ impl Val {
             (&Val::Int(ref i), &Val::Int(ref ii)) => Ok(i == ii),
             (&Val::Float(ref f), &Val::Float(ref ff)) => Ok(f == ff),
             (&Val::Boolean(ref b), &Val::Boolean(ref bb)) => Ok(b == bb),
-            (&Val::String(ref s), &Val::String(ref ss)) => Ok(s == ss),
+            (&Val::Str(ref s), &Val::Str(ref ss)) => Ok(s == ss),
             (&Val::List(ref ldef), &Val::List(ref rdef)) => {
                 if ldef.len() != rdef.len() {
                     Ok(false)
@@ -211,7 +211,7 @@ impl Val {
     }
 
     pub fn is_string(&self) -> bool {
-        if let &Val::String(_) = self {
+        if let &Val::Str(_) = self {
             return true;
         }
         return false;
@@ -246,7 +246,7 @@ impl Display for Val {
             &Val::Empty => write!(f, "EmptyValue"),
             &Val::Float(ref ff) => write!(f, "Float({})", ff),
             &Val::Int(ref i) => write!(f, "Int({})", i),
-            &Val::String(ref s) => write!(f, "String({})", s),
+            &Val::Str(ref s) => write!(f, "String({})", s),
             &Val::List(ref def) => {
                 try!(write!(f, "[\n"));
                 for v in def.iter() {
@@ -271,7 +271,7 @@ impl From<Val> for String {
         match v {
             Val::Int(ref i) => format!("{}", i),
             Val::Float(ref f) => format!("{}", f),
-            Val::String(ref s) => s.to_string(),
+            Val::Str(ref s) => s.to_string(),
             val => format!("<{}>", val),
         }
     }
@@ -279,7 +279,7 @@ impl From<Val> for String {
 
 impl From<String> for Val {
     fn from(s: String) -> Val {
-        Val::String(s)
+        Val::Str(s)
     }
 }
 
@@ -353,7 +353,7 @@ impl Builder {
             &Value::Boolean(ref b) => Ok(Rc::new(Val::Boolean(b.val))),
             &Value::Int(ref i) => Ok(Rc::new(Val::Int(i.val))),
             &Value::Float(ref f) => Ok(Rc::new(Val::Float(f.val))),
-            &Value::String(ref s) => Ok(Rc::new(Val::String(s.val.to_string()))),
+            &Value::Str(ref s) => Ok(Rc::new(Val::Str(s.val.to_string()))),
             &Value::Symbol(ref s) => self.lookup_sym(&(s.into())).ok_or(Box::new(
                 error::Error::new(
                     format!(
@@ -682,9 +682,9 @@ impl Builder {
             Val::Float(f) => {
                 eval_binary_expr!(&Val::Float(ff), pos, right, Val::Float(f + ff), "Float")
             }
-            Val::String(ref s) => match right.as_ref() {
-                &Val::String(ref ss) => {
-                    return Ok(Rc::new(Val::String([s.to_string(), ss.clone()].concat())))
+            Val::Str(ref s) => match right.as_ref() {
+                &Val::Str(ref ss) => {
+                    return Ok(Rc::new(Val::Str([s.to_string(), ss.clone()].concat())))
                 }
                 val => {
                     return Err(Box::new(error::Error::new(
@@ -1035,7 +1035,7 @@ impl Builder {
             vals.push(rcv.deref().clone());
         }
         let formatter = format::Formatter::new(tmpl.clone(), vals);
-        Ok(Rc::new(Val::String(try!(formatter.render(&def.pos)))))
+        Ok(Rc::new(Val::Str(try!(formatter.render(&def.pos)))))
     }
 
     fn eval_call(&self, def: &CallDef) -> Result<Rc<Val>, Box<Error>> {
@@ -1081,7 +1081,7 @@ impl Builder {
         // First resolve the target expression.
         let v = try!(self.eval_expr(target));
         // Second ensure that the expression resolves to a string.
-        if let &Val::String(ref name) = v.deref() {
+        if let &Val::Str(ref name) = v.deref() {
             // Third find the field with that name in the tuple.
             for &(ref fname, ref val_expr) in fields.iter() {
                 if &fname.fragment == name {
