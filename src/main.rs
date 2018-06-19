@@ -23,6 +23,7 @@ use std::rc::Rc;
 
 use ucglib::build;
 use ucglib::build::Val;
+use ucglib::convert::traits;
 use ucglib::convert::ConverterRunner;
 
 // TODO(jwall): List the target output types automatically.
@@ -46,7 +47,7 @@ fn do_flags<'a>() -> clap::ArgMatches<'a> {
     ).get_matches()
 }
 
-fn run_converter(c: ConverterRunner, v: Rc<Val>, f: Option<&str>) -> io::Result<()> {
+fn run_converter(c: ConverterRunner, v: Rc<Val>, f: Option<&str>) -> traits::Result {
     let file: Box<std::io::Write> = match f {
         Some(f) => Box::new(try!(File::create(f))),
         None => Box::new(io::stdout()),

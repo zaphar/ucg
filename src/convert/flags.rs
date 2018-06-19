@@ -13,12 +13,11 @@
 //  limitations under the License.
 
 //! Contains code for converting a UCG Val into the command line flag output target.
-use std::io::Result;
 use std::io::Write;
 use std::rc::Rc;
 
 use build::Val;
-use convert::traits::Converter;
+use convert::traits::{Converter, Result};
 
 /// FlagConverter implements the conversion logic for converting a Val into a set of command line flags.
 pub struct FlagConverter {}
@@ -28,7 +27,7 @@ impl FlagConverter {
         FlagConverter {}
     }
 
-    fn write_flag_name(&self, pfx: &str, name: &str, w: &mut Write) -> Result<()> {
+    fn write_flag_name(&self, pfx: &str, name: &str, w: &mut Write) -> Result {
         if name.chars().count() > 1 || pfx.chars().count() > 0 {
             try!(write!(w, "--{}{} ", pfx, name));
         } else {
@@ -37,13 +36,7 @@ impl FlagConverter {
         return Ok(());
     }
 
-    fn write_list_flag(
-        &self,
-        pfx: &str,
-        name: &str,
-        def: &Vec<Rc<Val>>,
-        w: &mut Write,
-    ) -> Result<()> {
+    fn write_list_flag(&self, pfx: &str, name: &str, def: &Vec<Rc<Val>>, w: &mut Write) -> Result {
         // first of all we need to make sure that each &Val is only a primitive type.
         for v in def.iter() {
             let vref = v.as_ref();
@@ -60,7 +53,7 @@ impl FlagConverter {
         return Ok(());
     }
 
-    fn write(&self, pfx: &str, v: &Val, w: &mut Write) -> Result<()> {
+    fn write(&self, pfx: &str, v: &Val, w: &mut Write) -> Result {
         match v {
             &Val::Empty => {
                 // Empty is a noop.
@@ -110,7 +103,7 @@ impl FlagConverter {
 }
 
 impl Converter for FlagConverter {
-    fn convert(&self, v: Rc<Val>, mut w: Box<Write>) -> Result<()> {
+    fn convert(&self, v: Rc<Val>, mut w: Box<Write>) -> Result {
         self.write("", &v, &mut w)
     }
 }

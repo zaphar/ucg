@@ -8,7 +8,7 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 //! Flags contains code for converting a UCG Val into the json output target.
-use std::io::Result;
+use std;
 use std::io::Write;
 use std::rc::Rc;
 
@@ -16,7 +16,7 @@ use serde_json;
 
 use ast;
 use build::Val;
-use convert::traits::Converter;
+use convert::traits::{Converter, Result};
 
 /// JsonConverter implements the logic for converting a Val into the json output format.
 pub struct JsonConverter {}
@@ -26,7 +26,7 @@ impl JsonConverter {
         JsonConverter {}
     }
 
-    fn convert_list(&self, items: &Vec<Rc<Val>>) -> Result<serde_json::Value> {
+    fn convert_list(&self, items: &Vec<Rc<Val>>) -> std::io::Result<serde_json::Value> {
         let mut v = Vec::new();
         for val in items.iter() {
             v.push(try!(self.convert_value(val)));
@@ -37,7 +37,7 @@ impl JsonConverter {
     fn convert_tuple(
         &self,
         items: &Vec<(ast::Positioned<String>, Rc<Val>)>,
-    ) -> Result<serde_json::Value> {
+    ) -> std::io::Result<serde_json::Value> {
         let mut mp = serde_json::Map::new();
         for &(ref k, ref v) in items.iter() {
             mp.entry(k.val.clone())
@@ -46,7 +46,7 @@ impl JsonConverter {
         Ok(serde_json::Value::Object(mp))
     }
 
-    fn convert_value(&self, v: &Val) -> Result<serde_json::Value> {
+    fn convert_value(&self, v: &Val) -> std::io::Result<serde_json::Value> {
         let jsn_val = match v {
             &Val::Boolean(b) => serde_json::Value::Bool(b),
             &Val::Empty => serde_json::Value::Null,
@@ -77,7 +77,7 @@ impl JsonConverter {
         Ok(jsn_val)
     }
 
-    fn write(&self, v: &Val, w: &mut Write) -> Result<()> {
+    fn write(&self, v: &Val, w: &mut Write) -> Result {
         let jsn_val = try!(self.convert_value(v));
         try!(serde_json::to_writer(w, &jsn_val));
         Ok(())
@@ -85,7 +85,7 @@ impl JsonConverter {
 }
 
 impl Converter for JsonConverter {
-    fn convert(&self, v: Rc<Val>, mut w: Box<Write>) -> Result<()> {
+    fn convert(&self, v: Rc<Val>, mut w: Box<Write>) -> Result {
         self.write(&v, &mut w)
     }
 }

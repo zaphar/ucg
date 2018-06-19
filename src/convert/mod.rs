@@ -18,7 +18,6 @@ pub mod flags;
 pub mod json;
 pub mod traits;
 
-use std::io;
 use std::io::Write;
 use std::rc::Rc;
 
@@ -54,7 +53,7 @@ impl ConverterRunner {
     }
 
     /// convert runs the Converter on a Val and writes the output to the provided writer.
-    pub fn convert(&self, v: Rc<Val>, w: Box<Write>) -> io::Result<()> {
+    pub fn convert(&self, v: Rc<Val>, w: Box<Write>) -> traits::Result {
         self.converter.convert(v, w)
     }
 }

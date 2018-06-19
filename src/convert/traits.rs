@@ -13,14 +13,17 @@
 //  limitations under the License.
 
 //! The traits used by the ucg compiler for converting Val intermediate format into the output formats..
-use std::io::Result;
+use std::error::Error;
 use std::io::Write;
 use std::rc::Rc;
+use std::result;
 
 use build::Val;
+
+pub type Result = result::Result<(), Box<Error>>;
 
 /// The trait that Converters from Val to different output formats for the
 /// final conversion stage of the ucg compiler.
 pub trait Converter {
-    fn convert(&self, vs: Rc<Val>, w: Box<Write>) -> Result<()>;
+    fn convert(&self, vs: Rc<Val>, w: Box<Write>) -> Result;
 }

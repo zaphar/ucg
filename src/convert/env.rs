@@ -13,13 +13,12 @@
 //  limitations under the License.
 
 //! An environment variable converter.
-use std::io::Result;
 use std::io::Write;
 use std::rc::Rc;
 
 use ast::Positioned;
 use build::Val;
-use convert::traits::Converter;
+use convert::traits::{Converter, Result};
 
 /// EnvConverter implements the conversion logic for converting a Val into a set of environment variables.
 pub struct EnvConverter {}
@@ -29,11 +28,7 @@ impl EnvConverter {
         EnvConverter {}
     }
 
-    fn convert_tuple(
-        &self,
-        flds: &Vec<(Positioned<String>, Rc<Val>)>,
-        w: &mut Write,
-    ) -> Result<()> {
+    fn convert_tuple(&self, flds: &Vec<(Positioned<String>, Rc<Val>)>, w: &mut Write) -> Result {
         for &(ref name, ref val) in flds.iter() {
             if val.is_tuple() {
                 eprintln!("Skipping embedded tuple...");
@@ -49,12 +44,12 @@ impl EnvConverter {
         Ok(())
     }
 
-    fn convert_list(&self, _items: &Vec<Rc<Val>>, _w: &mut Write) -> Result<()> {
+    fn convert_list(&self, _items: &Vec<Rc<Val>>, _w: &mut Write) -> Result {
         eprintln!("Skipping List...");
         Ok(())
     }
 
-    fn write(&self, v: &Val, w: &mut Write) -> Result<()> {
+    fn write(&self, v: &Val, w: &mut Write) -> Result {
         match v {
             &Val::Empty => {
                 // Empty is a noop.
@@ -88,7 +83,7 @@ impl EnvConverter {
 }
 
 impl Converter for EnvConverter {
-    fn convert(&self, v: Rc<Val>, mut w: Box<Write>) -> Result<()> {
+    fn convert(&self, v: Rc<Val>, mut w: Box<Write>) -> Result {
         self.write(&v, &mut w)
     }
 }
