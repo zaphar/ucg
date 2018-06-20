@@ -34,6 +34,8 @@ impl ConverterRunner {
     ///
     /// * flags
     /// * json
+    /// * env
+    /// * exec
     pub fn new(typ: &str) -> Result<Self, String> {
         if typ == "flags" {
             return Ok(ConverterRunner {
