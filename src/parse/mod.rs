@@ -104,11 +104,11 @@ macro_rules! alt_peek {
     (__inner $i:expr, $peekrule:ident!( $($peekargs:tt)* ) => $parserule:ident | $($rest:tt)* ) => (
         alt_peek!(__inner $i, $peekrule!($($peekargs)*) => call!($parserule) | $($rest)* )
     );
-    
+
     (__inner $i:expr, $peekrule:ident => $($rest:tt)* ) => (
         alt_peek!(__inner $i, call!($peek) => $($rest)* )
     );
-    
+
     (__inner $i:expr, $peekrule:ident!( $($peekargs:tt)* ) => $parserule:ident!( $($parseargs:tt)* ) | $($rest:tt)* ) => (
         {
             let _i = $i.clone();
@@ -118,7 +118,7 @@ macro_rules! alt_peek {
                 nom::IResult::Incomplete(i) => nom::IResult::Incomplete(i),
                 // If the peek was in error then try the next peek => parse pair.
                 nom::IResult::Error(_) =>  {
-                    alt_peek!(__inner $i, $($rest)*) 
+                    alt_peek!(__inner $i, $($rest)*)
                 },
                 // If the peek was successful then return the result of the parserule
                 // regardless of it's result.
@@ -133,7 +133,7 @@ macro_rules! alt_peek {
     (__inner $i:expr, $peekrule:ident!( $($peekargs:tt)* ) => $parserule:ident, __end ) => (
         alt_peek!(__inner $i, $peekrule!($($peekargs)*) => call!($parserule), __end )
     );
-    
+
     (__inner $i:expr, $peekrule:ident!( $($peekargs:tt)* ) => $parserule:ident!( $($parseargs:tt)* ), __end ) => (
         {
             let _i = $i.clone();
@@ -143,7 +143,7 @@ macro_rules! alt_peek {
                 nom::IResult::Incomplete(i) => nom::IResult::Incomplete(i),
                 // If the peek was in error then try the next peek => parse pair.
                 nom::IResult::Error(_) =>  {
-                    alt_peek!(__inner $i, __end) 
+                    alt_peek!(__inner $i, __end)
                 },
                 // If the peek was successful then return the result of the parserule
                 // regardless of it's result.
