@@ -83,7 +83,7 @@ impl EnvConverter {
 }
 
 impl Converter for EnvConverter {
-    fn convert(&self, v: Rc<Val>, mut w: Box<Write>) -> Result {
+    fn convert(&self, v: Rc<Val>, mut w: &mut Write) -> Result {
         self.write(&v, &mut w)
     }
 }

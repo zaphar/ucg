@@ -25,5 +25,5 @@ pub type Result = result::Result<(), Box<Error>>;
 /// The trait that Converters from Val to different output formats for the
 /// final conversion stage of the ucg compiler.
 pub trait Converter {
-    fn convert(&self, vs: Rc<Val>, w: Box<Write>) -> Result;
+    fn convert(&self, vs: Rc<Val>, w: &mut Write) -> Result;
 }

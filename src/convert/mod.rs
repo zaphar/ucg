@@ -14,6 +14,7 @@
 
 //! The conversion stage of the ucg compiler.
 pub mod env;
+pub mod exec;
 pub mod flags;
 pub mod json;
 pub mod traits;
@@ -49,11 +50,16 @@ impl ConverterRunner {
                 converter: Box::new(env::EnvConverter::new()),
             });
         }
+        if typ == "exec" {
+            return Ok(ConverterRunner {
+                converter: Box::new(exec::ExecConverter::new()),
+            });
+        }
         return Err(format!("Unknown Target output type: {}", typ));
     }
 
     /// convert runs the Converter on a Val and writes the output to the provided writer.
-    pub fn convert(&self, v: Rc<Val>, w: Box<Write>) -> traits::Result {
-        self.converter.convert(v, w)
+    pub fn convert(&self, v: Rc<Val>, mut w: Box<Write>) -> traits::Result {
+        self.converter.convert(v, &mut w)
     }
 }
