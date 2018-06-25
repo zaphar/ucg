@@ -166,7 +166,7 @@ macro_rules! alt_peek {
     (__inner $i:expr, $fallback:ident!( $($args:tt)* ), __end) => (
         {
             let _i = $i.clone();
-            $fallback(_i, $($args)*)
+            $fallback!(_i, $($args)*)
         }
     );
 
