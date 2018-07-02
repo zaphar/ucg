@@ -27,8 +27,39 @@ use tokenizer::*;
 
 type NomResult<'a, O> = nom::IResult<TokenIter<'a>, O, error::Error>;
 
-type ParseResult<O> = Result<O, error::Error>;
+#[cfg(feature = "tracing")]
+const ENABLE_TRACE: bool = true;
+#[cfg(not(feature = "tracing"))]
+const ENABLE_TRACE: bool = false;
 
+type ParseResult<O> = Result<O, error::Error>;
+macro_rules! trace_nom {
+    ($i:expr, $rule:ident!( $($args:tt)* )) => {
+        {
+            if ENABLE_TRACE {
+                eprintln!("Entering Rule: {:?} {:?}", stringify!($rule), $i);
+            }
+            let result = $rule($i, $($args)* ); 
+            if ENABLE_TRACE {
+                eprintln!("Exiting Rule: {:?}", stringify!($rule));
+            }
+            result
+        }
+    };
+
+    ($i:expr, $rule:ident) => {
+        {
+            if ENABLE_TRACE {
+                eprintln!("Entering Rule: {:?} {:?}", stringify!($rule), $i);
+            }
+            let result = call!($i, $rule);
+            if ENABLE_TRACE {
+                eprintln!("Exiting Rule: {:?}", stringify!($rule));
+            }
+            result
+        }
+    };
+}
 fn symbol_to_value(s: &Token) -> ParseResult<Value> {
     Ok(Value::Symbol(value_node!(
         s.fragment.to_string(),
@@ -300,24 +331,27 @@ named!(empty_value<TokenIter, Value, error::Error>,
     )
 );
 
-named!(compound_value<TokenIter, Value, error::Error>,
-    alt!(list_value | tuple)
+named!(pub compound_value<TokenIter, Value, error::Error>,
+    alt_peek!(
+        punct!("[") => trace_nom!(list_value) | 
+        punct!("{") => trace_nom!(tuple)
+    )
 );
 
 named!(scalar_value<TokenIter, Value, error::Error>,
     alt!(
-        boolean_value |
-        empty_value |
-        number |
-        quoted_value
+        trace_nom!(boolean_value) |
+        trace_nom!(empty_value) |
+        trace_nom!(number) |
+        trace_nom!(quoted_value)
     )
 );
 
-named!(value<TokenIter, Value, error::Error>,
+named!(pub value<TokenIter, Value, error::Error>,
     alt!(
-        selector_value
-        | compound_value
-        | scalar_value
+        trace_nom!(selector_value)
+        | trace_nom!(compound_value)
+        | trace_nom!(scalar_value)
     )
  );
 
@@ -327,7 +361,7 @@ fn value_to_expression(v: Value) -> ParseResult<Expression> {
 
 named!(simple_expression<TokenIter, Expression, error::Error>,
        map_res!(
-           value,
+           trace_nom!(value),
            value_to_expression
        )
 );
@@ -343,9 +377,9 @@ fn tuple_to_binary_expression(
     }))
 }
 
-/// do_binary_expr implements precedence based parsing where the more tightly bound parsers
-/// are passed in as lowerrule parsers. We default to grouped_expression and simple_expression as
-/// the most tightly bound expressions.
+/// do_binary_expr implements precedence based parsing where the more tightly bound
+/// parsers are passed in as lowerrule parsers. We default to any non_op_expression
+/// as the most tightly bound expressions.
 macro_rules! do_binary_expr {
     ($i:expr, $oprule:ident!( $($args:tt)* )) => {
         do_binary_expr!($i, $oprule!($($args)*), non_op_expression)
@@ -385,7 +419,7 @@ named!(sum_expression<TokenIter, Expression, error::Error>,
         alt_peek!(
             punct!("+") => math_op_type |
             punct!("-") => math_op_type),
-        alt!(product_expression | simple_expression | grouped_expression))
+        alt!(trace_nom!(product_expression) | trace_nom!(simple_expression) | trace_nom!(grouped_expression)))
 );
 
 named!(product_expression<TokenIter, Expression, error::Error>,
@@ -397,7 +431,7 @@ named!(product_expression<TokenIter, Expression, error::Error>,
 );
 
 named!(math_expression<TokenIter, Expression, error::Error>,
-    alt!(sum_expression | product_expression)
+    alt!(trace_nom!(sum_expression) | trace_nom!(product_expression))
 );
 
 // TODO(jwall): Change comparison operators to use the do_binary_expr! with precedence?
@@ -427,9 +461,9 @@ named!(compare_expression<TokenIter, Expression, error::Error>,
     map_res!(
         do_parse!(
             pos: pos >>
-            left: alt!(math_expression | non_op_expression) >>
+            left: alt!(trace_nom!(math_expression) | trace_nom!(non_op_expression)) >>
                 typ: compare_op_type >>
-                right: alt!(math_expression | non_op_expression) >>
+                right: alt!(trace_nom!(math_expression) | trace_nom!(non_op_expression)) >>
                 (pos, typ, left, right)
         ),
         tuple_to_compare_expression
@@ -438,7 +472,7 @@ named!(compare_expression<TokenIter, Expression, error::Error>,
 
 // FIXME(jwall): This is really *really* slow.
 named!(op_expression<TokenIter, Expression, error::Error>,
-    alt!(math_expression | compare_expression)
+    alt!(trace_nom!(math_expression) | trace_nom!(compare_expression))
 );
 
 fn expression_to_grouped_expression(e: Expression) -> ParseResult<Expression> {
@@ -447,7 +481,7 @@ fn expression_to_grouped_expression(e: Expression) -> ParseResult<Expression> {
 
 named!(grouped_expression<TokenIter, Expression, error::Error>,
        map_res!(
-           preceded!(punct!("("), terminated!(expression, punct!(")"))),
+           preceded!(punct!("("), terminated!(trace_nom!(expression), punct!(")"))),
            expression_to_grouped_expression
        )
 );
@@ -557,9 +591,9 @@ named!(copy_expression<TokenIter, Expression, error::Error>,
     map_res!(
         do_parse!(
             pos: pos >>
-            selector: selector_list >>
+            selector: trace_nom!(selector_list) >>
             punct!("{") >>
-            fields: field_list >>
+            fields: trace_nom!(field_list) >>
             opt_res!(punct!(",")) >> // noms opt! macro does not preserve error types properly but this one does.
             punct!("}") >>
             (SelectorDef::new(selector, pos.line, pos.column as usize), fields)
@@ -597,10 +631,10 @@ named!(macro_expression<TokenIter, Expression, error::Error>,
                 pos: pos >>
                 word!("macro") >>
                 punct!("(") >>
-                arglist: arglist >>
+                arglist: trace_nom!(arglist) >>
                 punct!(")") >>
                 punct!("=>") >>
-                map: tuple >>
+                map: trace_nom!(tuple) >>
                 (pos, arglist, map)
            ),
            tuple_to_macro
@@ -627,9 +661,9 @@ named!(select_expression<TokenIter, Expression, error::Error>,
        map_res!(
            do_parse!(
                start: word!("select") >>
-               val: terminated!(expression, punct!(",")) >>
-               default: terminated!(expression, punct!(",")) >>
-               map: tuple >>
+               val: terminated!(trace_nom!(expression), punct!(",")) >>
+               default: terminated!(trace_nom!(expression), punct!(",")) >>
+               map: trace_nom!(tuple) >>
                (start.pos.clone(), val, default, map)
            ),
            tuple_to_select
@@ -650,7 +684,7 @@ named!(format_expression<TokenIter, Expression, error::Error>,
                tmpl: match_type!(STR) >>
                    punct!("%") >>
                    punct!("(") >>
-                   args: separated_list!(punct!(","), expression) >>
+                   args: separated_list!(punct!(","), trace_nom!(expression)) >>
                    punct!(")") >>
                    (tmpl, args)
            ),
@@ -685,7 +719,7 @@ fn vec_to_selector_value(t: (Position, SelectorList)) -> ParseResult<Value> {
 named!(selector_value<TokenIter, Value, error::Error>,
        map_res!(
            do_parse!(
-               sl: selector_list >>
+               sl: trace_nom!(selector_list) >>
                (sl.head.pos().clone(), sl)
            ),
            vec_to_selector_value
@@ -695,9 +729,9 @@ named!(selector_value<TokenIter, Value, error::Error>,
 named!(call_expression<TokenIter, Expression, error::Error>,
        map_res!(
            do_parse!(
-               macroname: selector_value >>
+               macroname: trace_nom!(selector_value) >>
                punct!("(") >>
-               args: separated_list!(punct!(","), expression) >>
+               args: separated_list!(punct!(","), trace_nom!(expression)) >>
                punct!(")") >>
                (macroname.pos().clone(), macroname, args)
            ),
@@ -797,36 +831,41 @@ named!(list_op_expression<TokenIter, Expression, error::Error>,
         do_parse!(
             pos: pos >>
             optype: alt!(word!("map") | word!("filter")) >>
-            macroname: selector_value >>
-            list: symbol_or_list >>
+            macroname: trace_nom!(selector_value) >>
+            list: trace_nom!(symbol_or_list) >>
             (pos, optype, macroname, list)
         ),
         tuple_to_list_op
     )
 );
 
-named!(non_op_expression<TokenIter, Expression, error::Error>,
-    alt!(list_op_expression |
-         macro_expression |
-         format_expression |
-         select_expression |
-         call_expression |
-         copy_expression |
-         grouped_expression |
-         simple_expression)
+named!(pub non_op_expression<TokenIter, Expression, error::Error>,
+    alt!(trace_nom!(list_op_expression) |
+         trace_nom!(macro_expression) |
+         trace_nom!(format_expression) |
+         trace_nom!(select_expression) |
+         trace_nom!(grouped_expression) |
+         trace_nom!(call_expression) |
+         trace_nom!(copy_expression) |
+         trace_nom!(simple_expression))
 );
 
-named!(expression<TokenIter, Expression, error::Error>,
-    alt_complete!(op_expression | non_op_expression)
+// TODO(jwall): Because we have to parse an op_expression before a non_op_expression
+// this parser is really slow. The reason is that the op_expression is unable to fail
+// quickly enough and wastes a lot of parsing time before it realizes that this is not
+// an operator expression. Fixing this probably means hand rolling this parsing
+// function so we can identify early whether this is an op_expression or not.
+named!(pub expression<TokenIter, Expression, error::Error>,
+    alt_complete!(trace_nom!(op_expression) | trace_nom!(non_op_expression))
 );
 
 fn expression_to_statement(v: Expression) -> ParseResult<Statement> {
     Ok(Statement::Expression(v))
 }
 
-named!(expression_statement<TokenIter, Statement, error::Error>,
+named!(pub expression_statement<TokenIter, Statement, error::Error>,
     map_res!(
-        terminated!(expression, punct!(";")),
+        terminated!(trace_nom!(expression), punct!(";")),
         expression_to_statement
     )
 );
@@ -843,7 +882,7 @@ named!(let_stmt_body<TokenIter, Statement, error::Error>,
         do_parse!(
             name: match_type!(BAREWORD) >>
             punct!("=") >>
-            val: expression >>
+            val: trace_nom!(expression) >>
             punct!(";") >>
             (name, val)),
         tuple_to_let
@@ -859,7 +898,7 @@ named!(let_statement<TokenIter, Statement, error::Error>,
                 error::Error::new(
                     "Invalid syntax for let binding",
                     error::ErrorType::ParseError, pos)),
-            let_stmt_body) >>
+            trace_nom!(let_stmt_body)) >>
         (stmt)
     )
 );
@@ -893,7 +932,7 @@ named!(import_statement<TokenIter, Statement, error::Error>,
                 error::Error::new(
                     "Invalid syntax for import",
                     error::ErrorType::ParseError, pos)),
-            import_stmt_body) >>
+            trace_nom!(import_stmt_body)) >>
         (stmt)
     )
 );
@@ -916,10 +955,11 @@ named!(assert_statement<TokenIter, Statement, error::Error>,
 //trace_macros!(true);
 fn statement(i: TokenIter) -> nom::IResult<TokenIter, Statement, error::Error> {
     return alt_peek!(i,
-           word!("assert") => assert_statement |
-           word!("import") => import_statement |
-           word!("let") => let_statement |
-           expression_statement);
+            word!("assert") => trace_nom!(assert_statement) |
+            word!("import") => trace_nom!(import_statement) |
+            word!("let") => trace_nom!(let_statement) |
+            trace_nom!(expression_statement)
+        );
 }
 //trace_macros!(false);
 

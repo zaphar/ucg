@@ -23,6 +23,11 @@ let connstr_mapper = macro (item) => {
 
 let db_conns = map connstr_mapper.str [db_conn1, db_conn2];
 
+let cplx_list = [
+    {foo = 1},
+    {bar = {foo=1}},
+];
+
 // Our server configuration.
 let server_config = {
     db_conn1 = db_conns.0, // connection one
