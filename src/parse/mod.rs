@@ -21,6 +21,7 @@ use nom::IResult;
 use nom::InputLength;
 use nom_locate::LocatedSpan;
 
+use self::precedence::op_expression;
 use ast::*;
 use error;
 use tokenizer::*;
@@ -36,6 +37,7 @@ type ParseResult<O> = Result<O, error::Error>;
 macro_rules! trace_nom {
     ($i:expr, $rule:ident!( $($args:tt)* )) => {
         {
+            use parse::ENABLE_TRACE;
             if ENABLE_TRACE {
                 eprintln!("Entering Rule: {:?} {:?}", stringify!($rule), $i);
             }
@@ -49,6 +51,7 @@ macro_rules! trace_nom {
 
     ($i:expr, $rule:ident) => {
         {
+            use parse::ENABLE_TRACE;
             if ENABLE_TRACE {
                 eprintln!("Entering Rule: {:?} {:?}", stringify!($rule), $i);
             }
@@ -204,7 +207,7 @@ macro_rules! alt_peek {
     // This is our default termination case.
     // If there is no fallback then we return an Error.
     (__inner $i:expr, __end) => {
-        // FIXME(jwall): We should do a better custom error here.
+        // TODO(jwall): We should do a better custom error here.
         nom::IResult::Error(error_position!(nom::ErrorKind::Alt,$i))
     };
 
@@ -364,115 +367,6 @@ named!(simple_expression<TokenIter, Expression, error::Error>,
            trace_nom!(value),
            value_to_expression
        )
-);
-
-fn tuple_to_binary_expression(
-    tpl: (Position, BinaryExprType, Expression, Expression),
-) -> ParseResult<Expression> {
-    Ok(Expression::Binary(BinaryOpDef {
-        kind: tpl.1,
-        left: Box::new(tpl.2),
-        right: Box::new(tpl.3),
-        pos: Position::new(tpl.0.line as usize, tpl.0.column as usize),
-    }))
-}
-
-/// do_binary_expr implements precedence based parsing where the more tightly bound
-/// parsers are passed in as lowerrule parsers. We default to any non_op_expression
-/// as the most tightly bound expressions.
-macro_rules! do_binary_expr {
-    ($i:expr, $oprule:ident!( $($args:tt)* )) => {
-        do_binary_expr!($i, $oprule!($($args)*), non_op_expression)
-    };
-
-    ($i:expr, $oprule:ident!( $($args:tt)* ), $lowerrule:ident) => {
-        do_binary_expr!($i, $oprule!($($args)*), call!($lowerrule))
-    };
-
-    ($i:expr, $oprule:ident!( $($args:tt)* ), $lowerrule:ident!( $($lowerargs:tt)* )) => {
-        map_res!($i,
-            do_parse!(
-                pos: pos >>
-                left: $lowerrule!($($lowerargs)*) >>
-                    typ: $oprule!($($args)*) >>
-                    right: $lowerrule!($($lowerargs)*) >>
-                    (pos, typ, left, right)
-            ),
-            tuple_to_binary_expression
-        )
-    };
-}
-
-// Matches an operator token to a BinaryExprType
-named!(math_op_type<TokenIter, BinaryExprType, error::Error>,
-    alt!(
-        do_parse!(punct!("+") >> (BinaryExprType::Add)) |
-        do_parse!(punct!("-") >> (BinaryExprType::Sub)) |
-        do_parse!(punct!("*") >> (BinaryExprType::Mul)) |
-        do_parse!(punct!("/") >> (BinaryExprType::Div))
-    )
-);
-
-// trace_macros!(true);
-named!(sum_expression<TokenIter, Expression, error::Error>,
-    do_binary_expr!(
-        alt_peek!(
-            punct!("+") => math_op_type |
-            punct!("-") => math_op_type),
-        alt!(trace_nom!(product_expression) | trace_nom!(simple_expression) | trace_nom!(grouped_expression)))
-);
-
-named!(product_expression<TokenIter, Expression, error::Error>,
-    do_binary_expr!(
-       alt_peek!(
-       punct!("*") => math_op_type |
-       punct!("/") => math_op_type)
-    )
-);
-
-named!(math_expression<TokenIter, Expression, error::Error>,
-    alt!(trace_nom!(sum_expression) | trace_nom!(product_expression))
-);
-
-// TODO(jwall): Change comparison operators to use the do_binary_expr! with precedence?
-fn tuple_to_compare_expression(
-    tpl: (Position, CompareType, Expression, Expression),
-) -> ParseResult<Expression> {
-    Ok(Expression::Compare(ComparisonDef {
-        kind: tpl.1,
-        left: Box::new(tpl.2),
-        right: Box::new(tpl.3),
-        pos: Position::new(tpl.0.line as usize, tpl.0.column as usize),
-    }))
-}
-
-named!(compare_op_type<TokenIter, CompareType, error::Error>,
-    alt!(
-        do_parse!(punct!("==") >> (CompareType::Equal)) |
-        do_parse!(punct!("!=") >> (CompareType::NotEqual)) |
-        do_parse!(punct!("<=") >> (CompareType::LTEqual)) |
-        do_parse!(punct!(">=") >> (CompareType::GTEqual)) |
-        do_parse!(punct!("<") >> (CompareType::LT)) |
-        do_parse!(punct!(">") >> (CompareType::GT))
-    )
-);
-
-named!(compare_expression<TokenIter, Expression, error::Error>,
-    map_res!(
-        do_parse!(
-            pos: pos >>
-            left: alt!(trace_nom!(math_expression) | trace_nom!(non_op_expression)) >>
-                typ: compare_op_type >>
-                right: alt!(trace_nom!(math_expression) | trace_nom!(non_op_expression)) >>
-                (pos, typ, left, right)
-        ),
-        tuple_to_compare_expression
-    )
-);
-
-// FIXME(jwall): This is really *really* slow.
-named!(op_expression<TokenIter, Expression, error::Error>,
-    alt!(trace_nom!(math_expression) | trace_nom!(compare_expression))
 );
 
 fn expression_to_grouped_expression(e: Expression) -> ParseResult<Expression> {
@@ -1021,6 +915,8 @@ pub fn parse(input: LocatedSpan<&str>) -> Result<Vec<Statement>, error::Error> {
         }
     }
 }
+
+pub mod precedence;
 
 #[cfg(test)]
 mod test;

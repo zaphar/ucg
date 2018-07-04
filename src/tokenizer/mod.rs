@@ -514,17 +514,19 @@ macro_rules! match_type {
 /// nom style macro that matches various Tokens by type and value and allows optional
 /// conversion handlers for the matched Token.
 macro_rules! match_token {
-    ($i:expr,PUNCT => $f:expr) => {
+    ($i:expr,PUNCT => $f:expr) => {{
+        use tokenizer::token_clone;
         match_token!($i, PUNCT => $f, token_clone)
-    };
+    }};
 
     ($i:expr,PUNCT => $f:expr, $h:expr) => {
         match_token!($i, TokenType::PUNCT, $f, format!("Not PUNCT ({})", $f), $h)
     };
 
-    ($i:expr,BAREWORD => $f:expr) => {
+    ($i:expr,BAREWORD => $f:expr) => {{
+        use tokenizer::token_clone;
         match_token!($i, BAREWORD => $f, token_clone)
-    };
+    }};
 
     ($i:expr,BAREWORD => $f:expr, $h:expr) => {
         match_token!(
@@ -538,6 +540,7 @@ macro_rules! match_token {
 
     ($i:expr, $t:expr, $f:expr, $msg:expr, $h:expr) => {{
         let i_ = $i.clone();
+        use nom;
         use nom::Slice;
         use std::convert::Into;
         let tok = &(i_[0]);

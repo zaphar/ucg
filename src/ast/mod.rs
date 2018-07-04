@@ -703,6 +703,7 @@ pub enum Expression {
 
     // Complex Expressions
     Copy(CopyDef),
+    // TODO(jwall): This should really store it's position :-(
     Grouped(Box<Expression>),
     Format(FormatDef),
     Call(CallDef),

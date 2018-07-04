@@ -172,7 +172,7 @@ fn test_statement_parse() {
                     },
                 )))),
                 right: Box::new(Expression::Simple(Value::Int(value_node!(2, 1, 21)))),
-                pos: Position::new(1, 11),
+                pos: Position::new(1, 12),
             }),
         })
     );
@@ -421,15 +421,6 @@ fn test_expression_parse() {
         })
     );
     assert_parse!(
-        product_expression("1 * 1"),
-        Expression::Binary(BinaryOpDef {
-            kind: BinaryExprType::Mul,
-            left: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
-            right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 5)))),
-            pos: Position::new(1, 1),
-        })
-    );
-    assert_parse!(
         expression("1 / 1"),
         Expression::Binary(BinaryOpDef {
             kind: BinaryExprType::Div,
@@ -474,7 +465,7 @@ fn test_expression_parse() {
                 }
             )))),
             right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 11)))),
-            pos: Position::new(1, 1),
+            pos: Position::new(1, 2),
         })
     );
     assert_parse!(
