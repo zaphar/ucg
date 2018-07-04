@@ -9,23 +9,7 @@ extern crate ucglib;
 use bencher::Bencher;
 //use cpuprofiler::PROFILER;
 
-macro_rules! bench_parse {
-    ($parsemac:ident($i:expr), $b:expr) => {
-        bench_parse!($i, $parsemac, $b)
-    };
-    ($i:expr, $f:expr, $b:expr) => {
-        let input = nom_locate::LocatedSpan::new($i);
-        let val = tokenize(input).unwrap();
-        $b.iter(|| {
-            $f(TokenIter {
-                source: val.as_slice(),
-            })
-        });
-    };
-}
-
 use ucglib::parse::*;
-use ucglib::tokenizer::*;
 
 fn do_parse(i: &str) {
     parse(nom_locate::LocatedSpan::new(i));
@@ -81,7 +65,6 @@ fn parse_complex_tuple_list(b: &mut Bencher) {
     //    .unwrap();
     let input = "[{foo=1}, {bar=2}, {quux=4}];";
     b.iter(|| do_parse(input));
-    //bench_parse!(non_op_expression(input), b);
     //PROFILER.lock().unwrap().stop().unwrap();
 }
 
@@ -93,7 +76,6 @@ fn parse_complex_nested_list(b: &mut Bencher) {
     //    .unwrap();
     let input = "[[1,2], [3,4], [4,5]];";
     b.iter(|| do_parse(input));
-    //bench_parse!(non_op_expression(input), b);
     //PROFILER.lock().unwrap().stop().unwrap();
 }
 

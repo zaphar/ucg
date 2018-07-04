@@ -744,11 +744,6 @@ named!(pub non_op_expression<TokenIter, Expression, error::Error>,
          trace_nom!(simple_expression))
 );
 
-// TODO(jwall): Because we have to parse an op_expression before a non_op_expression
-// this parser is really slow. The reason is that the op_expression is unable to fail
-// quickly enough and wastes a lot of parsing time before it realizes that this is not
-// an operator expression. Fixing this probably means hand rolling this parsing
-// function so we can identify early whether this is an op_expression or not.
 named!(pub expression<TokenIter, Expression, error::Error>,
     alt_complete!(trace_nom!(op_expression) | trace_nom!(non_op_expression))
 );
