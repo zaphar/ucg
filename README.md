@@ -42,6 +42,27 @@ SUBCOMMANDS:
     validate    Check a specific ucg file for errors.
 ```
 
+## compiling a file
+
+```sh
+Compile a specific ucg file.
+
+USAGE:
+    ucg build [OPTIONS] <INPUT> --sym <sym> --target <target>
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+OPTIONS:
+    -o, --out <out>          Output file to write to.
+        --sym <sym>          Specify a specific let binding in the ucg file to output.
+    -t, --target <target>    Target output type. (flags, json, env, exec)
+
+ARGS:
+    <INPUT>    Input ucg file to build.
+```
+
 ## Language Reference
 
 https://docs.rs/ucg/

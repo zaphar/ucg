@@ -36,7 +36,7 @@ fn do_flags<'a>() -> clap::ArgMatches<'a> {
             (@subcommand build =>
              (about: "Compile a specific ucg file.")
              (@arg sym: --sym +takes_value +required "Specify a specific let binding in the ucg file to output.")
-             (@arg target: --target -t +required +takes_value "Target output type. (flags, json, env)")
+             (@arg target: --target -t +required +takes_value "Target output type. (flags, json, env, exec)")
              (@arg out: --out -o +takes_value "Output file to write to.")
              (@arg INPUT: +required "Input ucg file to build.")
             )
