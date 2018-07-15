@@ -19,7 +19,8 @@ use std::rc::Rc;
 use build::Val;
 use convert::traits::{Converter, Result};
 
-/// FlagConverter implements the conversion logic for converting a Val into a set of command line flags.
+/// FlagConverter implements the conversion logic for converting a Val into a set
+/// of command line flags.
 pub struct FlagConverter {}
 
 impl FlagConverter {

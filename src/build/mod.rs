@@ -286,13 +286,14 @@ impl From<String> for Val {
 /// Defines a set of values in a parsed file.
 type ValueMap = HashMap<Positioned<String>, Rc<Val>>;
 
+/// AssertCollector collects the results of assertions in the UCG AST.
 pub struct AssertCollector {
     pub success: bool,
     pub summary: String,
     pub failures: String,
 }
 
-/// Handles building ucg code.
+/// Builder handles building ucg code.
 pub struct Builder {
     root: PathBuf,
     validate_mode: bool,
@@ -432,6 +433,7 @@ impl Builder {
         Ok(())
     }
 
+    /// Evaluate an input string as UCG.
     pub fn eval_string(&mut self, input: &str) -> Result<Rc<Val>, Box<Error>> {
         match parse(Span::new(input)) {
             Ok(stmts) => {
@@ -453,18 +455,13 @@ impl Builder {
         }
     }
 
-    /// Builds a string of ucg syntax.
-    pub fn build_file_string(&mut self, input: String) -> BuildResult {
-        self.last = Some(try!(self.eval_string(&input)));
-        Ok(())
-    }
-
     /// Builds a ucg file at the named path.
     pub fn build_file(&mut self, name: &str) -> BuildResult {
         let mut f = try!(File::open(name));
         let mut s = String::new();
         try!(f.read_to_string(&mut s));
-        self.build_file_string(s)
+        self.last = Some(try!(self.eval_string(&s)));
+        Ok(())
     }
 
     fn build_import(&mut self, def: &ImportDef) -> Result<Rc<Val>, Box<Error>> {

@@ -11,6 +11,9 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
+
+//! Bottom up parser for precedence parsing of expressions separated by binary
+//! operators.
 use std;
 
 use nom::{ErrorKind, IResult, InputIter, InputLength, Slice};
@@ -20,6 +23,7 @@ use ast::*;
 use error;
 use tokenizer::TokenIter;
 
+/// Defines the intermediate stages of our bottom up parser for precedence parsing.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Element {
     Expr(Expression),
@@ -27,7 +31,7 @@ pub enum Element {
     CompareOp(CompareType),
 }
 
-named!(pub math_op_type<TokenIter, Element, error::Error>,
+named!(math_op_type<TokenIter, Element, error::Error>,
     alt!(
         do_parse!(punct!("+") >> (Element::MathOp(BinaryExprType::Add))) |
         do_parse!(punct!("-") >> (Element::MathOp(BinaryExprType::Sub))) |
@@ -180,19 +184,19 @@ macro_rules! do_binary_expr {
     };
 }
 
-named!(pub sum_expression<OpListIter, Expression, error::Error>,
+named!(sum_expression<OpListIter, Expression, error::Error>,
     do_binary_expr!(
         parse_sum_operator,
         alt!(trace_nom!(product_expression) | trace_nom!(parse_expression)))
 );
 
-named!(pub product_expression<OpListIter, Expression, error::Error>,
+named!(product_expression<OpListIter, Expression, error::Error>,
     do_binary_expr!(
        parse_product_operator,
     trace_nom!(parse_expression))
 );
 
-named!(pub math_expression<OpListIter, Expression, error::Error>,
+named!(math_expression<OpListIter, Expression, error::Error>,
     alt!(trace_nom!(sum_expression) | trace_nom!(product_expression))
 );
 
@@ -209,7 +213,7 @@ fn tuple_to_compare_expression(
     }))
 }
 
-named!(pub compare_op_type<TokenIter, Element, error::Error>,
+named!(compare_op_type<TokenIter, Element, error::Error>,
     alt!(
         do_parse!(punct!("==") >> (Element::CompareOp(CompareType::Equal))) |
         do_parse!(punct!("!=") >> (Element::CompareOp(CompareType::NotEqual))) |
@@ -245,7 +249,7 @@ fn parse_compare_operator(i: OpListIter) -> IResult<OpListIter, CompareType, err
     )));
 }
 
-named!(pub compare_expression<OpListIter, Expression, error::Error>,
+named!(compare_expression<OpListIter, Expression, error::Error>,
     map_res!(
         do_parse!(
             left: alt!(trace_nom!(math_expression) | trace_nom!(parse_expression)) >>
@@ -258,8 +262,8 @@ named!(pub compare_expression<OpListIter, Expression, error::Error>,
     )
 );
 
-// Implement nom::Input Length and nom::Slice for OpListIter.
-pub fn parse_operand_list(i: TokenIter) -> NomResult<Vec<Element>> {
+/// Parse a list of expressions separated by operators into a Vec<Element>.
+fn parse_operand_list(i: TokenIter) -> NomResult<Vec<Element>> {
     // 1. First try to parse a non_op_expression,
     let mut _i = i.clone();
     let mut list = Vec::new();
@@ -390,6 +394,7 @@ impl<'a> InputIter for OpListIter<'a> {
     }
 }
 
+/// Parse a binary operator expression.
 pub fn op_expression(i: TokenIter) -> NomResult<Expression> {
     let preparse = parse_operand_list(i.clone());
     match preparse {

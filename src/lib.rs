@@ -17,7 +17,7 @@
 //!
 //! Ucg defines a common grammar for describing a collection of configuration values.
 //! ucg allows you to specify configuration values with a syntax that that is immutable,
-//! comoposable with copy-on-write semantics, and safe.
+//! composable, with copy-on-write semantics, and safe.
 //!
 //! ## Example
 //!

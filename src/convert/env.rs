@@ -12,7 +12,7 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-//! An environment variable converter.
+//! Contains code for converting a UCG Val into the environment variable output target.
 use std::io::Write;
 use std::rc::Rc;
 
@@ -20,7 +20,8 @@ use ast::Positioned;
 use build::Val;
 use convert::traits::{Converter, Result};
 
-/// EnvConverter implements the conversion logic for converting a Val into a set of environment variables.
+/// EnvConverter implements the conversion logic for converting a Val into a
+/// set of environment variables.
 pub struct EnvConverter {}
 
 impl EnvConverter {

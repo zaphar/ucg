@@ -803,7 +803,7 @@ fn test_let_statement() {
 #[test]
 fn test_build_file_string() {
     let mut b = Builder::new(std::env::current_dir().unwrap());
-    b.build_file_string("let foo = 1;".to_string()).unwrap();
+    b.eval_string("let foo = 1;").unwrap();
     let key = value_node!("foo".to_string(), 1, 0);
     assert!(b.out.contains_key(&key));
 }

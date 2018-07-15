@@ -63,6 +63,7 @@ macro_rules! trace_nom {
         }
     };
 }
+
 fn symbol_to_value(s: &Token) -> ParseResult<Value> {
     Ok(Value::Symbol(value_node!(
         s.fragment.to_string(),
@@ -134,6 +135,7 @@ fn triple_to_number(v: (Option<Token>, Option<Token>, Option<Token>)) -> ParseRe
     return Ok(Value::Float(value_node!(f, pref_pos)));
 }
 
+/// alt_peek conditionally runs a combinator if a lookahead combinator matches.
 macro_rules! alt_peek {
     (__inner $i:expr, $peekrule:ident!( $($peekargs:tt)* ) => $parserule:ident | $($rest:tt)* ) => (
         alt_peek!(__inner $i, $peekrule!($($peekargs)*) => call!($parserule) | $($rest)* )
@@ -291,7 +293,6 @@ named!(field_list<TokenIter, FieldList, error::Error>,
 );
 
 named!(
-    #[doc="Capture a tuple of named fields with values. {<field>=<value>,...}"],
     tuple<TokenIter, Value, error::Error>,
     map_res!(
         do_parse!(
@@ -334,7 +335,7 @@ named!(empty_value<TokenIter, Value, error::Error>,
     )
 );
 
-named!(pub compound_value<TokenIter, Value, error::Error>,
+named!(compound_value<TokenIter, Value, error::Error>,
     alt_peek!(
         punct!("[") => trace_nom!(list_value) | 
         punct!("{") => trace_nom!(tuple)
@@ -350,7 +351,7 @@ named!(scalar_value<TokenIter, Value, error::Error>,
     )
 );
 
-named!(pub value<TokenIter, Value, error::Error>,
+named!(value<TokenIter, Value, error::Error>,
     alt!(
         trace_nom!(selector_value)
         | trace_nom!(compound_value)
@@ -733,7 +734,7 @@ named!(list_op_expression<TokenIter, Expression, error::Error>,
     )
 );
 
-named!(pub non_op_expression<TokenIter, Expression, error::Error>,
+named!(non_op_expression<TokenIter, Expression, error::Error>,
     alt!(trace_nom!(list_op_expression) |
          trace_nom!(macro_expression) |
          trace_nom!(format_expression) |
@@ -744,7 +745,7 @@ named!(pub non_op_expression<TokenIter, Expression, error::Error>,
          trace_nom!(simple_expression))
 );
 
-named!(pub expression<TokenIter, Expression, error::Error>,
+named!(expression<TokenIter, Expression, error::Error>,
     alt_complete!(trace_nom!(op_expression) | trace_nom!(non_op_expression))
 );
 
@@ -752,7 +753,7 @@ fn expression_to_statement(v: Expression) -> ParseResult<Statement> {
     Ok(Statement::Expression(v))
 }
 
-named!(pub expression_statement<TokenIter, Statement, error::Error>,
+named!(expression_statement<TokenIter, Statement, error::Error>,
     map_res!(
         terminated!(trace_nom!(expression), punct!(";")),
         expression_to_statement

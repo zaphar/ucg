@@ -13,7 +13,6 @@
 //  limitations under the License.
 
 //! The definitions of the ucg AST and Tokens.
-
 use std;
 use std::borrow::Borrow;
 use std::cmp::Eq;
@@ -626,6 +625,7 @@ pub enum BinaryExprType {
     Div,
 }
 
+/// CompareType signals the type of a comparison for a binary expression.
 #[derive(Debug, PartialEq, Clone)]
 pub enum CompareType {
     Equal,
@@ -636,6 +636,7 @@ pub enum CompareType {
     LTEqual,
 }
 
+/// ComparisonDef Represents a comparison between two expressions.
 #[derive(Debug, PartialEq, Clone)]
 pub struct ComparisonDef {
     pub kind: CompareType,
@@ -676,12 +677,14 @@ pub struct ListDef {
     pub pos: Position,
 }
 
+/// ListOpType represents the type of list operation for a ListOpDef.
 #[derive(Debug, PartialEq, Clone)]
 pub enum ListOpType {
     Map,
     Filter,
 }
 
+/// ListOpDef implements the list operations in the UCG AST.
 #[derive(Debug, PartialEq, Clone)]
 pub struct ListOpDef {
     pub typ: ListOpType,

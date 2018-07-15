@@ -420,6 +420,9 @@ pub fn tokenize(input: Span) -> Result<Vec<Token>, (Position, nom::ErrorKind)> {
     Ok(out)
 }
 
+/// Clones a token.
+///
+/// This is necessary to allow the match_type and match_token macros to work.
 pub fn token_clone(t: &Token) -> Result<Token, error::Error> {
     Ok(t.clone())
 }
