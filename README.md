@@ -1,5 +1,7 @@
 # Universal Configuration Grammar.
 
+[![Build Status](https://travis-ci.org/zaphar/ucg.svg?branch=master)](https://travis-ci.org/zaphar/ucg)
+
 This is an experiment in configuration management. The approach is **not**
 to create a "parsable" config file format.  We have plenty of
 those. Instead we try to specify a grammar for describing
