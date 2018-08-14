@@ -190,14 +190,18 @@ impl Converter for ExecConverter {
 #[cfg(test)]
 mod exec_test {
     use super::*;
+    use build::assets::MemoryCache;
     use build::Builder;
     use convert::traits::Converter;
+
     use std;
+    use std::cell::RefCell;
     use std::io::Cursor;
 
     #[test]
     fn convert_just_command_test() {
-        let mut b = Builder::new(std::env::current_dir().unwrap());
+        let cache = Rc::new(RefCell::new(MemoryCache::new()));
+        let mut b = Builder::new(std::env::current_dir().unwrap(), cache);
         let conv = ExecConverter::new();
         b.eval_string(
             "let script = {
@@ -216,7 +220,8 @@ mod exec_test {
 
     #[test]
     fn convert_command_with_env_test() {
-        let mut b = Builder::new(std::env::current_dir().unwrap());
+        let cache = Rc::new(RefCell::new(MemoryCache::new()));
+        let mut b = Builder::new(std::env::current_dir().unwrap(), cache);
         let conv = ExecConverter::new();
         b.eval_string(
             "let script = {
@@ -242,7 +247,8 @@ mod exec_test {
 
     #[test]
     fn convert_command_with_arg_test() {
-        let mut b = Builder::new(std::env::current_dir().unwrap());
+        let cache = Rc::new(RefCell::new(MemoryCache::new()));
+        let mut b = Builder::new(std::env::current_dir().unwrap(), cache);
         let conv = ExecConverter::new();
         b.eval_string(
             "let script = {

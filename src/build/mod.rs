@@ -13,8 +13,9 @@
 //  limitations under the License.
 
 //! The build stage of the ucg compiler.
+use std::cell::RefCell;
 use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 use std::convert::From;
 use std::env;
 use std::error::Error;
@@ -33,11 +34,14 @@ use format;
 use parse::parse;
 use tokenizer::Span;
 
+pub mod assets;
+
 impl MacroDef {
     /// Expands a ucg Macro using the given arguments into a new Tuple.
     pub fn eval(
         &self,
         root: PathBuf,
+        cache: Rc<RefCell<assets::Cache>>,
         env: Rc<Val>,
         mut args: Vec<Rc<Val>>,
     ) -> Result<Vec<(Positioned<String>, Rc<Val>)>, Box<Error>> {
@@ -61,7 +65,7 @@ impl MacroDef {
         for (i, arg) in args.drain(0..).enumerate() {
             scope.entry(self.argdefs[i].clone()).or_insert(arg.clone());
         }
-        let b = Builder::new_with_env_and_scope(root, scope, env);
+        let b = Builder::new_with_env_and_scope(root, cache, scope, env);
         let mut result: Vec<(Positioned<String>, Rc<Val>)> = Vec::new();
         for &(ref key, ref expr) in self.fields.iter() {
             // We clone the expressions here because this macro may be consumed
@@ -299,13 +303,18 @@ pub struct Builder {
     validate_mode: bool,
     assert_collector: AssertCollector,
     env: Rc<Val>,
-    /// assets are other parsed files from import statements. They
-    /// are keyed by the normalized import path. This acts as a cache
+    // NOTE(jwall): We use interior mutability here because we need
+    // our asset cache to be shared by multiple different sub-builders.
+    // We use Rc to handle the reference counting for us and we use
+    // RefCell to give us interior mutability. This sacrifices our
+    // compile time memory safety for runtime checks. However it's
+    // acceptable in this case since I can't figure out a better way to
+    // handle it.
+    /// The assets are other parsed files from import statements. They
+    /// are keyed by the canonicalized import path. This acts as a cache
     /// so multiple imports of the same file don't have to be parsed
     /// multiple times.
-    assets: ValueMap,
-    // List of file paths we have already parsed.
-    files: HashSet<String>,
+    assets: Rc<RefCell<assets::Cache>>,
     /// build_output is our built output.
     build_output: ValueMap,
     /// last is the result of the last statement.
@@ -377,20 +386,25 @@ impl Builder {
     }
 
     /// Constructs a new Builder.
-    pub fn new<P: Into<PathBuf>>(root: P) -> Self {
-        Self::new_with_scope(root, HashMap::new())
+    pub fn new<P: Into<PathBuf>>(root: P, cache: Rc<RefCell<assets::Cache>>) -> Self {
+        Self::new_with_scope(root, cache, HashMap::new())
     }
 
     /// Constructs a new Builder with a provided scope.
-    pub fn new_with_scope<P: Into<PathBuf>>(root: P, scope: ValueMap) -> Self {
+    pub fn new_with_scope<P: Into<PathBuf>>(
+        root: P,
+        cache: Rc<RefCell<assets::Cache>>,
+        scope: ValueMap,
+    ) -> Self {
         let env_vars: Vec<(Positioned<String>, Rc<Val>)> = env::vars()
             .map(|t| (Positioned::new(t.0, 0, 0), Rc::new(t.1.into())))
             .collect();
-        Self::new_with_env_and_scope(root, scope, Rc::new(Val::Tuple(env_vars)))
+        Self::new_with_env_and_scope(root, cache, scope, Rc::new(Val::Tuple(env_vars)))
     }
 
     pub fn new_with_env_and_scope<P: Into<PathBuf>>(
         root: P,
+        cache: Rc<RefCell<assets::Cache>>,
         scope: ValueMap,
         env: Rc<Val>,
     ) -> Self {
@@ -403,8 +417,7 @@ impl Builder {
                 failures: String::new(),
             },
             env: env,
-            assets: HashMap::new(),
-            files: HashSet::new(),
+            assets: cache,
             build_output: scope,
             out_lock: None,
             last: None,
@@ -460,6 +473,7 @@ impl Builder {
 
     /// Builds a ucg file at the named path.
     pub fn build_file(&mut self, name: &str) -> BuildResult {
+        eprintln!("building ucg file {}", name);
         let mut f = try!(File::open(name));
         let mut s = String::new();
         try!(f.read_to_string(&mut s));
@@ -469,40 +483,23 @@ impl Builder {
 
     fn build_import(&mut self, def: &ImportDef) -> Result<Rc<Val>, Box<Error>> {
         let sym = &def.name;
-        let positioned_sym = sym.into();
         let mut normalized = self.root.to_path_buf();
         normalized.push(&def.path.fragment);
-        let key = normalized.to_str().unwrap().to_string();
-        if !self.files.contains(&key) {
-            // Only parse the file once on import.
-            if self.assets.get(&positioned_sym).is_none() {
-                // FIXME(jwall): We should be sharing our assets collection.
-                let mut b = Self::new(normalized);
-                try!(b.build_file(&def.path.fragment));
-                let fields: Vec<(Positioned<String>, Rc<Val>)> = b.build_output.drain().collect();
-                let result = Rc::new(Val::Tuple(fields));
-                self.assets.entry(positioned_sym).or_insert(result.clone());
-                self.files.insert(def.path.fragment.clone());
-                return Ok(result);
-            } else {
-                return Ok(self.assets.get(&positioned_sym).unwrap().clone());
-            }
-        } else {
-            return match self.assets.get(&positioned_sym) {
-                None => {
-                    // some kind of error here I think.
-                    Err(Box::new(error::Error::new(
-                        format!(
-                            "Unknown Error processing import in file: {}",
-                            self.root.to_string_lossy()
-                        ),
-                        error::ErrorType::Unsupported,
-                        def.name.pos.clone(),
-                    )))
-                }
-                Some(val) => Ok(val.clone()),
-            };
+        eprintln!("processing import for {}", normalized.to_string_lossy());
+        // Only parse the file once on import.
+        let mut shared_assets = self.assets.borrow_mut();
+        if try!(shared_assets.get(&normalized)).is_some() {
+            return Ok(try!(shared_assets.get(&normalized)).unwrap().clone());
         }
+        let mut b = Self::new(normalized.clone(), self.assets.clone());
+        let filepath = normalized.to_str().unwrap().clone();
+        try!(b.build_file(filepath));
+        let fields: Vec<(Positioned<String>, Rc<Val>)> = b.build_output.drain().collect();
+        let result = Rc::new(Val::Tuple(fields));
+        //eprintln!("storing sym {:?} results {:?} ", sym, result)
+        self.build_output.insert(sym.into(), result.clone());
+        try!(shared_assets.stash(normalized.clone(), result.clone()));
+        return Ok(result);
     }
 
     fn build_let(&mut self, def: &LetDef) -> Result<Rc<Val>, Box<Error>> {
@@ -512,7 +509,7 @@ impl Builder {
             Entry::Occupied(e) => {
                 return Err(Box::new(error::Error::new(
                     format!(
-                        "Let binding \
+                        "Binding \
                          for {:?} already \
                          exists in file: {}",
                         e.key(),
@@ -559,9 +556,6 @@ impl Builder {
         }
         if self.build_output.contains_key(sym) {
             return Some(self.build_output[sym].clone());
-        }
-        if self.assets.contains_key(sym) {
-            return Some(self.assets[sym].clone());
         }
         None
     }
@@ -822,9 +816,11 @@ impl Builder {
         left: Rc<Val>,
         right: Rc<Val>,
     ) -> Result<Rc<Val>, Box<Error>> {
-        Ok(Rc::new(Val::Boolean(try!(
-            left.equal(right.as_ref(), &self.root.to_string_lossy(), pos.clone())
-        ))))
+        Ok(Rc::new(Val::Boolean(try!(left.equal(
+            right.as_ref(),
+            &self.root.to_string_lossy(),
+            pos.clone()
+        )))))
     }
 
     fn do_not_deep_equal(
@@ -833,9 +829,11 @@ impl Builder {
         left: Rc<Val>,
         right: Rc<Val>,
     ) -> Result<Rc<Val>, Box<Error>> {
-        Ok(Rc::new(Val::Boolean(!try!(
-            left.equal(right.as_ref(), &self.root.to_string_lossy(), pos.clone())
-        ))))
+        Ok(Rc::new(Val::Boolean(!try!(left.equal(
+            right.as_ref(),
+            &self.root.to_string_lossy(),
+            pos.clone()
+        )))))
     }
 
     fn do_gt(&self, pos: &Position, left: Rc<Val>, right: Rc<Val>) -> Result<Rc<Val>, Box<Error>> {
@@ -1064,7 +1062,12 @@ impl Builder {
             for arg in args.iter() {
                 argvals.push(try!(self.eval_expr(arg)));
             }
-            let fields = try!(m.eval(self.root.clone(), self.env.clone(), argvals));
+            let fields = try!(m.eval(
+                self.root.clone(),
+                self.assets.clone(),
+                self.env.clone(),
+                argvals
+            ));
             return Ok(Rc::new(Val::Tuple(fields)));
         }
         Err(Box::new(error::Error::new(
@@ -1127,7 +1130,12 @@ impl Builder {
             let mut out = Vec::new();
             for expr in l.iter() {
                 let argvals = vec![try!(self.eval_expr(expr))];
-                let fields = try!(macdef.eval(self.root.clone(), self.env.clone(), argvals));
+                let fields = try!(macdef.eval(
+                    self.root.clone(),
+                    self.assets.clone(),
+                    self.env.clone(),
+                    argvals
+                ));
                 if let Some(v) = Self::find_in_fieldlist(&def.field, &fields) {
                     match def.typ {
                         ListOpType::Map => {

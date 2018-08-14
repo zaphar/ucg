@@ -12,10 +12,15 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use super::assets::MemoryCache;
 use super::Builder;
 
 fn assert_build(input: &str) {
-    let mut b = Builder::new("<Eval>");
+    let cache = MemoryCache::new();
+    let mut b = Builder::new("<Eval>", Rc::new(RefCell::new(cache)));
     b.enable_validate_mode();
     b.eval_string(input).unwrap();
     if !b.assert_collector.success {
