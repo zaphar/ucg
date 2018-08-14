@@ -253,6 +253,10 @@ named!(asserttok( Span ) -> Token,
        do_tag_tok!(TokenType::BAREWORD, "assert", WS)
 );
 
+named!(outtok( Span ) -> Token,
+       do_tag_tok!(TokenType::BAREWORD, "out", WS)
+);
+
 named!(astok( Span ) -> Token,
        do_tag_tok!(TokenType::BAREWORD, "as", WS)
 );
@@ -359,6 +363,7 @@ named!(token( Span ) -> Token,
         rightsquarebracket |
         booleantok |
         lettok |
+        outtok |
         selecttok |
         asserttok |
         macrotok |

@@ -23,6 +23,16 @@ fn test_assert_token() {
 }
 
 #[test]
+fn test_out_token() {
+    let result = outtok(LocatedSpan::new("out "));
+    assert!(result.is_done(), format!("result {:?} is not done", result));
+    if let nom::IResult::Done(_, tok) = result {
+        assert_eq!(tok.fragment, "out");
+        assert_eq!(tok.typ, TokenType::BAREWORD);
+    }
+}
+
+#[test]
 fn test_escape_quoted() {
     let result = escapequoted(LocatedSpan::new("foo \\\"bar\""));
     assert!(result.is_done(), format!("result {:?} is not ok", result));
@@ -103,7 +113,7 @@ fn test_lteqtok() {
 #[test]
 fn test_tokenize_one_of_each() {
     let result = tokenize(LocatedSpan::new(
-        "map filter assert let import macro select as => [ ] { } ; = % / * \
+        "map out filter assert let import macro select as => [ ] { } ; = % / * \
          + - . ( ) , 1 . foo \"bar\" // comment\n ; true false == < > <= >= !=",
     ));
     assert!(result.is_ok(), format!("result {:?} is not ok", result));
@@ -111,8 +121,8 @@ fn test_tokenize_one_of_each() {
     for (i, t) in v.iter().enumerate() {
         println!("{}: {:?}", i, t);
     }
-    assert_eq!(v.len(), 38);
-    assert_eq!(v[37].typ, TokenType::END);
+    assert_eq!(v.len(), 39);
+    assert_eq!(v[38].typ, TokenType::END);
 }
 
 #[test]

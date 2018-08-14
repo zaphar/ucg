@@ -292,6 +292,24 @@ fn test_let_statement_parse() {
 }
 
 #[test]
+fn test_out_statement_parse() {
+    assert_error!(out_statement("out"));
+    assert_error!(out_statement("out json"));
+    assert_error!(out_statement("out json foo"));
+    assert_parse!(
+        out_statement("out json 1.0;"),
+        Statement::Output(
+            Token {
+                pos: Position { line: 1, column: 5 },
+                fragment: "json".to_string(),
+                typ: TokenType::BAREWORD
+            },
+            Expression::Simple(Value::Float(value_node!(1.0, 1, 10)))
+        )
+    );
+}
+
+#[test]
 fn test_expression_statement_parse() {
     assert_error!(expression_statement("foo"));
     assert_parse!(

@@ -799,6 +799,9 @@ pub enum Statement {
 
     // Assert statement
     Assert(Token),
+
+    // Identify an Expression for output.
+    Output(Token, Expression),
 }
 
 #[cfg(test)]

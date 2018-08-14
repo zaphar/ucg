@@ -293,7 +293,7 @@ pub struct AssertCollector {
     pub failures: String,
 }
 
-/// Builder handles building ucg code.
+/// Builder handles building ucg code for a single file..
 pub struct Builder {
     root: PathBuf,
     validate_mode: bool,
@@ -306,10 +306,12 @@ pub struct Builder {
     assets: ValueMap,
     // List of file paths we have already parsed.
     files: HashSet<String>,
-    /// out is our built output.
-    out: ValueMap,
+    /// build_output is our built output.
+    build_output: ValueMap,
     /// last is the result of the last statement.
     pub last: Option<Rc<Val>>,
+    // FIXME(jwall): This should be a per file mapping.
+    out_lock: Option<(String, Rc<Val>)>,
 }
 
 macro_rules! eval_binary_expr {
@@ -330,7 +332,7 @@ macro_rules! eval_binary_expr {
 }
 
 impl Builder {
-    // FIXME(jwall): This needs some unit tests.
+    // TOOD(jwall): This needs some unit tests.
     fn tuple_to_val(&self, fields: &Vec<(Token, Expression)>) -> Result<Rc<Val>, Box<Error>> {
         let mut new_fields = Vec::<(Positioned<String>, Rc<Val>)>::new();
         for &(ref name, ref expr) in fields.iter() {
@@ -403,7 +405,8 @@ impl Builder {
             env: env,
             assets: HashMap::new(),
             files: HashSet::new(),
-            out: scope,
+            build_output: scope,
+            out_lock: None,
             last: None,
         }
     }
@@ -473,9 +476,10 @@ impl Builder {
         if !self.files.contains(&key) {
             // Only parse the file once on import.
             if self.assets.get(&positioned_sym).is_none() {
+                // FIXME(jwall): We should be sharing our assets collection.
                 let mut b = Self::new(normalized);
                 try!(b.build_file(&def.path.fragment));
-                let fields: Vec<(Positioned<String>, Rc<Val>)> = b.out.drain().collect();
+                let fields: Vec<(Positioned<String>, Rc<Val>)> = b.build_output.drain().collect();
                 let result = Rc::new(Val::Tuple(fields));
                 self.assets.entry(positioned_sym).or_insert(result.clone());
                 self.files.insert(def.path.fragment.clone());
@@ -504,7 +508,7 @@ impl Builder {
     fn build_let(&mut self, def: &LetDef) -> Result<Rc<Val>, Box<Error>> {
         let val = try!(self.eval_expr(&def.value));
         let name = &def.name;
-        match self.out.entry(name.into()) {
+        match self.build_output.entry(name.into()) {
             Entry::Occupied(e) => {
                 return Err(Box::new(error::Error::new(
                     format!(
@@ -531,6 +535,21 @@ impl Builder {
             &Statement::Let(ref def) => self.build_let(def),
             &Statement::Import(ref def) => self.build_import(def),
             &Statement::Expression(ref expr) => self.eval_expr(expr),
+            // FIXME(jwall): Stash this into an output slot.
+            // Only one output can be used per file.
+            &Statement::Output(ref typ, ref expr) => {
+                if let None = self.out_lock {
+                    let val = try!(self.eval_expr(expr));
+                    self.out_lock = Some((typ.fragment.to_string(), val.clone()));
+                    Ok(val)
+                } else {
+                    Err(Box::new(error::Error::new(
+                        format!("You can only have one output per file."),
+                        error::ErrorType::DuplicateBinding,
+                        typ.pos.clone(),
+                    )))
+                }
+            }
         }
     }
 
@@ -538,8 +557,8 @@ impl Builder {
         if &sym.val == "env" {
             return Some(self.env.clone());
         }
-        if self.out.contains_key(sym) {
-            return Some(self.out[sym].clone());
+        if self.build_output.contains_key(sym) {
+            return Some(self.build_output[sym].clone());
         }
         if self.assets.contains_key(sym) {
             return Some(self.assets[sym].clone());
@@ -1138,7 +1157,6 @@ impl Builder {
             // we are not in validate_mode then build_asserts are noops.
             return Ok(Rc::new(Val::Empty));
         }
-        // FIXME(jwall): We need to append a semicolon to the expr.
         let mut expr_as_stmt = String::new();
         let expr = &tok.fragment;
         expr_as_stmt.push_str(expr);

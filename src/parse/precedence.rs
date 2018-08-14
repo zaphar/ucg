@@ -253,7 +253,6 @@ named!(compare_expression<OpListIter, Expression, error::Error>,
     map_res!(
         do_parse!(
             left: alt!(trace_nom!(math_expression) | trace_nom!(parse_expression)) >>
-                // FIXME(jwall): Wrong type of combinator
                 typ: parse_compare_operator >>
                 right: alt!(trace_nom!(math_expression) | trace_nom!(parse_expression)) >>
                 (typ, left, right)

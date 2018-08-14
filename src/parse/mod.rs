@@ -842,12 +842,29 @@ named!(assert_statement<TokenIter, Statement, error::Error>,
     )
 );
 
+named!(out_statement<TokenIter, Statement, error::Error>,
+    do_parse!(
+        word!("out") >>
+        pos: pos >>
+        typ: match_type!(BAREWORD) >>
+        expr: add_return_error!(
+            nom::ErrorKind::Custom(
+                error::Error::new(
+                    "Invalid syntax for assert",
+                    error::ErrorType::ParseError, pos)),
+            expression) >>
+        punct!(";") >>
+        (Statement::Output(typ.clone(), expr.clone()))
+    )
+);
+
 //trace_macros!(true);
 fn statement(i: TokenIter) -> nom::IResult<TokenIter, Statement, error::Error> {
     return alt_peek!(i,
             word!("assert") => trace_nom!(assert_statement) |
             word!("import") => trace_nom!(import_statement) |
             word!("let") => trace_nom!(let_statement) |
+            word!("out") => trace_nom!(out_statement) |
             trace_nom!(expression_statement)
         );
 }
