@@ -488,16 +488,25 @@ impl Builder {
         eprintln!("processing import for {}", normalized.to_string_lossy());
         // Only parse the file once on import.
         let mut shared_assets = self.assets.borrow_mut();
-        if try!(shared_assets.get(&normalized)).is_some() {
-            return Ok(try!(shared_assets.get(&normalized)).unwrap().clone());
+        let result = match try!(shared_assets.get(&normalized)) {
+            Some(v) => v.clone(),
+            None => {
+                let mut b = Self::new(normalized.clone(), self.assets.clone());
+                let filepath = normalized.to_str().unwrap().clone();
+                try!(b.build_file(filepath));
+                let fields: Vec<(Positioned<String>, Rc<Val>)> = b.build_output.drain().collect();
+                Rc::new(Val::Tuple(fields))
+            }
+        };
+        let key = sym.into();
+        if self.build_output.contains_key(&key) {
+            return Err(Box::new(error::Error::new(
+                format!("Binding for import name {} already exists", sym.fragment),
+                error::ErrorType::DuplicateBinding,
+                def.path.pos.clone(),
+            )));
         }
-        let mut b = Self::new(normalized.clone(), self.assets.clone());
-        let filepath = normalized.to_str().unwrap().clone();
-        try!(b.build_file(filepath));
-        let fields: Vec<(Positioned<String>, Rc<Val>)> = b.build_output.drain().collect();
-        let result = Rc::new(Val::Tuple(fields));
-        //eprintln!("storing sym {:?} results {:?} ", sym, result)
-        self.build_output.insert(sym.into(), result.clone());
+        self.build_output.insert(key, result.clone());
         try!(shared_assets.stash(normalized.clone(), result.clone()));
         return Ok(result);
     }

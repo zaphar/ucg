@@ -59,16 +59,19 @@ fn run_converter(c: ConverterRunner, v: Rc<Val>, f: Option<&str>) -> traits::Res
 
 fn main() {
     let app = do_flags();
+    let cache = Rc::new(RefCell::new(MemoryCache::new()));
     if let Some(matches) = app.subcommand_matches("build") {
         let file = matches.value_of("INPUT").unwrap();
         let out = matches.value_of("out");
         let sym = matches.value_of("sym");
         let target = matches.value_of("target").unwrap();
         let root = PathBuf::from(file);
-        let cache = Rc::new(RefCell::new(MemoryCache::new()));
         let mut builder = build::Builder::new(root.parent().unwrap(), cache);
         match ConverterRunner::new(target) {
             Ok(converter) => {
+                // FIXME(jwall): What should happen if they requested we build a _test.ucg file.
+                // 1. We could automatically go into validate mode.
+                // 2. We could warn that this is a test file.
                 let result = builder.build_file(file);
                 if !result.is_ok() {
                     eprintln!("{:?}", result.err().unwrap());
@@ -97,7 +100,6 @@ fn main() {
         }
     } else if let Some(matches) = app.subcommand_matches("validate") {
         let file = matches.value_of("INPUT").unwrap();
-        let cache = Rc::new(RefCell::new(MemoryCache::new()));
         let mut builder = build::Builder::new(std::env::current_dir().unwrap(), cache);
         builder.enable_validate_mode();
         builder.build_file(file).unwrap();
