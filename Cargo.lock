@@ -225,7 +225,7 @@ dependencies = [
 
 [[package]]
 name = "ucg"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "bencher 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.26.2 (registry+https://github.com/rust-lang/crates.io-index)",
