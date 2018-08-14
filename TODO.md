@@ -30,9 +30,9 @@ Some options here could be:
 
 # Minor Fixes and Polish
 
-* Compiler caching?
+* Compiler caching (interface has been defined)
 * Strings as tuple fields?
-* Streaming Parsing
+* Streaming Parsing?
 * Casting between types?
 * Better error messages.
 * Flags should allow different seperators for prefixed flags.
