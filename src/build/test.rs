@@ -499,7 +499,6 @@ fn test_eval_selector_list_expr() {
     );
 }
 
-// TODO(jwall): Eval for tuple and list.
 // Include nested for each.
 #[test]
 #[should_panic(expected = "Unable to find tpl1")]

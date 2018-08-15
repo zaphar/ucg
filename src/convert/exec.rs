@@ -37,8 +37,6 @@ impl ExecConverter {
         ExecConverter {}
     }
 
-    // TODO(jwall): We may want to include an built in exec macro for
-    // creating an exec tuple.
     #[allow(unused_assignments)]
     fn write(&self, v: &Val, w: &mut Write) -> Result {
         // We always expect the Val to be a Tuple.
@@ -128,7 +126,6 @@ impl ExecConverter {
             try!(write!(script, "# Turn on unofficial Bash-Strict-Mode\n"));
             try!(write!(script, "set -euo pipefail\n"));
             // 3. Then assign our environment variables
-            // TODO(jwall): We should escape bash ENV variable values.
             if let Some(env_list) = env {
                 for &(ref name, ref v) in env_list.iter() {
                     // We only allow string fields in our env tuple.

@@ -121,13 +121,14 @@ fn triple_to_number(v: (Option<Token>, Option<Token>, Option<Token>)) -> ParseRe
     };
 
     let to_parse = pref.to_string() + "." + &suf;
-    // TODO(jwall): if there is an error we should report where that error occured.
     let f = match FromStr::from_str(&to_parse) {
         Ok(f) => f,
         Err(_) => {
             return Err(error::Error::new(
                 format!("Not a float! {}", to_parse),
                 error::ErrorType::UnexpectedToken,
+                // NOTE(jwall): This is ugly. I should probably see if I can refactor
+                // it to something less confusing.
                 maybepos.unwrap(),
             ))
         }

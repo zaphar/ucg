@@ -400,7 +400,6 @@ pub fn op_expression(i: TokenIter) -> NomResult<Expression> {
         IResult::Error(e) => IResult::Error(e),
         IResult::Incomplete(i) => IResult::Incomplete(i),
         IResult::Done(rest, oplist) => {
-            // TODO run our binary parsing.
             let mut i_ = OpListIter {
                 source: oplist.as_slice(),
             };

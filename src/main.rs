@@ -77,9 +77,7 @@ fn main() {
         let mut builder = build::Builder::new(root.parent().unwrap(), cache);
         match ConverterRunner::new(target) {
             Ok(converter) => {
-                // TODO(jwall): What should happen if they requested we build a _test.ucg file.
-                // 1. We could automatically go into validate mode.
-                // 2. We could warn that this is a test file.
+                // TODO(jwall): We should warn if this is a test file.
                 let result = builder.build_file(file);
                 if !result.is_ok() {
                     eprintln!("{:?}", result.err().unwrap());
@@ -108,10 +106,7 @@ fn main() {
             }
         }
     } else if let Some(matches) = app.subcommand_matches("build") {
-        // TODO(jwall): This should take multiple files I think.
         let files = matches.values_of("INPUT").unwrap();
-        // TODO(jwall): We should default to the file name with appropriate
-        // extension if this is not set.
         for file in files {
             let root = PathBuf::from(file);
             let mut builder = build::Builder::new(root.parent().unwrap(), cache);
