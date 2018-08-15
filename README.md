@@ -48,22 +48,17 @@ SUBCOMMANDS:
 ## compiling a file
 
 ```sh
-Compile a specific ucg file.
+Build a list of ucg files.
 
 USAGE:
-    ucg build [OPTIONS] <INPUT> --sym <sym> --target <target>
+    ucg build <INPUT>...
 
 FLAGS:
     -h, --help       Prints help information
     -V, --version    Prints version information
 
-OPTIONS:
-    -o, --out <out>          Output file to write to.
-        --sym <sym>          Specify a specific let binding in the ucg file to output.
-    -t, --target <target>    Target output type. (flags, json, env, exec)
-
 ARGS:
-    <INPUT>    Input ucg file to build.
+    <INPUT>...    Input ucg files to build.
 ```
 
 ## Language Reference

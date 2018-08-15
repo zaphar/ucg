@@ -42,12 +42,11 @@ fn do_flags<'a>() -> clap::ArgMatches<'a> {
              (@arg INPUT: +required "Input ucg file to inspect symbol from.")
             )
             (@subcommand build =>
-             (about: "Build a specific ucg file.")
-             (@arg out: --out -o +takes_value "Output file to write to.")
+             (about: "Build a list of ucg files.")
              (@arg INPUT: ... +required "Input ucg files to build.")
             )
             (@subcommand validate =>
-             (about: "Check a specific ucg file for errors.")
+             (about: "Check a list of ucg files for errors and run assertions.")
              (@arg INPUT: ... +required "Input ucg files to validate.")
             )
     ).get_matches()
