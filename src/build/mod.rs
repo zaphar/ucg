@@ -298,8 +298,9 @@ pub struct AssertCollector {
 }
 
 /// Builder handles building ucg code for a single file..
-pub struct Builder {
+pub struct Builder<'a> {
     root: PathBuf,
+    curr_file: Option<&'a str>,
     validate_mode: bool,
     assert_collector: AssertCollector,
     env: Rc<Val>,
@@ -339,7 +340,7 @@ macro_rules! eval_binary_expr {
     };
 }
 
-impl Builder {
+impl<'a> Builder<'a> {
     // TOOD(jwall): This needs some unit tests.
     fn tuple_to_val(&self, fields: &Vec<(Token, Expression)>) -> Result<Rc<Val>, Box<Error>> {
         let mut new_fields = Vec::<(Positioned<String>, Rc<Val>)>::new();
@@ -409,6 +410,7 @@ impl Builder {
     ) -> Self {
         Builder {
             root: root.into(),
+            curr_file: None,
             validate_mode: false,
             assert_collector: AssertCollector {
                 success: true,
@@ -463,7 +465,10 @@ impl Builder {
                 }
             }
             Err(err) => Err(Box::new(error::Error::new_with_cause(
-                format!("Error while parsing file: {}", self.root.to_string_lossy()),
+                format!(
+                    "Error while parsing file: {}",
+                    self.curr_file.unwrap_or("<eval>")
+                ),
                 error::ErrorType::ParseError,
                 err,
             ))),
@@ -471,8 +476,9 @@ impl Builder {
     }
 
     /// Builds a ucg file at the named path.
-    pub fn build_file(&mut self, name: &str) -> BuildResult {
+    pub fn build_file(&mut self, name: &'a str) -> BuildResult {
         eprintln!("building ucg file {}", name);
+        self.curr_file = Some(name);
         let mut f = try!(File::open(name));
         let mut s = String::new();
         try!(f.read_to_string(&mut s));
