@@ -26,4 +26,5 @@ pub type Result = result::Result<(), Box<Error>>;
 /// final conversion stage of the ucg compiler.
 pub trait Converter {
     fn convert(&self, vs: Rc<Val>, w: &mut Write) -> Result;
+    fn file_ext(&self) -> String;
 }

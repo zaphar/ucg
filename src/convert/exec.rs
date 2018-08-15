@@ -185,6 +185,10 @@ impl Converter for ExecConverter {
     fn convert(&self, v: Rc<Val>, mut w: &mut Write) -> Result {
         self.write(&v, &mut w)
     }
+
+    fn file_ext(&self) -> String {
+        String::from("sh")
+    }
 }
 
 #[cfg(test)]

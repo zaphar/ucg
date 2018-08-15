@@ -500,7 +500,8 @@ named!(copy_expression<TokenIter, Expression, error::Error>,
 fn tuple_to_macro(mut t: (Position, Vec<Value>, Value)) -> ParseResult<Expression> {
     match t.2 {
         Value::Tuple(v) => Ok(Expression::Macro(MacroDef {
-            argdefs: t.1
+            argdefs: t
+                .1
                 .drain(0..)
                 .map(|s| Positioned {
                     pos: s.pos().clone(),

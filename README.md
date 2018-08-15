@@ -39,8 +39,9 @@ FLAGS:
     -V, --version    Prints version information
 
 SUBCOMMANDS:
-    build       Compile a specific ucg file.
+    build       Build a specific ucg file.
     help        Prints this message or the help of the given subcommand(s)
+    inspect     Inspect a specific symbol in a ucg file.
     validate    Check a specific ucg file for errors.
 ```
 

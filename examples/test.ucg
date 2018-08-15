@@ -40,3 +40,5 @@ let server_config = {
     },
     l = ["foo", "bar"]
 };
+
+out json server_config;

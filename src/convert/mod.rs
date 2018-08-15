@@ -64,4 +64,9 @@ impl ConverterRunner {
     pub fn convert(&self, v: Rc<Val>, mut w: Box<Write>) -> traits::Result {
         self.converter.convert(v, &mut w)
     }
+
+    /// ext returns the expected file extension for this conversion.
+    pub fn ext(&self) -> String {
+        self.converter.file_ext()
+    }
 }

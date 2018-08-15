@@ -319,8 +319,7 @@ pub struct Builder {
     build_output: ValueMap,
     /// last is the result of the last statement.
     pub last: Option<Rc<Val>>,
-    // FIXME(jwall): This should be a per file mapping.
-    out_lock: Option<(String, Rc<Val>)>,
+    pub out_lock: Option<(String, Rc<Val>)>,
 }
 
 macro_rules! eval_binary_expr {
@@ -541,8 +540,8 @@ impl Builder {
             &Statement::Let(ref def) => self.build_let(def),
             &Statement::Import(ref def) => self.build_import(def),
             &Statement::Expression(ref expr) => self.eval_expr(expr),
-            // FIXME(jwall): Stash this into an output slot.
-            // Only one output can be used per file.
+            // Only one output can be used per file. Right now we enforce this by
+            // having a single builder per file.
             &Statement::Output(ref typ, ref expr) => {
                 if let None = self.out_lock {
                     let val = try!(self.eval_expr(expr));
