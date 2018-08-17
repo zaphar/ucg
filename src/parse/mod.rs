@@ -130,7 +130,7 @@ fn triple_to_number(v: (Option<Token>, Option<Token>, Option<Token>)) -> ParseRe
                 // NOTE(jwall): This is ugly. I should probably see if I can refactor
                 // it to something less confusing.
                 maybepos.unwrap(),
-            ))
+            ));
         }
     };
     return Ok(Value::Float(value_node!(f, pref_pos)));
