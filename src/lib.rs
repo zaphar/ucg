@@ -40,9 +40,8 @@
 //!
 //! ## Syntax
 //!
-//! ucg is a safe language with type inference that tries to guarantee that it will halt.
-//! A valid ucg file is composesed of a series of statements. Statements are any valid
-//! ucg expression terminated by a semicolon.
+//! A valid ucg file is composesed of a series of statements. Stataments start with an
+//! optional keyword and terminate with a semicolon.
 //!
 //! ### Reserved words
 //!
@@ -60,10 +59,13 @@
 //! * map
 //! * filter
 //! * NULL
+//! * out
+//!
+//! ## Types
 //!
 //! ### Primitive types
 //!
-//! ucg has a relatively simple syntax with a few primitive types, Null, Boolean, Int, Float, and String.
+//! ucg has a relatively simple syntax with just a few primitive types, Null, Boolean, Int, Float, and String.
 //!
 //! ### Boolean
 //!
@@ -133,44 +135,6 @@
 //! let zero = mylist.0;
 //! ```
 //!
-//! ##### List macros
-//!
-//! ucg supports a couple of ways to use macros for mapping or filtering a list to a new list.
-//!
-//! A map expression starts with the map keyword followed by the name of a macro with exactly
-//! one argument, a `.`, and the name of the output field for the macro. ucg will apply the macro
-//! to each element of the list and then take the output field from the resulting tuple and add append
-//! it to the resulting list. If the output field does not exist in the macro it will be a compile
-//! error.
-//!
-//! ```ucg
-//! let list = [1, 2, 3, 4];
-//! let mapper = macro(item) => { result = item + 1 };
-//!
-//! // results in: [2, 3, 4, 5]
-//! let mapped = map mapper.result list;
-//! ```
-//!
-//
-//! A filter expression starts with the filter keyword followed by the name of a macro with exactly
-//! one argument, a `.`, and the name of the output field for the macro. The filter will apply the
-//! macro to each element of the list and if the output field is a Value that is not NULL then the
-//! list element is appended to the output list. If the output field returns a NULL Value then the
-//! element is not appended to the output list. If the output field does not exist in the macro it
-//! will be a compile error.
-//!
-//! ```ucg
-//! let list = ["foo", "bar", "foo", "bar"];
-//! let filtrator = macro(item) => {
-//!   ok = select item NULL {
-//!     foo = 1
-//!   }
-//! };
-//!
-//! // results in: ["foo", "foo"]
-//! let filtered = filter filtrator.ok list;
-//! ```
-//!
 //! #### Tuple
 //!
 //! Tuple's are an ordered collection of name, value pairs. They are bounded by curly braces `{ }`
@@ -211,10 +175,12 @@
 //! mytuple.field2.0; // descend into a deeply nested tuple and array.
 //! ```
 //!
-//! The `env` variable is a reserved variable that always contains a tuple with any environment
+//! ##### The Environment Selector
+//!
+//! The `env` selector is a reserved selector that always contains a tuple with any environment
 //! variables in it.
 //!
-//! Attempting to reference an enviroment variable that does not exist is a compile error.
+//! Attempting to reference an enviroment selector field that does not exist is a compile error.
 //!
 //! #### Binary operators
 //!
@@ -243,7 +209,7 @@
 //! ucg supports comparison using the `==`, `!=`, `>`, `<`, `>=`, `<=` operators. They are type safe and expect both
 //! sides to be of the same type.
 //!
-//! The `>`, `<`, `>=`, and `>=` operators are only supported on numeric types.
+//! The `>`, `<`, `>=`, and `>=` operators are only supported on numeric types (i.e. int, and float).
 //!
 //! ```ucg
 //! 1 > 2; // result is false
@@ -251,7 +217,6 @@
 //! 10 > "9"; // This is a compile error.
 //! (1+2) == 3
 //! ```
-//! The comparison operators expect either a simple value or a grouped expression as their left operand.
 //!
 //! The equality operators `==` and `!=` are supported for all types and will perform deep equal comparisons on complex
 //! types.
@@ -311,9 +276,10 @@
 //!
 //! #### Conditional data
 //!
-//! ucg supports a limited form of conditional data selection of using the select expression. A select expression starts with the `select`
-//! keyword and is followed by a an expression resolving to a string naming the field to select, an expression resolving to the default value,
-//! and a tuple to select the field from. If the field selected is not in the tuple then the default value will be used.
+//! ucg supports a limited form of conditional data selection of using the select expression. A select expression
+//! starts with the `select` keyword and is followed by a an expression resolving to a string naming the field to
+//! select, an expression resolving to the default value, and a tuple to select the field from. If the field selected
+//! is not in the tuple then the default value will be used.
 //!
 //! ```ucg
 //! let want = "baz";
@@ -334,30 +300,67 @@
 //! #### Macros
 //!
 //! Macros look like functions but they are resolved at compile time and configurations don't execute so they never appear in output.
-//! They can only reference the arguments in their arguments. They can't refer to bindings or other macros defined elsewhere.
-//! They are useful for constructing tuples of a certain shape or otherwise promoting data reuse. You define a macro with the `macro`
-//! keyword followed by the arguments in parentheses, a `=>`, and then a tuple.
+//! Macros do not close over their environment so they can only reference values defined in their arguments. They can't refer to bindings
+//! or other macros defined elsewhere. They are useful for constructing tuples of a certain shape or otherwise promoting data reuse.
+//! You define a macro with the `macro` keyword followed by the arguments in parentheses, a `=>`, and then a tuple.
 //!
 //! ```ucg
-//! let myfunc = macro (arg1, arg2) => {
+//! let mymacro = macro (arg1, arg2) => {
 //!     host = arg1,
 //!     port = arg2,
 //!     connstr = "couchdb://@:@" % (arg1, arg2),
 //! }
 //!
-//! let my_dbconf = myfunc("couchdb.example.org", "9090");
+//! let my_dbconf = mymacro("couchdb.example.org", "9090");
 //!
 //! let my_dbhost = dbconf.host;
 //! ```
 //!
 //! macros always resolve to a tuple. If you want to get a single value out you can use selector syntax to retrieve it.
 //!
+//! ##### List macros
+//!
+//! ucg supports a couple of ways to use macros for mapping or filtering a list to a new list.
+//!
+//! A map expression starts with the map keyword followed by the name of a macro that takes exactly
+//! one argument, a `.`, and the name of the output field for the macro. ucg will apply the macro
+//! to each element of the list and then take the output field from the resulting tuple and append
+//! it to the resulting list. If the output field does not exist in the macro output tuple it will
+//! be a compile error.
+//!
+//! ```ucg
+//! let list = [1, 2, 3, 4];
+//! let mapper = macro(item) => { result = item + 1 };
+//!
+//! // results in: [2, 3, 4, 5]
+//! let mapped = map mapper.result list;
+//! ```
+//
+//! A filter expression starts with the filter keyword followed by the name of a macro with exactly
+//! one argument, a `.`, and the name of the output field for the macro. The filter will apply the
+//! macro to each element of the list and if the output field is a value that is not NULL then the
+//! list element is appended to the output list. If the output field returns a NULL Value then the
+//! element is not appended to the output list. If the output field does not exist in the macro it
+//! will be a compile error.
+//!
+//! ```ucg
+//! let list = ["foo", "bar", "foo", "bar"];
+//! let filtrator = macro(item) => {
+//!   ok = select item NULL {
+//!     foo = 1
+//!   }
+//! };
+//!
+//! // results in: ["foo", "foo"]
+//! let filtered = filter filtrator.ok list;
+//! ```
+//!
 //! ### Statements
 //!
-//! There are 3 kinds of statements in a ucg configuration file. expression statements, let statements, and import statements.
-//! All ucg statements must be terminated by a semicolon.
+//! There are several kinds of statements in a ucg file. expression statements, let statements, import statements,
+//! assert statements, and out statements. All ucg statements must be terminated by a semicolon.
 //!
-//! * expression statements
+//! #### Expression statements
 //!
 //! The simplest and least useful is the expression statement. It is any valid expression followed by a semicolon.
 //!
@@ -371,6 +374,12 @@
 //! Despite the fact that these are valid the results are thrown away and can essentially be considered a noop. If we
 //! ever create a repl for ucg statements they may prove more useful.
 //!
+//! #### Named value statements
+//!
+//! There are two statements that can introduce a named value for a given ucg file. Let statnements and import statements.
+//! Any collisions in binding names inside a file are treated as compile errors. Bindings are immutable and once bound they
+//! can't be modified.
+//!
 //!  * Let statements
 //!
 //! The let statement binds the result of any valid expression to a name. It starts with the `let` keyword and is followed by
@@ -382,7 +391,7 @@
 //!
 //! * Import statement
 //!
-//! The import statement imports the contents of another ucg file into the current file with a name. The imported files bound
+//! The import statement imports the contents of another ucg file into the current file with a name. The imported files named
 //! values are exposed as a tuple in the referencing file. It starts with the `import` keyword and is followed by a quoted path
 //! to the ucg file, the keyword `as`, and a name for the imported values.
 //!
@@ -391,6 +400,10 @@
 //!
 //! let mysqlconf = dbconfigs.mysql;
 //! ```
+//!
+//! #### Statements to generate output.
+//!
+//! Some statements in ucg exist to generate an output. Either a compiled configuration or the results of test assertions.
 //!
 //! * Assert statement
 //!
@@ -414,6 +427,26 @@
 //! let expected_host = "www.example.com";
 //! assert "host == expected_host";
 //! ```
+//!
+//! When _test.ucg files are run in a validation run then ucg will output a log of all the assertions
+//! to stdout. Giving you a simple test harness for your ucg configs.
+//!
+//! * Out statement
+//!
+//! The out statement defined the output for a UCG file. It identifies an expression that will be output as a
+//! compiled artifact by the UCG compiler was well as the artifact type. The artifact type is expected to be one
+//! of the registered converters (e.g. json, exec) and the artifact file will take the same name as the ucg file
+//! with the extension replaced by the defined extension for that converter.
+//!
+//! ### Converters
+//!
+//! Converters convert the ucg intermediate format into an output artifact. Converters define two different things.
+//! A conversion for UCG's Intermediate Representation Val's and a file extension for output artifacts.
+//!
+//! * json: `json`, Serialized json datastructure.
+//! * flags: `txt`, command line flags suitable for appending to a command line as arguments.
+//! * env: `env`, a list of environment variables posix shell style.
+//! * exec: `sh`, a bash script that will `exec` an executable with arguments and environment variables set.
 
 // The following is necessary to allow the macros in tokenizer and parse modules
 // to succeed.
