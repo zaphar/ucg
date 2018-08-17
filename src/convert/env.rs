@@ -89,6 +89,6 @@ impl Converter for EnvConverter {
     }
 
     fn file_ext(&self) -> String {
-        String::from(".env")
+        String::from("env")
     }
 }
