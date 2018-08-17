@@ -302,7 +302,7 @@ pub struct Builder<'a> {
     root: PathBuf,
     curr_file: Option<&'a str>,
     validate_mode: bool,
-    assert_collector: AssertCollector,
+    pub assert_collector: AssertCollector,
     env: Rc<Val>,
     // NOTE(jwall): We use interior mutability here because we need
     // our asset cache to be shared by multiple different sub-builders.
@@ -477,7 +477,6 @@ impl<'a> Builder<'a> {
 
     /// Builds a ucg file at the named path.
     pub fn build_file(&mut self, name: &'a str) -> BuildResult {
-        eprintln!("building ucg file {}", name);
         self.curr_file = Some(name);
         let mut f = try!(File::open(name));
         let mut s = String::new();
