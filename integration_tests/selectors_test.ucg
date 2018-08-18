@@ -1,0 +1,19 @@
+let list = [1, 2, 3, 4];
+
+let tuple = {
+    field1 = list.0,
+    field2 = list.2,
+    deeplist = ["foo", "bar"],
+};
+
+let testmacro = macro(arg) => {
+    output = arg,
+};
+
+assert "list.0 == 1";
+assert "list.1 == 2";
+assert "list.3 == 4";
+assert "tuple.field1 == 1";
+assert "tuple.field2 == 3";
+assert "tuple.deeplist.0 == \"foo\"";
+assert "tuple.deeplist.1 == \"bar\"";
