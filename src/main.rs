@@ -90,10 +90,11 @@ fn build_file(
 }
 
 fn do_validate(file: &str, cache: Rc<RefCell<Cache>>) -> bool {
+    println!("Validating {}", file);
     match build_file(file, true, cache) {
-        Ok(_) => println!("File {} validates", file),
+        Ok(_) => println!("{} validates\n\n", file),
         Err(msg) => {
-            eprintln!("Err 2: {}", msg);
+            eprintln!("Err: {}", msg);
             return false;
         }
     }
@@ -112,7 +113,7 @@ fn do_compile(file: &str, cache: Rc<RefCell<Cache>>) -> bool {
     let (typ, val) = match builder.out_lock {
         Some((ref typ, ref val)) => (typ, val.clone()),
         None => {
-            eprintln!("Build results in no value.");
+            eprintln!("Build results in no artifacts.");
             return false;
         }
     };
