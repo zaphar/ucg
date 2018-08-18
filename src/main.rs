@@ -50,7 +50,7 @@ fn do_flags<'a>() -> clap::ArgMatches<'a> {
             (@subcommand validate =>
              (about: "Check a list of ucg files for errors and run assertions.")
              (@arg recurse: -r +required conflicts_with[INPUT] "Whether we should recurse or not.")
-             (@arg INPUT: ... "Input ucg files or directories to validate. If not provided scan the director for files with _test.ucg")
+             (@arg INPUT: ... "Input ucg files or directories to validate. If not provided it will scan the directories for files with _test.ucg")
             )
             (@subcommand converters =>
              (about: "list the available converters")
@@ -272,5 +272,6 @@ fn main() {
         }
         process::exit(0);
     } else if let Some(_todo) = app.subcommand_matches("converters") {
+        // TODO(jwall): Flesh this command out.
     }
 }

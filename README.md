@@ -45,21 +45,38 @@ SUBCOMMANDS:
     validate    Check a specific ucg file for errors.
 ```
 
-## compiling a file
+## Compiling
 
 ```sh
 Build a list of ucg files.
 
 USAGE:
-    ucg build <INPUT>...
+    ucg build [FLAGS] -r [INPUT]...
 
 FLAGS:
     -h, --help       Prints help information
+    -r               Whether we should recurse in directories or not.
     -V, --version    Prints version information
 
 ARGS:
-    <INPUT>...    Input ucg files to build.
+    <INPUT>...    Input ucg files or directories to build. If not provided then build the contents of the current directory.
 ```
+
+## Validating
+ ```sh
+ Check a list of ucg files for errors and run assertions.
+
+USAGE:
+    ucg validate [FLAGS] -r [INPUT]...
+
+FLAGS:
+    -h, --help       Prints help information
+    -r               Whether we should recurse or not.
+    -V, --version    Prints version information
+
+ARGS:
+    <INPUT>...    Input ucg files or directories to validate. If not provided scan the directory for files with _test.ucg
+ ```
 
 ## Language Reference
 
