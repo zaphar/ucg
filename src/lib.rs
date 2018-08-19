@@ -159,8 +159,8 @@
 //! #### Selectors
 //!
 //! Selectors are references to a bound value in ucg. They can index arbitrarily deep into either tuples or lists.
-//! The head of a selector can be any expression that resolves to a tuple or list. Optionally a selector can also be
-//! followed by either a bareword to index a tuple field or an integer to index a list position.
+//! The head of a selector can be a tuple or list or symbol. Optionally a selector can also be followed by either a
+//! bareword to index a tuple field or an integer to index a list position.
 //!
 //! The simplest selector is just a reference to a bound value by name.
 //!
