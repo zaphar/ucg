@@ -13,10 +13,10 @@ let cplxmacro = macro(argint, argstr, argfloat) => {
 let simpleresult = simplemacro(1, 2, 3);
 let cplxresult = cplxmacro(1, "We", 3.0);
 
-assert "simpleresult.field1 == 1";
-assert "simpleresult.field2 == 2";
-assert "simpleresult.field3 == 3";
+assert |simpleresult.field1 == 1|;
+assert |simpleresult.field2 == 2|;
+assert |simpleresult.field3 == 3|;
 
-assert "cplxresult.field1 == 2";
-assert "cplxresult.field2 == \"We are here\"";
-assert "cplxresult.field3 == 2.0";
+assert |cplxresult.field1 == 2|;
+assert |cplxresult.field2 == "We are here"|;
+assert |cplxresult.field3 == 2.0|;

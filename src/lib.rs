@@ -409,23 +409,15 @@
 //!
 //! The assert statement defines an expression that must evaluate to either true or false. Assert statements are noops except
 //! during a validation compile. They give you a way to assert certains properties about your data and can be used as a form
-//! of unit testting for your configurations. It starts with the assert keyword followed by a quoted string that is
-//! itself a valid boolean ucg expression.
+//! of unit testing for your configurations. It starts with the assert keyword followed by a valid boolean ucg expression
+//! delimited by `|` characters.
 //!
 //! ```ucg
-//! assert "host == \"www.example.com\"";
-//! assert "select qa, 443, {
+//! assert host == "www.example.com";
+//! assert |select qa, 443, {
 //!   qa = 80,
 //!   prod = 443,
-//! } == 443";
-//! ```
-//!
-//! It is a little bit awkward for strings since you have to escape their quotes. But you can work around it by
-//! by storing the expectations in variables first and referencing them in the assert statement.
-//!
-//! ```ucg
-//! let expected_host = "www.example.com";
-//! assert "host == expected_host";
+//! } == 443|;
 //! ```
 //!
 //! When _test.ucg files are run in a validation run then ucg will output a log of all the assertions

@@ -73,6 +73,20 @@ named!(strtok( Span ) -> Token,
        )
 );
 
+named!(pipequotetok( Span ) -> Token,
+       do_parse!(
+           span: position!() >>
+               tag!("|") >>
+               frag: take_until!("|") >>
+               tag!("|") >>
+           (Token{
+               typ: TokenType::PIPEQUOTE,
+               pos: Position::from(span),
+               fragment: frag.fragment.to_string(),
+           })
+       )
+);
+
 named!(barewordtok( Span ) -> Token,
        do_parse!(
            span: position!() >>
@@ -336,6 +350,7 @@ named!(whitespace( Span ) -> Token,
 named!(token( Span ) -> Token,
     alt!(
         strtok |
+        pipequotetok |
         emptytok | // This must come before the barewordtok
         digittok |
         commatok |
@@ -473,6 +488,14 @@ macro_rules! match_type {
 
     ($i:expr,STR) => {
         match_type!($i, STR => token_clone)
+    };
+
+    ($i:expr,PIPEQUOTE => $h:expr) => {
+        match_type!($i, TokenType::PIPEQUOTE, "Not a Pipe Quoted String", $h)
+    };
+
+    ($i:expr,PIPEQUOTE) => {
+        match_type!($i, PIPEQUOTE => token_clone)
     };
 
     ($i:expr,DIGIT => $h:expr) => {

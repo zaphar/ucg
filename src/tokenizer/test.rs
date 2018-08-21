@@ -43,6 +43,16 @@ fn test_escape_quoted() {
 }
 
 #[test]
+fn test_pipe_quoted() {
+    let result = pipequotetok(LocatedSpan::new("|foo|"));
+    assert!(result.is_done(), format!("result {:?} is not ok", result));
+    if let nom::IResult::Done(_, tok) = result {
+        assert_eq!(tok.fragment, "foo".to_string());
+        assert_eq!(tok.typ, TokenType::PIPEQUOTE);
+    }
+}
+
+#[test]
 fn test_string_with_escaping() {
     let result = strtok(LocatedSpan::new("\"foo \\\\ \\\"bar\""));
     assert!(result.is_done(), format!("result {:?} is not ok", result));

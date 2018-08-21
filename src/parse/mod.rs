@@ -838,7 +838,7 @@ named!(assert_statement<TokenIter, Statement, error::Error>,
                 error::Error::new(
                     "Invalid syntax for assert",
                     error::ErrorType::ParseError, pos)),
-            match_type!(STR)) >>
+            match_type!(PIPEQUOTE)) >>
         punct!(";") >>
         (Statement::Assert(tok.clone()))
     )

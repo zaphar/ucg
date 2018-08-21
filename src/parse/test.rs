@@ -310,6 +310,20 @@ fn test_out_statement_parse() {
 }
 
 #[test]
+fn test_assert_statement_parse() {
+    assert_error!(out_statement("assert"));
+    assert_error!(out_statement("assert |"));
+    assert_error!(out_statement("assert |foo"));
+    assert_parse!(
+        assert_statement("assert |foo|;"),
+        Statement::Assert(Token {
+            pos: Position { line: 1, column: 8 },
+            fragment: "foo".to_string(),
+            typ: TokenType::PIPEQUOTE
+        })
+    );
+}
+#[test]
 fn test_expression_statement_parse() {
     assert_error!(expression_statement("foo"));
     assert_parse!(

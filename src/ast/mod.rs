@@ -71,6 +71,7 @@ pub enum TokenType {
     WS,
     COMMENT,
     QUOTED,
+    PIPEQUOTE,
     DIGIT,
     BAREWORD,
     PUNCT,

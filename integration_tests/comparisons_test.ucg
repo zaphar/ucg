@@ -16,15 +16,15 @@ let list = [1, 2, 3];
 let list2 = list;
 let list3 = [1, 2];
 
-assert "one == one";
-assert "one == one";
-assert "one >= one";
-assert "two > one";
-assert "two >= two";
-assert "tpl1 == tpl2";
-assert "tpl1 != tpl3";
-assert "list == list2";
-assert "list != list3";
+assert |one == one|;
+assert |one == one|;
+assert |one >= one|;
+assert |two > one|;
+assert |two >= two|;
+assert |tpl1 == tpl2|;
+assert |tpl1 != tpl3|;
+assert |list == list2|;
+assert |list != list3|;
 
 // Deep Comparisons
 let tpl4 = {
@@ -40,17 +40,17 @@ let less = {
     foo = "bar"
 };
 
-assert "tpl4.inner == copy.inner";
-assert "tpl4.inner.fld == copy.inner.fld";
-assert "tpl4.lst == copy.lst";
-assert "tpl4.foo == copy.foo";
-assert "tpl4 == copy";
-assert "tpl4 != extra";
-assert "tpl4 != less";
+assert |tpl4.inner == copy.inner|;
+assert |tpl4.inner.fld == copy.inner.fld|;
+assert |tpl4.lst == copy.lst|;
+assert |tpl4.foo == copy.foo|;
+assert |tpl4 == copy|;
+assert |tpl4 != extra|;
+assert |tpl4 != less|;
 
 // Expression comparisons
-assert "2 == 1+1";
-assert "(1+1) == 2";
-assert "(1+1) == (1+1)";
+assert |2 == 1+1|;
+assert |(1+1) == 2|;
+assert |(1+1) == (1+1)|;
 let want = "foo";
-assert "select want, 1, { foo=2, } == 2";
+assert |select want, 1, { foo=2, } == 2|;
