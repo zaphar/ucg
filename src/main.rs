@@ -138,6 +138,8 @@ fn visit_ucg_files(
 ) -> Result<bool, Box<Error>> {
     let our_path = String::from(path.to_string_lossy());
     let mut result = true;
+    // TODO(jwall): Report the failing files at the bottom.
+    let mut summary = String::new();
     if path.is_dir() {
         for entry in try!(std::fs::read_dir(path)) {
             let next_item = try!(entry);
@@ -152,8 +154,11 @@ fn visit_ucg_files(
                 if validate && path_as_string.ends_with("_test.ucg") {
                     if !do_validate(&path_as_string, cache.clone()) {
                         result = false;
+                        summary.push_str(format!("{} - FAIL\n", path_as_string).as_str())
+                    } else {
+                        summary.push_str(format!("{} - PASS\n", path_as_string).as_str())
                     }
-                } else {
+                } else if !validate {
                     if !do_compile(&path_as_string, cache.clone()) {
                         result = false;
                     }
@@ -163,11 +168,18 @@ fn visit_ucg_files(
     } else if validate && our_path.ends_with("_test.ucg") {
         if !do_validate(&our_path, cache) {
             result = false;
+            summary.push_str(format!("{} - FAIL\n", our_path).as_str())
+        } else {
+            summary.push_str(format!("{} - PASS\n", &our_path).as_str())
         }
-    } else {
+    } else if !validate {
         if !do_compile(&our_path, cache) {
             result = false;
         }
+    }
+    if validate {
+        println!("RESULTS:");
+        println!("{}", summary);
     }
     Ok(result)
 }
