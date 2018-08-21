@@ -1,0 +1,30 @@
+let goodwant = "door1";
+let badwant = "door4";
+
+let got = select goodwant, "OOPS", {
+    door1 = "grand prize",
+    door2 = "you lose",
+};
+
+let defaultgot = select badwant, "OOPS", {
+    door1 = "grand prize",
+    door2 = "you lose",
+};
+
+assert |got == "grand prize"|;
+assert |defaultgot == "OOPS"|;
+
+// select inside a macro
+
+let condmacro = macro(arg) => {
+    output = select arg, NULL, {
+        opt1 = "yay",
+        opt2 = "boo",
+    },
+};
+
+let result = condmacro("opt1");
+
+assert |condmacro("opt1") == {output = "yay"}|;
+assert |condmacro("opt2") == {output = "boo"}|;
+assert |condmacro("invalid") == {output = NULL}|;

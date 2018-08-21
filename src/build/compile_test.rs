@@ -49,6 +49,13 @@ fn test_empty_value() {
 }
 
 #[test]
+fn test_select_expressions() {
+    assert_build(include_str!(
+        "../../integration_tests/select_expressions_test.ucg"
+    ));
+}
+
+#[test]
 fn test_binary_operator_precedence() {
     assert_build(include_str!(
         "../../integration_tests/operator_precedence_test.ucg"
