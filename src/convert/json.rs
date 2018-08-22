@@ -92,4 +92,8 @@ impl Converter for JsonConverter {
     fn file_ext(&self) -> String {
         String::from("json")
     }
+
+    fn description(&self) -> String {
+        "Convert ucg Vals into valid json.".to_string()
+    }
 }

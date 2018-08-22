@@ -186,6 +186,10 @@ impl Converter for ExecConverter {
     fn file_ext(&self) -> String {
         String::from("sh")
     }
+
+    fn description(&self) -> String {
+        "Convert ucg Vals into an bash script with \nenvironment variables set and command line arguments sent..".to_string()
+    }
 }
 
 #[cfg(test)]

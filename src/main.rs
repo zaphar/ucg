@@ -27,7 +27,7 @@ use ucglib::build;
 use ucglib::build::assets::{Cache, MemoryCache};
 use ucglib::build::Val;
 use ucglib::convert::traits;
-use ucglib::convert::ConverterRunner;
+use ucglib::convert::ConverterRegistry;
 
 // TODO(jwall): List the target output types automatically.
 fn do_flags<'a>() -> clap::ArgMatches<'a> {
@@ -54,22 +54,21 @@ fn do_flags<'a>() -> clap::ArgMatches<'a> {
             )
             (@subcommand converters =>
              (about: "list the available converters")
-             (@arg name: -c --converter-name +takes_value "Optionally print help for the provided converter")
             )
     ).get_matches()
 }
 
-fn run_converter(c: ConverterRunner, v: Rc<Val>, f: Option<&str>) -> traits::Result {
-    let file: Box<std::io::Write> = match f {
+fn run_converter(c: &traits::Converter, v: Rc<Val>, f: Option<&str>) -> traits::Result {
+    let mut file: Box<std::io::Write> = match f {
         Some(f) => {
             let mut path_buf = PathBuf::from(f);
-            path_buf.set_extension(c.ext());
+            path_buf.set_extension(c.file_ext());
             let new_path = path_buf.to_str().unwrap();
             Box::new(try!(File::create(&new_path)))
         }
         None => Box::new(io::stdout()),
     };
-    c.convert(v, file)
+    c.convert(v, file.as_mut())
 }
 
 fn build_file(
@@ -101,7 +100,7 @@ fn do_validate(file: &str, cache: Rc<RefCell<Cache>>) -> bool {
     return true;
 }
 
-fn do_compile(file: &str, cache: Rc<RefCell<Cache>>) -> bool {
+fn do_compile(file: &str, cache: Rc<RefCell<Cache>>, registry: &ConverterRegistry) -> bool {
     println!("Building {}", file);
     let builder = match build_file(file, false, cache.clone()) {
         Ok(builder) => builder,
@@ -117,14 +116,14 @@ fn do_compile(file: &str, cache: Rc<RefCell<Cache>>) -> bool {
             return false;
         }
     };
-    match ConverterRunner::new(typ) {
-        Ok(converter) => {
+    match registry.get_converter(typ) {
+        Some(converter) => {
             run_converter(converter, val, Some(file)).unwrap();
             eprintln!("Build successful");
             process::exit(0);
         }
-        Err(msg) => {
-            eprintln!("{}", msg);
+        None => {
+            eprintln!("No such converter {}", typ);
             return false;
         }
     }
@@ -135,6 +134,7 @@ fn visit_ucg_files(
     recurse: bool,
     validate: bool,
     cache: Rc<RefCell<Cache>>,
+    registry: &ConverterRegistry,
 ) -> Result<bool, Box<Error>> {
     let our_path = String::from(path.to_string_lossy());
     let mut result = true;
@@ -146,7 +146,9 @@ fn visit_ucg_files(
             let next_path = next_item.path();
             let path_as_string = String::from(next_path.to_string_lossy());
             if next_path.is_dir() && recurse {
-                if let Err(msg) = visit_ucg_files(&next_path, recurse, validate, cache.clone()) {
+                if let Err(msg) =
+                    visit_ucg_files(&next_path, recurse, validate, cache.clone(), registry)
+                {
                     eprintln!("Err 1: {}", msg);
                     result = false;
                 }
@@ -159,7 +161,7 @@ fn visit_ucg_files(
                         summary.push_str(format!("{} - PASS\n", path_as_string).as_str())
                     }
                 } else if !validate {
-                    if !do_compile(&path_as_string, cache.clone()) {
+                    if !do_compile(&path_as_string, cache.clone(), registry) {
                         result = false;
                     }
                 }
@@ -173,7 +175,7 @@ fn visit_ucg_files(
             summary.push_str(format!("{} - PASS\n", &our_path).as_str())
         }
     } else if !validate {
-        if !do_compile(&our_path, cache) {
+        if !do_compile(&our_path, cache, registry) {
             result = false;
         }
     }
@@ -187,14 +189,15 @@ fn visit_ucg_files(
 fn main() {
     let app = do_flags();
     let cache: Rc<RefCell<Cache>> = Rc::new(RefCell::new(MemoryCache::new()));
+    let registry = ConverterRegistry::make_registry();
     if let Some(matches) = app.subcommand_matches("inspect") {
         let file = matches.value_of("INPUT").unwrap();
         let sym = matches.value_of("sym");
         let target = matches.value_of("target").unwrap();
         let root = PathBuf::from(file);
         let mut builder = build::Builder::new(root.parent().unwrap(), cache);
-        match ConverterRunner::new(target) {
-            Ok(converter) => {
+        match registry.get_converter(target) {
+            Some(converter) => {
                 // TODO(jwall): We should warn if this is a test file.
                 let result = builder.build_file(file);
                 if !result.is_ok() {
@@ -218,8 +221,8 @@ fn main() {
                     }
                 }
             }
-            Err(msg) => {
-                eprintln!("{}", msg);
+            None => {
+                eprintln!("No such converter {}", target);
                 process::exit(1);
             }
         }
@@ -229,14 +232,14 @@ fn main() {
         let mut ok = true;
         if files.is_none() {
             let curr_dir = std::env::current_dir().unwrap();
-            let ok = visit_ucg_files(curr_dir.as_path(), recurse, false, cache.clone());
+            let ok = visit_ucg_files(curr_dir.as_path(), recurse, false, cache.clone(), &registry);
             if let Ok(false) = ok {
                 process::exit(1)
             }
         }
         for file in files.unwrap() {
             let pb = PathBuf::from(file);
-            if let Ok(false) = visit_ucg_files(&pb, recurse, false, cache.clone()) {
+            if let Ok(false) = visit_ucg_files(&pb, recurse, false, cache.clone(), &registry) {
                 ok = false;
             }
         }
@@ -248,7 +251,7 @@ fn main() {
         let recurse = matches.is_present("recurse");
         if files.is_none() {
             let curr_dir = std::env::current_dir().unwrap();
-            let ok = visit_ucg_files(curr_dir.as_path(), recurse, true, cache.clone());
+            let ok = visit_ucg_files(curr_dir.as_path(), recurse, true, cache.clone(), &registry);
             if let Ok(false) = ok {
                 process::exit(1)
             }
@@ -257,7 +260,9 @@ fn main() {
             for file in files.unwrap() {
                 let pb = PathBuf::from(file);
                 if pb.is_dir() {
-                    if let Ok(false) = visit_ucg_files(pb.as_path(), recurse, true, cache.clone()) {
+                    if let Ok(false) =
+                        visit_ucg_files(pb.as_path(), recurse, true, cache.clone(), &registry)
+                    {
                         ok = false;
                     }
                 } else {
@@ -284,6 +289,13 @@ fn main() {
         }
         process::exit(0);
     } else if let Some(_todo) = app.subcommand_matches("converters") {
-        // TODO(jwall): Flesh this command out.
+        println!("Available converters:");
+        println!("");
+        for (name, c) in registry.get_converter_list().iter() {
+            println!("- {}", name);
+            println!("  Description: {}", c.description());
+            println!("  Output Extension: `.{}`", c.file_ext());
+            println!("");
+        }
     }
 }

@@ -27,4 +27,5 @@ pub type Result = result::Result<(), Box<Error>>;
 pub trait Converter {
     fn convert(&self, vs: Rc<Val>, w: &mut Write) -> Result;
     fn file_ext(&self) -> String;
+    fn description(&self) -> String;
 }

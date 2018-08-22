@@ -19,54 +19,46 @@ pub mod flags;
 pub mod json;
 pub mod traits;
 
-use std::io::Write;
-use std::rc::Rc;
-
-use build::Val;
+use std::collections::HashMap;
 
 /// ConverterRunner knows how to run a given converter on a Val.
-pub struct ConverterRunner {
-    converter: Box<traits::Converter>,
+pub struct ConverterRegistry {
+    converters: HashMap<String, Box<traits::Converter>>,
 }
 
-impl ConverterRunner {
+impl ConverterRegistry {
     /// new creates a new ConverterRunner with a converter for the provided output target.
     ///
     /// * flags
     /// * json
     /// * env
     /// * exec
-    pub fn new(typ: &str) -> Result<Self, String> {
-        if typ == "flags" {
-            return Ok(ConverterRunner {
-                converter: Box::new(flags::FlagConverter::new()),
-            });
+    fn new() -> Self {
+        ConverterRegistry {
+            converters: HashMap::new(),
         }
-        if typ == "json" {
-            return Ok(ConverterRunner {
-                converter: Box::new(json::JsonConverter::new()),
-            });
-        }
-        if typ == "env" {
-            return Ok(ConverterRunner {
-                converter: Box::new(env::EnvConverter::new()),
-            });
-        }
-        if typ == "exec" {
-            return Ok(ConverterRunner {
-                converter: Box::new(exec::ExecConverter::new()),
-            });
-        }
-        return Err(format!("Unknown Target output type: {}", typ));
     }
 
-    /// convert runs the Converter on a Val and writes the output to the provided writer.
-    pub fn convert(&self, v: Rc<Val>, mut w: Box<Write>) -> traits::Result {
-        self.converter.convert(v, &mut w)
+    pub fn make_registry() -> Self {
+        let mut registry = Self::new();
+        registry.register("json", Box::new(json::JsonConverter::new()));
+        registry.register("env", Box::new(env::EnvConverter::new()));
+        registry.register("flags", Box::new(flags::FlagConverter::new()));
+        registry.register("exec", Box::new(exec::ExecConverter::new()));
+        registry
     }
 
-    /// ext returns the expected file extension for this conversion.
-    pub fn ext(&self) -> String {
-        self.converter.file_ext()
+    pub fn register<S: Into<String>>(&mut self, typ: S, converter: Box<traits::Converter>) {
+        self.converters.insert(typ.into(), converter);
     }
+
+    pub fn get_converter(&self, typ: &str) -> Option<&traits::Converter> {
+        self.converters.get(typ).map(|c| c.as_ref())
+    }
+
+    pub fn get_converter_list(&self) -> Vec<(&String, &Box<traits::Converter>)> {
+        self.converters.iter().collect()
+    }
+
+    // TODO(jwall): Support converter help descriptions.
 }

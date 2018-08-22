@@ -91,4 +91,8 @@ impl Converter for EnvConverter {
     fn file_ext(&self) -> String {
         String::from("env")
     }
+
+    fn description(&self) -> String {
+        "Convert ucg Vals into environment variables.".to_string()
+    }
 }

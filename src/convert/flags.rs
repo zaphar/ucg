@@ -111,6 +111,10 @@ impl Converter for FlagConverter {
     fn file_ext(&self) -> String {
         String::from("txt")
     }
+
+    fn description(&self) -> String {
+        "Convert ucg Vals into command line flags.".to_string()
+    }
 }
 
 // We need some unit tests for this now :D
