@@ -1151,8 +1151,8 @@ impl<'a> Builder<'a> {
         let mac = &def.mac;
         if let &Val::Macro(ref macdef) = try!(self.lookup_selector(&mac.sel)).as_ref() {
             let mut out = Vec::new();
-            for expr in l.iter() {
-                let argvals = vec![expr.clone()];
+            for item in l.iter() {
+                let argvals = vec![item.clone()];
                 let fields = try!(macdef.eval(
                     self.root.clone(),
                     self.assets.clone(),
@@ -1168,8 +1168,11 @@ impl<'a> Builder<'a> {
                             if let &Val::Empty = v.as_ref() {
                                 // noop
                                 continue;
+                            } else if let &Val::Boolean(false) = v.as_ref() {
+                                // noop
+                                continue;
                             }
-                            out.push(v.clone());
+                            out.push(item.clone());
                         }
                     }
                 }
@@ -1225,9 +1228,11 @@ impl<'a> Builder<'a> {
         } else {
             // record an assertion type-failure result.
             let msg = format!(
-                "TYPE FAIL - '{}' at line: {} column: {}\n",
-                expr, tok.pos.line, tok.pos.column
+                "TYPE FAIL - '{}' Expected Boolean got {} at line: {} column: {}\n",
+                expr, ok, tok.pos.line, tok.pos.column
             );
+            self.assert_collector.failures.push_str(&msg);
+            self.assert_collector.success = false;
             self.assert_collector.summary.push_str(&msg);
         }
         Ok(ok)
