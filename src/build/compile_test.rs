@@ -61,3 +61,8 @@ fn test_binary_operator_precedence() {
         "../../integration_tests/operator_precedence_test.ucg"
     ));
 }
+
+#[test]
+fn test_list_operations() {
+    assert_build(include_str!("../../integration_tests/list_ops_test.ucg"));
+}

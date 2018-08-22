@@ -1,0 +1,17 @@
+let list1 = [1, 2, 3, 4];
+let list2 = ["foo", "bar", "foo", "bar"];
+
+let mapper = macro(item) => { result = item + 1 };
+let filtrator = macro(item) => {
+    result = select item, NULL, {
+        foo = item,
+    },
+};
+
+assert |map mapper.result list1 == [2, 3, 4, 5]|;
+assert |(map mapper.result [1, 2, 3, 4]) == [2, 3, 4, 5]|;
+assert |map mapper.result [1, 2, 3, 4] == [2, 3, 4, 5]|;
+
+assert |filter filtrator.result list2 == ["foo", "foo"]|;
+assert |(filter filtrator.result ["foo", "bar", "foo", "bar"]) == ["foo", "foo"]|;
+assert |filter filtrator.result ["foo", "bar", "foo", "bar"] == ["foo", "foo"]|;

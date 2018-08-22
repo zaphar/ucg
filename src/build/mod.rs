@@ -1137,12 +1137,22 @@ impl<'a> Builder<'a> {
     }
 
     fn eval_list_op(&self, def: &ListOpDef) -> Result<Rc<Val>, Box<Error>> {
-        let l = &def.target.elems;
+        let maybe_list = try!(self.eval_expr(&def.target));
+        let l = match maybe_list.as_ref() {
+            &Val::List(ref elems) => elems,
+            other => {
+                return Err(Box::new(error::Error::new(
+                    format!("Expected List as target but got {:?}", other.type_name()),
+                    error::ErrorType::TypeFail,
+                    def.target.pos().clone(),
+                )));
+            }
+        };
         let mac = &def.mac;
         if let &Val::Macro(ref macdef) = try!(self.lookup_selector(&mac.sel)).as_ref() {
             let mut out = Vec::new();
             for expr in l.iter() {
-                let argvals = vec![try!(self.eval_expr(expr))];
+                let argvals = vec![expr.clone()];
                 let fields = try!(macdef.eval(
                     self.root.clone(),
                     self.assets.clone(),

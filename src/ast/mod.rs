@@ -691,7 +691,7 @@ pub struct ListOpDef {
     pub typ: ListOpType,
     pub mac: SelectorDef,
     pub field: String,
-    pub target: ListDef,
+    pub target: Box<Expression>,
     pub pos: Position,
 }
 

@@ -43,7 +43,7 @@ macro_rules! trace_nom {
             }
             let result = $rule($i, $($args)* ); 
             if ENABLE_TRACE {
-                eprintln!("Exiting Rule: {:?}", stringify!($rule));
+                eprintln!("Exiting Rule: {:?} with {:?}", stringify!($rule), result);
             }
             result
         }
@@ -57,7 +57,7 @@ macro_rules! trace_nom {
             }
             let result = call!($i, $rule);
             if ENABLE_TRACE {
-                eprintln!("Exiting Rule: {:?}", stringify!($rule));
+                eprintln!("Exiting Rule: {:?} with {:?}", stringify!($rule), result);
             }
             result
         }
@@ -636,31 +636,7 @@ named!(call_expression<TokenIter, Expression, error::Error>,
        )
 );
 
-fn symbol_or_list(input: TokenIter) -> NomResult<Value> {
-    let sym = do_parse!(input, sym: symbol >> (sym));
-
-    match sym {
-        IResult::Incomplete(i) => {
-            return IResult::Incomplete(i);
-        }
-        IResult::Error(_) => match list_value(input) {
-            IResult::Incomplete(i) => {
-                return IResult::Incomplete(i);
-            }
-            IResult::Error(e) => {
-                return IResult::Error(e);
-            }
-            IResult::Done(i, val) => {
-                return IResult::Done(i, val);
-            }
-        },
-        IResult::Done(rest, val) => {
-            return IResult::Done(rest, val);
-        }
-    }
-}
-
-fn tuple_to_list_op(tpl: (Position, Token, Value, Value)) -> ParseResult<Expression> {
+fn tuple_to_list_op(tpl: (Position, Token, Value, Expression)) -> ParseResult<Expression> {
     let pos = tpl.0;
     let t = if &tpl.1.fragment == "map" {
         ListOpType::Map
@@ -683,6 +659,12 @@ fn tuple_to_list_op(tpl: (Position, Token, Value, Value)) -> ParseResult<Express
         // two sections.
         let fieldname: String = match &mut def.sel.tail {
             &mut None => {
+                if ENABLE_TRACE {
+                    eprintln!(
+                        "tuple_to_list_op had error {}",
+                        "Missing a result field for the macro"
+                    );
+                }
                 return Err(error::Error::new(
                     format!("Missing a result field for the macro"),
                     error::ErrorType::IncompleteParsing,
@@ -691,6 +673,12 @@ fn tuple_to_list_op(tpl: (Position, Token, Value, Value)) -> ParseResult<Express
             }
             &mut Some(ref mut tl) => {
                 if tl.len() < 1 {
+                    if ENABLE_TRACE {
+                        eprintln!(
+                            "tuple_to_list_op had error {}",
+                            "Missing a result field for the macro"
+                        );
+                    }
                     return Err(error::Error::new(
                         format!("Missing a result field for the macro"),
                         error::ErrorType::IncompleteParsing,
@@ -701,20 +689,19 @@ fn tuple_to_list_op(tpl: (Position, Token, Value, Value)) -> ParseResult<Express
                 fname.unwrap().fragment
             }
         };
-        if let Value::List(ldef) = list {
-            return Ok(Expression::ListOp(ListOpDef {
-                typ: t,
-                mac: def,
-                field: fieldname,
-                target: ldef,
-                pos: pos,
-            }));
-        }
-        return Err(error::Error::new(
-            format!("Expected a list but got {}", list.type_name()),
-            error::ErrorType::UnexpectedToken,
-            pos,
-        ));
+        return Ok(Expression::ListOp(ListOpDef {
+            typ: t,
+            mac: def,
+            field: fieldname,
+            target: Box::new(list),
+            pos: pos,
+        }));
+    }
+    if ENABLE_TRACE {
+        eprintln!(
+            "tuple_to_list_op had error {}",
+            format!("Expected a selector but got {}", macroname.type_name())
+        );
     }
     return Err(error::Error::new(
         format!("Expected a selector but got {}", macroname.type_name()),
@@ -729,7 +716,7 @@ named!(list_op_expression<TokenIter, Expression, error::Error>,
             pos: pos >>
             optype: alt!(word!("map") | word!("filter")) >>
             macroname: trace_nom!(selector_value) >>
-            list: trace_nom!(symbol_or_list) >>
+            list: trace_nom!(non_op_expression) >>
             (pos, optype, macroname, list)
         ),
         tuple_to_list_op
@@ -785,12 +772,7 @@ named!(let_statement<TokenIter, Statement, error::Error>,
     do_parse!(
         word!("let") >>
         pos: pos >>
-        stmt: add_return_error!(
-            nom::ErrorKind::Custom(
-                error::Error::new(
-                    "Invalid syntax for let binding",
-                    error::ErrorType::ParseError, pos)),
-            trace_nom!(let_stmt_body)) >>
+        stmt: trace_nom!(let_stmt_body) >>
         (stmt)
     )
 );
@@ -819,12 +801,7 @@ named!(import_statement<TokenIter, Statement, error::Error>,
         word!("import") >>
         // past this point we know this is supposed to be an import statement.
         pos: pos >>
-        stmt: add_return_error!(
-            nom::ErrorKind::Custom(
-                error::Error::new(
-                    "Invalid syntax for import",
-                    error::ErrorType::ParseError, pos)),
-            trace_nom!(import_stmt_body)) >>
+        stmt: trace_nom!(import_stmt_body) >>
         (stmt)
     )
 );
@@ -833,12 +810,7 @@ named!(assert_statement<TokenIter, Statement, error::Error>,
     do_parse!(
         word!("assert") >>
         pos: pos >>
-        tok: add_return_error!(
-            nom::ErrorKind::Custom(
-                error::Error::new(
-                    "Invalid syntax for assert",
-                    error::ErrorType::ParseError, pos)),
-            match_type!(PIPEQUOTE)) >>
+        tok: match_type!(PIPEQUOTE) >>
         punct!(";") >>
         (Statement::Assert(tok.clone()))
     )
@@ -849,12 +821,7 @@ named!(out_statement<TokenIter, Statement, error::Error>,
         word!("out") >>
         pos: pos >>
         typ: match_type!(BAREWORD) >>
-        expr: add_return_error!(
-            nom::ErrorKind::Custom(
-                error::Error::new(
-                    "Invalid syntax for assert",
-                    error::ErrorType::ParseError, pos)),
-            expression) >>
+        expr: expression >>
         punct!(";") >>
         (Statement::Output(typ.clone(), expr.clone()))
     )
