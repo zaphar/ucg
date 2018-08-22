@@ -91,7 +91,14 @@ fn build_file(
 fn do_validate(file: &str, cache: Rc<RefCell<Cache>>) -> bool {
     println!("Validating {}", file);
     match build_file(file, true, cache) {
-        Ok(_) => println!("{} validates\n\n", file),
+        Ok(b) => {
+            if b.assert_collector.success {
+                println!("File {} Pass\n", file);
+            } else {
+                println!("File {} Fail\n", file);
+                return false;
+            }
+        }
         Err(msg) => {
             eprintln!("Err: {}", msg);
             return false;
@@ -259,28 +266,11 @@ fn main() {
             let mut ok = true;
             for file in files.unwrap() {
                 let pb = PathBuf::from(file);
-                if pb.is_dir() {
-                    if let Ok(false) =
-                        visit_ucg_files(pb.as_path(), recurse, true, cache.clone(), &registry)
-                    {
-                        ok = false;
-                    }
-                } else {
-                    match build_file(file, true, cache.clone()) {
-                        Ok(b) => {
-                            if b.assert_collector.success {
-                                println!("File {} Validates", file);
-                            } else {
-                                println!("File {} Fails", file);
-                                ok = false;
-                            }
-                        }
-                        Err(msg) => {
-                            // We continue to process the other files despite this failure.
-                            eprintln!("{}", msg);
-                            ok = false;
-                        }
-                    }
+                //if pb.is_dir() {
+                if let Ok(false) =
+                    visit_ucg_files(pb.as_path(), recurse, true, cache.clone(), &registry)
+                {
+                    ok = false;
                 }
             }
             if !ok {
