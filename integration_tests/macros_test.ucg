@@ -8,6 +8,7 @@ let cplxmacro = macro(argint, argstr, argfloat) => {
     field1 = argint + 1,
     field2 = argstr + " are here",
     field3 = argfloat - 1.0,
+    boolfield = argint == 1,
 };
 
 let simpleresult = simplemacro(1, 2, 3);
@@ -20,3 +21,4 @@ assert |simpleresult.field3 == 3|;
 assert |cplxresult.field1 == 2|;
 assert |cplxresult.field2 == "We are here"|;
 assert |cplxresult.field3 == 2.0|;
+assert |cplxresult.boolfield == true|;

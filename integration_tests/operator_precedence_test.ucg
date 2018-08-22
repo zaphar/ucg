@@ -2,6 +2,6 @@ assert |2 * 2 + 1 == 5|;
 assert |2 + 2 * 3 == 8|;
 assert |2 * (2 + 1) == 6|;
 assert |2 * 2 + 1 > 4|;
-assert |2 * 2 + 1 > 6|;
+assert |2 * 2 + 1 < 6|;
 assert |2 * 2 + 1 >= 5|;
 assert |2 * 2 + 1 <= 5|;

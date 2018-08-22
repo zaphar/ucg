@@ -406,7 +406,7 @@ pub fn op_expression(i: TokenIter) -> NomResult<Expression> {
 
             let parse_result = alt!(
                 i_,
-                trace_nom!(math_expression) | trace_nom!(compare_expression)
+                trace_nom!(compare_expression) | trace_nom!(math_expression)
             );
 
             match parse_result {
