@@ -339,9 +339,9 @@
 //! A filter expression starts with the filter keyword followed by the name of a macro with exactly
 //! one argument, a `.`, and the name of the output field for the macro. The filter will apply the
 //! macro to each element of the list and if the output field is a value that is not NULL then the
-//! list element is appended to the output list. If the output field returns a NULL Value then the
-//! element is not appended to the output list. If the output field does not exist in the macro it
-//! will be a compile error.
+//! list element is appended to the output list. If the output field returns a NULL Value or Boolean
+//! false then the element is not appended to the output list. If the output field does not exist in
+//! the macro it will be a compile error.
 //!
 //! ```ucg
 //! let list = ["foo", "bar", "foo", "bar"];
