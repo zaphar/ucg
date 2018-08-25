@@ -2,4 +2,4 @@ language: rust
 script:
   - cargo build --verbose 
   - cargo test --verbose
-  - cargo run -- validate integration_tests
+  - cargo run -- test integration_tests
