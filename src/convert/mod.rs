@@ -18,6 +18,7 @@ pub mod exec;
 pub mod flags;
 pub mod json;
 pub mod traits;
+pub mod yaml;
 
 use std::collections::HashMap;
 
@@ -45,6 +46,7 @@ impl ConverterRegistry {
         registry.register("env", Box::new(env::EnvConverter::new()));
         registry.register("flags", Box::new(flags::FlagConverter::new()));
         registry.register("exec", Box::new(exec::ExecConverter::new()));
+        registry.register("yaml", Box::new(yaml::YamlConverter::new()));
         registry
     }
 

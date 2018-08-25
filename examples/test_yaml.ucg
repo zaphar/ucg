@@ -1,0 +1,44 @@
+import "shared.ucg" as shared;
+
+// A few constants.
+let dbhost1 = "db1.prod.net";
+let dbhost2 = "db2.prod.net";
+let dbname = "testdb";
+
+// Constructor for database connection strings.
+let mk_db_conn = macro (host, port, db) => {
+    host = host,
+    port = port,
+    db = db,
+    conn_string = "@:@/@" % (host, port, db)
+};
+
+let db_conn1 = mk_db_conn(dbhost1, shared.port, dbname);
+let db_conn2 = mk_db_conn(dbhost2, shared.port, dbname);
+
+// We have two database connections in a list
+let db_conn_list = [db_conn1, db_conn2];
+
+let connstr_mapper = macro (item) => {
+    str = item.conn_string
+};
+
+let db_conns = map connstr_mapper.str [db_conn1, db_conn2];
+
+let cplx_list = [
+    {foo = 1},
+    {bar = {foo=1}},
+];
+
+// Our server configuration.
+let server_config = {
+    db_conn1 = db_conns.0, // connection one
+    db_conn2 = db_conns.1,
+    tmpldir = "./templates",
+    prefix = {
+        foo = "bar"
+    },
+    l = ["foo", "bar"]
+};
+
+out yaml server_config;
