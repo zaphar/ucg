@@ -14,7 +14,6 @@ compiled configuration.
 # Minor Fixes and Polish
 
 * Compiler caching (interface has been defined)
-* Strings as tuple fields?
 * Streaming Parsing?
 * Casting between types?
 * Better error messages.

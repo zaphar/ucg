@@ -273,7 +273,7 @@ named!(boolean_value<TokenIter, Value, error::Error>,
 named!(
     field_value<TokenIter, (Token, Expression), error::Error>,
     do_parse!(
-            field: match_type!(BAREWORD) >>
+            field: alt!(match_type!(BAREWORD) | match_type!(STR)) >>
             punct!("=") >>
             value: expression >>
             (field, value)
@@ -442,7 +442,7 @@ fn selector_list(input: TokenIter) -> NomResult<SelectorList> {
         let (rest, list) = match separated_list!(
             rest,
             punct!("."),
-            alt!(match_type!(BAREWORD) | match_type!(DIGIT))
+            alt!(match_type!(BAREWORD) | match_type!(DIGIT) | match_type!(STR))
         ) {
             IResult::Done(rest, val) => (rest, val),
             IResult::Incomplete(i) => {

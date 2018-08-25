@@ -139,7 +139,7 @@
 //!
 //! Tuple's are an ordered collection of name, value pairs. They are bounded by curly braces `{ }`
 //! and contain name = value pairs separated by commas. Trailing commas are permitted. The name must
-//! be a bareword without quotes.
+//! be either a bareword without quotes or a quoted string.
 //!
 //! ```ucg
 //! let mytuple = {
@@ -160,7 +160,7 @@
 //!
 //! Selectors are references to a bound value in ucg. They can index arbitrarily deep into either tuples or lists.
 //! The head of a selector can be a tuple or list or symbol. Optionally a selector can also be followed by either a
-//! bareword to index a tuple field or an integer to index a list position.
+//! bareword or string to index a tuple field or an integer to index a list position.
 //!
 //! The simplest selector is just a reference to a bound value by name.
 //!

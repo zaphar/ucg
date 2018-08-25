@@ -1,0 +1,24 @@
+let simpletpl = {
+    foo = "bar"
+};
+
+let stringfieldtpl = {
+    "field 1" = 1,
+};
+
+let nestedtpl = {
+    inner = {
+        field = "value",
+    },
+    scalar = 1,
+    list = [1, 2, 3, 4],
+};
+
+assert |simpletpl.foo == "bar"|;
+assert |stringfieldtpl."field 1" == 1|;
+assert |nestedtpl.scalar == 1|;
+assert |nestedtpl.inner.field == "value"|;
+assert |nestedtpl.list.0 == 1|;
+assert |nestedtpl.list.1 == 2|;
+assert |nestedtpl.list.2 == 3|;
+assert |nestedtpl.list.3 == 4|;
