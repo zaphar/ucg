@@ -73,3 +73,8 @@ fn test_concatenation() {
         "../../integration_tests/concatenation_test.ucg"
     ));
 }
+
+#[test]
+fn test_format() {
+    assert_build(include_str!("../../integration_tests/format_test.ucg"));
+}

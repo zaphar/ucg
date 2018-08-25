@@ -276,6 +276,8 @@ impl From<Val> for String {
             Val::Int(ref i) => format!("{}", i),
             Val::Float(ref f) => format!("{}", f),
             Val::Str(ref s) => s.to_string(),
+            Val::Boolean(ref b) => format!("{}", b),
+            Val::Empty => "NULL".to_string(),
             val => format!("<{}>", val),
         }
     }
