@@ -18,7 +18,6 @@ compiled configuration.
 * Casting between types?
 * Better error messages.
 * Flags should allow different seperators for prefixed flags.
-* YAML export
 * HCL export
 
 # Release Checklist
