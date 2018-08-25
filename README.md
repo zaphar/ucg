@@ -42,7 +42,7 @@ SUBCOMMANDS:
     build       Build a specific ucg file.
     help        Prints this message or the help of the given subcommand(s)
     inspect     Inspect a specific symbol in a ucg file.
-    validate    Check a specific ucg file for errors.
+    test        Check a specific ucg file for errors.
 ```
 
 ## Compiling
@@ -62,12 +62,12 @@ ARGS:
     <INPUT>...    Input ucg files or directories to build. If not provided then build the contents of the current directory.
 ```
 
-## Validating
+## Testing
  ```sh
- Check a list of ucg files for errors and run assertions.
+ CCheck a list of ucg files for errors and run test assertions.
 
 USAGE:
-    ucg validate [FLAGS] -r [INPUT]...
+    ucg test [FLAGS] -r [INPUT]...
 
 FLAGS:
     -h, --help       Prints help information
@@ -75,8 +75,7 @@ FLAGS:
     -V, --version    Prints version information
 
 ARGS:
-    <INPUT>...    Input ucg files or directories to validate. If not provided scan the directory for files with _test.ucg
- ```
+    <INPUT>...    Input ucg files or directories to run test assertions for. If not provided it will scan the current directory for files with _test.ucg
 
 ## Language Reference
 

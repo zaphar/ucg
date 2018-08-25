@@ -47,10 +47,10 @@ fn do_flags<'a>() -> clap::ArgMatches<'a> {
              (@arg recurse: -r +required conflicts_with[INPUT] "Whether we should recurse in directories or not.")
              (@arg INPUT: ... "Input ucg files or directories to build. If not provided then build the contents of the current directory.")
             )
-            (@subcommand validate =>
-             (about: "Check a list of ucg files for errors and run assertions.")
+            (@subcommand test =>
+             (about: "Check a list of ucg files for errors and run test assertions.")
              (@arg recurse: -r +required conflicts_with[INPUT] "Whether we should recurse or not.")
-             (@arg INPUT: ... "Input ucg files or directories to validate. If not provided it will scan the directories for files with _test.ucg")
+             (@arg INPUT: ... "Input ucg files or directories to run test assertions for. If not provided it will scan the current directory for files with _test.ucg")
             )
             (@subcommand converters =>
              (about: "list the available converters")
