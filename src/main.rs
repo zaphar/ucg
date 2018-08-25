@@ -127,7 +127,7 @@ fn do_compile(file: &str, cache: Rc<RefCell<Cache>>, registry: &ConverterRegistr
         Some(converter) => {
             run_converter(converter, val, Some(file)).unwrap();
             eprintln!("Build successful");
-            process::exit(0);
+            return true;
         }
         None => {
             eprintln!("No such converter {}", typ);
@@ -148,7 +148,15 @@ fn visit_ucg_files(
     // TODO(jwall): Report the failing files at the bottom.
     let mut summary = String::new();
     if path.is_dir() {
-        for entry in try!(std::fs::read_dir(path)) {
+        let mut dir_iter = try!(std::fs::read_dir(path)).peekable();
+        loop {
+            let entry = match dir_iter.next() {
+                Some(e) => e,
+                None => {
+                    println!("Exiting the loop");
+                    break;
+                }
+            };
             let next_item = try!(entry);
             let next_path = next_item.path();
             let path_as_string = String::from(next_path.to_string_lossy());
@@ -156,7 +164,7 @@ fn visit_ucg_files(
                 if let Err(msg) =
                     visit_ucg_files(&next_path, recurse, validate, cache.clone(), registry)
                 {
-                    eprintln!("Err 1: {}", msg);
+                    eprintln!("Err: {}", msg);
                     result = false;
                 }
             } else {
@@ -167,7 +175,7 @@ fn visit_ucg_files(
                     } else {
                         summary.push_str(format!("{} - PASS\n", path_as_string).as_str())
                     }
-                } else if !validate {
+                } else if !validate && path_as_string.ends_with(".ucg") {
                     if !do_compile(&path_as_string, cache.clone(), registry) {
                         result = false;
                     }
@@ -177,9 +185,9 @@ fn visit_ucg_files(
     } else if validate && our_path.ends_with("_test.ucg") {
         if !do_validate(&our_path, cache) {
             result = false;
-            summary.push_str(format!("{} - FAIL\n", our_path).as_str())
+            summary.push_str(format!("{} - FAIL\n", our_path).as_str());
         } else {
-            summary.push_str(format!("{} - PASS\n", &our_path).as_str())
+            summary.push_str(format!("{} - PASS\n", &our_path).as_str());
         }
     } else if !validate {
         if !do_compile(&our_path, cache, registry) {
@@ -253,7 +261,7 @@ fn main() {
         if !ok {
             process::exit(1)
         }
-    } else if let Some(matches) = app.subcommand_matches("validate") {
+    } else if let Some(matches) = app.subcommand_matches("test") {
         let files = matches.values_of("INPUT");
         let recurse = matches.is_present("recurse");
         if files.is_none() {
