@@ -30,7 +30,7 @@ use ucglib::convert::traits;
 use ucglib::convert::ConverterRegistry;
 
 // TODO(jwall): List the target output types automatically.
-fn do_flags<'a>() -> clap::ArgMatches<'a> {
+fn do_flags<'a, 'b>() -> clap::App<'a, 'b> {
     clap_app!(
         ucg =>
             (version: crate_version!())
@@ -55,7 +55,7 @@ fn do_flags<'a>() -> clap::ArgMatches<'a> {
             (@subcommand converters =>
              (about: "list the available converters")
             )
-    ).get_matches()
+    )
 }
 
 fn run_converter(c: &traits::Converter, v: Rc<Val>, f: Option<&str>) -> traits::Result {
@@ -201,99 +201,131 @@ fn visit_ucg_files(
     Ok(result)
 }
 
-fn main() {
-    let app = do_flags();
-    let cache: Rc<RefCell<Cache>> = Rc::new(RefCell::new(MemoryCache::new()));
-    let registry = ConverterRegistry::make_registry();
-    if let Some(matches) = app.subcommand_matches("inspect") {
-        let file = matches.value_of("INPUT").unwrap();
-        let sym = matches.value_of("sym");
-        let target = matches.value_of("target").unwrap();
-        let root = PathBuf::from(file);
-        let mut builder = build::Builder::new(root.parent().unwrap(), cache);
-        match registry.get_converter(target) {
-            Some(converter) => {
-                // TODO(jwall): We should warn if this is a test file.
-                let result = builder.build_file(file);
-                if !result.is_ok() {
-                    eprintln!("{:?}", result.err().unwrap());
-                    process::exit(1);
-                }
-                let val = match sym {
-                    Some(sym_name) => builder.get_out_by_name(sym_name),
-                    None => builder.last,
-                };
-                match val {
-                    Some(value) => {
-                        // We use None here because we always output to stdout for an inspect.
-                        run_converter(converter, value, None).unwrap();
-                        eprintln!("Build successful");
-                        process::exit(0);
-                    }
-                    None => {
-                        eprintln!("Build results in no value.");
-                        process::exit(1);
-                    }
-                }
-            }
-            None => {
-                eprintln!("No such converter {}", target);
+fn inspect_command(
+    matches: &clap::ArgMatches,
+    cache: Rc<RefCell<Cache>>,
+    registry: &ConverterRegistry,
+) {
+    let file = matches.value_of("INPUT").unwrap();
+    let sym = matches.value_of("sym");
+    let target = matches.value_of("target").unwrap();
+    let root = PathBuf::from(file);
+    let mut builder = build::Builder::new(root.parent().unwrap(), cache);
+    match registry.get_converter(target) {
+        Some(converter) => {
+            // TODO(jwall): We should warn if this is a test file.
+            let result = builder.build_file(file);
+            if !result.is_ok() {
+                eprintln!("{:?}", result.err().unwrap());
                 process::exit(1);
             }
-        }
-    } else if let Some(matches) = app.subcommand_matches("build") {
-        let files = matches.values_of("INPUT");
-        let recurse = matches.is_present("recurse");
-        let mut ok = true;
-        if files.is_none() {
-            let curr_dir = std::env::current_dir().unwrap();
-            let ok = visit_ucg_files(curr_dir.as_path(), recurse, false, cache.clone(), &registry);
-            if let Ok(false) = ok {
-                process::exit(1)
+            let val = match sym {
+                Some(sym_name) => builder.get_out_by_name(sym_name),
+                None => builder.last,
+            };
+            match val {
+                Some(value) => {
+                    // We use None here because we always output to stdout for an inspect.
+                    run_converter(converter, value, None).unwrap();
+                    eprintln!("Build successful");
+                    process::exit(0);
+                }
+                None => {
+                    eprintln!("Build results in no value.");
+                    process::exit(1);
+                }
             }
         }
+        None => {
+            eprintln!("No such converter {}", target);
+            process::exit(1);
+        }
+    }
+}
+
+fn build_command(
+    matches: &clap::ArgMatches,
+    cache: Rc<RefCell<Cache>>,
+    registry: &ConverterRegistry,
+) {
+    let files = matches.values_of("INPUT");
+    let recurse = matches.is_present("recurse");
+    let mut ok = true;
+    if files.is_none() {
+        let curr_dir = std::env::current_dir().unwrap();
+        let ok = visit_ucg_files(curr_dir.as_path(), recurse, false, cache.clone(), &registry);
+        if let Ok(false) = ok {
+            process::exit(1)
+        }
+    }
+    for file in files.unwrap() {
+        let pb = PathBuf::from(file);
+        if let Ok(false) = visit_ucg_files(&pb, recurse, false, cache.clone(), &registry) {
+            ok = false;
+        }
+    }
+    if !ok {
+        process::exit(1)
+    }
+}
+
+fn test_command(
+    matches: &clap::ArgMatches,
+    cache: Rc<RefCell<Cache>>,
+    registry: &ConverterRegistry,
+) {
+    let files = matches.values_of("INPUT");
+    let recurse = matches.is_present("recurse");
+    if files.is_none() {
+        let curr_dir = std::env::current_dir().unwrap();
+        let ok = visit_ucg_files(curr_dir.as_path(), recurse, true, cache.clone(), &registry);
+        if let Ok(false) = ok {
+            process::exit(1)
+        }
+    } else {
+        let mut ok = true;
         for file in files.unwrap() {
             let pb = PathBuf::from(file);
-            if let Ok(false) = visit_ucg_files(&pb, recurse, false, cache.clone(), &registry) {
+            //if pb.is_dir() {
+            if let Ok(false) =
+                visit_ucg_files(pb.as_path(), recurse, true, cache.clone(), &registry)
+            {
                 ok = false;
             }
         }
         if !ok {
             process::exit(1)
         }
-    } else if let Some(matches) = app.subcommand_matches("test") {
-        let files = matches.values_of("INPUT");
-        let recurse = matches.is_present("recurse");
-        if files.is_none() {
-            let curr_dir = std::env::current_dir().unwrap();
-            let ok = visit_ucg_files(curr_dir.as_path(), recurse, true, cache.clone(), &registry);
-            if let Ok(false) = ok {
-                process::exit(1)
-            }
-        } else {
-            let mut ok = true;
-            for file in files.unwrap() {
-                let pb = PathBuf::from(file);
-                //if pb.is_dir() {
-                if let Ok(false) =
-                    visit_ucg_files(pb.as_path(), recurse, true, cache.clone(), &registry)
-                {
-                    ok = false;
-                }
-            }
-            if !ok {
-                process::exit(1)
-            }
-        }
-        process::exit(0);
-    } else if let Some(_todo) = app.subcommand_matches("converters") {
-        println!("Available converters:");
+    }
+    process::exit(0);
+}
+
+fn converters_command(registry: &ConverterRegistry) {
+    println!("Available converters:");
+    println!("");
+    for (name, c) in registry.get_converter_list().iter() {
+        println!("- {}", name);
+        println!("  Description: {}", c.description());
+        println!("  Output Extension: `.{}`", c.file_ext());
         println!("");
-        for (name, c) in registry.get_converter_list().iter() {
-            println!("- {}", name);
-            println!("  Description: {}", c.description());
-            println!("  Output Extension: `.{}`", c.file_ext());
-            println!("");
-        }
+    }
+}
+
+fn main() {
+    let mut app = do_flags();
+    let app_matches = app.clone().get_matches();
+    let cache: Rc<RefCell<Cache>> = Rc::new(RefCell::new(MemoryCache::new()));
+    let registry = ConverterRegistry::make_registry();
+    if let Some(matches) = app_matches.subcommand_matches("inspect") {
+        inspect_command(matches, cache, &registry);
+    } else if let Some(matches) = app_matches.subcommand_matches("build") {
+        build_command(matches, cache, &registry);
+    } else if let Some(matches) = app_matches.subcommand_matches("test") {
+        test_command(matches, cache, &registry);
+    } else if let Some(_) = app_matches.subcommand_matches("converters") {
+        converters_command(&registry)
+    } else {
+        app.print_help().unwrap();
+        println!("");
     }
 }
