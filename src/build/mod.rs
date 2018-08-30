@@ -991,11 +991,15 @@ impl<'a> Builder<'a> {
         let ok = match self.eval_string(&expr_as_stmt) {
             Ok(v) => v,
             Err(e) => {
-                return Err(Box::new(error::Error::new(
-                    format!("Assertion Evaluation of [{}] failed: {}", expr, e),
-                    error::ErrorType::AssertError,
-                    tok.pos.clone(),
-                )));
+                // failure!
+                let msg = format!(
+                    "NOT OK - '{}' at line: {} column: {}\n\tCompileError: {}\n",
+                    expr, tok.pos.line, tok.pos.column, e
+                );
+                self.assert_collector.summary.push_str(&msg);
+                self.assert_collector.failures.push_str(&msg);
+                self.assert_collector.success = false;
+                return Ok(Rc::new(Val::Empty));
             }
         };
 
