@@ -1,0 +1,13 @@
+assert |macro |;
+assert |{ foo = hello world}|;
+assert |{ foo = "hello world"|;
+assert |{ = }|;
+assert |let foo |;
+assert |let |;
+assert |import |;
+assert |import foo |;
+assert |out |;
+assert |out "|;
+assert |out json|;
+assert |"|;
+assert |=|;

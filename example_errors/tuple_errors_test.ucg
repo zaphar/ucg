@@ -1,2 +1,0 @@
-assert |macro |;
-assert |{ foo = hello world}|;

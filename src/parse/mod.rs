@@ -34,6 +34,26 @@ const ENABLE_TRACE: bool = true;
 const ENABLE_TRACE: bool = false;
 
 type ParseResult<O> = Result<O, error::Error>;
+
+macro_rules! wrap_err {
+    ($i:expr, $submac:ident, $msg:expr) => {
+        wrap_err!($i, call!($submac), $msg)
+    };
+
+    ($i:expr, $submac:ident!( $($args:tt)* ), $msg:expr) => {{
+        let _i = $i.clone();
+        match $submac!(_i, $($args)*) {
+            IResult::Done(rest, mac) => IResult::Done(rest, mac),
+            IResult::Incomplete(i) => IResult::Incomplete(i),
+            IResult::Error(nom::ErrorKind::Custom(cause)) => {
+                let wrapper = error::Error::new_with_cause($msg, error::ErrorType::ParseError, cause);
+                IResult::Error(nom::ErrorKind::Custom(wrapper))
+            }
+            IResult::Error(e) => IResult::Error(e),
+        }
+    }};
+}
+
 macro_rules! trace_nom {
     ($i:expr, $rule:ident!( $($args:tt)* )) => {
         {
@@ -143,7 +163,7 @@ macro_rules! alt_peek {
     );
 
     (__inner $i:expr, $peekrule:ident => $($rest:tt)* ) => (
-        alt_peek!(__inner $i, call!($peek) => $($rest)* )
+        alt_peek!(__inner $i, call!($peekrule) => $($rest)* )
     );
 
     (__inner $i:expr, $peekrule:ident!( $($peekargs:tt)* ) => $parserule:ident!( $($parseargs:tt)* ) | $($rest:tt)* ) => (
@@ -273,7 +293,8 @@ named!(boolean_value<TokenIter, Value, error::Error>,
 named!(
     field_value<TokenIter, (Token, Expression), error::Error>,
     do_parse!(
-            field: alt!(match_type!(BAREWORD) | match_type!(STR)) >>
+            field: wrap_err!(alt!(match_type!(BAREWORD) | match_type!(STR)),
+                    "Field names must be a bareword or a string.") >>
             punct!("=") >>
             value: expression >>
             (field, value)
@@ -343,20 +364,14 @@ named!(compound_value<TokenIter, Value, error::Error>,
     )
 );
 
-named!(scalar_value<TokenIter, Value, error::Error>,
-    alt!(
-        trace_nom!(boolean_value) |
-        trace_nom!(empty_value) |
-        trace_nom!(number) |
-        trace_nom!(quoted_value)
-    )
-);
-
 named!(value<TokenIter, Value, error::Error>,
-    alt!(
-        trace_nom!(selector_value)
-        | trace_nom!(compound_value)
-        | trace_nom!(scalar_value)
+    alt_peek!(
+        symbol_or_expression => trace_nom!(selector_value)
+        | alt!(punct!("[") | punct!("{")) => trace_nom!(compound_value)
+        | match_type!(BOOLEAN) => trace_nom!(boolean_value)
+        | match_type!(EMPTY) => trace_nom!(empty_value)
+        | alt!(match_type!(DIGIT) | punct!(".")) => trace_nom!(number)
+        | trace_nom!(quoted_value)
     )
  );
 
@@ -723,20 +738,40 @@ named!(list_op_expression<TokenIter, Expression, error::Error>,
     )
 );
 
+fn unprefixed_expression(input: TokenIter) -> NomResult<Expression> {
+    let _input = input.clone();
+    let attempt = alt!(input,
+        trace_nom!(call_expression) |
+        trace_nom!(copy_expression) |
+        trace_nom!(format_expression));
+        match attempt {
+            IResult::Incomplete(i) => IResult::Incomplete(i),
+            IResult::Done(rest, expr) => IResult::Done(rest, expr),
+            IResult::Error(_) => trace_nom!(_input, simple_expression),
+        }
+}
+
 named!(non_op_expression<TokenIter, Expression, error::Error>,
-    alt!(trace_nom!(list_op_expression) |
-         trace_nom!(macro_expression) |
-         trace_nom!(format_expression) |
-         trace_nom!(select_expression) |
-         trace_nom!(grouped_expression) |
-         trace_nom!(call_expression) |
-         trace_nom!(copy_expression) |
-         trace_nom!(simple_expression))
+    alt_peek!(
+         alt!(word!("map") | word!("filter")) => trace_nom!(list_op_expression) |
+         word!("macro") => trace_nom!(macro_expression) |
+         word!("select") => trace_nom!(select_expression) |
+         punct!("(") => trace_nom!(grouped_expression) |
+         trace_nom!(unprefixed_expression))
 );
 
-named!(expression<TokenIter, Expression, error::Error>,
-    alt_complete!(trace_nom!(op_expression) | trace_nom!(non_op_expression))
-);
+fn expression(input: TokenIter) -> NomResult<Expression> {
+    let _input = input.clone();
+    match trace_nom!(_input, op_expression) {
+        IResult::Incomplete(i) => IResult::Incomplete(i),
+        IResult::Error(_) => trace_nom!(input, non_op_expression),
+        IResult::Done(rest, expr) => IResult::Done(rest, expr),
+    }
+}
+
+//named!(expression<TokenIter, Expression, error::Error>,
+//    alt_complete!(trace_nom!(op_expression) | trace_nom!(non_op_expression))
+//);
 
 fn expression_to_statement(v: Expression) -> ParseResult<Statement> {
     Ok(Statement::Expression(v))
@@ -769,12 +804,12 @@ named!(let_stmt_body<TokenIter, Statement, error::Error>,
 );
 
 named!(let_statement<TokenIter, Statement, error::Error>,
-    do_parse!(
+    wrap_err!(do_parse!(
         word!("let") >>
         pos: pos >>
         stmt: trace_nom!(let_stmt_body) >>
         (stmt)
-    )
+    ), "Invalid let statement")
 );
 
 fn tuple_to_import(t: (Token, Token)) -> ParseResult<Statement> {
@@ -797,34 +832,34 @@ named!(import_stmt_body<TokenIter, Statement, error::Error>,
 );
 
 named!(import_statement<TokenIter, Statement, error::Error>,
-    do_parse!(
+    wrap_err!(do_parse!(
         word!("import") >>
         // past this point we know this is supposed to be an import statement.
         pos: pos >>
         stmt: trace_nom!(import_stmt_body) >>
         (stmt)
-    )
+    ), "Invalid import statement")
 );
 
 named!(assert_statement<TokenIter, Statement, error::Error>,
-    do_parse!(
+    wrap_err!(do_parse!(
         word!("assert") >>
         pos: pos >>
         tok: match_type!(PIPEQUOTE) >>
         punct!(";") >>
         (Statement::Assert(tok.clone()))
-    )
+    ), "Invalid assert statement")
 );
 
 named!(out_statement<TokenIter, Statement, error::Error>,
-    do_parse!(
+    wrap_err!(do_parse!(
         word!("out") >>
         pos: pos >>
         typ: match_type!(BAREWORD) >>
         expr: expression >>
         punct!(";") >>
         (Statement::Output(typ.clone(), expr.clone()))
-    )
+    ), "Invalid out statement")
 );
 
 //trace_macros!(true);
@@ -889,10 +924,10 @@ pub fn parse(input: LocatedSpan<&str>) -> Result<Vec<Statement>, error::Error> {
             return Ok(out);
         }
         Err(e) => {
-            return Err(error::Error::new(
-                format!("Tokenization Error {:?}", e.1),
+            return Err(error::Error::new_with_cause(
+                format!("Tokenization Error"),
                 error::ErrorType::ParseError,
-                e.0,
+                e,
             ));
         }
     }

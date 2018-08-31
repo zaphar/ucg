@@ -392,7 +392,7 @@ named!(token( Span ) -> Token,
 );
 
 /// Consumes an input Span and returns either a Vec<Token> or a nom::ErrorKind.
-pub fn tokenize(input: Span) -> Result<Vec<Token>, (Position, nom::ErrorKind)> {
+pub fn tokenize(input: Span) -> Result<Vec<Token>, error::Error> {
     let mut out = Vec::new();
     let mut i = input;
     loop {
@@ -400,22 +400,24 @@ pub fn tokenize(input: Span) -> Result<Vec<Token>, (Position, nom::ErrorKind)> {
             break;
         }
         match token(i) {
-            nom::IResult::Error(e) => {
-                return Err((
+            nom::IResult::Error(_e) => {
+                return Err(error::Error::new(
+                    "Invalid Token encountered",
+                    error::ErrorType::UnexpectedToken,
                     Position {
                         line: i.line as usize,
                         column: i.get_column() as usize,
                     },
-                    e,
                 ));
             }
             nom::IResult::Incomplete(_) => {
-                return Err((
+                return Err(error::Error::new(
+                    "Unexepcted end of Input",
+                    error::ErrorType::UnexpectedToken,
                     Position {
                         line: i.line as usize,
                         column: i.get_column() as usize,
                     },
-                    nom::ErrorKind::Complete,
                 ));
             }
             nom::IResult::Done(rest, tok) => {
