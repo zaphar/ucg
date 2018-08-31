@@ -243,9 +243,8 @@ impl<'a> Builder<'a> {
         Ok(())
     }
 
-    /// Evaluate an input string as UCG.
-    pub fn eval_string(&mut self, input: &str) -> Result<Rc<Val>, Box<Error>> {
-        match parse(Span::new(input)) {
+    fn eval_span(&mut self, input: Span) -> Result<Rc<Val>, Box<Error>> {
+        match parse(input) {
             Ok(stmts) => {
                 //panic!("Successfully parsed {}", input);
                 let mut out: Option<Rc<Val>> = None;
@@ -266,6 +265,11 @@ impl<'a> Builder<'a> {
                 err,
             ))),
         }
+    }
+
+    /// Evaluate an input string as UCG.
+    pub fn eval_string(&mut self, input: &str) -> Result<Rc<Val>, Box<Error>> {
+        self.eval_span(Span::new(input))
     }
 
     /// Builds a ucg file at the named path.
@@ -988,7 +992,12 @@ impl<'a> Builder<'a> {
         let expr = &tok.fragment;
         expr_as_stmt.push_str(expr);
         expr_as_stmt.push_str(";");
-        let ok = match self.eval_string(&expr_as_stmt) {
+        let assert_input = Span {
+            fragment: &expr_as_stmt,
+            line: tok.pos.line as u32,
+            offset: tok.pos.column,
+        };
+        let ok = match self.eval_span(assert_input) {
             Ok(v) => v,
             Err(e) => {
                 // failure!
