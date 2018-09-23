@@ -25,11 +25,12 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::string::ToString;
 
+use abortable_parser::StrIter;
+
 use ast::*;
 use error;
 use format;
 use parse::parse;
-use tokenizer::Span;
 
 pub mod assets;
 pub mod ir;
@@ -159,17 +160,18 @@ impl<'a> Builder<'a> {
             &Value::Int(ref i) => Ok(Rc::new(Val::Int(i.val))),
             &Value::Float(ref f) => Ok(Rc::new(Val::Float(f.val))),
             &Value::Str(ref s) => Ok(Rc::new(Val::Str(s.val.to_string()))),
-            &Value::Symbol(ref s) => self.lookup_sym(&(s.into())).ok_or(Box::new(
-                error::Error::new(
-                    format!(
-                        "Unable to find {} in file: {}",
-                        s.val,
-                        self.root.to_string_lossy()
-                    ),
-                    error::ErrorType::NoSuchSymbol,
-                    v.pos().clone(),
-                ),
-            )),
+            &Value::Symbol(ref s) => {
+                self.lookup_sym(&(s.into()))
+                    .ok_or(Box::new(error::Error::new(
+                        format!(
+                            "Unable to find {} in file: {}",
+                            s.val,
+                            self.root.to_string_lossy()
+                        ),
+                        error::ErrorType::NoSuchSymbol,
+                        v.pos().clone(),
+                    )))
+            }
             &Value::List(ref def) => self.list_to_val(def),
             &Value::Tuple(ref tuple) => self.tuple_to_val(&tuple.val),
             &Value::Selector(ref selector_list_node) => {
@@ -243,7 +245,7 @@ impl<'a> Builder<'a> {
         Ok(())
     }
 
-    fn eval_span(&mut self, input: Span) -> Result<Rc<Val>, Box<Error>> {
+    fn eval_span(&mut self, input: StrIter) -> Result<Rc<Val>, Box<Error>> {
         match parse(input) {
             Ok(stmts) => {
                 //panic!("Successfully parsed {}", input);
@@ -256,20 +258,20 @@ impl<'a> Builder<'a> {
                     Some(val) => Ok(val),
                 }
             }
-            Err(err) => Err(Box::new(error::Error::new_with_cause(
+            Err(err) => Err(Box::new(error::Error::new_with_boxed_cause(
                 format!(
                     "Error while parsing file: {}",
                     self.curr_file.unwrap_or("<eval>")
                 ),
                 error::ErrorType::ParseError,
-                err,
+                Box::new(err),
             ))),
         }
     }
 
     /// Evaluate an input string as UCG.
     pub fn eval_string(&mut self, input: &str) -> Result<Rc<Val>, Box<Error>> {
-        self.eval_span(Span::new(input))
+        self.eval_span(StrIter::new(input))
     }
 
     /// Builds a ucg file at the named path.
@@ -839,8 +841,7 @@ impl<'a> Builder<'a> {
                         let first = a.0.clone();
                         let t = a.1.clone();
                         (first, t.1)
-                    })
-                    .collect(),
+                    }).collect(),
             )));
         }
         Err(Box::new(error::Error::new(
@@ -992,11 +993,7 @@ impl<'a> Builder<'a> {
         let expr = &tok.fragment;
         expr_as_stmt.push_str(expr);
         expr_as_stmt.push_str(";");
-        let assert_input = Span {
-            fragment: &expr_as_stmt,
-            line: tok.pos.line as u32,
-            offset: tok.pos.column,
-        };
+        let assert_input = StrIter::new(&expr_as_stmt);
         let ok = match self.eval_span(assert_input) {
             Ok(v) => v,
             Err(e) => {

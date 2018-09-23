@@ -12,23 +12,20 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 use super::*;
-use tokenizer::{tokenize, TokenIter};
+use tokenizer::tokenize;
 
-use nom::IResult;
-use nom_locate::LocatedSpan;
+use abortable_parser::{Result, SliceIter, StrIter};
 
 macro_rules! assert_parse {
     ($parsemac:ident($i:expr), $out:expr) => {
         assert_parse!($i, $parsemac, $out)
     };
     ($i:expr, $f:expr, $out:expr) => {{
-        let input = LocatedSpan::new($i);
+        let input = StrIter::new($i);
         match tokenize(input) {
             Err(e) => assert!(false, format!("Tokenizer Error: {:?}", e)),
-            Ok(val) => match $f(TokenIter {
-                source: val.as_slice(),
-            }) {
-                IResult::Done(_, result) => assert_eq!(result, $out),
+            Ok(val) => match $f(SliceIter::new(val.as_slice())) {
+                Result::Complete(_, result) => assert_eq!(result, $out),
                 other => assert!(false, format!("Expected Done got {:?}", other)),
             },
         }
@@ -40,14 +37,12 @@ macro_rules! assert_error {
         assert_error!($i, $parsemac)
     };
     ($i:expr, $f:expr) => {{
-        let input = LocatedSpan::new($i);
+        let input = StrIter::new($i);
         match tokenize(input) {
             Err(_) => assert!(true),
             Ok(val) => {
-                let result = $f(TokenIter {
-                    source: val.as_slice(),
-                });
-                assert!(result.is_err(), format!("Not an error: {:?}", result))
+                let result = $f(SliceIter::new(val.as_slice()));
+                assert!(result.is_fail(), format!("Not a fail: {:?}", result))
             }
         }
     }};
@@ -758,6 +753,24 @@ fn test_macro_expression_parsing() {
     assert_error!(macro_expression("macro (arg1, arg2) => { foo ="));
 
     assert_parse!(
+        macro_expression("macro () => {foo=1,bar=2}"),
+        Expression::Macro(MacroDef {
+            argdefs: Vec::new(),
+            fields: vec![
+                (
+                    make_tok!("foo", 1, 14),
+                    Expression::Simple(Value::Int(value_node!(1, 1, 18))),
+                ),
+                (
+                    make_tok!("bar", 1, 20),
+                    Expression::Simple(Value::Int(value_node!(2, 1, 24))),
+                ),
+            ],
+            pos: Position::new(1, 1),
+        })
+    );
+
+    assert_parse!(
         macro_expression("macro (arg1, arg2) => {foo=1,bar=2}"),
         Expression::Macro(MacroDef {
             argdefs: vec![
@@ -1223,12 +1236,12 @@ fn test_number_parsing() {
 
 #[test]
 fn test_parse() {
-    let bad_input = LocatedSpan::new("import mylib as lib;");
+    let bad_input = StrIter::new("import mylib as lib;");
     let bad_result = parse(bad_input);
     assert!(bad_result.is_err());
 
     // Valid parsing tree
-    let input = LocatedSpan::new("import \"mylib\" as lib;let foo = 1;1+1;");
+    let input = StrIter::new("import \"mylib\" as lib;let foo = 1;1+1;");
     let result = parse(input);
     assert!(result.is_ok(), format!("Expected Ok, Got {:?}", result));
     let tpl = result.unwrap();

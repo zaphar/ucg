@@ -18,8 +18,6 @@ use std::fmt;
 
 use ast::*;
 
-use nom;
-
 /// ErrorType defines the various types of errors that can result from compiling UCG into an
 /// output format.
 pub enum ErrorType {
@@ -62,7 +60,7 @@ pub struct Error {
     pub err_type: ErrorType,
     pub pos: Position,
     pub msg: String,
-    pub cause: Option<Box<Error>>,
+    pub cause: Option<Box<error::Error>>,
     _pkgonly: (),
 }
 
@@ -77,30 +75,18 @@ impl Error {
         }
     }
 
-    pub fn new_with_boxed_cause<S: Into<String>>(msg: S, t: ErrorType, cause: Box<Self>) -> Self {
-        let mut e = Self::new(msg, t, cause.pos.clone());
+    pub fn new_with_boxed_cause<S: Into<String>>(
+        msg: S,
+        t: ErrorType,
+        cause: Box<error::Error>,
+    ) -> Self {
+        let mut e = Self::new(msg, t, Position { line: 0, column: 0 });
         e.cause = Some(cause);
         return e;
     }
 
     pub fn new_with_cause<S: Into<String>>(msg: S, t: ErrorType, cause: Self) -> Self {
         Self::new_with_boxed_cause(msg, t, Box::new(cause))
-    }
-
-    pub fn new_with_errorkind<S: Into<String>>(
-        msg: S,
-        t: ErrorType,
-        pos: Position,
-        cause: nom::ErrorKind<Error>,
-    ) -> Self {
-        match cause {
-            nom::ErrorKind::Custom(e) => Self::new_with_cause(msg, t, e),
-            e => Self::new_with_cause(
-                msg,
-                t,
-                Error::new(format!("ErrorKind: {}", e), ErrorType::Unsupported, pos),
-            ),
-        }
     }
 
     fn render(&self, w: &mut fmt::Formatter) -> fmt::Result {

@@ -13,46 +13,28 @@
 //  limitations under the License.
 
 //! The Parsing stage of the ucg compiler.
+use std;
 use std::borrow::Borrow;
 use std::str::FromStr;
 
-use nom;
-use nom::IResult;
-use nom::InputLength;
-use nom_locate::LocatedSpan;
+use abortable_parser;
+use abortable_parser::combinators::eoi;
+use abortable_parser::iter::{SliceIter, StrIter};
+use abortable_parser::{Error, Peekable, Result};
 
 use self::precedence::op_expression;
 use ast::*;
-use error;
 use tokenizer::*;
 
-type NomResult<'a, O> = nom::IResult<TokenIter<'a>, O, error::Error>;
+type NomResult<'a, O> = Result<SliceIter<'a, Token>, O>;
 
+// FIXME(jwall): All the do_each mappers need to return an actual value.
 #[cfg(feature = "tracing")]
 const ENABLE_TRACE: bool = true;
 #[cfg(not(feature = "tracing"))]
 const ENABLE_TRACE: bool = false;
 
-type ParseResult<O> = Result<O, error::Error>;
-
-macro_rules! wrap_err {
-    ($i:expr, $submac:ident, $msg:expr) => {
-        wrap_err!($i, call!($submac), $msg)
-    };
-
-    ($i:expr, $submac:ident!( $($args:tt)* ), $msg:expr) => {{
-        let _i = $i.clone();
-        match $submac!(_i, $($args)*) {
-            IResult::Done(rest, mac) => IResult::Done(rest, mac),
-            IResult::Incomplete(i) => IResult::Incomplete(i),
-            IResult::Error(nom::ErrorKind::Custom(cause)) => {
-                let wrapper = error::Error::new_with_cause($msg, error::ErrorType::ParseError, cause);
-                IResult::Error(nom::ErrorKind::Custom(wrapper))
-            }
-            IResult::Error(e) => IResult::Error(e),
-        }
-    }};
-}
+type ParseResult<O> = std::result::Result<O, abortable_parser::Error>;
 
 macro_rules! trace_nom {
     ($i:expr, $rule:ident!( $($args:tt)* )) => {
@@ -61,7 +43,7 @@ macro_rules! trace_nom {
             if ENABLE_TRACE {
                 eprintln!("Entering Rule: {:?} {:?}", stringify!($rule), $i);
             }
-            let result = $rule($i, $($args)* ); 
+            let result = $rule!($i, $($args)* );
             if ENABLE_TRACE {
                 eprintln!("Exiting Rule: {:?} with {:?}", stringify!($rule), result);
             }
@@ -75,7 +57,7 @@ macro_rules! trace_nom {
             if ENABLE_TRACE {
                 eprintln!("Entering Rule: {:?} {:?}", stringify!($rule), $i);
             }
-            let result = call!($i, $rule);
+            let result = run!($i, $rule);
             if ENABLE_TRACE {
                 eprintln!("Exiting Rule: {:?} with {:?}", stringify!($rule), result);
             }
@@ -92,7 +74,8 @@ fn symbol_to_value(s: &Token) -> ParseResult<Value> {
 }
 
 // symbol is a bare unquoted field.
-named!(symbol<TokenIter, Value, error::Error>,
+make_fn!(
+    symbol<SliceIter<Token>, Value>,
     match_type!(BAREWORD => symbol_to_value)
 );
 
@@ -104,10 +87,12 @@ fn str_to_value(s: &Token) -> ParseResult<Value> {
 }
 
 // quoted_value is a quoted string.
-named!(quoted_value<TokenIter, Value, error::Error>,
-       match_type!(STR => str_to_value)
+make_fn!(
+    quoted_value<SliceIter<Token>, Value>,
+    match_type!(STR => str_to_value)
 );
 
+// FIXME(jwall): We need to just turn this into a custom parser function.
 // Helper function to make the return types work for down below.
 fn triple_to_number(v: (Option<Token>, Option<Token>, Option<Token>)) -> ParseResult<Value> {
     let (pref, mut pref_pos) = match v.0 {
@@ -121,11 +106,11 @@ fn triple_to_number(v: (Option<Token>, Option<Token>, Option<Token>)) -> ParseRe
         let i = match FromStr::from_str(pref) {
             Ok(i) => i,
             Err(_) => {
-                return Err(error::Error::new(
+                return Err(Error::new(
                     format!("Not an integer! {}", pref),
-                    error::ErrorType::UnexpectedToken,
-                    pref_pos,
-                ))
+                    // FIXME(jwall): This really needs the correct offset.
+                    &0,
+                ));
             }
         };
         return Ok(Value::Int(value_node!(i, pref_pos)));
@@ -135,35 +120,35 @@ fn triple_to_number(v: (Option<Token>, Option<Token>, Option<Token>)) -> ParseRe
         pref_pos = v.1.unwrap().pos;
     }
 
-    let (maybepos, suf) = match v.2 {
-        None => (None, "".to_string()),
-        Some(bs) => (Some(bs.pos), bs.fragment),
+    let suf = match v.2 {
+        None => "".to_string(),
+        Some(bs) => bs.fragment,
     };
 
     let to_parse = pref.to_string() + "." + &suf;
     let f = match FromStr::from_str(&to_parse) {
         Ok(f) => f,
         Err(_) => {
-            return Err(error::Error::new(
+            return Err(Error::new(
                 format!("Not a float! {}", to_parse),
-                error::ErrorType::UnexpectedToken,
-                // NOTE(jwall): This is ugly. I should probably see if I can refactor
-                // it to something less confusing.
-                maybepos.unwrap(),
+                // FIXME(jwall): This should take the real offset.
+                &0,
             ));
         }
     };
     return Ok(Value::Float(value_node!(f, pref_pos)));
 }
 
+// FIXME(jwall): This should actually be unnecessary now.
+
 /// alt_peek conditionally runs a combinator if a lookahead combinator matches.
 macro_rules! alt_peek {
     (__inner $i:expr, $peekrule:ident!( $($peekargs:tt)* ) => $parserule:ident | $($rest:tt)* ) => (
-        alt_peek!(__inner $i, $peekrule!($($peekargs)*) => call!($parserule) | $($rest)* )
+        alt_peek!(__inner $i, $peekrule!($($peekargs)*) => run!($parserule) | $($rest)* )
     );
 
     (__inner $i:expr, $peekrule:ident => $($rest:tt)* ) => (
-        alt_peek!(__inner $i, call!($peekrule) => $($rest)* )
+        alt_peek!(__inner $i, run!($peekrule) => $($rest)* )
     );
 
     (__inner $i:expr, $peekrule:ident!( $($peekargs:tt)* ) => $parserule:ident!( $($parseargs:tt)* ) | $($rest:tt)* ) => (
@@ -172,14 +157,15 @@ macro_rules! alt_peek {
             let pre_res = peek!(_i, $peekrule!($($peekargs)*));
             match pre_res {
                 // if the peek was incomplete then it might still match so return incomplete.
-                nom::IResult::Incomplete(i) => nom::IResult::Incomplete(i),
+                Result::Incomplete(i) => Result::Incomplete(i),
                 // If the peek was in error then try the next peek => parse pair.
-                nom::IResult::Error(_) =>  {
+                Result::Fail(_) =>  {
                     alt_peek!(__inner $i, $($rest)*)
                 },
+                Result::Abort(e) => Result::Abort(e),
                 // If the peek was successful then return the result of the parserule
                 // regardless of it's result.
-                nom::IResult::Done(_i, _) => {
+                Result::Complete(_i, _) => {
                     $parserule!(_i, $($parseargs)*)
                 },
             }
@@ -197,14 +183,15 @@ macro_rules! alt_peek {
             let pre_res = peek!(_i, $peekrule!($($peekargs)*));
             match pre_res {
                 // if the peek was incomplete then it might still match so return incomplete.
-                nom::IResult::Incomplete(i) => nom::IResult::Incomplete(i),
+                Result::Incomplete(i) => Result::Incomplete(i),
                 // If the peek was in error then try the next peek => parse pair.
-                nom::IResult::Error(_) =>  {
+                Result::Fail(_) =>  {
                     alt_peek!(__inner $i, __end)
                 },
+                Result::Abort(e) => Result::Abort(e),
                 // If the peek was successful then return the result of the parserule
                 // regardless of it's result.
-                nom::IResult::Done(_i, _) => {
+                Result::Complete(_i, _) => {
                     $parserule!(_i, $($parseargs)*)
                 },
             }
@@ -215,7 +202,7 @@ macro_rules! alt_peek {
     (__inner $i:expr, $fallback:ident, __end) => (
         {
             let _i = $i.clone();
-            call!(_i, $fallback)
+            run!(_i, $fallback)
         }
     );
     // In the case of a fallback rule with no peek we just return whatever
@@ -230,8 +217,8 @@ macro_rules! alt_peek {
     // This is our default termination case.
     // If there is no fallback then we return an Error.
     (__inner $i:expr, __end) => {
-        // TODO(jwall): We should do a better custom error here.
-        nom::IResult::Error(error_position!(nom::ErrorKind::Alt,$i))
+        // FIXME(jwall): Should we make this a compile error instead?
+        compile_error!("alt_peek! requirs a fallback case");
     };
 
     // alt_peek entry_point.
@@ -246,43 +233,60 @@ macro_rules! alt_peek {
 // NOTE(jwall): HERE THERE BE DRAGONS. The order for these matters
 // alot. We need to process alternatives in order of decreasing
 // specificity.  Unfortunately this means we are required to go in a
-// decreasing size order which messes with alt!'s completion logic. To
+// decreasing size order which messes with either!'s completion logic. To
 // work around this we have to force Incomplete to be Error so that
-// alt! will try the next in the series instead of aborting.
+// either! will try the next in the series instead of aborting.
 //
 // *IMPORTANT*
 // It also means this combinator is risky when used with partial
 // inputs. So handle with care.
-named!(number<TokenIter, Value, error::Error>,
-       map_res!(alt!(
-           complete!(do_parse!( // 1.0
-               prefix: match_type!(DIGIT) >>
-               has_dot: punct!(".") >>
-               suffix: match_type!(DIGIT) >>
-               (Some(prefix.clone()), Some(has_dot.clone()), Some(suffix.clone()))
-           )) |
-           complete!(do_parse!( // 1.
-               prefix: match_type!(DIGIT) >>
-               has_dot: punct!(".") >>
-               (Some(prefix.clone()), Some(has_dot.clone()), None)
-           )) |
-           complete!(do_parse!( // .1
-               has_dot: punct!(".") >>
-               suffix: match_type!(DIGIT) >>
-               (None, Some(has_dot.clone()), Some(suffix.clone()))
-           )) |
-           do_parse!( // 1
-               prefix: match_type!(DIGIT) >>
-               (Some(prefix.clone()), None, None)
-           )),
-           triple_to_number
-       )
-);
+fn number(input: SliceIter<Token>) -> Result<SliceIter<Token>, Value> {
+    let parsed = do_each!(input,
+            num => either!(
+                complete!(
+                     "Not a float",
+                     do_each!( // 1.0
+                         prefix => match_type!(DIGIT),
+                         has_dot => punct!("."),
+                         suffix => match_type!(DIGIT),
+                         (Some(prefix.clone()), Some(has_dot.clone()), Some(suffix.clone()))
+                )),
+                complete!(
+                     "Not a float",
+                     do_each!( // 1.
+                         prefix => match_type!(DIGIT),
+                         has_dot => punct!("."),
+                         (Some(prefix.clone()), Some(has_dot.clone()), None)
+                )),
+                complete!(
+                     "Not a float",
+                     do_each!( // .1
+                         has_dot => punct!("."),
+                         suffix => match_type!(DIGIT),
+                         (None, Some(has_dot.clone()), Some(suffix.clone()))
+                )),
+                do_each!( // 1
+                    prefix => match_type!(DIGIT),
+                    (Some(prefix.clone()), None, None)
+                )),
+            (num)
+       );
+    match parsed {
+        Result::Abort(e) => Result::Abort(e),
+        Result::Fail(e) => Result::Fail(e),
+        Result::Incomplete(offset) => Result::Incomplete(offset),
+        Result::Complete(rest, triple) => match triple_to_number(triple) {
+            Ok(val) => Result::Complete(rest, val),
+            Err(e) => Result::Fail(e),
+        },
+    }
+}
 // trace_macros!(false);
 
-named!(boolean_value<TokenIter, Value, error::Error>,
-    do_parse!(
-        b: match_type!(BOOLEAN) >>
+make_fn!(
+    boolean_value<SliceIter<Token>, Value>,
+    do_each!(
+        b => match_type!(BOOLEAN),
         (Value::Boolean(Positioned{
             val: b.fragment == "true",
             pos: b.pos,
@@ -290,190 +294,194 @@ named!(boolean_value<TokenIter, Value, error::Error>,
     )
 );
 
-named!(
-    field_value<TokenIter, (Token, Expression), error::Error>,
-    do_parse!(
-            field: wrap_err!(alt!(match_type!(BAREWORD) | match_type!(STR)),
-                    "Field names must be a bareword or a string.") >>
-            punct!("=") >>
-            value: expression >>
+make_fn!(
+    field_value<SliceIter<Token>, (Token, Expression)>,
+    do_each!(
+            field => wrap_err!(either!(match_type!(BAREWORD), match_type!(STR)),
+                               "Field names must be a bareword or a string."),
+            _ => punct!("="),
+            value => expression,
             (field, value)
     )
 );
 
 // Helper function to make the return types work for down below.
-fn vec_to_tuple(t: (Position, Option<FieldList>)) -> ParseResult<Value> {
-    Ok(Value::Tuple(value_node!(
-        t.1.unwrap_or(Vec::new()),
-        t.0.line as usize,
-        t.0.column as usize
-    )))
+fn vec_to_tuple(pos: Position, fields: Option<FieldList>) -> Value {
+    Value::Tuple(value_node!(
+        fields.unwrap_or(Vec::new()),
+        pos.line as usize,
+        pos.column as usize
+    ))
 }
 
-named!(field_list<TokenIter, FieldList, error::Error>,
-       separated_list!(punct!(","), field_value)
+make_fn!(
+    field_list<SliceIter<Token>, FieldList>,
+    separated!(punct!(","), field_value)
 );
 
-named!(
-    tuple<TokenIter, Value, error::Error>,
-    map_res!(
-        do_parse!(
-            pos: pos >>
-            punct!("{") >>
-            v: field_list >>
-            opt_res!(punct!(",")) >> // nom's opt! macro doesn't preserve error types properly but this one does.
-            punct!("}") >>
-            (pos, Some(v))
-        ),
-        vec_to_tuple
+make_fn!(
+    tuple<SliceIter<Token>, Value>,
+    do_each!(
+        pos => pos,
+        _ => punct!("{"),
+        v => optional!(field_list),
+        _ => optional!(punct!(",")),
+        _ => punct!("}"),
+        (vec_to_tuple(pos, v))
     )
 );
 
-fn tuple_to_list<Sp: Into<Position>>(t: (Sp, Vec<Expression>)) -> ParseResult<Value> {
-    return Ok(Value::List(ListDef {
-        elems: t.1,
-        pos: t.0.into(),
-    }));
+fn tuple_to_list<Sp: Into<Position>>(pos: Sp, elems: Vec<Expression>) -> Value {
+    Value::List(ListDef {
+        elems: elems,
+        pos: pos.into(),
+    })
 }
 
-named!(list_value<TokenIter, Value, error::Error>,
-       map_res!(
-           do_parse!(
-               start: punct!("[") >>
-               elements: separated_list!(punct!(","), expression) >>
-               opt_res!(punct!(",")) >> // nom's opt! macro doesn't preserve error types properly but this one does.
-               punct!("]") >>
-               (start.pos, elements)
-           ),
-           tuple_to_list
-       )
-);
-
-named!(empty_value<TokenIter, Value, error::Error>,
-    do_parse!(
-        pos: pos >>
-        match_type!(EMPTY) >>
-        (Value::Empty(pos))
+make_fn!(
+    list_value<SliceIter<Token>, Value>,
+    do_each!(
+        start => punct!("["),
+        elements => separated!(punct!(","), expression),
+        _ => optional!(punct!(",")), // nom's opt! macro doesn't preserve error types properly but this one does.
+        _ => punct!("]"),
+        (tuple_to_list(start.pos, elements))
     )
 );
 
-named!(compound_value<TokenIter, Value, error::Error>,
-    alt_peek!(
-        punct!("[") => trace_nom!(list_value) | 
-        punct!("{") => trace_nom!(tuple)
+make_fn!(
+    empty_value<SliceIter<Token>, Value>,
+    do_each!(
+        pos => pos,
+        _ => match_type!(EMPTY),
+        (Value::Empty(pos.into()))
     )
 );
 
-named!(value<TokenIter, Value, error::Error>,
+make_fn!(
+    compound_value<SliceIter<Token>, Value>,
+    either!(trace_nom!(list_value), trace_nom!(tuple))
+);
+
+make_fn!(
+    value<SliceIter<Token>, Value>,
     alt_peek!(
         symbol_or_expression => trace_nom!(selector_value)
-        | alt!(punct!("[") | punct!("{")) => trace_nom!(compound_value)
+        | either!(punct!("["), punct!("{")) => trace_nom!(compound_value)
         | match_type!(BOOLEAN) => trace_nom!(boolean_value)
         | match_type!(EMPTY) => trace_nom!(empty_value)
-        | alt!(match_type!(DIGIT) | punct!(".")) => trace_nom!(number)
+        | either!(match_type!(DIGIT), punct!(".")) => trace_nom!(number)
         | trace_nom!(quoted_value)
     )
- );
-
-fn value_to_expression(v: Value) -> ParseResult<Expression> {
-    Ok(Expression::Simple(v))
-}
-
-named!(simple_expression<TokenIter, Expression, error::Error>,
-       map_res!(
-           trace_nom!(value),
-           value_to_expression
-       )
 );
 
-fn expression_to_grouped_expression(e: Expression) -> ParseResult<Expression> {
-    Ok(Expression::Grouped(Box::new(e)))
+fn value_to_expression(v: Value) -> Expression {
+    Expression::Simple(v)
 }
 
-named!(grouped_expression<TokenIter, Expression, error::Error>,
-       map_res!(
-           preceded!(punct!("("), terminated!(trace_nom!(expression), punct!(")"))),
-           expression_to_grouped_expression
-       )
+make_fn!(
+    simple_expression<SliceIter<Token>, Expression>,
+    do_each!(
+        val => trace_nom!(value),
+        (value_to_expression(val))
+    )
 );
 
-fn symbol_or_expression(input: TokenIter) -> NomResult<Expression> {
-    let scalar_head = do_parse!(input, sym: alt!(symbol | compound_value) >> (sym));
+fn expression_to_grouped_expression(e: Expression) -> Expression {
+    Expression::Grouped(Box::new(e))
+}
+
+make_fn!(
+    grouped_expression<SliceIter<Token>, Expression>,
+    do_each!(
+        _ => punct!("("),
+        expr => do_each!(
+            expr => trace_nom!(expression),
+            _ => punct!(")"),
+            (expr)
+        ),
+        (expression_to_grouped_expression(expr))
+    )
+);
+
+fn symbol_or_expression(input: SliceIter<Token>) -> NomResult<Expression> {
+    let _i = input.clone();
+    let scalar_head = do_each!(input,
+        sym => either!(symbol, compound_value),
+        (sym)
+    );
 
     match scalar_head {
-        IResult::Incomplete(i) => IResult::Incomplete(i),
-        IResult::Error(_) => grouped_expression(input),
-        IResult::Done(rest, val) => {
+        Result::Incomplete(offset) => Result::Incomplete(offset),
+        Result::Fail(_) => grouped_expression(_i),
+        Result::Abort(e) => Result::Abort(e),
+        Result::Complete(rest, val) => {
             let res = peek!(rest.clone(), punct!("."));
             match val {
                 Value::Tuple(_) => {
-                    if res.is_done() {
-                        IResult::Done(rest, Expression::Simple(val))
+                    if res.is_complete() {
+                        Result::Complete(rest, Expression::Simple(val))
                     } else {
-                        return IResult::Error(nom::ErrorKind::Custom(error::Error::new(
+                        return Result::Fail(Error::new(
                             "Expected (.) but no dot found".to_string(),
-                            error::ErrorType::IncompleteParsing,
-                            val.pos().clone(),
-                        )));
+                            &rest,
+                        ));
                     }
                 }
                 Value::List(_) => {
-                    if res.is_done() {
-                        IResult::Done(rest, Expression::Simple(val))
+                    if res.is_complete() {
+                        Result::Complete(rest, Expression::Simple(val))
                     } else {
-                        return IResult::Error(nom::ErrorKind::Custom(error::Error::new(
+                        return Result::Fail(Error::new(
                             "Expected (.) but no dot found".to_string(),
-                            error::ErrorType::IncompleteParsing,
-                            val.pos().clone(),
-                        )));
+                            &rest,
+                        ));
                     }
                 }
-                _ => IResult::Done(rest, Expression::Simple(val)),
+                _ => Result::Complete(rest, Expression::Simple(val)),
             }
         }
     }
 }
 
-fn selector_list(input: TokenIter) -> NomResult<SelectorList> {
+fn selector_list(input: SliceIter<Token>) -> NomResult<SelectorList> {
     let (rest, head) = match symbol_or_expression(input) {
-        IResult::Done(rest, val) => (rest, val),
-        IResult::Error(e) => {
-            return IResult::Error(e);
+        Result::Complete(rest, val) => (rest, val),
+        Result::Fail(e) => {
+            return Result::Fail(e);
         }
-        IResult::Incomplete(i) => {
-            return IResult::Incomplete(i);
+        Result::Incomplete(i) => {
+            return Result::Incomplete(i);
         }
+        Result::Abort(e) => return Result::Abort(e),
     };
 
     let (rest, is_dot) = match punct!(rest, ".") {
-        IResult::Done(rest, tok) => (rest, Some(tok)),
-        IResult::Incomplete(i) => {
-            return IResult::Incomplete(i);
+        Result::Complete(rest, tok) => (rest, Some(tok)),
+        Result::Incomplete(i) => {
+            return Result::Incomplete(i);
         }
-        IResult::Error(_) => (rest, None),
+        Result::Fail(_) => (rest, None),
+        Result::Abort(e) => return Result::Abort(e),
     };
 
     let (rest, list) = if is_dot.is_some() {
-        let (rest, list) = match separated_list!(
+        let (rest, list) = match separated!(
             rest,
             punct!("."),
-            alt!(match_type!(BAREWORD) | match_type!(DIGIT) | match_type!(STR))
+            either!(match_type!(BAREWORD), match_type!(DIGIT), match_type!(STR))
         ) {
-            IResult::Done(rest, val) => (rest, val),
-            IResult::Incomplete(i) => {
-                return IResult::Incomplete(i);
-            }
-            IResult::Error(e) => {
-                return IResult::Error(e);
-            }
+            Result::Complete(rest, val) => (rest, val),
+            Result::Incomplete(i) => return Result::Incomplete(i),
+            Result::Fail(e) => return Result::Fail(e),
+            Result::Abort(e) => return Result::Abort(e),
         };
 
         if list.is_empty() {
-            return IResult::Error(nom::ErrorKind::Custom(error::Error::new(
+            return Result::Fail(Error::new(
                 "(.) with no selector fields after".to_string(),
-                error::ErrorType::IncompleteParsing,
-                is_dot.unwrap().pos,
-            )));
+                &rest,
+            ));
         } else {
             (rest, Some(list))
         }
@@ -486,189 +494,214 @@ fn selector_list(input: TokenIter) -> NomResult<SelectorList> {
         tail: list,
     };
 
-    return IResult::Done(rest, sel_list);
+    return Result::Complete(rest, sel_list);
 }
 
-fn tuple_to_copy(t: (SelectorDef, FieldList)) -> ParseResult<Expression> {
-    let pos = t.0.pos.clone();
-    Ok(Expression::Copy(CopyDef {
-        selector: t.0,
-        fields: t.1,
+fn tuple_to_copy(def: SelectorDef, fields: Option<FieldList>) -> Expression {
+    let pos = def.pos.clone();
+    let fields = match fields {
+        Some(fields) => fields,
+        None => Vec::new(),
+    };
+    Expression::Copy(CopyDef {
+        selector: def,
+        fields: fields,
         pos: pos,
-    }))
+    })
 }
 
-named!(copy_expression<TokenIter, Expression, error::Error>,
-    map_res!(
-        do_parse!(
-            pos: pos >>
-            selector: trace_nom!(selector_list) >>
-            punct!("{") >>
-            fields: trace_nom!(field_list) >>
-            opt_res!(punct!(",")) >> // noms opt! macro does not preserve error types properly but this one does.
-            punct!("}") >>
-            (SelectorDef::new(selector, pos.line, pos.column as usize), fields)
-        ),
-        tuple_to_copy
+make_fn!(
+    copy_expression<SliceIter<Token>, Expression>,
+    do_each!(
+        pos => pos,
+        selector => trace_nom!(selector_list),
+        _ => punct!("{"),
+        fields => optional!(trace_nom!(field_list)),
+        _ => optional!(punct!(",")), // noms opt! macro does not preserve error types properly but this one does.
+        _ => punct!("}"),
+        (tuple_to_copy(SelectorDef::new(selector, pos.line, pos.column), fields))
     )
 );
 
-fn tuple_to_macro(mut t: (Position, Vec<Value>, Value)) -> ParseResult<Expression> {
-    match t.2 {
+// FIXME(jwall): need to make this into a proper parse function.
+fn tuple_to_macro(pos: Position, vals: Option<Vec<Value>>, val: Value) -> ParseResult<Expression> {
+    let mut default_args = match vals {
+        None => Vec::new(),
+        Some(vals) => vals,
+    };
+    let arglist = default_args
+        .drain(0..)
+        .map(|s| Positioned {
+            pos: s.pos().clone(),
+            val: s.to_string(),
+        }).collect();
+    match val {
         Value::Tuple(v) => Ok(Expression::Macro(MacroDef {
-            argdefs: t
-                .1
-                .drain(0..)
-                .map(|s| Positioned {
-                    pos: s.pos().clone(),
-                    val: s.to_string(),
-                })
-                .collect(),
+            argdefs: arglist,
             fields: v.val,
-            pos: t.0,
+            pos: pos,
         })),
-        val => Err(error::Error::new(
+        val => Err(Error::new(
             format!("Expected Tuple Got {:?}", val),
-            error::ErrorType::UnexpectedToken,
-            t.0,
+            // FIXME(jwall): Should have correct Offset here.
+            &0,
         )),
     }
 }
 
-named!(arglist<TokenIter, Vec<Value>, error::Error>, separated_list!(punct!(","), symbol));
-
-named!(macro_expression<TokenIter, Expression, error::Error>,
-       map_res!(
-           do_parse!(
-                pos: pos >>
-                word!("macro") >>
-                punct!("(") >>
-                arglist: trace_nom!(arglist) >>
-                punct!(")") >>
-                punct!("=>") >>
-                map: trace_nom!(tuple) >>
-                (pos, arglist, map)
-           ),
-           tuple_to_macro
-       )
+make_fn!(
+    arglist<SliceIter<Token>, Vec<Value>>,
+    separated!(punct!(","), symbol)
 );
 
-fn tuple_to_select(t: (Position, Expression, Expression, Value)) -> ParseResult<Expression> {
-    match t.3 {
+fn macro_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expression> {
+    let parsed = do_each!(input,
+        pos => pos,
+        _ => word!("macro"),
+        _ => punct!("("),
+        arglist => trace_nom!(optional!(arglist)),
+        _ => punct!(")"),
+        _ => punct!("=>"),
+        map =>  trace_nom!(tuple),
+        (pos, arglist, map)
+    );
+    match parsed {
+        Result::Abort(e) => Result::Abort(e),
+        Result::Fail(e) => Result::Fail(e),
+        Result::Incomplete(offset) => Result::Incomplete(offset),
+        Result::Complete(rest, (pos, arglist, map)) => match tuple_to_macro(pos, arglist, map) {
+            Ok(expr) => Result::Complete(rest, expr),
+            Err(e) => Result::Fail(Error::caused_by("Invalid Macro syntax", &rest, Box::new(e))),
+        },
+    }
+}
+
+// FIXME(jwall): need to make this into a proper parse function.
+fn tuple_to_select(
+    pos: Position,
+    e1: Expression,
+    e2: Expression,
+    val: Value,
+) -> ParseResult<Expression> {
+    match val {
         Value::Tuple(v) => Ok(Expression::Select(SelectDef {
-            val: Box::new(t.1),
-            default: Box::new(t.2),
+            val: Box::new(e1),
+            default: Box::new(e2),
             tuple: v.val,
-            pos: t.0,
+            pos: pos,
         })),
-        val => Err(error::Error::new(
-            format!("Expected Tuple Got {:?}", val),
-            error::ErrorType::UnexpectedToken,
-            t.0,
-        )),
+        val => Err(Error::new(format!("Expected Tuple Got {:?}", val), &0)),
     }
 }
 
-named!(select_expression<TokenIter, Expression, error::Error>,
-       map_res!(
-           do_parse!(
-               start: word!("select") >>
-               val: terminated!(trace_nom!(expression), punct!(",")) >>
-               default: terminated!(trace_nom!(expression), punct!(",")) >>
-               map: trace_nom!(tuple) >>
-               (start.pos.clone(), val, default, map)
-           ),
-           tuple_to_select
-       )
-);
-
-fn tuple_to_format(t: (Token, Vec<Expression>)) -> ParseResult<Expression> {
-    Ok(Expression::Format(FormatDef {
-        template: t.0.fragment.to_string(),
-        args: t.1,
-        pos: t.0.pos,
-    }))
+fn select_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expression> {
+    let parsed = do_each!(input,
+        start => word!("select"),
+        val => do_each!(
+            expr => trace_nom!(expression),
+            _ => punct!(","),
+            (expr)
+        ),
+        default => do_each!(
+            expr => trace_nom!(expression),
+            _ => punct!(","),
+            (expr)
+        ),
+        map => trace_nom!(tuple),
+        (start.pos.clone(), val, default, map)
+    );
+    match parsed {
+        Result::Abort(e) => Result::Abort(e),
+        Result::Fail(e) => Result::Fail(e),
+        Result::Incomplete(offset) => Result::Incomplete(offset),
+        Result::Complete(rest, (pos, val, default, map)) => {
+            match tuple_to_select(pos, val, default, map) {
+                Ok(expr) => Result::Complete(rest, expr),
+                Err(e) => Result::Fail(Error::caused_by(
+                    "Invalid Select Expression",
+                    &rest,
+                    Box::new(e),
+                )),
+            }
+        }
+    }
 }
 
-named!(format_expression<TokenIter, Expression, error::Error>,
-       map_res!(
-           do_parse!(
-               tmpl: match_type!(STR) >>
-                   punct!("%") >>
-                   punct!("(") >>
-                   args: separated_list!(punct!(","), trace_nom!(expression)) >>
-                   punct!(")") >>
-                   (tmpl, args)
-           ),
-           tuple_to_format
-       )
+fn tuple_to_format(tok: Token, exprs: Vec<Expression>) -> Expression {
+    Expression::Format(FormatDef {
+        template: tok.fragment.to_string(),
+        args: exprs,
+        pos: tok.pos,
+    })
+}
+
+make_fn!(
+    format_expression<SliceIter<Token>, Expression>,
+    do_each!(
+        tmpl => match_type!(STR),
+        _ => punct!("%"),
+        _ => punct!("("),
+        args => separated!(punct!(","), trace_nom!(expression)),
+        _ => punct!(")"),
+        (tuple_to_format(tmpl, args))
+    )
 );
 
-fn tuple_to_call(t: (Position, Value, Vec<Expression>)) -> ParseResult<Expression> {
-    if let Value::Selector(def) = t.1 {
+// FIXME(jwall): Convert this into a custom parser function.
+fn tuple_to_call(pos: Position, val: Value, exprs: Vec<Expression>) -> ParseResult<Expression> {
+    if let Value::Selector(def) = val {
         Ok(Expression::Call(CallDef {
             macroref: def,
-            arglist: t.2,
-            pos: Position::new(t.0.line as usize, t.0.column as usize),
+            arglist: exprs,
+            pos: pos,
         }))
     } else {
-        Err(error::Error::new(
-            format!("Expected Selector Got {:?}", t.0),
-            error::ErrorType::UnexpectedToken,
-            Position::new(t.0.line as usize, t.0.column as usize),
-        ))
+        // FIXME(jwall): Should get correct offset here.
+        Err(Error::new(format!("Expected Selector Got {:?}", val), &0))
     }
 }
 
-fn vec_to_selector_value(t: (Position, SelectorList)) -> ParseResult<Value> {
-    Ok(Value::Selector(SelectorDef::new(
-        t.1,
-        t.0.line as usize,
-        t.0.column as usize,
-    )))
+fn vec_to_selector_value(pos: Position, list: SelectorList) -> Value {
+    Value::Selector(SelectorDef::new(
+        list,
+        pos.line as usize,
+        pos.column as usize,
+    ))
 }
 
-named!(selector_value<TokenIter, Value, error::Error>,
-       map_res!(
-           do_parse!(
-               sl: trace_nom!(selector_list) >>
-               (sl.head.pos().clone(), sl)
-           ),
-           vec_to_selector_value
-       )
+make_fn!(
+    selector_value<SliceIter<Token>, Value>,
+    do_each!(
+        sl => trace_nom!(selector_list),
+        (vec_to_selector_value(sl.head.pos().clone(), sl))
+    )
 );
 
-named!(call_expression<TokenIter, Expression, error::Error>,
-       map_res!(
-           do_parse!(
-               macroname: trace_nom!(selector_value) >>
-               punct!("(") >>
-               args: separated_list!(punct!(","), trace_nom!(expression)) >>
-               punct!(")") >>
-               (macroname.pos().clone(), macroname, args)
-           ),
-           tuple_to_call
-       )
-);
+fn call_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expression> {
+    let parsed = do_each!(input,
+        macroname => trace_nom!(selector_value),
+        _ => punct!("("),
+        args => separated!(punct!(","), trace_nom!(expression)),
+        _ => punct!(")"),
+        (macroname.pos().clone(), macroname, args)
+    );
+    match parsed {
+        Result::Abort(e) => Result::Abort(e),
+        Result::Fail(e) => Result::Fail(e),
+        Result::Incomplete(offset) => Result::Incomplete(offset),
+        Result::Complete(rest, (pos, name, args)) => match tuple_to_call(pos, name, args) {
+            Ok(expr) => Result::Complete(rest, expr),
+            Err(e) => Result::Fail(Error::caused_by("Invalid Call Syntax", &rest, Box::new(e))),
+        },
+    }
+}
 
-fn tuple_to_list_op(tpl: (Position, Token, Value, Expression)) -> ParseResult<Expression> {
-    let pos = tpl.0;
-    let t = if &tpl.1.fragment == "map" {
-        ListOpType::Map
-    } else if &tpl.1.fragment == "filter" {
-        ListOpType::Filter
-    } else {
-        return Err(error::Error::new(
-            format!(
-                "Expected one of 'map' or 'filter' but got '{}'",
-                tpl.1.fragment
-            ),
-            error::ErrorType::UnexpectedToken,
-            pos,
-        ));
-    };
-    let macroname = tpl.2;
-    let list = tpl.3;
+fn tuple_to_list_op(
+    pos: Position,
+    kind: ListOpType,
+    macroname: Value,
+    list: Expression,
+) -> ParseResult<Expression> {
     if let Value::Selector(mut def) = macroname {
         // First of all we need to assert that this is a selector of at least
         // two sections.
@@ -680,10 +713,10 @@ fn tuple_to_list_op(tpl: (Position, Token, Value, Expression)) -> ParseResult<Ex
                         "Missing a result field for the macro"
                     );
                 }
-                return Err(error::Error::new(
+                return Err(Error::new(
                     format!("Missing a result field for the macro"),
-                    error::ErrorType::IncompleteParsing,
-                    pos,
+                    // FIXME(jwall): Should have correct offset.
+                    &0,
                 ));
             }
             &mut Some(ref mut tl) => {
@@ -694,10 +727,10 @@ fn tuple_to_list_op(tpl: (Position, Token, Value, Expression)) -> ParseResult<Ex
                             "Missing a result field for the macro"
                         );
                     }
-                    return Err(error::Error::new(
+                    return Err(Error::new(
                         format!("Missing a result field for the macro"),
-                        error::ErrorType::IncompleteParsing,
-                        def.pos.clone(),
+                        // FIXME(jwall): Should have correct offset.
+                        &0,
                     ));
                 }
                 let fname = tl.pop();
@@ -705,7 +738,7 @@ fn tuple_to_list_op(tpl: (Position, Token, Value, Expression)) -> ParseResult<Ex
             }
         };
         return Ok(Expression::ListOp(ListOpDef {
-            typ: t,
+            typ: kind,
             mac: def,
             field: fieldname,
             target: Box::new(list),
@@ -718,152 +751,154 @@ fn tuple_to_list_op(tpl: (Position, Token, Value, Expression)) -> ParseResult<Ex
             format!("Expected a selector but got {}", macroname.type_name())
         );
     }
-    return Err(error::Error::new(
+    return Err(Error::new(
         format!("Expected a selector but got {}", macroname.type_name()),
-        error::ErrorType::UnexpectedToken,
-        pos,
+        // FIXME(jwall): Should have correct offset.
+        &0,
     ));
 }
 
-named!(list_op_expression<TokenIter, Expression, error::Error>,
-    map_res!(
-        do_parse!(
-            pos: pos >>
-            optype: alt!(word!("map") | word!("filter")) >>
-            macroname: trace_nom!(selector_value) >>
-            list: trace_nom!(non_op_expression) >>
-            (pos, optype, macroname, list)
+// FIXME(jwall): need to make this a custom function to parse it.
+make_fn!(
+    list_op_expression<SliceIter<Token>, Expression>,
+    do_each!(
+        pos => pos,
+        optype => either!(
+            do_each!(_ => word!("map"), (ListOpType::Map)),
+            do_each!(_ => word!("filter"), (ListOpType::Filter))
         ),
-        tuple_to_list_op
+        macroname => trace_nom!(selector_value),
+        list => trace_nom!(non_op_expression),
+        (tuple_to_list_op(pos, optype, macroname, list).unwrap())
     )
 );
 
-fn unprefixed_expression(input: TokenIter) -> NomResult<Expression> {
+fn unprefixed_expression(input: SliceIter<Token>) -> NomResult<Expression> {
     let _input = input.clone();
-    let attempt = alt!(input,
-        trace_nom!(call_expression) |
-        trace_nom!(copy_expression) |
-        trace_nom!(format_expression));
-        match attempt {
-            IResult::Incomplete(i) => IResult::Incomplete(i),
-            IResult::Done(rest, expr) => IResult::Done(rest, expr),
-            IResult::Error(_) => trace_nom!(_input, simple_expression),
-        }
+    let attempt = either!(
+        input,
+        trace_nom!(call_expression),
+        trace_nom!(copy_expression),
+        trace_nom!(format_expression)
+    );
+    match attempt {
+        Result::Incomplete(i) => Result::Incomplete(i),
+        Result::Complete(rest, expr) => Result::Complete(rest, expr),
+        Result::Fail(_) => trace_nom!(_input, simple_expression),
+        Result::Abort(e) => Result::Abort(e),
+    }
 }
 
-named!(non_op_expression<TokenIter, Expression, error::Error>,
+make_fn!(
+    non_op_expression<SliceIter<Token>, Expression>,
     alt_peek!(
-         alt!(word!("map") | word!("filter")) => trace_nom!(list_op_expression) |
+         either!(word!("map"), word!("filter")) => trace_nom!(list_op_expression) |
          word!("macro") => trace_nom!(macro_expression) |
          word!("select") => trace_nom!(select_expression) |
          punct!("(") => trace_nom!(grouped_expression) |
          trace_nom!(unprefixed_expression))
 );
 
-fn expression(input: TokenIter) -> NomResult<Expression> {
+fn expression(input: SliceIter<Token>) -> NomResult<Expression> {
     let _input = input.clone();
     match trace_nom!(_input, op_expression) {
-        IResult::Incomplete(i) => IResult::Incomplete(i),
-        IResult::Error(_) => trace_nom!(input, non_op_expression),
-        IResult::Done(rest, expr) => IResult::Done(rest, expr),
+        Result::Incomplete(i) => Result::Incomplete(i),
+        Result::Fail(_) => trace_nom!(input, non_op_expression),
+        Result::Abort(e) => Result::Abort(e),
+        Result::Complete(rest, expr) => Result::Complete(rest, expr),
     }
 }
 
-//named!(expression<TokenIter, Expression, error::Error>,
-//    alt_complete!(trace_nom!(op_expression) | trace_nom!(non_op_expression))
-//);
-
-fn expression_to_statement(v: Expression) -> ParseResult<Statement> {
-    Ok(Statement::Expression(v))
-}
-
-named!(expression_statement<TokenIter, Statement, error::Error>,
-    map_res!(
-        terminated!(trace_nom!(expression), punct!(";")),
-        expression_to_statement
+make_fn!(
+    expression_statement<SliceIter<Token>, Statement>,
+    do_each!(
+        e => do_each!(
+            expr => trace_nom!(expression),
+            _ => punct!(";"),
+            (expr)
+        ),
+        (Statement::Expression(e))
     )
 );
 
-fn tuple_to_let(t: (Token, Expression)) -> ParseResult<Statement> {
-    Ok(Statement::Let(LetDef {
-        name: t.0,
-        value: t.1,
-    }))
+fn tuple_to_let(tok: Token, expr: Expression) -> Statement {
+    Statement::Let(LetDef {
+        name: tok,
+        value: expr,
+    })
 }
 
-named!(let_stmt_body<TokenIter, Statement, error::Error>,
-    map_res!(
-        do_parse!(
-            name: match_type!(BAREWORD) >>
-            punct!("=") >>
-            val: trace_nom!(expression) >>
-            punct!(";") >>
-            (name, val)),
-        tuple_to_let
+make_fn!(
+    let_stmt_body<SliceIter<Token>, Statement>,
+    do_each!(
+        name => match_type!(BAREWORD),
+        _ => punct!("="),
+        val => trace_nom!(expression),
+        _ => punct!(";"),
+        (tuple_to_let(name, val))
     )
 );
 
-named!(let_statement<TokenIter, Statement, error::Error>,
-    wrap_err!(do_parse!(
-        word!("let") >>
-        pos: pos >>
-        stmt: trace_nom!(let_stmt_body) >>
+make_fn!(
+    let_statement<SliceIter<Token>, Statement>,
+    do_each!(
+        _ => word!("let"),
+        stmt => trace_nom!(let_stmt_body),
         (stmt)
-    ), "Invalid let statement")
-);
-
-fn tuple_to_import(t: (Token, Token)) -> ParseResult<Statement> {
-    Ok(Statement::Import(ImportDef {
-        path: t.0,
-        name: t.1,
-    }))
-}
-
-named!(import_stmt_body<TokenIter, Statement, error::Error>,
-    map_res!(
-        do_parse!(
-             path: match_type!(STR) >>
-             word!("as") >>
-             name: match_type!(BAREWORD) >>
-             punct!(";") >>
-             (path, name)),
-       tuple_to_import
     )
 );
 
-named!(import_statement<TokenIter, Statement, error::Error>,
-    wrap_err!(do_parse!(
-        word!("import") >>
+fn tuple_to_import(tok: Token, tok2: Token) -> Statement {
+    Statement::Import(ImportDef {
+        path: tok,
+        name: tok2,
+    })
+}
+
+make_fn!(
+    import_stmt_body<SliceIter<Token>, Statement>,
+    do_each!(
+        path => match_type!(STR),
+        _ => word!("as"),
+        name => match_type!(BAREWORD),
+        _ => punct!(";"),
+        (tuple_to_import(path, name))
+    )
+);
+
+make_fn!(
+    import_statement<SliceIter<Token>, Statement>,
+    do_each!(
+        _ => word!("import"),
         // past this point we know this is supposed to be an import statement.
-        pos: pos >>
-        stmt: trace_nom!(import_stmt_body) >>
+        stmt => trace_nom!(import_stmt_body),
         (stmt)
-    ), "Invalid import statement")
+    )
 );
 
-named!(assert_statement<TokenIter, Statement, error::Error>,
-    wrap_err!(do_parse!(
-        word!("assert") >>
-        pos: pos >>
-        tok: match_type!(PIPEQUOTE) >>
-        punct!(";") >>
-        (Statement::Assert(tok.clone()))
-    ), "Invalid assert statement")
+make_fn!(
+    assert_statement<SliceIter<Token>, Statement>,
+    do_each!(
+        _ => word!("assert"),
+            tok => match_type!(PIPEQUOTE),
+            _ => punct!(";"),
+            (Statement::Assert(tok.clone()))
+    )
 );
 
-named!(out_statement<TokenIter, Statement, error::Error>,
-    wrap_err!(do_parse!(
-        word!("out") >>
-        pos: pos >>
-        typ: match_type!(BAREWORD) >>
-        expr: expression >>
-        punct!(";") >>
+make_fn!(
+    out_statement<SliceIter<Token>, Statement>,
+    do_each!(
+        _ => word!("out"),
+        typ => match_type!(BAREWORD),
+        expr => expression,
+        _ => punct!(";"),
         (Statement::Output(typ.clone(), expr.clone()))
-    ), "Invalid out statement")
+    )
 );
 
 //trace_macros!(true);
-fn statement(i: TokenIter) -> nom::IResult<TokenIter, Statement, error::Error> {
+fn statement(i: SliceIter<Token>) -> Result<SliceIter<Token>, Statement> {
     return alt_peek!(i,
             word!("assert") => trace_nom!(assert_statement) |
             word!("import") => trace_nom!(import_statement) |
@@ -874,48 +909,33 @@ fn statement(i: TokenIter) -> nom::IResult<TokenIter, Statement, error::Error> {
 }
 //trace_macros!(false);
 
-/// Parses a LocatedSpan into a list of Statements or an error::Error.
-pub fn parse(input: LocatedSpan<&str>) -> Result<Vec<Statement>, error::Error> {
-    match tokenize(input) {
+/// Parses a LocatedSpan into a list of Statements or an `abortable_parser::Error`.
+pub fn parse(input: StrIter) -> std::result::Result<Vec<Statement>, Error> {
+    match tokenize(input.clone()) {
         Ok(tokenized) => {
             let mut out = Vec::new();
-            let mut i_ = TokenIter {
-                source: tokenized.as_slice(),
-            };
+            let mut i_ = SliceIter::from(&tokenized);
             loop {
                 let i = i_.clone();
-                if i[0].typ == TokenType::END {
-                    break;
+                if let Some(tok) = i.peek_next() {
+                    if tok.typ == TokenType::END {
+                        break;
+                    }
                 }
-                match statement(i) {
-                    IResult::Error(nom::ErrorKind::Custom(e)) => {
+                match statement(i.clone()) {
+                    Result::Abort(e) => {
                         return Err(e);
                     }
-                    IResult::Error(e) => {
-                        return Err(error::Error::new_with_errorkind(
-                            "Statement Parse error",
-                            error::ErrorType::ParseError,
-                            Position {
-                                line: i_[0].pos.line,
-                                column: i_[0].pos.column,
-                            },
-                            e,
-                        ));
+                    Result::Fail(e) => {
+                        return Err(Error::caused_by("Statement Parse error", &i, Box::new(e)));
                     }
-                    IResult::Incomplete(ei) => {
-                        return Err(error::Error::new(
-                            format!("Unexpected end of parsing input: {:?}", ei),
-                            error::ErrorType::IncompleteParsing,
-                            Position {
-                                line: i_[0].pos.line,
-                                column: i_[0].pos.column,
-                            },
-                        ));
+                    Result::Incomplete(ei) => {
+                        return Err(Error::new("Unexpected end of parsing input: {:?}", &ei));
                     }
-                    IResult::Done(rest, stmt) => {
+                    Result::Complete(rest, stmt) => {
                         out.push(stmt);
                         i_ = rest;
-                        if i_.input_len() == 0 {
+                        if eoi(i).is_complete() {
                             break;
                         }
                     }
@@ -924,11 +944,7 @@ pub fn parse(input: LocatedSpan<&str>) -> Result<Vec<Statement>, error::Error> {
             return Ok(out);
         }
         Err(e) => {
-            return Err(error::Error::new_with_cause(
-                format!("Tokenization Error"),
-                error::ErrorType::ParseError,
-                e,
-            ));
+            return Err(Error::caused_by("Tokenization Error", &input, Box::new(e)));
         }
     }
 }
