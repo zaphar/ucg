@@ -43,13 +43,18 @@ macro_rules! wrap_err {
     ($i:expr, $submac:ident!( $($args:tt)* ), $msg:expr) => {{
         let _i = $i.clone();
         match $submac!(_i, $($args)*) {
-            IResult::Done(rest, mac) => IResult::Done(rest, mac),
-            IResult::Incomplete(i) => IResult::Incomplete(i),
-            IResult::Error(nom::ErrorKind::Custom(cause)) => {
-                let wrapper = error::Error::new_with_cause($msg, error::ErrorType::ParseError, cause);
-                IResult::Error(nom::ErrorKind::Custom(wrapper))
+            Ok((rest, mac)) => Ok((rest, mac)),
+            Err(e) => {
+                let context = match e {
+                    nom::Err::Incomplete(i) => nom::Err::Incomplete(i),
+                    nom::Err::Error(nom::Context::Code((i, e))) => {
+                        let wrapper = error::Error::new_with_cause($msg, error::ErrorType::ParseError, e);
+                        nom::Err::Error(nom::Context::Code((i, wrapper)))
+                    }
+                    nom::Err::Failure(e) => nom::Err::Error(e),
+                };
+                Err(context)
             }
-            IResult::Error(e) => IResult::Error(e),
         }
     }};
 }
@@ -61,7 +66,7 @@ macro_rules! trace_nom {
             if ENABLE_TRACE {
                 eprintln!("Entering Rule: {:?} {:?}", stringify!($rule), $i);
             }
-            let result = $rule($i, $($args)* ); 
+            let result = $rule($i, $($args)* );
             if ENABLE_TRACE {
                 eprintln!("Exiting Rule: {:?} with {:?}", stringify!($rule), result);
             }
@@ -522,8 +527,7 @@ fn tuple_to_macro(mut t: (Position, Vec<Value>, Value)) -> ParseResult<Expressio
                 .map(|s| Positioned {
                     pos: s.pos().clone(),
                     val: s.to_string(),
-                })
-                .collect(),
+                }).collect(),
             fields: v.val,
             pos: t.0,
         })),
@@ -740,15 +744,15 @@ named!(list_op_expression<TokenIter, Expression, error::Error>,
 
 fn unprefixed_expression(input: TokenIter) -> NomResult<Expression> {
     let _input = input.clone();
-    let attempt = alt!(input,
-        trace_nom!(call_expression) |
-        trace_nom!(copy_expression) |
-        trace_nom!(format_expression));
-        match attempt {
-            IResult::Incomplete(i) => IResult::Incomplete(i),
-            IResult::Done(rest, expr) => IResult::Done(rest, expr),
-            IResult::Error(_) => trace_nom!(_input, simple_expression),
-        }
+    let attempt = alt!(
+        input,
+        trace_nom!(call_expression) | trace_nom!(copy_expression) | trace_nom!(format_expression)
+    );
+    match attempt {
+        IResult::Incomplete(i) => IResult::Incomplete(i),
+        IResult::Done(rest, expr) => IResult::Done(rest, expr),
+        IResult::Error(_) => trace_nom!(_input, simple_expression),
+    }
 }
 
 named!(non_op_expression<TokenIter, Expression, error::Error>,
