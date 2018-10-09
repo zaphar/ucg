@@ -16,6 +16,8 @@
 //! operators.
 use std;
 
+use nom;
+use nom::Context::Code;
 use nom::{ErrorKind, IResult, InputIter, InputLength, Slice};
 
 use super::{non_op_expression, NomResult, ParseResult};
@@ -43,60 +45,72 @@ named!(math_op_type<TokenIter, Element, error::Error>,
 fn parse_expression(i: OpListIter) -> IResult<OpListIter, Expression, error::Error> {
     let i_ = i.clone();
     if i_.input_len() == 0 {
-        return IResult::Error(ErrorKind::Custom(error::Error::new(
-            format!("Expected Expression found End Of Input"),
-            error::ErrorType::IncompleteParsing,
-            // TODO(jwall): This position information is incorrect.
-            Position { line: 0, column: 0 },
+        return Err(nom::Err::Error(Code(
+            i_,
+            ErrorKind::Custom(error::Error::new(
+                format!("Expected Expression found End Of Input"),
+                error::ErrorType::IncompleteParsing,
+                // TODO(jwall): This position information is incorrect.
+                Position { line: 0, column: 0 },
+            )),
         )));
     }
     let el = &(i_[0]);
     if let &Element::Expr(ref expr) = el {
-        return IResult::Done(i.slice(1..), expr.clone());
+        return Ok((i.slice(1..), expr.clone()));
     }
-    return IResult::Error(ErrorKind::Custom(error::Error::new(
-        format!(
-            "Error while parsing Binary Expression Unexpected Operator {:?}",
-            el
-        ),
-        error::ErrorType::ParseError,
-        // TODO(jwall): This position information is incorrect.
-        Position { line: 0, column: 0 },
+    return Err(nom::Err::Error(Code(
+        i_.clone(),
+        ErrorKind::Custom(error::Error::new(
+            format!(
+                "Error while parsing Binary Expression Unexpected Operator {:?}",
+                el
+            ),
+            error::ErrorType::ParseError,
+            // TODO(jwall): This position information is incorrect.
+            Position { line: 0, column: 0 },
+        )),
     )));
 }
 
 fn parse_sum_operator(i: OpListIter) -> IResult<OpListIter, BinaryExprType, error::Error> {
     let i_ = i.clone();
     if i_.input_len() == 0 {
-        return IResult::Error(ErrorKind::Custom(error::Error::new(
-            format!("Expected Expression found End Of Input"),
-            error::ErrorType::IncompleteParsing,
-            // TODO(jwall): This position information is incorrect.
-            Position { line: 0, column: 0 },
+        return Err(nom::Err::Error(Code(
+            i_,
+            ErrorKind::Custom(error::Error::new(
+                format!("Expected Expression found End Of Input"),
+                error::ErrorType::IncompleteParsing,
+                // TODO(jwall): This position information is incorrect.
+                Position { line: 0, column: 0 },
+            )),
         )));
     }
     let el = &(i_[0]);
     if let &Element::MathOp(ref op) = el {
         match op {
             &BinaryExprType::Add => {
-                return IResult::Done(i.slice(1..), op.clone());
+                return Ok((i.slice(1..), op.clone()));
             }
             &BinaryExprType::Sub => {
-                return IResult::Done(i.slice(1..), op.clone());
+                return Ok((i.slice(1..), op.clone()));
             }
             _other => {
                 // noop
             }
         };
     }
-    return IResult::Error(ErrorKind::Custom(error::Error::new(
-        format!(
-            "Error while parsing Binary Expression Unexpected Operator {:?}",
-            el
-        ),
-        error::ErrorType::ParseError,
-        // TODO(jwall): This position information is incorrect.
-        Position { line: 0, column: 0 },
+    return Err(nom::Err::Error(Code(
+        i_.clone(),
+        ErrorKind::Custom(error::Error::new(
+            format!(
+                "Error while parsing Binary Expression Unexpected Operator {:?}",
+                el
+            ),
+            error::ErrorType::ParseError,
+            // TODO(jwall): This position information is incorrect.
+            Position { line: 0, column: 0 },
+        )),
     )));
 }
 
@@ -115,35 +129,41 @@ fn tuple_to_binary_expression(
 fn parse_product_operator(i: OpListIter) -> IResult<OpListIter, BinaryExprType, error::Error> {
     let i_ = i.clone();
     if i_.input_len() == 0 {
-        return IResult::Error(ErrorKind::Custom(error::Error::new(
-            format!("Expected Expression found End Of Input"),
-            error::ErrorType::IncompleteParsing,
-            // TODO(jwall): This position information is incorrect.
-            Position { line: 0, column: 0 },
+        return Err(nom::Err::Error(Code(
+            i_,
+            ErrorKind::Custom(error::Error::new(
+                format!("Expected Expression found End Of Input"),
+                error::ErrorType::IncompleteParsing,
+                // TODO(jwall): This position information is incorrect.
+                Position { line: 0, column: 0 },
+            )),
         )));
     }
     let el = &(i_[0]);
     if let &Element::MathOp(ref op) = el {
         match op {
             &BinaryExprType::Mul => {
-                return IResult::Done(i.slice(1..), op.clone());
+                return Ok((i.slice(1..), op.clone()));
             }
             &BinaryExprType::Div => {
-                return IResult::Done(i.slice(1..), op.clone());
+                return Ok((i.slice(1..), op.clone()));
             }
             _other => {
                 // noop
             }
         };
     }
-    return IResult::Error(ErrorKind::Custom(error::Error::new(
-        format!(
-            "Error while parsing Binary Expression Unexpected Operator {:?}",
-            el
-        ),
-        error::ErrorType::ParseError,
-        // TODO(jwall): This position information is incorrect.
-        Position { line: 0, column: 0 },
+    return Err(nom::Err::Error(Code(
+        i_.clone(),
+        ErrorKind::Custom(error::Error::new(
+            format!(
+                "Error while parsing Binary Expression Unexpected Operator {:?}",
+                el
+            ),
+            error::ErrorType::ParseError,
+            // TODO(jwall): This position information is incorrect.
+            Position { line: 0, column: 0 },
+        )),
     )));
 }
 
@@ -227,25 +247,31 @@ named!(compare_op_type<TokenIter, Element, error::Error>,
 fn parse_compare_operator(i: OpListIter) -> IResult<OpListIter, CompareType, error::Error> {
     let i_ = i.clone();
     if i_.input_len() == 0 {
-        return IResult::Error(ErrorKind::Custom(error::Error::new(
-            format!("Expected Expression found End Of Input"),
-            error::ErrorType::IncompleteParsing,
-            // TODO(jwall): This position information is incorrect.
-            Position { line: 0, column: 0 },
+        return Err(nom::Err::Error(Code(
+            i_,
+            ErrorKind::Custom(error::Error::new(
+                format!("Expected Expression found End Of Input"),
+                error::ErrorType::IncompleteParsing,
+                // TODO(jwall): This position information is incorrect.
+                Position { line: 0, column: 0 },
+            )),
         )));
     }
     let el = &(i_[0]);
     if let &Element::CompareOp(ref op) = el {
-        return IResult::Done(i.slice(1..), op.clone());
+        return Ok((i.slice(1..), op.clone()));
     }
-    return IResult::Error(ErrorKind::Custom(error::Error::new(
-        format!(
-            "Error while parsing Binary Expression Unexpected Operator {:?}",
-            el
-        ),
-        error::ErrorType::ParseError,
-        // TODO(jwall): This position information is incorrect.
-        Position { line: 0, column: 0 },
+    return Err(nom::Err::Error(Code(
+        i_.clone(),
+        ErrorKind::Custom(error::Error::new(
+            format!(
+                "Error while parsing Binary Expression Unexpected Operator {:?}",
+                el
+            ),
+            error::ErrorType::ParseError,
+            // TODO(jwall): This position information is incorrect.
+            Position { line: 0, column: 0 },
+        )),
     )));
 }
 
@@ -271,42 +297,50 @@ fn parse_operand_list(i: TokenIter) -> NomResult<Vec<Element>> {
     loop {
         // 2. Parse a non_op_expression.
         match non_op_expression(_i.clone()) {
-            IResult::Error(e) => {
+            Err(nom::Err::Error(ctx)) => {
                 // A failure to parse an expression
                 // is always an error.
-                return IResult::Error(e);
+                return Err(nom::Err::Error(ctx));
             }
-            IResult::Incomplete(i) => {
-                return IResult::Incomplete(i);
+            Err(nom::Err::Failure(ctx)) => {
+                // A failure to parse an expression
+                // is always an error.
+                return Err(nom::Err::Failure(ctx));
             }
-            IResult::Done(rest, expr) => {
+            Err(nom::Err::Incomplete(i)) => {
+                return Err(nom::Err::Incomplete(i));
+            }
+            Ok((rest, expr)) => {
                 list.push(Element::Expr(expr));
                 _i = rest.clone();
             }
         }
         // 3. Parse an operator.
-        match alt!(_i, math_op_type | compare_op_type) {
-            IResult::Error(e) => {
+        match alt!(_i.clone(), math_op_type | compare_op_type) {
+            Err(nom::Err::Error(ctx)) => {
                 if firstrun {
                     // If we don't find an operator in our first
                     // run then this is not an operand list.
-                    return IResult::Error(e);
+                    return Err(nom::Err::Error(ctx));
                 }
                 // if we don't find one on subsequent runs then
                 // that's the end of the operand list.
                 break;
             }
-            IResult::Incomplete(i) => {
-                return IResult::Incomplete(i);
+            Err(nom::Err::Failure(ctx)) => {
+                return Err(nom::Err::Failure(ctx));
             }
-            IResult::Done(rest, el) => {
+            Err(nom::Err::Incomplete(i)) => {
+                return Err(nom::Err::Incomplete(i));
+            }
+            Ok((rest, el)) => {
                 list.push(el);
                 _i = rest.clone();
             }
         }
         firstrun = false;
     }
-    return IResult::Done(_i, list);
+    return Ok((_i, list));
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -397,9 +431,10 @@ impl<'a> InputIter for OpListIter<'a> {
 pub fn op_expression(i: TokenIter) -> NomResult<Expression> {
     let preparse = parse_operand_list(i.clone());
     match preparse {
-        IResult::Error(e) => IResult::Error(e),
-        IResult::Incomplete(i) => IResult::Incomplete(i),
-        IResult::Done(rest, oplist) => {
+        Err(nom::Err::Error(ctx)) => Err(nom::Err::Error(ctx)),
+        Err(nom::Err::Failure(ctx)) => Err(nom::Err::Failure(ctx)),
+        Err(nom::Err::Incomplete(i)) => Err(nom::Err::Incomplete(i)),
+        Ok((rest, oplist)) => {
             let mut i_ = OpListIter {
                 source: oplist.as_slice(),
             };
@@ -410,9 +445,10 @@ pub fn op_expression(i: TokenIter) -> NomResult<Expression> {
             );
 
             match parse_result {
-                IResult::Error(e) => IResult::Error(e),
-                IResult::Incomplete(i) => IResult::Incomplete(i),
-                IResult::Done(_, expr) => IResult::Done(rest.clone(), expr),
+                Err(nom::Err::Error(Code(_, e))) => Err(nom::Err::Error(Code(rest.clone(), e))),
+                Err(nom::Err::Failure(Code(_, e))) => Err(nom::Err::Failure(Code(rest.clone(), e))),
+                Err(nom::Err::Incomplete(i)) => Err(nom::Err::Incomplete(i)),
+                Ok((_, expr)) => Ok((rest.clone(), expr)),
             }
         }
     }

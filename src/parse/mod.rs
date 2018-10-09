@@ -17,7 +17,7 @@ use std::borrow::Borrow;
 use std::str::FromStr;
 
 use nom;
-use nom::IResult;
+use nom::Context::Code;
 use nom::InputLength;
 use nom_locate::LocatedSpan;
 
@@ -42,16 +42,18 @@ macro_rules! wrap_err {
 
     ($i:expr, $submac:ident!( $($args:tt)* ), $msg:expr) => {{
         let _i = $i.clone();
+        use nom::Context::Code;
         match $submac!(_i, $($args)*) {
             Ok((rest, mac)) => Ok((rest, mac)),
             Err(e) => {
                 let context = match e {
                     nom::Err::Incomplete(i) => nom::Err::Incomplete(i),
-                    nom::Err::Error(nom::Context::Code((i, e))) => {
-                        let wrapper = error::Error::new_with_cause($msg, error::ErrorType::ParseError, e);
-                        nom::Err::Error(nom::Context::Code((i, wrapper)))
+                    nom::Err::Error(Code(i, e)) => {
+                        // TODO(jwall): This is a little ugly. Can we fix the position handling?
+                        let wrapper = error::Error::new_with_errorkind($msg, error::ErrorType::ParseError, try!(pos(i.clone())).1, e);
+                        nom::Err::Error(Code(i, nom::ErrorKind::Custom(wrapper)))
                     }
-                    nom::Err::Failure(e) => nom::Err::Error(e),
+                    nom::Err::Failure(ctx) => nom::Err::Error(ctx),
                 };
                 Err(context)
             }
@@ -113,6 +115,94 @@ named!(quoted_value<TokenIter, Value, error::Error>,
        match_type!(STR => str_to_value)
 );
 
+/// alt_peek conditionally runs a combinator if a lookahead combinator matches.
+macro_rules! alt_peek {
+    (__inner $i:expr, $peekrule:ident!( $($peekargs:tt)* ) => $parserule:ident | $($rest:tt)* ) => (
+        alt_peek!(__inner $i, $peekrule!($($peekargs)*) => call!($parserule) | $($rest)* )
+    );
+
+    (__inner $i:expr, $peekrule:ident => $($rest:tt)* ) => (
+        alt_peek!(__inner $i, call!($peekrule) => $($rest)* )
+    );
+
+    (__inner $i:expr, $peekrule:ident!( $($peekargs:tt)* ) => $parserule:ident!( $($parseargs:tt)* ) | $($rest:tt)* ) => (
+        {
+            let _i = $i.clone();
+            let pre_res = peek!(_i, $peekrule!($($peekargs)*));
+            match pre_res {
+                // if the peek was incomplete then it might still match so return incomplete.
+                Err(nom::Err::Incomplete(i)) => Err(nom::Err::Incomplete(i)),
+                // If the peek was in error then try the next peek => parse pair.
+                Err(nom::Err::Error(_ctx)) => {
+                    alt_peek!(__inner $i, $($rest)*)
+                },
+                // Failures are a hard abort. Don't keep parsing.
+                Err(nom::Err::Failure(ctx)) => Err(nom::Err::Failure(ctx)),
+                // If the peek was successful then return the result of the parserule
+                // regardless of it's result.
+                Ok((_i, _)) => {
+                    $parserule!(_i, $($parseargs)*)
+                },
+            }
+        }
+    );
+
+    // These are our no fallback termination cases.
+    (__inner $i:expr, $peekrule:ident!( $($peekargs:tt)* ) => $parserule:ident, __end ) => (
+        alt_peek!(__inner $i, $peekrule!($($peekargs)*) => call!($parserule), __end )
+    );
+
+    (__inner $i:expr, $peekrule:ident!( $($peekargs:tt)* ) => $parserule:ident!( $($parseargs:tt)* ), __end ) => (
+        {
+            let _i = $i.clone();
+            let pre_res = peek!(_i, $peekrule!($($peekargs)*));
+            match pre_res {
+                // if the peek was incomplete then it might still match so return incomplete.
+                Err(nom::Err::Incomplete(i)) => Err(nom::Err::Incomplete(i)),
+                // If the peek was in error then try the next peek => parse pair.
+                Err(nom::Err::Error(_)) =>  {
+                    alt_peek!(__inner $i, __end)
+                },
+                Err(nom::Err::Failure(ctx)) => Err(nom::Err::Failure(ctx)),
+                // If the peek was successful then return the result of the parserule
+                // regardless of it's result.
+                Ok((_i, _)) => {
+                    $parserule!(_i, $($parseargs)*)
+                },
+            }
+        }
+    );
+
+    // These are our fallback termination cases.
+    (__inner $i:expr, $fallback:ident, __end) => (
+        {
+            let _i = $i.clone();
+            call!(_i, $fallback)
+        }
+    );
+    // In the case of a fallback rule with no peek we just return whatever
+    // the fallback rule returns.
+    (__inner $i:expr, $fallback:ident!( $($args:tt)* ), __end) => (
+        {
+            let _i = $i.clone();
+            $fallback!(_i, $($args)*)
+        }
+    );
+
+    // This is our default termination case.
+    // If there is no fallback then we return an Error.
+    (__inner $i:expr, __end) => {
+        // TODO(jwall): We should do a better custom error here.
+        Err(nom::Err::Error(error_position!($i, nom::ErrorKind::Alt)))
+    };
+
+    // alt_peek entry_point.
+    ($i:expr, $($rest:tt)*) => {
+        // We use __end to define the termination token the recursive rule should consume.
+        alt_peek!(__inner $i, $($rest)*, __end)
+    };
+}
+
 // Helper function to make the return types work for down below.
 fn triple_to_number(v: (Option<Token>, Option<Token>, Option<Token>)) -> ParseResult<Value> {
     let (pref, mut pref_pos) = match v.0 {
@@ -161,129 +251,68 @@ fn triple_to_number(v: (Option<Token>, Option<Token>, Option<Token>)) -> ParseRe
     return Ok(Value::Float(value_node!(f, pref_pos)));
 }
 
-/// alt_peek conditionally runs a combinator if a lookahead combinator matches.
-macro_rules! alt_peek {
-    (__inner $i:expr, $peekrule:ident!( $($peekargs:tt)* ) => $parserule:ident | $($rest:tt)* ) => (
-        alt_peek!(__inner $i, $peekrule!($($peekargs)*) => call!($parserule) | $($rest)* )
-    );
-
-    (__inner $i:expr, $peekrule:ident => $($rest:tt)* ) => (
-        alt_peek!(__inner $i, call!($peekrule) => $($rest)* )
-    );
-
-    (__inner $i:expr, $peekrule:ident!( $($peekargs:tt)* ) => $parserule:ident!( $($parseargs:tt)* ) | $($rest:tt)* ) => (
-        {
-            let _i = $i.clone();
-            let pre_res = peek!(_i, $peekrule!($($peekargs)*));
-            match pre_res {
-                // if the peek was incomplete then it might still match so return incomplete.
-                nom::IResult::Incomplete(i) => nom::IResult::Incomplete(i),
-                // If the peek was in error then try the next peek => parse pair.
-                nom::IResult::Error(_) =>  {
-                    alt_peek!(__inner $i, $($rest)*)
-                },
-                // If the peek was successful then return the result of the parserule
-                // regardless of it's result.
-                nom::IResult::Done(_i, _) => {
-                    $parserule!(_i, $($parseargs)*)
-                },
-            }
+macro_rules! try_number {
+    ($ctx:expr, $res:expr) => {{
+        use nom::Context::Code;
+        // Failures abort processing and returned immediately.
+        if let Err(nom::Err::Failure(ctx)) = $res {
+            return Err(nom::Err::Failure(ctx));
         }
-    );
-
-    // These are our no fallback termination cases.
-    (__inner $i:expr, $peekrule:ident!( $($peekargs:tt)* ) => $parserule:ident, __end ) => (
-        alt_peek!(__inner $i, $peekrule!($($peekargs)*) => call!($parserule), __end )
-    );
-
-    (__inner $i:expr, $peekrule:ident!( $($peekargs:tt)* ) => $parserule:ident!( $($parseargs:tt)* ), __end ) => (
-        {
-            let _i = $i.clone();
-            let pre_res = peek!(_i, $peekrule!($($peekargs)*));
-            match pre_res {
-                // if the peek was incomplete then it might still match so return incomplete.
-                nom::IResult::Incomplete(i) => nom::IResult::Incomplete(i),
-                // If the peek was in error then try the next peek => parse pair.
-                nom::IResult::Error(_) =>  {
-                    alt_peek!(__inner $i, __end)
-                },
-                // If the peek was successful then return the result of the parserule
-                // regardless of it's result.
-                nom::IResult::Done(_i, _) => {
-                    $parserule!(_i, $($parseargs)*)
-                },
-            }
+        // Successes abort processing and return immediately.
+        if let Ok((rest, tpl)) = $res {
+            return match triple_to_number(tpl) {
+                Ok(val) => Ok((rest, val)),
+                Err(e) => Err(nom::Err::Error(Code(
+                    $ctx.clone(),
+                    nom::ErrorKind::Custom(e),
+                ))),
+            };
         }
-    );
-
-    // These are our fallback termination cases.
-    (__inner $i:expr, $fallback:ident, __end) => (
-        {
-            let _i = $i.clone();
-            call!(_i, $fallback)
-        }
-    );
-    // In the case of a fallback rule with no peek we just return whatever
-    // the fallback rule returns.
-    (__inner $i:expr, $fallback:ident!( $($args:tt)* ), __end) => (
-        {
-            let _i = $i.clone();
-            $fallback!(_i, $($args)*)
-        }
-    );
-
-    // This is our default termination case.
-    // If there is no fallback then we return an Error.
-    (__inner $i:expr, __end) => {
-        // TODO(jwall): We should do a better custom error here.
-        nom::IResult::Error(error_position!(nom::ErrorKind::Alt,$i))
-    };
-
-    // alt_peek entry_point.
-    ($i:expr, $($rest:tt)*) => {
-        // We use __end to define the termination token the recursive rule should consume.
-        alt_peek!(__inner $i, $($rest)*, __end)
-    };
+        // If we get an incomplete or an error we'll try the next one.
+    }};
 }
 
-// trace_macros!(true);
-
-// NOTE(jwall): HERE THERE BE DRAGONS. The order for these matters
-// alot. We need to process alternatives in order of decreasing
-// specificity.  Unfortunately this means we are required to go in a
-// decreasing size order which messes with alt!'s completion logic. To
-// work around this we have to force Incomplete to be Error so that
-// alt! will try the next in the series instead of aborting.
-//
-// *IMPORTANT*
-// It also means this combinator is risky when used with partial
-// inputs. So handle with care.
-named!(number<TokenIter, Value, error::Error>,
-       map_res!(alt!(
-           complete!(do_parse!( // 1.0
-               prefix: match_type!(DIGIT) >>
-               has_dot: punct!(".") >>
-               suffix: match_type!(DIGIT) >>
-               (Some(prefix.clone()), Some(has_dot.clone()), Some(suffix.clone()))
-           )) |
-           complete!(do_parse!( // 1.
-               prefix: match_type!(DIGIT) >>
-               has_dot: punct!(".") >>
-               (Some(prefix.clone()), Some(has_dot.clone()), None)
-           )) |
-           complete!(do_parse!( // .1
-               has_dot: punct!(".") >>
-               suffix: match_type!(DIGIT) >>
-               (None, Some(has_dot.clone()), Some(suffix.clone()))
-           )) |
-           do_parse!( // 1
-               prefix: match_type!(DIGIT) >>
-               (Some(prefix.clone()), None, None)
-           )),
-           triple_to_number
-       )
-);
-// trace_macros!(false);
+fn number(i: TokenIter) -> NomResult<Value> {
+    let full = do_parse!(
+        i.clone(), // 1.0
+        prefix: match_type!(DIGIT)
+            >> has_dot: punct!(".")
+            >> suffix: match_type!(DIGIT)
+            >> (
+                Some(prefix.clone()),
+                Some(has_dot.clone()),
+                Some(suffix.clone())
+            )
+    );
+    try_number!(i, full);
+    let left_partial = do_parse!(
+        i.clone(), // 1.
+        prefix: match_type!(DIGIT)
+            >> has_dot: punct!(".")
+            >> (Some(prefix.clone()), Some(has_dot.clone()), None)
+    );
+    try_number!(i, left_partial);
+    let right_partial = do_parse!(
+        i.clone(), // .1
+        has_dot: punct!(".")
+            >> suffix: match_type!(DIGIT)
+            >> (None, Some(has_dot.clone()), Some(suffix.clone()))
+    );
+    try_number!(i, right_partial);
+    let int_num = do_parse!(
+        i.clone(), // 1
+        prefix: match_type!(DIGIT) >> (Some(prefix.clone()), None, None)
+    );
+    try_number!(i, int_num);
+    Err(nom::Err::Error(Code(
+        i.clone(),
+        nom::ErrorKind::Custom(error::Error::new(
+            "Not a Number",
+            error::ErrorType::ParseError,
+            i.token_pos(),
+        )),
+    )))
+}
 
 named!(boolean_value<TokenIter, Value, error::Error>,
     do_parse!(
@@ -406,34 +435,44 @@ fn symbol_or_expression(input: TokenIter) -> NomResult<Expression> {
     let scalar_head = do_parse!(input, sym: alt!(symbol | compound_value) >> (sym));
 
     match scalar_head {
-        IResult::Incomplete(i) => IResult::Incomplete(i),
-        IResult::Error(_) => grouped_expression(input),
-        IResult::Done(rest, val) => {
-            let res = peek!(rest.clone(), punct!("."));
+        Err(nom::Err::Incomplete(i)) => Err(nom::Err::Incomplete(i)),
+        Err(nom::Err::Failure(ctx)) => Err(nom::Err::Failure(ctx)),
+        Err(nom::Err::Error(_)) => grouped_expression(input),
+        Ok((rest, val)) => {
+            let res: NomResult<Token> = peek!(rest.clone(), punct!("."));
+            // NOTE(jwall): We ignore the failure case below because it's nonsensical
+            // for a peek on a single character. If the above ever becomes not a single
+            // character then we would want to handle the Failure state below.
             match val {
                 Value::Tuple(_) => {
-                    if res.is_done() {
-                        IResult::Done(rest, Expression::Simple(val))
+                    if res.is_ok() {
+                        Ok((rest, Expression::Simple(val)))
                     } else {
-                        return IResult::Error(nom::ErrorKind::Custom(error::Error::new(
-                            "Expected (.) but no dot found".to_string(),
-                            error::ErrorType::IncompleteParsing,
-                            val.pos().clone(),
+                        return Err(nom::Err::Error(Code(
+                            rest,
+                            nom::ErrorKind::Custom(error::Error::new(
+                                "Expected (.) but no dot found".to_string(),
+                                error::ErrorType::IncompleteParsing,
+                                val.pos().clone(),
+                            )),
                         )));
                     }
                 }
                 Value::List(_) => {
-                    if res.is_done() {
-                        IResult::Done(rest, Expression::Simple(val))
+                    if res.is_ok() {
+                        Ok((rest, Expression::Simple(val)))
                     } else {
-                        return IResult::Error(nom::ErrorKind::Custom(error::Error::new(
-                            "Expected (.) but no dot found".to_string(),
-                            error::ErrorType::IncompleteParsing,
-                            val.pos().clone(),
+                        return Err(nom::Err::Error(Code(
+                            rest,
+                            nom::ErrorKind::Custom(error::Error::new(
+                                "Expected (.) but no dot found".to_string(),
+                                error::ErrorType::IncompleteParsing,
+                                val.pos().clone(),
+                            )),
                         )));
                     }
                 }
-                _ => IResult::Done(rest, Expression::Simple(val)),
+                _ => Ok((rest, Expression::Simple(val))),
             }
         }
     }
@@ -441,21 +480,23 @@ fn symbol_or_expression(input: TokenIter) -> NomResult<Expression> {
 
 fn selector_list(input: TokenIter) -> NomResult<SelectorList> {
     let (rest, head) = match symbol_or_expression(input) {
-        IResult::Done(rest, val) => (rest, val),
-        IResult::Error(e) => {
-            return IResult::Error(e);
+        Ok((rest, val)) => (rest, val),
+        Err(nom::Err::Error(ctx)) => {
+            return Err(nom::Err::Error(ctx));
         }
-        IResult::Incomplete(i) => {
-            return IResult::Incomplete(i);
+        Err(nom::Err::Failure(ctx)) => {
+            return Err(nom::Err::Failure(ctx));
+        }
+        Err(nom::Err::Incomplete(i)) => {
+            return Err(nom::Err::Incomplete(i));
         }
     };
 
     let (rest, is_dot) = match punct!(rest, ".") {
-        IResult::Done(rest, tok) => (rest, Some(tok)),
-        IResult::Incomplete(i) => {
-            return IResult::Incomplete(i);
-        }
-        IResult::Error(_) => (rest, None),
+        Ok((rest, tok)) => (rest, Some(tok)),
+        Err(nom::Err::Incomplete(i)) => return Err(nom::Err::Incomplete(i)),
+        Err(nom::Err::Error(_)) => (rest, None),
+        Err(nom::Err::Failure(ctx)) => return Err(nom::Err::Failure(ctx)),
     };
 
     let (rest, list) = if is_dot.is_some() {
@@ -464,20 +505,26 @@ fn selector_list(input: TokenIter) -> NomResult<SelectorList> {
             punct!("."),
             alt!(match_type!(BAREWORD) | match_type!(DIGIT) | match_type!(STR))
         ) {
-            IResult::Done(rest, val) => (rest, val),
-            IResult::Incomplete(i) => {
-                return IResult::Incomplete(i);
+            Ok((rest, val)) => (rest, val),
+            Err(nom::Err::Incomplete(i)) => {
+                return Err(nom::Err::Incomplete(i));
             }
-            IResult::Error(e) => {
-                return IResult::Error(e);
+            Err(nom::Err::Error(ctx)) => {
+                return Err(nom::Err::Error(ctx));
+            }
+            Err(nom::Err::Failure(ctx)) => {
+                return Err(nom::Err::Failure(ctx));
             }
         };
 
         if list.is_empty() {
-            return IResult::Error(nom::ErrorKind::Custom(error::Error::new(
-                "(.) with no selector fields after".to_string(),
-                error::ErrorType::IncompleteParsing,
-                is_dot.unwrap().pos,
+            return Err(nom::Err::Error(Code(
+                rest,
+                nom::ErrorKind::Custom(error::Error::new(
+                    "(.) with no selector fields after".to_string(),
+                    error::ErrorType::IncompleteParsing,
+                    is_dot.unwrap().pos,
+                )),
             )));
         } else {
             (rest, Some(list))
@@ -491,7 +538,7 @@ fn selector_list(input: TokenIter) -> NomResult<SelectorList> {
         tail: list,
     };
 
-    return IResult::Done(rest, sel_list);
+    return Ok((rest, sel_list));
 }
 
 fn tuple_to_copy(t: (SelectorDef, FieldList)) -> ParseResult<Expression> {
@@ -749,9 +796,10 @@ fn unprefixed_expression(input: TokenIter) -> NomResult<Expression> {
         trace_nom!(call_expression) | trace_nom!(copy_expression) | trace_nom!(format_expression)
     );
     match attempt {
-        IResult::Incomplete(i) => IResult::Incomplete(i),
-        IResult::Done(rest, expr) => IResult::Done(rest, expr),
-        IResult::Error(_) => trace_nom!(_input, simple_expression),
+        Err(nom::Err::Incomplete(i)) => Err(nom::Err::Incomplete(i)),
+        Err(nom::Err::Failure(ctx)) => Err(nom::Err::Failure(ctx)),
+        Err(nom::Err::Error(_)) => trace_nom!(_input, simple_expression),
+        Ok((rest, expr)) => Ok((rest, expr)),
     }
 }
 
@@ -767,9 +815,10 @@ named!(non_op_expression<TokenIter, Expression, error::Error>,
 fn expression(input: TokenIter) -> NomResult<Expression> {
     let _input = input.clone();
     match trace_nom!(_input, op_expression) {
-        IResult::Incomplete(i) => IResult::Incomplete(i),
-        IResult::Error(_) => trace_nom!(input, non_op_expression),
-        IResult::Done(rest, expr) => IResult::Done(rest, expr),
+        Err(nom::Err::Incomplete(i)) => Err(nom::Err::Incomplete(i)),
+        Err(nom::Err::Failure(ctx)) => Err(nom::Err::Failure(ctx)),
+        Err(nom::Err::Error(_)) => trace_nom!(input, non_op_expression),
+        Ok((rest, expr)) => Ok((rest, expr)),
     }
 }
 
@@ -810,7 +859,6 @@ named!(let_stmt_body<TokenIter, Statement, error::Error>,
 named!(let_statement<TokenIter, Statement, error::Error>,
     wrap_err!(do_parse!(
         word!("let") >>
-        pos: pos >>
         stmt: trace_nom!(let_stmt_body) >>
         (stmt)
     ), "Invalid let statement")
@@ -839,7 +887,6 @@ named!(import_statement<TokenIter, Statement, error::Error>,
     wrap_err!(do_parse!(
         word!("import") >>
         // past this point we know this is supposed to be an import statement.
-        pos: pos >>
         stmt: trace_nom!(import_stmt_body) >>
         (stmt)
     ), "Invalid import statement")
@@ -848,7 +895,6 @@ named!(import_statement<TokenIter, Statement, error::Error>,
 named!(assert_statement<TokenIter, Statement, error::Error>,
     wrap_err!(do_parse!(
         word!("assert") >>
-        pos: pos >>
         tok: match_type!(PIPEQUOTE) >>
         punct!(";") >>
         (Statement::Assert(tok.clone()))
@@ -858,7 +904,6 @@ named!(assert_statement<TokenIter, Statement, error::Error>,
 named!(out_statement<TokenIter, Statement, error::Error>,
     wrap_err!(do_parse!(
         word!("out") >>
-        pos: pos >>
         typ: match_type!(BAREWORD) >>
         expr: expression >>
         punct!(";") >>
@@ -892,10 +937,13 @@ pub fn parse(input: LocatedSpan<&str>) -> Result<Vec<Statement>, error::Error> {
                     break;
                 }
                 match statement(i) {
-                    IResult::Error(nom::ErrorKind::Custom(e)) => {
+                    Err(nom::Err::Error(Code(_, nom::ErrorKind::Custom(e)))) => {
                         return Err(e);
                     }
-                    IResult::Error(e) => {
+                    Err(nom::Err::Failure(Code(_, nom::ErrorKind::Custom(e)))) => {
+                        return Err(e);
+                    }
+                    Err(nom::Err::Error(Code(_, e))) => {
                         return Err(error::Error::new_with_errorkind(
                             "Statement Parse error",
                             error::ErrorType::ParseError,
@@ -906,7 +954,18 @@ pub fn parse(input: LocatedSpan<&str>) -> Result<Vec<Statement>, error::Error> {
                             e,
                         ));
                     }
-                    IResult::Incomplete(ei) => {
+                    Err(nom::Err::Failure(Code(_, e))) => {
+                        return Err(error::Error::new_with_errorkind(
+                            "Statement Parse error",
+                            error::ErrorType::ParseError,
+                            Position {
+                                line: i_[0].pos.line,
+                                column: i_[0].pos.column,
+                            },
+                            e,
+                        ));
+                    }
+                    Err(nom::Err::Incomplete(ei)) => {
                         return Err(error::Error::new(
                             format!("Unexpected end of parsing input: {:?}", ei),
                             error::ErrorType::IncompleteParsing,
@@ -916,7 +975,7 @@ pub fn parse(input: LocatedSpan<&str>) -> Result<Vec<Statement>, error::Error> {
                             },
                         ));
                     }
-                    IResult::Done(rest, stmt) => {
+                    Ok((rest, stmt)) => {
                         out.push(stmt);
                         i_ = rest;
                         if i_.input_len() == 0 {

@@ -98,7 +98,11 @@ impl Error {
             e => Self::new_with_cause(
                 msg,
                 t,
-                Error::new(format!("ErrorKind: {}", e), ErrorType::Unsupported, pos),
+                Error::new(
+                    format!("ErrorKind: {}", e.description()),
+                    ErrorType::Unsupported,
+                    pos,
+                ),
             ),
         }
     }

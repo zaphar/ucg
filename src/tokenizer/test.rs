@@ -3,10 +3,17 @@ use nom;
 use nom_locate::LocatedSpan;
 
 #[test]
+fn test_whitespace() {
+    //let result = whitespace(LocatedSpan::new("  \n\t"));
+    let result = take_while!(LocatedSpan::new("  f"), is_ws);
+    assert!(result.is_ok(), format!("result {:?} is not ok", result));
+}
+
+#[test]
 fn test_empty_token() {
     let result = emptytok(LocatedSpan::new("NULL "));
-    assert!(result.is_done(), format!("result {:?} is not done", result));
-    if let nom::IResult::Done(_, tok) = result {
+    assert!(result.is_ok(), format!("result {:?} is not ok", result));
+    if let Ok((_, tok)) = result {
         assert_eq!(tok.fragment, "NULL");
         assert_eq!(tok.typ, TokenType::EMPTY);
     }
@@ -15,9 +22,29 @@ fn test_empty_token() {
 #[test]
 fn test_assert_token() {
     let result = asserttok(LocatedSpan::new("assert "));
-    assert!(result.is_done(), format!("result {:?} is not done", result));
-    if let nom::IResult::Done(_, tok) = result {
+    assert!(result.is_ok(), format!("result {:?} is not ok", result));
+    if let Ok((_, tok)) = result {
         assert_eq!(tok.fragment, "assert");
+        assert_eq!(tok.typ, TokenType::BAREWORD);
+    }
+}
+
+#[test]
+fn test_let_token() {
+    let result = lettok(LocatedSpan::new("let "));
+    assert!(result.is_ok(), format!("result {:?} is not ok", result));
+    if let Ok((_, tok)) = result {
+        assert_eq!(tok.fragment, "let");
+        assert_eq!(tok.typ, TokenType::BAREWORD);
+    }
+}
+
+#[test]
+fn test_filter_token() {
+    let result = filtertok(LocatedSpan::new("filter "));
+    assert!(result.is_ok(), format!("result {:?} is not ok", result));
+    if let Ok((_, tok)) = result {
+        assert_eq!(tok.fragment, "filter");
         assert_eq!(tok.typ, TokenType::BAREWORD);
     }
 }
@@ -25,8 +52,8 @@ fn test_assert_token() {
 #[test]
 fn test_out_token() {
     let result = outtok(LocatedSpan::new("out "));
-    assert!(result.is_done(), format!("result {:?} is not done", result));
-    if let nom::IResult::Done(_, tok) = result {
+    assert!(result.is_ok(), format!("result {:?} is not ok", result));
+    if let Ok((_, tok)) = result {
         assert_eq!(tok.fragment, "out");
         assert_eq!(tok.typ, TokenType::BAREWORD);
     }
@@ -35,8 +62,8 @@ fn test_out_token() {
 #[test]
 fn test_escape_quoted() {
     let result = escapequoted(LocatedSpan::new("foo \\\"bar\""));
-    assert!(result.is_done(), format!("result {:?} is not ok", result));
-    if let nom::IResult::Done(rest, frag) = result {
+    assert!(result.is_ok(), format!("result {:?} is not ok", result));
+    if let Ok((rest, frag)) = result {
         assert_eq!(frag, "foo \"bar");
         assert_eq!(rest.fragment, "\"");
     }
@@ -45,8 +72,8 @@ fn test_escape_quoted() {
 #[test]
 fn test_pipe_quoted() {
     let result = pipequotetok(LocatedSpan::new("|foo|"));
-    assert!(result.is_done(), format!("result {:?} is not ok", result));
-    if let nom::IResult::Done(_, tok) = result {
+    assert!(result.is_ok(), format!("result {:?} is not ok", result));
+    if let Ok((_, tok)) = result {
         assert_eq!(tok.fragment, "foo".to_string());
         assert_eq!(tok.typ, TokenType::PIPEQUOTE);
     }
@@ -55,8 +82,8 @@ fn test_pipe_quoted() {
 #[test]
 fn test_string_with_escaping() {
     let result = strtok(LocatedSpan::new("\"foo \\\\ \\\"bar\""));
-    assert!(result.is_done(), format!("result {:?} is not ok", result));
-    if let nom::IResult::Done(_, tok) = result {
+    assert!(result.is_ok(), format!("result {:?} is not ok", result));
+    if let Ok((_, tok)) = result {
         assert_eq!(tok.fragment, "foo \\ \"bar".to_string());
     }
 }
@@ -75,10 +102,10 @@ macro_rules! assert_token {
     ($input:expr, $typ:expr, $msg:expr) => {
         let result = token(LocatedSpan::new($input));
         assert!(
-            result.is_done(),
+            result.is_ok(),
             format!("result {:?} is not a {}", result, $msg)
         );
-        if let nom::IResult::Done(_, tok) = result {
+        if let Ok((_, tok)) = result {
             assert_eq!(tok.fragment, $input);
             assert_eq!(tok.typ, $typ);
         }
@@ -146,11 +173,11 @@ fn test_parse_has_end() {
 
 #[test]
 fn test_parse_comment() {
-    assert!(comment(LocatedSpan::new("// comment\n")).is_done());
-    assert!(comment(LocatedSpan::new("// comment")).is_done());
+    assert!(comment(LocatedSpan::new("// comment\n")).is_ok());
+    assert!(comment(LocatedSpan::new("// comment")).is_ok());
     assert_eq!(
         comment(LocatedSpan::new("// comment\n")),
-        nom::IResult::Done(
+        Ok((
             LocatedSpan {
                 fragment: "",
                 offset: 11,
@@ -161,12 +188,12 @@ fn test_parse_comment() {
                 fragment: " comment".to_string(),
                 pos: Position { line: 1, column: 1 },
             }
-        )
+        ))
     );
-    assert!(comment(LocatedSpan::new("// comment\r\n")).is_done());
+    assert!(comment(LocatedSpan::new("// comment\r\n")).is_ok());
     assert_eq!(
         comment(LocatedSpan::new("// comment\r\n")),
-        nom::IResult::Done(
+        Ok((
             LocatedSpan {
                 fragment: "",
                 offset: 12,
@@ -177,12 +204,12 @@ fn test_parse_comment() {
                 fragment: " comment".to_string(),
                 pos: Position { column: 1, line: 1 },
             }
-        )
+        ))
     );
-    assert!(comment(LocatedSpan::new("// comment\r\n ")).is_done());
+    assert!(comment(LocatedSpan::new("// comment\r\n ")).is_ok());
     assert_eq!(
         comment(LocatedSpan::new("// comment\r\n ")),
-        nom::IResult::Done(
+        Ok((
             LocatedSpan {
                 fragment: " ",
                 offset: 12,
@@ -193,9 +220,9 @@ fn test_parse_comment() {
                 fragment: " comment".to_string(),
                 pos: Position { column: 1, line: 1 },
             }
-        )
+        ))
     );
-    assert!(comment(LocatedSpan::new("// comment")).is_done());
+    assert!(comment(LocatedSpan::new("// comment")).is_ok());
 }
 
 #[test]
@@ -212,7 +239,7 @@ fn test_match_word() {
         "foo"
     );
     match result {
-        nom::IResult::Done(_, tok) => assert_eq!(tok, input[0]),
+        Ok((_, tok)) => assert_eq!(tok, input[0]),
         res => assert!(false, format!("Fail: {:?}", res)),
     }
 }
@@ -231,11 +258,12 @@ fn test_match_word_empty_input() {
         "foo"
     );
     match result {
-        nom::IResult::Done(_, _) => assert!(false, "Should have been an error but was Done"),
-        nom::IResult::Incomplete(_) => {
+        Ok((_, _)) => assert!(false, "Should have been an error but was Done"),
+        Err(nom::Err::Incomplete(_)) => {
             assert!(false, "Should have been an error but was Incomplete")
         }
-        nom::IResult::Error(_) => {
+        Err(nom::Err::Failure(_)) => assert!(false, "Should have been an error but was Failure"),
+        Err(nom::Err::Error(_)) => {
             // noop
         }
     }
@@ -255,7 +283,7 @@ fn test_match_punct() {
         "!"
     );
     match result {
-        nom::IResult::Done(_, tok) => assert_eq!(tok, input[0]),
+        Ok((_, tok)) => assert_eq!(tok, input[0]),
         res => assert!(false, format!("Fail: {:?}", res)),
     }
 }
@@ -274,7 +302,7 @@ fn test_match_type() {
         BAREWORD
     );
     match result {
-        nom::IResult::Done(_, tok) => assert_eq!(tok, input[0]),
+        Ok((_, tok)) => assert_eq!(tok, input[0]),
         res => assert!(false, format!("Fail: {:?}", res)),
     }
 }

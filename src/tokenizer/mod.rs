@@ -16,7 +16,7 @@
 use ast::*;
 use error;
 use nom;
-use nom::{alpha, digit, is_alphanumeric, multispace};
+use nom::{alpha, digit, is_alphanumeric};
 use nom::{InputIter, InputLength, Slice};
 use nom_locate::LocatedSpan;
 use std;
@@ -49,14 +49,14 @@ fn escapequoted(input: Span) -> nom::IResult<Span, String> {
         } else if c == '"' && !escape {
             // Bail if this is an unescaped "
             // we exit here.
-            return nom::IResult::Done(input.slice(i..), frag);
+            return Ok((input.slice(i..), frag));
         } else {
             // we accumulate this character.
             frag.push(c);
             escape = false; // reset our escaping sentinel
         }
     }
-    return nom::IResult::Incomplete(nom::Needed::Unknown);
+    return Err(nom::Err::Incomplete(nom::Needed::Unknown));
 }
 
 named!(strtok( Span ) -> Token,
@@ -136,21 +136,26 @@ macro_rules! do_tag_tok {
     ($i:expr, $type:expr, $tag:expr,WS) => {
         do_parse!(
             $i,
-            span: position!() >> frag: tag!($tag) >> alt!(whitespace | comment) >> (Token {
-                typ: $type,
-                pos: Position::from(span),
-                fragment: frag.fragment.to_string(),
-            })
+            span: position!()
+                >> frag: tag!($tag)
+                >> alt!(whitespace | comment)
+                >> (Token {
+                    typ: $type,
+                    pos: Position::from(span),
+                    fragment: frag.fragment.to_string(),
+                })
         )
     };
     ($i:expr, $type:expr, $tag:expr) => {
         do_parse!(
             $i,
-            span: position!() >> frag: tag!($tag) >> (Token {
-                typ: $type,
-                pos: Position::from(span),
-                fragment: frag.fragment.to_string(),
-            })
+            span: position!()
+                >> frag: tag!($tag)
+                >> (Token {
+                    typ: $type,
+                    pos: Position::from(span),
+                    fragment: frag.fragment.to_string(),
+                })
         )
     };
 }
@@ -285,60 +290,59 @@ named!(filtertok( Span ) -> Token,
 
 fn end_of_input(input: Span) -> nom::IResult<Span, Token> {
     match eof!(input,) {
-        nom::IResult::Done(_, _) => {
-            return nom::IResult::Done(
+        Ok((_, _)) => {
+            return Ok((
                 input,
                 make_tok!(EOF => input.line as usize,
                                                 input.get_column() as usize),
-            );
+            ));
         }
-        nom::IResult::Incomplete(_) => {
-            return nom::IResult::Incomplete(nom::Needed::Unknown);
-        }
-        nom::IResult::Error(e) => {
-            return nom::IResult::Error(e);
-        }
+        Err(e) => Err(e),
     }
 }
 
 fn comment(input: Span) -> nom::IResult<Span, Token> {
     match tag!(input, "//") {
-        nom::IResult::Done(rest, _) => {
+        Ok((rest, _)) => {
             match alt!(
                 rest,
                 take_until_and_consume!("\r\n") | take_until_and_consume!("\n")
             ) {
-                nom::IResult::Done(rest, cmt) => {
-                    return nom::IResult::Done(
+                Ok((rest, cmt)) => {
+                    return Ok((
                         rest,
                         make_tok!(CMT => cmt.fragment.to_string(),
                                   input.line as usize,
                                   input.get_column() as usize),
-                    );
+                    ));
                 }
                 // If we didn't find a new line then we just grab everything.
                 _ => {
                     let blen = rest.input_len();
                     let next = rest.slice(blen..);
                     let tok = rest.slice(..blen);
-                    return nom::IResult::Done(
+                    return Ok((
                         next,
                         make_tok!(CMT => tok.fragment.to_string(),
                                   input.line as usize, input.get_column() as usize
                     ),
-                    );
+                    ));
                 }
             }
         }
-        nom::IResult::Incomplete(i) => return nom::IResult::Incomplete(i),
-        nom::IResult::Error(e) => return nom::IResult::Error(e),
+        Err(e) => Err(e),
     }
 }
 
+pub fn is_ws(chr: char) -> bool {
+    chr.is_whitespace()
+}
+
+// TODO(jwall): take_while and many don't work well with the end of input.
 named!(whitespace( Span ) -> Token,
     do_parse!(
         span: position!() >>
-        many1!(multispace) >>
+        take_while!(is_ws) >>
          (Token{
             typ: TokenType::WS,
             pos: Position::from(span),
@@ -351,7 +355,6 @@ named!(token( Span ) -> Token,
     alt!(
         strtok |
         pipequotetok |
-        emptytok | // This must come before the barewordtok
         digittok |
         commatok |
         rbracetok |
@@ -376,6 +379,7 @@ named!(token( Span ) -> Token,
         semicolontok |
         leftsquarebracket |
         rightsquarebracket |
+        emptytok | // This must come before the barewordtok
         booleantok |
         lettok |
         outtok |
@@ -400,7 +404,7 @@ pub fn tokenize(input: Span) -> Result<Vec<Token>, error::Error> {
             break;
         }
         match token(i) {
-            nom::IResult::Error(_e) => {
+            Err(nom::Err::Error(_e)) => {
                 return Err(error::Error::new(
                     "Invalid Token encountered",
                     error::ErrorType::UnexpectedToken,
@@ -410,7 +414,17 @@ pub fn tokenize(input: Span) -> Result<Vec<Token>, error::Error> {
                     },
                 ));
             }
-            nom::IResult::Incomplete(_) => {
+            Err(nom::Err::Failure(_ctx)) => {
+                return Err(error::Error::new(
+                    "Invalid Token encountered",
+                    error::ErrorType::UnexpectedToken,
+                    Position {
+                        line: i.line as usize,
+                        column: i.get_column() as usize,
+                    },
+                ));
+            }
+            Err(nom::Err::Incomplete(_)) => {
                 return Err(error::Error::new(
                     "Unexepcted end of Input",
                     error::ErrorType::UnexpectedToken,
@@ -420,7 +434,7 @@ pub fn tokenize(input: Span) -> Result<Vec<Token>, error::Error> {
                     },
                 ));
             }
-            nom::IResult::Done(rest, tok) => {
+            Ok((rest, tok)) => {
                 i = rest;
                 if tok.typ == TokenType::COMMENT || tok.typ == TokenType::WS {
                     // we skip comments and whitespace
@@ -518,26 +532,36 @@ macro_rules! match_type {
 
     ($i:expr, $t:expr, $msg:expr, $h:expr) => {{
         let i_ = $i.clone();
+        use nom::Context::Code;
         use nom::Slice;
         use std::convert::Into;
         if i_.input_len() == 0 {
-            nom::IResult::Error(nom::ErrorKind::Custom(error::Error::new(
-                format!("End of Input! {}", $msg),
-                error::ErrorType::IncompleteParsing,
-                Position { line: 0, column: 0 },
+            Err(nom::Err::Error(Code(
+                i_,
+                nom::ErrorKind::Custom(error::Error::new(
+                    format!("End of Input! {}", $msg),
+                    error::ErrorType::IncompleteParsing,
+                    Position { line: 0, column: 0 },
+                )),
             )))
         } else {
             let tok = &(i_[0]);
             if tok.typ == $t {
                 match $h(tok) {
-                    Result::Ok(v) => nom::IResult::Done($i.slice(1..), v),
-                    Result::Err(e) => nom::IResult::Error(nom::ErrorKind::Custom(e.into())),
+                    Result::Ok(v) => Result::Ok(($i.slice(1..), v)),
+                    Result::Err(e) => Err(nom::Err::Error(Code(
+                        i_.clone(),
+                        nom::ErrorKind::Custom(e.into()),
+                    ))),
                 }
             } else {
-                nom::IResult::Error(nom::ErrorKind::Custom(error::Error::new(
-                    $msg.to_string(),
-                    error::ErrorType::UnexpectedToken,
-                    tok.pos.clone(),
+                Err(nom::Err::Error(Code(
+                    i_.clone(),
+                    nom::ErrorKind::Custom(error::Error::new(
+                        $msg.to_string(),
+                        error::ErrorType::UnexpectedToken,
+                        tok.pos.clone(),
+                    )),
                 )))
             }
         }
@@ -574,19 +598,26 @@ macro_rules! match_token {
     ($i:expr, $t:expr, $f:expr, $msg:expr, $h:expr) => {{
         let i_ = $i.clone();
         use nom;
+        use nom::Context::Code;
         use nom::Slice;
         use std::convert::Into;
         let tok = &(i_[0]);
         if tok.typ == $t && &tok.fragment == $f {
             match $h(tok) {
-                Result::Ok(v) => nom::IResult::Done($i.slice(1..), v),
-                Result::Err(e) => nom::IResult::Error(nom::ErrorKind::Custom(e.into())),
+                Result::Ok(v) => Ok(($i.slice(1..), v)),
+                Result::Err(e) => Result::Err(nom::Err::Error(Code(
+                    i_.clone(),
+                    nom::ErrorKind::Custom(e.into()),
+                ))),
             }
         } else {
-            nom::IResult::Error(nom::ErrorKind::Custom(error::Error::new(
-                format!("{} Instead is ({})", $msg, tok.fragment),
-                error::ErrorType::UnexpectedToken,
-                tok.pos.clone(),
+            Err(nom::Err::Error(Code(
+                i_.clone(),
+                nom::ErrorKind::Custom(error::Error::new(
+                    format!("{} Instead is ({})", $msg, tok.fragment),
+                    error::ErrorType::UnexpectedToken,
+                    tok.pos.clone(),
+                )),
             )))
         }
     }};
@@ -611,13 +642,13 @@ pub fn pos(i: TokenIter) -> nom::IResult<TokenIter, Position, error::Error> {
     let tok = &i[0];
     let line = tok.pos.line;
     let column = tok.pos.column;
-    nom::IResult::Done(
+    Ok((
         i.clone(),
         Position {
             line: line,
             column: column,
         },
-    )
+    ))
 }
 
 /// TokenIter wraps a slice of Tokens and implements the various necessary
@@ -630,6 +661,14 @@ pub struct TokenIter<'a> {
 impl<'a> TokenIter<'a> {
     pub fn len(&self) -> usize {
         self.source.len()
+    }
+
+    pub fn token_pos(&self) -> Position {
+        let curr = &self.source[0];
+        Position {
+            line: curr.pos.line,
+            column: curr.pos.column,
+        }
     }
 }
 

@@ -14,7 +14,6 @@
 use super::*;
 use tokenizer::{tokenize, TokenIter};
 
-use nom::IResult;
 use nom_locate::LocatedSpan;
 
 macro_rules! assert_parse {
@@ -28,8 +27,8 @@ macro_rules! assert_parse {
             Ok(val) => match $f(TokenIter {
                 source: val.as_slice(),
             }) {
-                IResult::Done(_, result) => assert_eq!(result, $out),
-                other => assert!(false, format!("Expected Done got {:?}", other)),
+                Ok((_, result)) => assert_eq!(result, $out),
+                other => assert!(false, format!("Expected Ok got {:?}", other)),
             },
         }
     };};
