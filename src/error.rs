@@ -79,15 +79,17 @@ impl Error {
         msg: S,
         t: ErrorType,
         cause: Box<error::Error>,
+        pos: Position,
     ) -> Self {
-        // TODO(jwall): This should take a real position instead of this fake one.
-        let mut e = Self::new(msg, t, Position::new(0, 0, 0));
+        // FIXME(jwall): This should take a real position instead of this fake one.
+        let mut e = Self::new(msg, t, pos);
         e.cause = Some(cause);
         return e;
     }
 
     pub fn new_with_cause<S: Into<String>>(msg: S, t: ErrorType, cause: Self) -> Self {
-        Self::new_with_boxed_cause(msg, t, Box::new(cause))
+        let pos = cause.pos.clone();
+        Self::new_with_boxed_cause(msg, t, Box::new(cause), pos)
     }
 
     fn render(&self, w: &mut fmt::Formatter) -> fmt::Result {

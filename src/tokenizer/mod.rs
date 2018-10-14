@@ -17,16 +17,11 @@ use std;
 
 use abortable_parser::combinators::*;
 use abortable_parser::iter::SliceIter;
-use abortable_parser::{Error, Offsetable, Result, TextPositionTracker};
+use abortable_parser::{Error, Offsetable, Result};
 
 use ast::*;
+use error;
 use iter::OffsetStrIter;
-
-impl<'a> From<OffsetStrIter<'a>> for Position {
-    fn from(s: OffsetStrIter<'a>) -> Position {
-        Position::new(s.line(), s.column(), s.get_offset())
-    }
-}
 
 fn is_symbol_char<'a>(i: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, u8> {
     let mut _i = i.clone();
@@ -75,7 +70,7 @@ make_fn!(strtok<OffsetStrIter, Token>,
            frag => escapequoted,
            (Token{
                typ: TokenType::QUOTED,
-               pos: Position::from(span),
+               pos: Position::from(&span),
                fragment: frag.to_string(),
            })
        )
@@ -89,7 +84,7 @@ make_fn!(pipequotetok<OffsetStrIter, Token>,
            _    => text_token!("|"),
            (Token{
                typ: TokenType::PIPEQUOTE,
-               pos: Position::from(p),
+               pos: Position::from(&p),
                fragment: frag.to_string(),
            })
        )
@@ -102,7 +97,7 @@ make_fn!(barewordtok<OffsetStrIter, Token>,
            frag => consume_all!(is_symbol_char),
            (Token{
                typ: TokenType::BAREWORD,
-               pos: Position::from(span),
+               pos: Position::from(&span),
                fragment: frag.to_string(),
            })
        )
@@ -115,7 +110,7 @@ make_fn!(digittok<OffsetStrIter, Token>,
            digits => consume_all!(ascii_digit),
            (Token{
                typ: TokenType::DIGIT,
-               pos: Position::from(span),
+               pos: Position::from(&span),
                fragment: digits.to_string(),
            })
        )
@@ -130,7 +125,7 @@ make_fn!(booleantok<OffsetStrIter, Token>,
         ),
         (Token{
             typ: TokenType::BOOLEAN,
-            pos: Position::from(span),
+            pos: Position::from(&span),
             fragment: token.to_string(),
         })
     )
@@ -141,27 +136,27 @@ make_fn!(booleantok<OffsetStrIter, Token>,
 macro_rules! do_text_token_tok {
     ($i:expr, $type:expr, $text_token:expr, WS) => {
         do_each!($i,
-                                                            span => input!(),
-                                                            frag => text_token!($text_token),
-                                                            _ => either!(whitespace, comment),
-                                                            (Token {
-                                                                typ: $type,
-                                                                pos: Position::from(span),
-                                                                fragment: frag.to_string(),
-                                                            })
-                                                        )
+                        span => input!(),
+                        frag => text_token!($text_token),
+                        _ => either!(whitespace, comment),
+                        (Token {
+                            typ: $type,
+                            pos: Position::from(&span),
+                            fragment: frag.to_string(),
+                        })
+                        )
     };
 
     ($i:expr, $type:expr, $text_token:expr) => {
         do_each!($i,
-                                                            span => input!(),
-                                                            frag => text_token!($text_token),
-                                                            (Token {
-                                                                typ: $type,
-                                                                pos: Position::from(span),
-                                                                fragment: frag.to_string(),
-                                                            })
-                                                        )
+                        span => input!(),
+                        frag => text_token!($text_token),
+                        (Token {
+                            typ: $type,
+                            pos: Position::from(&span),
+                            fragment: frag.to_string(),
+                        })
+                        )
     };
 }
 
@@ -326,7 +321,7 @@ make_fn!(whitespace<OffsetStrIter, Token>,
         _ => repeat!(ascii_ws),
          (Token{
             typ: TokenType::WS,
-            pos: Position::from(span),
+            pos: Position::from(&span),
             fragment: String::new(),
          })
     )
@@ -338,7 +333,7 @@ make_fn!(end_of_input<OffsetStrIter, Token>,
         _ => eoi,
         (Token{
             typ: TokenType::END,
-            pos: Position::from(span),
+            pos: Position::from(&span),
             fragment: String::new(),
         })
     )
@@ -389,31 +384,38 @@ make_fn!(token<OffsetStrIter, Token>,
 );
 
 /// Consumes an input OffsetStrIter and returns either a Vec<Token> or a error::Error.
-pub fn tokenize(input: OffsetStrIter) -> std::result::Result<Vec<Token>, Error> {
+pub fn tokenize(input: OffsetStrIter) -> std::result::Result<Vec<Token>, error::Error> {
     let mut out = Vec::new();
     let mut i = input.clone();
     loop {
         if let Result::Complete(_, _) = eoi(i.clone()) {
             break;
         }
+        let pos: Position = Position::from(&i);
         // FIXME(jwall): We need to return a error::Error so we have position information.
         match token(i.clone()) {
             Result::Abort(e) => {
-                return Err(Error::caused_by(
+                return Err(error::Error::new_with_boxed_cause(
                     "Invalid Token encountered",
-                    &i,
+                    error::ErrorType::UnexpectedToken,
                     Box::new(e),
-                ));
+                    pos,
+                ))
             }
             Result::Fail(e) => {
-                return Err(Error::caused_by(
+                return Err(error::Error::new_with_boxed_cause(
                     "Invalid Token encountered",
-                    &i,
+                    error::ErrorType::UnexpectedToken,
                     Box::new(e),
-                ));
+                    pos,
+                ))
             }
-            Result::Incomplete(offset) => {
-                return Err(Error::new("Unexepcted end of Input", &offset));
+            Result::Incomplete(_offset) => {
+                return Err(error::Error::new(
+                    "Invalid Token encountered",
+                    error::ErrorType::IncompleteParsing,
+                    pos,
+                ))
             }
             Result::Complete(rest, tok) => {
                 i = rest;
@@ -429,7 +431,7 @@ pub fn tokenize(input: OffsetStrIter) -> std::result::Result<Vec<Token>, Error> 
     out.push(Token {
         fragment: String::new(),
         typ: TokenType::END,
-        pos: i.into(),
+        pos: Position::from(&i),
     });
     Ok(out)
 }

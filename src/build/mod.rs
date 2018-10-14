@@ -249,6 +249,7 @@ impl<'a> Builder<'a> {
     }
 
     fn eval_span(&mut self, input: OffsetStrIter) -> Result<Rc<Val>, Box<Error>> {
+        // TODO(jwall): This should really return a better error.
         match parse(input) {
             Ok(stmts) => {
                 //panic!("Successfully parsed {}", input);
@@ -261,14 +262,13 @@ impl<'a> Builder<'a> {
                     Some(val) => Ok(val),
                 }
             }
-            // FIXME(jwall): We need to return a error::Error so we have position information.
-            Err(err) => Err(Box::new(error::Error::new_with_boxed_cause(
+            Err(err) => Err(Box::new(error::Error::new_with_cause(
                 format!(
                     "Error while parsing file: {}",
                     self.curr_file.unwrap_or("<eval>")
                 ),
                 error::ErrorType::ParseError,
-                Box::new(err),
+                err,
             ))),
         }
     }
@@ -998,7 +998,7 @@ impl<'a> Builder<'a> {
         expr_as_stmt.push_str(expr);
         expr_as_stmt.push_str(";");
         let assert_input =
-            OffsetStrIter::new_with_offsets(&expr_as_stmt, 0, tok.pos.line - 1, tok.pos.column - 1);
+            OffsetStrIter::new_with_offsets(&expr_as_stmt, tok.pos.line - 1, tok.pos.column - 1);
         let ok = match self.eval_span(assert_input) {
             Ok(v) => v,
             Err(e) => {

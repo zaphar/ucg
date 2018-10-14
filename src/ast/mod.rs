@@ -63,6 +63,12 @@ impl Position {
     }
 }
 
+impl<'a> From<&'a Position> for Position {
+    fn from(source: &'a Position) -> Self {
+        source.clone()
+    }
+}
+
 /// Defines the types of tokens in UCG syntax.
 #[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord, Hash)]
 pub enum TokenType {
@@ -121,31 +127,31 @@ macro_rules! value_node {
 #[allow(unused_macros)]
 macro_rules! make_tok {
     (EOF => $i:expr) => {
-        Token::new("", TokenType::END, $i)
+        Token::new("", TokenType::END, &$i)
     };
 
     (WS => $i:expr) => {
-        Token::new("", TokenType::WS, $i)
+        Token::new("", TokenType::WS, &$i)
     };
 
     (CMT => $e:expr, $i:expr) => {
-        Token::new($e, TokenType::COMMENT, $i)
+        Token::new($e, TokenType::COMMENT, &$i)
     };
 
     (QUOT => $e:expr, $i:expr) => {
-        Token::new($e, TokenType::QUOTED, $i)
+        Token::new($e, TokenType::QUOTED, &$i)
     };
 
     (PUNCT => $e:expr, $i:expr) => {
-        Token::new($e, TokenType::PUNCT, $i)
+        Token::new($e, TokenType::PUNCT, &$i)
     };
 
     (DIGIT => $e:expr, $i:expr) => {
-        Token::new($e, TokenType::DIGIT, $i)
+        Token::new($e, TokenType::DIGIT, &$i)
     };
 
     ($e:expr, $i:expr) => {
-        Token::new($e, TokenType::BAREWORD, $i)
+        Token::new($e, TokenType::BAREWORD, &$i)
     };
 }
 

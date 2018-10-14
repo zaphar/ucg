@@ -24,6 +24,7 @@ use abortable_parser::{Error, Peekable, Result};
 
 use self::precedence::op_expression;
 use ast::*;
+use error;
 use iter::OffsetStrIter;
 use tokenizer::*;
 
@@ -890,8 +891,8 @@ fn statement(i: SliceIter<Token>) -> Result<SliceIter<Token>, Statement> {
 }
 //trace_macros!(false);
 
-/// Parses a LocatedSpan into a list of Statements or an `abortable_parser::Error`.
-pub fn parse(input: OffsetStrIter) -> std::result::Result<Vec<Statement>, Error> {
+/// Parses a LocatedSpan into a list of Statements or an `error::Error`.
+pub fn parse(input: OffsetStrIter) -> std::result::Result<Vec<Statement>, error::Error> {
     match tokenize(input.clone()) {
         Ok(tokenized) => {
             let mut out = Vec::new();
@@ -903,16 +904,35 @@ pub fn parse(input: OffsetStrIter) -> std::result::Result<Vec<Statement>, Error>
                         break;
                     }
                 }
-                // FIXME(jwall): We need to return a error::Error so we have position information.
                 match statement(i.clone()) {
                     Result::Abort(e) => {
-                        return Err(e);
+                        let pos: Position = (&i).into();
+                        let err = error::Error::new_with_boxed_cause(
+                            "Statement Parse Error",
+                            error::ErrorType::ParseError,
+                            Box::new(e),
+                            pos,
+                        );
+                        return Err(err);
                     }
                     Result::Fail(e) => {
-                        return Err(Error::caused_by("Statement Parse error", &i, Box::new(e)));
+                        let pos: Position = (&i).into();
+                        let err = error::Error::new_with_boxed_cause(
+                            "Statement Parse Error",
+                            error::ErrorType::ParseError,
+                            Box::new(e),
+                            pos,
+                        );
+                        return Err(err);
                     }
-                    Result::Incomplete(ei) => {
-                        return Err(Error::new("Unexpected end of parsing input: {:?}", &ei));
+                    Result::Incomplete(_ei) => {
+                        let pos: Position = (&i).into();
+                        let err = error::Error::new(
+                            "Unexpected end of parse input",
+                            error::ErrorType::IncompleteParsing,
+                            pos,
+                        );
+                        return Err(err);
                     }
                     Result::Complete(rest, stmt) => {
                         out.push(stmt);
@@ -926,7 +946,12 @@ pub fn parse(input: OffsetStrIter) -> std::result::Result<Vec<Statement>, Error>
             return Ok(out);
         }
         Err(e) => {
-            return Err(Error::caused_by("Tokenization Error", &input, Box::new(e)));
+            let err = error::Error::new_with_cause(
+                "Tokenization Error",
+                error::ErrorType::UnexpectedToken,
+                e,
+            );
+            return Err(err);
         }
     }
 }

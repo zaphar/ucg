@@ -1,33 +1,28 @@
 use std::convert::From;
 use std::iter::Iterator;
 
-use abortable_parser::iter::StrIter;
+use abortable_parser::iter::{SliceIter, StrIter};
 use abortable_parser::{
     InputIter, Offsetable, Peekable, Seekable, Span, SpanRange, TextPositionTracker,
 };
 
+use ast::{Position, Token};
+
 #[derive(Debug)]
 pub struct OffsetStrIter<'a> {
     contained: StrIter<'a>,
-    idx_offset: usize,
     line_offset: usize,
     col_offset: usize,
 }
 
 impl<'a> OffsetStrIter<'a> {
     pub fn new(input: &'a str) -> Self {
-        Self::new_with_offsets(input, 0, 0, 0)
+        Self::new_with_offsets(input, 0, 0)
     }
 
-    pub fn new_with_offsets(
-        input: &'a str,
-        idx_offset: usize,
-        line_offset: usize,
-        col_offset: usize,
-    ) -> Self {
+    pub fn new_with_offsets(input: &'a str, line_offset: usize, col_offset: usize) -> Self {
         OffsetStrIter {
             contained: StrIter::new(input),
-            idx_offset: idx_offset,
             line_offset: line_offset,
             col_offset: col_offset,
         }
@@ -44,7 +39,7 @@ impl<'a> Iterator for OffsetStrIter<'a> {
 
 impl<'a> Offsetable for OffsetStrIter<'a> {
     fn get_offset(&self) -> usize {
-        self.contained.get_offset() + self.idx_offset
+        self.contained.get_offset()
     }
 }
 
@@ -52,7 +47,6 @@ impl<'a> Clone for OffsetStrIter<'a> {
     fn clone(&self) -> Self {
         OffsetStrIter {
             contained: self.contained.clone(),
-            idx_offset: self.idx_offset,
             line_offset: self.line_offset,
             col_offset: self.col_offset,
         }
@@ -63,7 +57,6 @@ impl<'a> From<&'a str> for OffsetStrIter<'a> {
     fn from(source: &'a str) -> Self {
         OffsetStrIter {
             contained: StrIter::new(source),
-            idx_offset: 0,
             line_offset: 0,
             col_offset: 0,
         }
@@ -72,9 +65,7 @@ impl<'a> From<&'a str> for OffsetStrIter<'a> {
 
 impl<'a> Seekable for OffsetStrIter<'a> {
     fn seek(&mut self, to: usize) -> usize {
-        let contained_offset = self.contained.seek(to);
-        self.idx_offset += contained_offset;
-        contained_offset
+        self.contained.seek(to)
     }
 }
 
@@ -101,3 +92,18 @@ impl<'a> TextPositionTracker for OffsetStrIter<'a> {
 }
 
 impl<'a> InputIter for OffsetStrIter<'a> {}
+
+impl<'a> From<&'a SliceIter<'a, Token>> for Position {
+    fn from(source: &'a SliceIter<'a, Token>) -> Self {
+        match source.peek_next() {
+            Some(t) => t.pos.clone(),
+            None => Position::new(0, 0, 0),
+        }
+    }
+}
+
+impl<'a> From<&'a OffsetStrIter<'a>> for Position {
+    fn from(s: &'a OffsetStrIter<'a>) -> Position {
+        Position::new(s.line(), s.column(), s.get_offset())
+    }
+}
