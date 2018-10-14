@@ -19,16 +19,16 @@ use std::str::FromStr;
 
 use abortable_parser;
 use abortable_parser::combinators::eoi;
-use abortable_parser::iter::{SliceIter, StrIter};
+use abortable_parser::iter::SliceIter;
 use abortable_parser::{Error, Peekable, Result};
 
 use self::precedence::op_expression;
 use ast::*;
+use iter::OffsetStrIter;
 use tokenizer::*;
 
 type NomResult<'a, O> = Result<SliceIter<'a, Token>, O>;
 
-// FIXME(jwall): All the do_each mappers need to return an actual value.
 #[cfg(feature = "tracing")]
 const ENABLE_TRACE: bool = true;
 #[cfg(not(feature = "tracing"))]
@@ -92,11 +92,10 @@ make_fn!(
     match_type!(STR => str_to_value)
 );
 
-// FIXME(jwall): We need to just turn this into a custom parser function.
 // Helper function to make the return types work for down below.
 fn triple_to_number(v: (Option<Token>, Option<Token>, Option<Token>)) -> ParseResult<Value> {
     let (pref, mut pref_pos) = match v.0 {
-        None => ("", Position::new(0, 0)),
+        None => ("", Position::new(0, 0, 0)),
         Some(ref bs) => (bs.fragment.borrow(), bs.pos.clone()),
     };
 
@@ -106,11 +105,7 @@ fn triple_to_number(v: (Option<Token>, Option<Token>, Option<Token>)) -> ParseRe
         let i = match FromStr::from_str(pref) {
             Ok(i) => i,
             Err(_) => {
-                return Err(Error::new(
-                    format!("Not an integer! {}", pref),
-                    // FIXME(jwall): This really needs the correct offset.
-                    &0,
-                ));
+                return Err(Error::new(format!("Not an integer! {}", pref), &0));
             }
         };
         return Ok(Value::Int(value_node!(i, pref_pos)));
@@ -120,9 +115,9 @@ fn triple_to_number(v: (Option<Token>, Option<Token>, Option<Token>)) -> ParseRe
         pref_pos = v.1.unwrap().pos;
     }
 
-    let suf = match v.2 {
-        None => "".to_string(),
-        Some(bs) => bs.fragment,
+    let (suf, pos) = match v.2 {
+        None => ("".to_string(), Position::new(0, 0, 0)),
+        Some(bs) => (bs.fragment, bs.pos),
     };
 
     let to_parse = pref.to_string() + "." + &suf;
@@ -131,8 +126,7 @@ fn triple_to_number(v: (Option<Token>, Option<Token>, Option<Token>)) -> ParseRe
         Err(_) => {
             return Err(Error::new(
                 format!("Not a float! {}", to_parse),
-                // FIXME(jwall): This should take the real offset.
-                &0,
+                &pos.offset,
             ));
         }
     };
@@ -307,11 +301,7 @@ make_fn!(
 
 // Helper function to make the return types work for down below.
 fn vec_to_tuple(pos: Position, fields: Option<FieldList>) -> Value {
-    Value::Tuple(value_node!(
-        fields.unwrap_or(Vec::new()),
-        pos.line as usize,
-        pos.column as usize
-    ))
+    Value::Tuple(value_node!(fields.unwrap_or(Vec::new()), pos))
 }
 
 make_fn!(
@@ -519,11 +509,10 @@ make_fn!(
         fields => optional!(trace_nom!(field_list)),
         _ => optional!(punct!(",")), // noms opt! macro does not preserve error types properly but this one does.
         _ => punct!("}"),
-        (tuple_to_copy(SelectorDef::new(selector, pos.line, pos.column), fields))
+        (tuple_to_copy(SelectorDef::new(selector, pos), fields))
     )
 );
 
-// FIXME(jwall): need to make this into a proper parse function.
 fn tuple_to_macro(pos: Position, vals: Option<Vec<Value>>, val: Value) -> ParseResult<Expression> {
     let mut default_args = match vals {
         None => Vec::new(),
@@ -543,8 +532,7 @@ fn tuple_to_macro(pos: Position, vals: Option<Vec<Value>>, val: Value) -> ParseR
         })),
         val => Err(Error::new(
             format!("Expected Tuple Got {:?}", val),
-            // FIXME(jwall): Should have correct Offset here.
-            &0,
+            &val.pos().offset,
         )),
     }
 }
@@ -647,7 +635,6 @@ make_fn!(
     )
 );
 
-// FIXME(jwall): Convert this into a custom parser function.
 fn tuple_to_call(pos: Position, val: Value, exprs: Vec<Expression>) -> ParseResult<Expression> {
     if let Value::Selector(def) = val {
         Ok(Expression::Call(CallDef {
@@ -656,17 +643,15 @@ fn tuple_to_call(pos: Position, val: Value, exprs: Vec<Expression>) -> ParseResu
             pos: pos,
         }))
     } else {
-        // FIXME(jwall): Should get correct offset here.
-        Err(Error::new(format!("Expected Selector Got {:?}", val), &0))
+        Err(Error::new(
+            format!("Expected Selector Got {:?}", val),
+            &val.pos().offset,
+        ))
     }
 }
 
 fn vec_to_selector_value(pos: Position, list: SelectorList) -> Value {
-    Value::Selector(SelectorDef::new(
-        list,
-        pos.line as usize,
-        pos.column as usize,
-    ))
+    Value::Selector(SelectorDef::new(list, pos))
 }
 
 make_fn!(
@@ -715,8 +700,7 @@ fn tuple_to_list_op(
                 }
                 return Err(Error::new(
                     format!("Missing a result field for the macro"),
-                    // FIXME(jwall): Should have correct offset.
-                    &0,
+                    &def.pos.offset,
                 ));
             }
             &mut Some(ref mut tl) => {
@@ -729,8 +713,7 @@ fn tuple_to_list_op(
                     }
                     return Err(Error::new(
                         format!("Missing a result field for the macro"),
-                        // FIXME(jwall): Should have correct offset.
-                        &0,
+                        &def.pos.offset,
                     ));
                 }
                 let fname = tl.pop();
@@ -753,12 +736,10 @@ fn tuple_to_list_op(
     }
     return Err(Error::new(
         format!("Expected a selector but got {}", macroname.type_name()),
-        // FIXME(jwall): Should have correct offset.
-        &0,
+        &pos.offset,
     ));
 }
 
-// FIXME(jwall): need to make this a custom function to parse it.
 make_fn!(
     list_op_expression<SliceIter<Token>, Expression>,
     do_each!(
@@ -843,7 +824,7 @@ make_fn!(
     let_statement<SliceIter<Token>, Statement>,
     do_each!(
         _ => word!("let"),
-        stmt => trace_nom!(let_stmt_body),
+        stmt => trace_nom!(must!(let_stmt_body)),
         (stmt)
     )
 );
@@ -871,7 +852,7 @@ make_fn!(
     do_each!(
         _ => word!("import"),
         // past this point we know this is supposed to be an import statement.
-        stmt => trace_nom!(import_stmt_body),
+        stmt => trace_nom!(must!(import_stmt_body)),
         (stmt)
     )
 );
@@ -880,8 +861,8 @@ make_fn!(
     assert_statement<SliceIter<Token>, Statement>,
     do_each!(
         _ => word!("assert"),
-            tok => match_type!(PIPEQUOTE),
-            _ => punct!(";"),
+            tok => must!(match_type!(PIPEQUOTE)),
+            _ => must!(punct!(";")),
             (Statement::Assert(tok.clone()))
     )
 );
@@ -890,9 +871,9 @@ make_fn!(
     out_statement<SliceIter<Token>, Statement>,
     do_each!(
         _ => word!("out"),
-        typ => match_type!(BAREWORD),
-        expr => expression,
-        _ => punct!(";"),
+        typ => must!(match_type!(BAREWORD)),
+        expr => must!(expression),
+        _ => must!(punct!(";")),
         (Statement::Output(typ.clone(), expr.clone()))
     )
 );
@@ -910,7 +891,7 @@ fn statement(i: SliceIter<Token>) -> Result<SliceIter<Token>, Statement> {
 //trace_macros!(false);
 
 /// Parses a LocatedSpan into a list of Statements or an `abortable_parser::Error`.
-pub fn parse(input: StrIter) -> std::result::Result<Vec<Statement>, Error> {
+pub fn parse(input: OffsetStrIter) -> std::result::Result<Vec<Statement>, Error> {
     match tokenize(input.clone()) {
         Ok(tokenized) => {
             let mut out = Vec::new();
@@ -922,6 +903,7 @@ pub fn parse(input: StrIter) -> std::result::Result<Vec<Statement>, Error> {
                         break;
                     }
                 }
+                // FIXME(jwall): We need to return a error::Error so we have position information.
                 match statement(i.clone()) {
                     Result::Abort(e) => {
                         return Err(e);

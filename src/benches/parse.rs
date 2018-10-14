@@ -22,14 +22,14 @@ extern crate ucglib;
 
 use bencher::Bencher;
 
-use abortable_parser::StrIter;
+use ucglib::iter::OffsetStrIter;
 
 //use cpuprofiler::PROFILER;
 
 use ucglib::parse::*;
 
 fn do_parse(i: &str) {
-    parse(StrIter::new(i));
+    parse(OffsetStrIter::new(i));
 }
 
 fn parse_int(b: &mut Bencher) {

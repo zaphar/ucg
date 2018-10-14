@@ -46,7 +46,7 @@ impl ExecConverter {
                 return Err(Box::new(Error::new(
                     "Exec tuples must have no more than 3 fields",
                     ErrorType::TypeFail,
-                    Position::new(0, 0),
+                    Position::new(0, 0, 0),
                 )));
             }
             let mut env: Option<&Vec<(Positioned<String>, Rc<Val>)>> = None;
@@ -115,7 +115,7 @@ impl ExecConverter {
                 return Err(Box::new(Error::new(
                     "An exec tuple must have a command field",
                     ErrorType::TypeFail,
-                    Position::new(0, 0),
+                    Position::new(0, 0, 0),
                 )));
             }
             // Okay if we have made it this far then we are ready to start creating our script.
@@ -157,7 +157,7 @@ impl ExecConverter {
                             return Err(Box::new(Error::new(
                                 "Exec args must be a list of strings or tuples of strings.",
                                 ErrorType::TypeFail,
-                                Position::new(0, 0),
+                                Position::new(0, 0, 0),
                             )))
                         }
                     }
@@ -173,7 +173,7 @@ impl ExecConverter {
         Err(Box::new(Error::new(
             "Exec outputs must be of type Tuple",
             ErrorType::TypeFail,
-            Position::new(0, 0),
+            Position::new(0, 0, 0),
         )))
     }
 }

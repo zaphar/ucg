@@ -21,10 +21,9 @@ use std::cmp::PartialEq;
 use std::cmp::PartialOrd;
 use std::collections::HashSet;
 use std::convert::Into;
+use std::fmt;
 use std::hash::Hash;
 use std::hash::Hasher;
-
-use std::fmt;
 
 macro_rules! enum_type_equality {
     ( $slf:ident, $r:expr, $( $l:pat ),* ) => {
@@ -50,14 +49,16 @@ macro_rules! enum_type_equality {
 pub struct Position {
     pub line: usize,
     pub column: usize,
+    pub offset: usize,
 }
 
 impl Position {
     /// Construct a new Position.
-    pub fn new(line: usize, column: usize) -> Self {
+    pub fn new(line: usize, column: usize, offset: usize) -> Self {
         Position {
             line: line,
             column: column,
+            offset: offset,
         }
     }
 }
@@ -89,8 +90,8 @@ pub struct Token {
 
 impl Token {
     /// Constructs a new Token with a type and line and column information.
-    pub fn new<S: Into<String>>(f: S, typ: TokenType, line: usize, col: usize) -> Self {
-        Self::new_with_pos(f, typ, Position::new(line, col))
+    pub fn new<S: Into<String>, P: Into<Position>>(f: S, typ: TokenType, p: P) -> Self {
+        Self::new_with_pos(f, typ, p.into())
     }
 
     // Constructs a new Token with a type and a Position.
@@ -114,56 +115,49 @@ macro_rules! value_node {
     ($v:expr, $p:expr) => {
         Positioned::new_with_pos($v, $p)
     };
-    ($v:expr, $l:expr, $c:expr) => {
-        Positioned::new($v, $l, $c)
-    };
 }
 
 /// Helper macro for making a Token.
 #[allow(unused_macros)]
 macro_rules! make_tok {
-    (EOF => $l:expr, $c:expr) => {
-        Token::new("", TokenType::END, $l, $c)
+    (EOF => $i:expr) => {
+        Token::new("", TokenType::END, $i)
     };
 
-    (WS => $l:expr, $c:expr) => {
-        Token::new("", TokenType::WS, $l, $c)
+    (WS => $i:expr) => {
+        Token::new("", TokenType::WS, $i)
     };
 
-    (CMT => $e:expr, $l:expr, $c:expr) => {
-        Token::new($e, TokenType::COMMENT, $l, $c)
+    (CMT => $e:expr, $i:expr) => {
+        Token::new($e, TokenType::COMMENT, $i)
     };
 
-    (QUOT => $e:expr, $l:expr, $c:expr) => {
-        Token::new($e, TokenType::QUOTED, $l, $c)
+    (QUOT => $e:expr, $i:expr) => {
+        Token::new($e, TokenType::QUOTED, $i)
     };
 
-    (PUNCT => $e:expr, $l:expr, $c:expr) => {
-        Token::new($e, TokenType::PUNCT, $l, $c)
+    (PUNCT => $e:expr, $i:expr) => {
+        Token::new($e, TokenType::PUNCT, $i)
     };
 
-    (DIGIT => $e:expr, $l:expr, $c:expr) => {
-        Token::new($e, TokenType::DIGIT, $l, $c)
+    (DIGIT => $e:expr, $i:expr) => {
+        Token::new($e, TokenType::DIGIT, $i)
     };
 
-    ($e:expr, $l:expr, $c:expr) => {
-        Token::new($e, TokenType::BAREWORD, $l, $c)
+    ($e:expr, $i:expr) => {
+        Token::new($e, TokenType::BAREWORD, $i)
     };
 }
 
 /// Helper macro for making expressions.
 #[allow(unused_macros)]
 macro_rules! make_expr {
-    ($e:expr) => {
-        make_expr!($e, 1, 1)
+    ($e:expr, $i:expr) => {
+        Expression::Simple(Value::Symbol(Positioned::new_with_pos($e.to_string(), $i)))
     };
 
-    ($e:expr, $l:expr, $c:expr) => {
-        Expression::Simple(Value::Symbol(Positioned::new($e.to_string(), $l, $c)))
-    };
-
-    ($e:expr => int, $l:expr, $c:expr) => {
-        Expression::Simple(Value::Int(Positioned::new($e, $l, $c)))
+    ($e:expr => int, $i:expr) => {
+        Expression::Simple(Value::Int(Positioned::new_with_pos($e, $i)))
     };
 }
 
@@ -180,30 +174,26 @@ macro_rules! make_expr {
 /// ```
 #[allow(unused_macros)]
 macro_rules! make_selector {
-    ( $h:expr ) => {
-        make_selector!($h, 1, 0)
-    };
-
-    ( $h:expr, $l:expr, $c:expr ) => {
+    ( $h:expr, $i:expr) => {
         SelectorDef::new(
             SelectorList{head: Box::new($h), tail: None},
-            $l, $c)
+            $i)
     };
 
-    ( $h: expr, $list:expr, $l:expr, $c:expr) => {
+    ( $h: expr, $list:expr, $i:expr) => {
         SelectorDef::new(
             SelectorList{head: Box::new($h), tail: Some($list)},
-            $l, $c)
+            $i)
     };
 
     // Tokens
-    ( $h:expr => [ $( $item:expr ),* ] ) => {
+    ( $h:expr => [ $( $item:expr ),* ], $i:expr ) => {
         {
-            make_selector!($h => [ $( $item, )* ] => 1, 1)
+            make_selector!($h => [ $( $item, )* ] => $i)
         }
     };
 
-    ( $h:expr => [ $( $item:expr ),* ] => $l:expr, $c:expr ) => {
+    ( $h:expr => [ $( $item:expr ),* ] => $i:expr ) => {
         {
             let mut list: Vec<Token> = Vec::new();
 
@@ -211,7 +201,7 @@ macro_rules! make_selector {
                 list.push($item);
             )*
 
-            make_selector!($h, list, $l, $c)
+            make_selector!($h, list, $i)
         }
     };
 
@@ -223,14 +213,14 @@ macro_rules! make_selector {
             let mut list: Vec<Token> = Vec::new();
 
             $(
-                list.push(make_tok!($item, 1, col));
+                list.push(make_tok!($item, Position::new(1, col, col)));
                 col += $item.len() + 1;
             )*
 
             // Shut up the lint about unused code;
             assert!(col != 0);
 
-            make_selector!($h, list, 1, 1)
+            make_selector!($h, list, Position::new(1, 1, 1))
         }
 
     };
@@ -241,14 +231,14 @@ macro_rules! make_selector {
             let mut list: Vec<Token> = Vec::new();
 
             $(
-                list.push(make_tok!($item, $l, col));
+                list.push(make_tok!($item, Position::new($l, col, col)));
                 col += $item.len() + 1;
             )*
 
             // Shut up the linter about unused code;
             assert!(col != 0);
 
-            make_selector!($h, list, $l, $c)
+            make_selector!($h, list, Position::new($l, $c, $c))
         }
     };
 }
@@ -314,9 +304,9 @@ pub struct SelectorDef {
 
 impl SelectorDef {
     /// Constructs a new SelectorDef.
-    pub fn new(sel: SelectorList, line: usize, col: usize) -> Self {
+    pub fn new<P: Into<Position>>(sel: SelectorList, p: P) -> Self {
         SelectorDef {
-            pos: Position::new(line, col),
+            pos: p.into(),
             sel: sel,
         }
     }
@@ -451,8 +441,8 @@ impl<T: std::fmt::Display> std::fmt::Display for Positioned<T> {
 
 impl<T> Positioned<T> {
     /// Constructs a new Positioned<T> with a value, line, and column information.
-    pub fn new(v: T, l: usize, c: usize) -> Self {
-        Self::new_with_pos(v, Position::new(l, c))
+    pub fn new<P: Into<Position>>(v: T, p: P) -> Self {
+        Self::new_with_pos(v, p.into())
     }
 
     /// Constructs a new Positioned<T> with a value and a Position.

@@ -25,11 +25,10 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::string::ToString;
 
-use abortable_parser::StrIter;
-
 use ast::*;
 use error;
 use format;
+use iter::OffsetStrIter;
 use parse::parse;
 
 pub mod assets;
@@ -192,8 +191,12 @@ impl<'a> Builder<'a> {
         scope: ValueMap,
     ) -> Self {
         let env_vars: Vec<(Positioned<String>, Rc<Val>)> = env::vars()
-            .map(|t| (Positioned::new(t.0, 0, 0), Rc::new(t.1.into())))
-            .collect();
+            .map(|t| {
+                (
+                    Positioned::new(t.0, Position::new(0, 0, 0)),
+                    Rc::new(t.1.into()),
+                )
+            }).collect();
         Self::new_with_env_and_scope(root, cache, scope, Rc::new(Val::Tuple(env_vars)))
     }
 
@@ -223,7 +226,7 @@ impl<'a> Builder<'a> {
     /// Returns a Val by name from previously built UCG.
     pub fn get_out_by_name(&self, name: &str) -> Option<Rc<Val>> {
         let key = Positioned {
-            pos: Position::new(0, 0),
+            pos: Position::new(0, 0, 0),
             val: name.to_string(),
         };
         self.lookup_sym(&key)
@@ -245,7 +248,7 @@ impl<'a> Builder<'a> {
         Ok(())
     }
 
-    fn eval_span(&mut self, input: StrIter) -> Result<Rc<Val>, Box<Error>> {
+    fn eval_span(&mut self, input: OffsetStrIter) -> Result<Rc<Val>, Box<Error>> {
         match parse(input) {
             Ok(stmts) => {
                 //panic!("Successfully parsed {}", input);
@@ -258,6 +261,7 @@ impl<'a> Builder<'a> {
                     Some(val) => Ok(val),
                 }
             }
+            // FIXME(jwall): We need to return a error::Error so we have position information.
             Err(err) => Err(Box::new(error::Error::new_with_boxed_cause(
                 format!(
                     "Error while parsing file: {}",
@@ -271,7 +275,7 @@ impl<'a> Builder<'a> {
 
     /// Evaluate an input string as UCG.
     pub fn eval_string(&mut self, input: &str) -> Result<Rc<Val>, Box<Error>> {
-        self.eval_span(StrIter::new(input))
+        self.eval_span(OffsetStrIter::new(input))
     }
 
     /// Builds a ucg file at the named path.
@@ -993,7 +997,8 @@ impl<'a> Builder<'a> {
         let expr = &tok.fragment;
         expr_as_stmt.push_str(expr);
         expr_as_stmt.push_str(";");
-        let assert_input = StrIter::new(&expr_as_stmt);
+        let assert_input =
+            OffsetStrIter::new_with_offsets(&expr_as_stmt, 0, tok.pos.line - 1, tok.pos.column - 1);
         let ok = match self.eval_span(assert_input) {
             Ok(v) => v,
             Err(e) => {

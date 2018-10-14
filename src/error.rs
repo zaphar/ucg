@@ -80,7 +80,8 @@ impl Error {
         t: ErrorType,
         cause: Box<error::Error>,
     ) -> Self {
-        let mut e = Self::new(msg, t, Position { line: 0, column: 0 });
+        // TODO(jwall): This should take a real position instead of this fake one.
+        let mut e = Self::new(msg, t, Position::new(0, 0, 0));
         e.cause = Some(cause);
         return e;
     }

@@ -456,6 +456,7 @@ pub mod tokenizer;
 pub mod build;
 pub mod convert;
 pub mod error;
+pub mod iter;
 pub mod parse;
 
 mod format;

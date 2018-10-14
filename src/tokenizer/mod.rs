@@ -16,20 +16,19 @@
 use std;
 
 use abortable_parser::combinators::*;
-use abortable_parser::iter::{SliceIter, StrIter};
+use abortable_parser::iter::SliceIter;
 use abortable_parser::{Error, Offsetable, Result, TextPositionTracker};
-use ast::*;
 
-impl<'a> From<StrIter<'a>> for Position {
-    fn from(s: StrIter<'a>) -> Position {
-        Position {
-            line: s.line(),
-            column: s.column(),
-        }
+use ast::*;
+use iter::OffsetStrIter;
+
+impl<'a> From<OffsetStrIter<'a>> for Position {
+    fn from(s: OffsetStrIter<'a>) -> Position {
+        Position::new(s.line(), s.column(), s.get_offset())
     }
 }
 
-fn is_symbol_char<'a>(i: StrIter<'a>) -> Result<StrIter<'a>, u8> {
+fn is_symbol_char<'a>(i: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, u8> {
     let mut _i = i.clone();
     let c = match _i.next() {
         Some(c) => *c,
@@ -42,7 +41,7 @@ fn is_symbol_char<'a>(i: StrIter<'a>) -> Result<StrIter<'a>, u8> {
     }
 }
 
-fn escapequoted<'a>(input: StrIter<'a>) -> Result<StrIter<'a>, String> {
+fn escapequoted<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, String> {
     // loop until we find a " that is not preceded by \.
     // Collapse all \<char> to just char  for escaping.
     let mut frag = String::new();
@@ -69,7 +68,7 @@ fn escapequoted<'a>(input: StrIter<'a>) -> Result<StrIter<'a>, String> {
     return Result::Incomplete(_input.get_offset());
 }
 
-make_fn!(strtok<StrIter, Token>,
+make_fn!(strtok<OffsetStrIter, Token>,
        do_each!(
            span => input!(),
            _    => text_token!("\""),
@@ -82,7 +81,7 @@ make_fn!(strtok<StrIter, Token>,
        )
 );
 
-make_fn!(pipequotetok<StrIter, Token>,
+make_fn!(pipequotetok<OffsetStrIter, Token>,
        do_each!(
            p    => input!(),
            _    => text_token!("|"),
@@ -96,7 +95,7 @@ make_fn!(pipequotetok<StrIter, Token>,
        )
 );
 
-make_fn!(barewordtok<StrIter, Token>,
+make_fn!(barewordtok<OffsetStrIter, Token>,
        do_each!(
            span => input!(),
            _    => peek!(ascii_alpha),
@@ -109,7 +108,7 @@ make_fn!(barewordtok<StrIter, Token>,
        )
 );
 
-make_fn!(digittok<StrIter, Token>,
+make_fn!(digittok<OffsetStrIter, Token>,
        do_each!(
            span => input!(),
            _ => peek!(ascii_digit),
@@ -122,7 +121,7 @@ make_fn!(digittok<StrIter, Token>,
        )
 );
 
-make_fn!(booleantok<StrIter, Token>,
+make_fn!(booleantok<OffsetStrIter, Token>,
     do_each!(
         span => input!(),
         token => either!(
@@ -142,159 +141,159 @@ make_fn!(booleantok<StrIter, Token>,
 macro_rules! do_text_token_tok {
     ($i:expr, $type:expr, $text_token:expr, WS) => {
         do_each!($i,
-                            span => input!(),
-                            frag => text_token!($text_token),
-                            _ => either!(whitespace, comment),
-                            (Token {
-                                typ: $type,
-                                pos: Position::from(span),
-                                fragment: frag.to_string(),
-                            })
-                        )
+                                                            span => input!(),
+                                                            frag => text_token!($text_token),
+                                                            _ => either!(whitespace, comment),
+                                                            (Token {
+                                                                typ: $type,
+                                                                pos: Position::from(span),
+                                                                fragment: frag.to_string(),
+                                                            })
+                                                        )
     };
 
     ($i:expr, $type:expr, $text_token:expr) => {
         do_each!($i,
-                            span => input!(),
-                            frag => text_token!($text_token),
-                            (Token {
-                                typ: $type,
-                                pos: Position::from(span),
-                                fragment: frag.to_string(),
-                            })
-                        )
+                                                            span => input!(),
+                                                            frag => text_token!($text_token),
+                                                            (Token {
+                                                                typ: $type,
+                                                                pos: Position::from(span),
+                                                                fragment: frag.to_string(),
+                                                            })
+                                                        )
     };
 }
 
-make_fn!(emptytok<StrIter, Token>,
+make_fn!(emptytok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::EMPTY, "NULL")
 );
 
-make_fn!(commatok<StrIter, Token>,
+make_fn!(commatok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, ",")
 );
 
-make_fn!(lbracetok<StrIter, Token>,
+make_fn!(lbracetok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, "{")
 );
 
-make_fn!(rbracetok<StrIter, Token>,
+make_fn!(rbracetok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, "}")
 );
 
-make_fn!(lparentok<StrIter, Token>,
+make_fn!(lparentok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, "(")
 );
 
-make_fn!(rparentok<StrIter, Token>,
+make_fn!(rparentok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, ")")
 );
 
-make_fn!(dottok<StrIter, Token>,
+make_fn!(dottok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, ".")
 );
 
-make_fn!(plustok<StrIter, Token>,
+make_fn!(plustok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, "+")
 );
 
-make_fn!(dashtok<StrIter, Token>,
+make_fn!(dashtok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, "-")
 );
 
-make_fn!(startok<StrIter, Token>,
+make_fn!(startok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, "*")
 );
 
-make_fn!(slashtok<StrIter, Token>,
+make_fn!(slashtok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, "/")
 );
 
-make_fn!(pcttok<StrIter, Token>,
+make_fn!(pcttok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, "%")
 );
 
-make_fn!(eqeqtok<StrIter, Token>,
+make_fn!(eqeqtok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, "==")
 );
 
-make_fn!(notequaltok<StrIter, Token>,
+make_fn!(notequaltok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, "!=")
 );
 
-make_fn!(gttok<StrIter, Token>,
+make_fn!(gttok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, ">")
 );
 
-make_fn!(gtequaltok<StrIter, Token>,
+make_fn!(gtequaltok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, ">=")
 );
 
-make_fn!(ltequaltok<StrIter, Token>,
+make_fn!(ltequaltok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, "<=")
 );
 
-make_fn!(lttok<StrIter, Token>,
+make_fn!(lttok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, "<")
 );
 
-make_fn!(equaltok<StrIter, Token>,
+make_fn!(equaltok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, "=")
 );
 
-make_fn!(semicolontok<StrIter, Token>,
+make_fn!(semicolontok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, ";")
 );
 
-make_fn!(leftsquarebracket<StrIter, Token>,
+make_fn!(leftsquarebracket<OffsetStrIter, Token>,
     do_text_token_tok!(TokenType::PUNCT, "[")
 );
 
-make_fn!(rightsquarebracket<StrIter, Token>,
+make_fn!(rightsquarebracket<OffsetStrIter, Token>,
     do_text_token_tok!(TokenType::PUNCT, "]")
 );
 
-make_fn!(fatcommatok<StrIter, Token>,
+make_fn!(fatcommatok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, "=>")
 );
 
-make_fn!(selecttok<StrIter, Token>,
+make_fn!(selecttok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "select", WS)
 );
 
-make_fn!(macrotok<StrIter, Token>,
+make_fn!(macrotok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "macro", WS)
 );
 
-make_fn!(lettok<StrIter, Token>,
+make_fn!(lettok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "let", WS)
 );
 
-make_fn!(importtok<StrIter, Token>,
+make_fn!(importtok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "import", WS)
 );
 
-make_fn!(asserttok<StrIter, Token>,
+make_fn!(asserttok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "assert", WS)
 );
 
-make_fn!(outtok<StrIter, Token>,
+make_fn!(outtok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "out", WS)
 );
 
-make_fn!(astok<StrIter, Token>,
+make_fn!(astok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "as", WS)
 );
 
-make_fn!(maptok<StrIter, Token>,
+make_fn!(maptok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "map", WS)
 );
 
-make_fn!(filtertok<StrIter, Token>,
+make_fn!(filtertok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "filter", WS)
 );
 
-fn comment(input: StrIter) -> Result<StrIter, Token> {
+fn comment(input: OffsetStrIter) -> Result<OffsetStrIter, Token> {
     match text_token!(input, "//") {
         Result::Complete(rest, _) => {
             match until!(
@@ -306,12 +305,7 @@ fn comment(input: StrIter) -> Result<StrIter, Token> {
                 )
             ) {
                 Result::Complete(rest, cmt) => {
-                    return Result::Complete(
-                        rest,
-                        make_tok!(CMT => cmt.to_string(),
-                                  input.line() as usize,
-                                  input.column() as usize),
-                    );
+                    return Result::Complete(rest, make_tok!(CMT => cmt.to_string(), input));
                 }
                 // If we didn't find a new line then we just grab everything.
                 _ => {
@@ -325,7 +319,7 @@ fn comment(input: StrIter) -> Result<StrIter, Token> {
     }
 }
 
-make_fn!(whitespace<StrIter, Token>,
+make_fn!(whitespace<OffsetStrIter, Token>,
     do_each!(
         span => input!(),
         _ => peek!(ascii_ws),
@@ -338,7 +332,7 @@ make_fn!(whitespace<StrIter, Token>,
     )
 );
 
-make_fn!(end_of_input<StrIter, Token>,
+make_fn!(end_of_input<OffsetStrIter, Token>,
     do_each!(
         span => input!(),
         _ => eoi,
@@ -350,7 +344,7 @@ make_fn!(end_of_input<StrIter, Token>,
     )
 );
 
-make_fn!(token<StrIter, Token>,
+make_fn!(token<OffsetStrIter, Token>,
     either!(
         strtok,
         pipequotetok,
@@ -394,14 +388,15 @@ make_fn!(token<StrIter, Token>,
         end_of_input)
 );
 
-/// Consumes an input StrIter and returns either a Vec<Token> or a error::Error.
-pub fn tokenize(input: StrIter) -> std::result::Result<Vec<Token>, Error> {
+/// Consumes an input OffsetStrIter and returns either a Vec<Token> or a error::Error.
+pub fn tokenize(input: OffsetStrIter) -> std::result::Result<Vec<Token>, Error> {
     let mut out = Vec::new();
     let mut i = input.clone();
     loop {
         if let Result::Complete(_, _) = eoi(i.clone()) {
             break;
         }
+        // FIXME(jwall): We need to return a error::Error so we have position information.
         match token(i.clone()) {
             Result::Abort(e) => {
                 return Err(Error::caused_by(
@@ -434,10 +429,7 @@ pub fn tokenize(input: StrIter) -> std::result::Result<Vec<Token>, Error> {
     out.push(Token {
         fragment: String::new(),
         typ: TokenType::END,
-        pos: Position {
-            line: i.line(),
-            column: i.column(),
-        },
+        pos: i.into(),
     });
     Ok(out)
 }
@@ -616,13 +608,7 @@ pub fn pos<'a>(i: SliceIter<'a, Token>) -> Result<SliceIter<'a, Token>, Position
     let tok = _i.next().unwrap();
     let line = tok.pos.line;
     let column = tok.pos.column;
-    Result::Complete(
-        i.clone(),
-        Position {
-            line: line,
-            column: column,
-        },
-    )
+    Result::Complete(i.clone(), Position::new(line, column, i.get_offset()))
 }
 
 #[cfg(test)]
