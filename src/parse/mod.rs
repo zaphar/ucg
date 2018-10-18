@@ -28,6 +28,7 @@ use error;
 use iter::OffsetStrIter;
 use tokenizer::*;
 
+// TODO(jwall): Rename this to something better.
 type NomResult<'a, O> = Result<SliceIter<'a, Token>, O>;
 
 #[cfg(feature = "tracing")]
@@ -35,7 +36,7 @@ const ENABLE_TRACE: bool = true;
 #[cfg(not(feature = "tracing"))]
 const ENABLE_TRACE: bool = false;
 
-type ParseResult<O> = std::result::Result<O, abortable_parser::Error>;
+type ParseResult<'a, O> = std::result::Result<O, abortable_parser::Error<SliceIter<'a, Token>>>;
 
 macro_rules! trace_nom {
     ($i:expr, $rule:ident!( $($args:tt)* )) => {
@@ -94,7 +95,10 @@ make_fn!(
 );
 
 // Helper function to make the return types work for down below.
-fn triple_to_number(v: (Option<Token>, Option<Token>, Option<Token>)) -> ParseResult<Value> {
+fn triple_to_number<'a>(
+    input: SliceIter<'a, Token>,
+    v: (Option<Token>, Option<Token>, Option<Token>),
+) -> ParseResult<'a, Value> {
     let (pref, mut pref_pos) = match v.0 {
         None => ("", Position::new(0, 0, 0)),
         Some(ref bs) => (bs.fragment.borrow(), bs.pos.clone()),
@@ -106,7 +110,10 @@ fn triple_to_number(v: (Option<Token>, Option<Token>, Option<Token>)) -> ParseRe
         let i = match FromStr::from_str(pref) {
             Ok(i) => i,
             Err(_) => {
-                return Err(Error::new(format!("Not an integer! {}", pref), &0));
+                return Err(Error::new(
+                    format!("Not an integer! {}", pref),
+                    Box::new(input.clone()),
+                ));
             }
         };
         return Ok(Value::Int(value_node!(i, pref_pos)));
@@ -116,9 +123,9 @@ fn triple_to_number(v: (Option<Token>, Option<Token>, Option<Token>)) -> ParseRe
         pref_pos = v.1.unwrap().pos;
     }
 
-    let (suf, pos) = match v.2 {
-        None => ("".to_string(), Position::new(0, 0, 0)),
-        Some(bs) => (bs.fragment, bs.pos),
+    let suf = match v.2 {
+        None => "".to_string(),
+        Some(bs) => bs.fragment,
     };
 
     let to_parse = pref.to_string() + "." + &suf;
@@ -127,7 +134,7 @@ fn triple_to_number(v: (Option<Token>, Option<Token>, Option<Token>)) -> ParseRe
         Err(_) => {
             return Err(Error::new(
                 format!("Not a float! {}", to_parse),
-                &pos.offset,
+                Box::new(input.clone()),
             ));
         }
     };
@@ -212,7 +219,6 @@ macro_rules! alt_peek {
     // This is our default termination case.
     // If there is no fallback then we return an Error.
     (__inner $i:expr, __end) => {
-        // FIXME(jwall): Should we make this a compile error instead?
         compile_error!("alt_peek! requirs a fallback case");
     };
 
@@ -270,10 +276,13 @@ fn number(input: SliceIter<Token>) -> Result<SliceIter<Token>, Value> {
         Result::Abort(e) => Result::Abort(e),
         Result::Fail(e) => Result::Fail(e),
         Result::Incomplete(offset) => Result::Incomplete(offset),
-        Result::Complete(rest, triple) => match triple_to_number(triple) {
-            Ok(val) => Result::Complete(rest, val),
-            Err(e) => Result::Fail(e),
-        },
+        Result::Complete(rest, triple) => {
+            let num = triple_to_number(rest.clone(), triple);
+            match num {
+                Ok(val) => Result::Complete(rest, val),
+                Err(e) => Result::Fail(e),
+            }
+        }
     }
 }
 // trace_macros!(false);
@@ -415,7 +424,7 @@ fn symbol_or_expression(input: SliceIter<Token>) -> NomResult<Expression> {
                     } else {
                         return Result::Fail(Error::new(
                             "Expected (.) but no dot found".to_string(),
-                            &rest,
+                            Box::new(rest.clone()),
                         ));
                     }
                 }
@@ -425,7 +434,7 @@ fn symbol_or_expression(input: SliceIter<Token>) -> NomResult<Expression> {
                     } else {
                         return Result::Fail(Error::new(
                             "Expected (.) but no dot found".to_string(),
-                            &rest,
+                            Box::new(rest.clone()),
                         ));
                     }
                 }
@@ -471,7 +480,7 @@ fn selector_list(input: SliceIter<Token>) -> NomResult<SelectorList> {
         if list.is_empty() {
             return Result::Fail(Error::new(
                 "(.) with no selector fields after".to_string(),
-                &rest,
+                Box::new(rest.clone()),
             ));
         } else {
             (rest, Some(list))
@@ -514,7 +523,12 @@ make_fn!(
     )
 );
 
-fn tuple_to_macro(pos: Position, vals: Option<Vec<Value>>, val: Value) -> ParseResult<Expression> {
+fn tuple_to_macro<'a>(
+    input: SliceIter<'a, Token>,
+    pos: Position,
+    vals: Option<Vec<Value>>,
+    val: Value,
+) -> ParseResult<'a, Expression> {
     let mut default_args = match vals {
         None => Vec::new(),
         Some(vals) => vals,
@@ -533,7 +547,7 @@ fn tuple_to_macro(pos: Position, vals: Option<Vec<Value>>, val: Value) -> ParseR
         })),
         val => Err(Error::new(
             format!("Expected Tuple Got {:?}", val),
-            &val.pos().offset,
+            Box::new(input.clone()),
         )),
     }
 }
@@ -558,34 +572,42 @@ fn macro_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Express
         Result::Abort(e) => Result::Abort(e),
         Result::Fail(e) => Result::Fail(e),
         Result::Incomplete(offset) => Result::Incomplete(offset),
-        Result::Complete(rest, (pos, arglist, map)) => match tuple_to_macro(pos, arglist, map) {
-            Ok(expr) => Result::Complete(rest, expr),
-            Err(e) => Result::Fail(Error::caused_by("Invalid Macro syntax", &rest, Box::new(e))),
-        },
+        Result::Complete(rest, (pos, arglist, map)) => {
+            match tuple_to_macro(rest.clone(), pos, arglist, map) {
+                Ok(expr) => Result::Complete(rest, expr),
+                Err(e) => Result::Fail(Error::caused_by(
+                    "Invalid Macro syntax",
+                    Box::new(e),
+                    Box::new(rest.clone()),
+                )),
+            }
+        }
     }
 }
 
-// FIXME(jwall): need to make this into a proper parse function.
-fn tuple_to_select(
-    pos: Position,
+fn tuple_to_select<'a>(
+    input: SliceIter<'a, Token>,
     e1: Expression,
     e2: Expression,
     val: Value,
-) -> ParseResult<Expression> {
+) -> ParseResult<'a, Expression> {
     match val {
         Value::Tuple(v) => Ok(Expression::Select(SelectDef {
             val: Box::new(e1),
             default: Box::new(e2),
             tuple: v.val,
-            pos: pos,
+            pos: (&input).into(),
         })),
-        val => Err(Error::new(format!("Expected Tuple Got {:?}", val), &0)),
+        val => Err(Error::new(
+            format!("Expected Tuple Got {:?}", val),
+            Box::new(input.clone()),
+        )),
     }
 }
 
 fn select_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expression> {
     let parsed = do_each!(input,
-        start => word!("select"),
+        _ => word!("select"),
         val => do_each!(
             expr => trace_nom!(expression),
             _ => punct!(","),
@@ -597,19 +619,19 @@ fn select_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expres
             (expr)
         ),
         map => trace_nom!(tuple),
-        (start.pos.clone(), val, default, map)
+        (val, default, map)
     );
     match parsed {
         Result::Abort(e) => Result::Abort(e),
         Result::Fail(e) => Result::Fail(e),
         Result::Incomplete(offset) => Result::Incomplete(offset),
-        Result::Complete(rest, (pos, val, default, map)) => {
-            match tuple_to_select(pos, val, default, map) {
+        Result::Complete(rest, (val, default, map)) => {
+            match tuple_to_select(input.clone(), val, default, map) {
                 Ok(expr) => Result::Complete(rest, expr),
                 Err(e) => Result::Fail(Error::caused_by(
                     "Invalid Select Expression",
-                    &rest,
                     Box::new(e),
+                    Box::new(rest.clone()),
                 )),
             }
         }
@@ -636,17 +658,21 @@ make_fn!(
     )
 );
 
-fn tuple_to_call(pos: Position, val: Value, exprs: Vec<Expression>) -> ParseResult<Expression> {
+fn tuple_to_call<'a>(
+    input: SliceIter<'a, Token>,
+    val: Value,
+    exprs: Vec<Expression>,
+) -> ParseResult<'a, Expression> {
     if let Value::Selector(def) = val {
         Ok(Expression::Call(CallDef {
             macroref: def,
             arglist: exprs,
-            pos: pos,
+            pos: (&input).into(),
         }))
     } else {
         Err(Error::new(
             format!("Expected Selector Got {:?}", val),
-            &val.pos().offset,
+            Box::new(input.clone()),
         ))
     }
 }
@@ -664,30 +690,34 @@ make_fn!(
 );
 
 fn call_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expression> {
-    let parsed = do_each!(input,
+    let parsed = do_each!(input.clone(),
         macroname => trace_nom!(selector_value),
         _ => punct!("("),
         args => separated!(punct!(","), trace_nom!(expression)),
         _ => punct!(")"),
-        (macroname.pos().clone(), macroname, args)
+        (macroname, args)
     );
     match parsed {
         Result::Abort(e) => Result::Abort(e),
         Result::Fail(e) => Result::Fail(e),
         Result::Incomplete(offset) => Result::Incomplete(offset),
-        Result::Complete(rest, (pos, name, args)) => match tuple_to_call(pos, name, args) {
+        Result::Complete(rest, (name, args)) => match tuple_to_call(input.clone(), name, args) {
             Ok(expr) => Result::Complete(rest, expr),
-            Err(e) => Result::Fail(Error::caused_by("Invalid Call Syntax", &rest, Box::new(e))),
+            Err(e) => Result::Fail(Error::caused_by(
+                "Invalid Call Syntax",
+                Box::new(e),
+                Box::new(rest),
+            )),
         },
     }
 }
 
-fn tuple_to_list_op(
-    pos: Position,
+fn tuple_to_list_op<'a>(
+    input: &'a SliceIter<Token>,
     kind: ListOpType,
     macroname: Value,
     list: Expression,
-) -> ParseResult<Expression> {
+) -> ParseResult<'a, Expression> {
     if let Value::Selector(mut def) = macroname {
         // First of all we need to assert that this is a selector of at least
         // two sections.
@@ -701,7 +731,7 @@ fn tuple_to_list_op(
                 }
                 return Err(Error::new(
                     format!("Missing a result field for the macro"),
-                    &def.pos.offset,
+                    Box::new(input.clone()),
                 ));
             }
             &mut Some(ref mut tl) => {
@@ -714,7 +744,7 @@ fn tuple_to_list_op(
                     }
                     return Err(Error::new(
                         format!("Missing a result field for the macro"),
-                        &def.pos.offset,
+                        Box::new(input.clone()),
                     ));
                 }
                 let fname = tl.pop();
@@ -726,7 +756,7 @@ fn tuple_to_list_op(
             mac: def,
             field: fieldname,
             target: Box::new(list),
-            pos: pos,
+            pos: input.into(),
         }));
     }
     if ENABLE_TRACE {
@@ -737,21 +767,21 @@ fn tuple_to_list_op(
     }
     return Err(Error::new(
         format!("Expected a selector but got {}", macroname.type_name()),
-        &pos.offset,
+        Box::new(input.clone()),
     ));
 }
 
 make_fn!(
     list_op_expression<SliceIter<Token>, Expression>,
     do_each!(
-        pos => pos,
+        input => input!(),
         optype => either!(
             do_each!(_ => word!("map"), (ListOpType::Map)),
             do_each!(_ => word!("filter"), (ListOpType::Filter))
         ),
         macroname => trace_nom!(selector_value),
         list => trace_nom!(non_op_expression),
-        (tuple_to_list_op(pos, optype, macroname, list).unwrap())
+        (tuple_to_list_op(&input, optype, macroname, list).unwrap())
     )
 );
 
@@ -893,7 +923,7 @@ fn statement(i: SliceIter<Token>) -> Result<SliceIter<Token>, Statement> {
 
 /// Parses a LocatedSpan into a list of Statements or an `error::Error`.
 pub fn parse(input: OffsetStrIter) -> std::result::Result<Vec<Statement>, error::Error> {
-    match tokenize(input.clone()) {
+    match tokenize(&input) {
         Ok(tokenized) => {
             let mut out = Vec::new();
             let mut i_ = SliceIter::from(&tokenized);
@@ -907,20 +937,18 @@ pub fn parse(input: OffsetStrIter) -> std::result::Result<Vec<Statement>, error:
                 match statement(i.clone()) {
                     Result::Abort(e) => {
                         let pos: Position = (&i).into();
-                        let err = error::Error::new_with_boxed_cause(
-                            "Statement Parse Error",
+                        let err = error::Error::new(
+                            format!("Statement Parse Error {}", e),
                             error::ErrorType::ParseError,
-                            Box::new(e),
                             pos,
                         );
                         return Err(err);
                     }
                     Result::Fail(e) => {
                         let pos: Position = (&i).into();
-                        let err = error::Error::new_with_boxed_cause(
-                            "Statement Parse Error",
+                        let err = error::Error::new(
+                            format!("Statement Parse Error {}", e),
                             error::ErrorType::ParseError,
-                            Box::new(e),
                             pos,
                         );
                         return Err(err);

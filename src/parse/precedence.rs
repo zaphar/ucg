@@ -49,7 +49,10 @@ make_fn!(
 fn parse_expression(i: SliceIter<Element>) -> Result<SliceIter<Element>, Expression> {
     let mut i_ = i.clone();
     if eoi(i_.clone()).is_complete() {
-        return Result::Abort(Error::new("Expected Expression found End Of Input", &i_));
+        return Result::Abort(Error::new(
+            "Expected Expression found End Of Input",
+            Box::new(i_),
+        ));
     }
     let el = i_.next();
     if let Some(&Element::Expr(ref expr)) = el {
@@ -60,7 +63,7 @@ fn parse_expression(i: SliceIter<Element>) -> Result<SliceIter<Element>, Express
             "Error while parsing Binary Expression Expected Expression got {:?}",
             el
         ),
-        &i_,
+        Box::new(i_),
     ));
 }
 
@@ -69,7 +72,7 @@ fn parse_sum_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, Binar
     if eoi(i_.clone()).is_complete() {
         return Result::Fail(Error::new(
             format!("Expected Expression found End Of Input"),
-            &i_,
+            Box::new(i_),
         ));
     }
     let el = i_.next();
@@ -91,7 +94,7 @@ fn parse_sum_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, Binar
             "Error while parsing Binary Expression Unexpected Operator {:?}",
             el
         ),
-        &i_,
+        Box::new(i_),
     ));
 }
 
@@ -114,7 +117,7 @@ fn parse_product_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, B
     if eoi(i_.clone()).is_complete() {
         return Result::Fail(Error::new(
             format!("Expected Expression found End Of Input"),
-            &i_,
+            Box::new(i_),
         ));
     }
     let el = i_.next();
@@ -136,7 +139,7 @@ fn parse_product_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, B
             "Error while parsing Binary Expression Unexpected Operator {:?}",
             el
         ),
-        &i_,
+        Box::new(i_),
     ));
 }
 
@@ -224,7 +227,7 @@ fn parse_compare_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, C
     if eoi(i_.clone()).is_complete() {
         return Result::Fail(Error::new(
             format!("Expected Expression found End Of Input"),
-            &i_,
+            Box::new(i_),
         ));
     }
     let el = i_.next();
@@ -236,7 +239,7 @@ fn parse_compare_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, C
             "Error while parsing Binary Expression Unexpected Operator {:?}",
             el
         ),
-        &i,
+        Box::new(i),
     ));
 }
 
@@ -309,24 +312,51 @@ fn parse_operand_list<'a>(i: SliceIter<'a, Token>) -> NomResult<'a, Vec<Element>
 }
 
 /// Parse a binary operator expression.
-pub fn op_expression<'a>(i: SliceIter<'a, Token>) -> NomResult<'a, Expression> {
+pub fn op_expression<'a>(i: SliceIter<'a, Token>) -> Result<SliceIter<Token>, Expression> {
     let preparse = parse_operand_list(i.clone());
     match preparse {
-        Result::Fail(e) => Result::Fail(e),
-        Result::Abort(e) => Result::Abort(e),
+        Result::Fail(e) => {
+            let err = Error::caused_by(
+                "Failed while parsing operator expression",
+                Box::new(e),
+                Box::new(i),
+            );
+            Result::Fail(err)
+        }
+        Result::Abort(e) => {
+            let err = Error::caused_by(
+                "Failed while parsing operator expression",
+                Box::new(e),
+                Box::new(i),
+            );
+            Result::Fail(err)
+        }
         Result::Incomplete(i) => Result::Incomplete(i),
         Result::Complete(rest, oplist) => {
             let mut i_ = SliceIter::new(&oplist);
             let parse_result = either!(
-                i_,
+                i_.clone(),
                 trace_nom!(compare_expression),
                 trace_nom!(math_expression)
             );
 
             match parse_result {
-                Result::Fail(e) => Result::Fail(e),
-                Result::Abort(e) => Result::Abort(e),
-                Result::Incomplete(i) => Result::Incomplete(i),
+                Result::Fail(_e) => {
+                    // TODO(jwall): It would be good to be able to use caused_by here.
+                    let err = Error::new(
+                        "Failed while parsing operator expression",
+                        Box::new(rest.clone()),
+                    );
+                    Result::Fail(err)
+                }
+                Result::Abort(_e) => {
+                    let err = Error::new(
+                        "Failed while parsing operator expression",
+                        Box::new(rest.clone()),
+                    );
+                    Result::Abort(err)
+                }
+                Result::Incomplete(_) => Result::Incomplete(i.clone()),
                 Result::Complete(_, expr) => Result::Complete(rest.clone(), expr),
             }
         }

@@ -24,7 +24,7 @@ macro_rules! assert_parse {
     };
     ($i:expr, $f:expr, $out:expr) => {{
         let input = OffsetStrIter::new($i);
-        match tokenize(input) {
+        match tokenize(&input) {
             Err(e) => assert!(false, format!("Tokenizer Error: {:?}", e)),
             Ok(val) => match $f(SliceIter::new(val.as_slice())) {
                 Result::Complete(_, result) => assert_eq!(result, $out),
@@ -40,7 +40,7 @@ macro_rules! assert_fail {
     };
     ($i:expr, $f:expr) => {{
         let input = OffsetStrIter::new($i);
-        match tokenize(input) {
+        match tokenize(&input) {
             Err(_) => assert!(true),
             Ok(val) => {
                 let result = $f(SliceIter::new(val.as_slice()));
@@ -56,7 +56,7 @@ macro_rules! assert_abort {
     };
     ($i:expr, $f:expr) => {{
         let input = OffsetStrIter::new($i);
-        match tokenize(input) {
+        match tokenize(&input) {
             Err(_) => assert!(true),
             Ok(val) => {
                 let result = $f(SliceIter::new(val.as_slice()));

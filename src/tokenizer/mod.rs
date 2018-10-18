@@ -27,12 +27,20 @@ fn is_symbol_char<'a>(i: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, u8> {
     let mut _i = i.clone();
     let c = match _i.next() {
         Some(c) => *c,
-        None => return Result::Fail(Error::new("Unexpected End of Input".to_string(), &_i)),
+        None => {
+            return Result::Fail(Error::new(
+                "Unexpected End of Input".to_string(),
+                Box::new(_i.clone()),
+            ))
+        }
     };
     if (c as char).is_ascii_alphanumeric() || c == b'-' || c == b'_' {
         Result::Complete(_i, c)
     } else {
-        Result::Fail(Error::new("Not a symbol character".to_string(), &_i))
+        Result::Fail(Error::new(
+            "Not a symbol character".to_string(),
+            Box::new(_i.clone()),
+        ))
     }
 }
 
@@ -60,7 +68,7 @@ fn escapequoted<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Strin
             escape = false; // reset our escaping sentinel
         }
     }
-    return Result::Incomplete(_input.get_offset());
+    return Result::Incomplete(_input.clone());
 }
 
 make_fn!(strtok<OffsetStrIter, Token>,
@@ -136,27 +144,27 @@ make_fn!(booleantok<OffsetStrIter, Token>,
 macro_rules! do_text_token_tok {
     ($i:expr, $type:expr, $text_token:expr, WS) => {
         do_each!($i,
-                        span => input!(),
-                        frag => text_token!($text_token),
-                        _ => either!(whitespace, comment),
-                        (Token {
-                            typ: $type,
-                            pos: Position::from(&span),
-                            fragment: frag.to_string(),
-                        })
-                        )
+                                                        span => input!(),
+                                                        frag => text_token!($text_token),
+                                                        _ => either!(whitespace, comment),
+                                                        (Token {
+                                                            typ: $type,
+                                                            pos: Position::from(&span),
+                                                            fragment: frag.to_string(),
+                                                        })
+                                                        )
     };
 
     ($i:expr, $type:expr, $text_token:expr) => {
         do_each!($i,
-                        span => input!(),
-                        frag => text_token!($text_token),
-                        (Token {
-                            typ: $type,
-                            pos: Position::from(&span),
-                            fragment: frag.to_string(),
-                        })
-                        )
+                                                        span => input!(),
+                                                        frag => text_token!($text_token),
+                                                        (Token {
+                                                            typ: $type,
+                                                            pos: Position::from(&span),
+                                                            fragment: frag.to_string(),
+                                                        })
+                                                        )
     };
 }
 
@@ -304,11 +312,14 @@ fn comment(input: OffsetStrIter) -> Result<OffsetStrIter, Token> {
                 }
                 // If we didn't find a new line then we just grab everything.
                 _ => {
-                    return Result::Abort(Error::new("Unparsable comment".to_string(), &rest));
+                    return Result::Abort(Error::new(
+                        "Unparsable comment".to_string(),
+                        Box::new(rest.clone()),
+                    ));
                 }
             }
         }
-        Result::Incomplete(offset) => return Result::Incomplete(offset),
+        Result::Incomplete(ctx) => return Result::Incomplete(ctx),
         Result::Fail(e) => return Result::Fail(e),
         Result::Abort(e) => return Result::Abort(e),
     }
@@ -339,8 +350,9 @@ make_fn!(end_of_input<OffsetStrIter, Token>,
     )
 );
 
-make_fn!(token<OffsetStrIter, Token>,
+fn token<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Token> {
     either!(
+        input,
         strtok,
         pipequotetok,
         emptytok, // This must come before the barewordtok
@@ -380,11 +392,12 @@ make_fn!(token<OffsetStrIter, Token>,
         filtertok,
         barewordtok,
         whitespace,
-        end_of_input)
-);
+        end_of_input
+    )
+}
 
 /// Consumes an input OffsetStrIter and returns either a Vec<Token> or a error::Error.
-pub fn tokenize(input: OffsetStrIter) -> std::result::Result<Vec<Token>, error::Error> {
+pub fn tokenize(input: &OffsetStrIter) -> std::result::Result<Vec<Token>, error::Error> {
     let mut out = Vec::new();
     let mut i = input.clone();
     loop {
@@ -392,27 +405,24 @@ pub fn tokenize(input: OffsetStrIter) -> std::result::Result<Vec<Token>, error::
             break;
         }
         let pos: Position = Position::from(&i);
-        // FIXME(jwall): We need to return a error::Error so we have position information.
         match token(i.clone()) {
             Result::Abort(e) => {
-                return Err(error::Error::new_with_boxed_cause(
-                    "Invalid Token encountered",
+                return Err(error::Error::new(
+                    format!("Invalid Token encountered {}", e),
                     error::ErrorType::UnexpectedToken,
-                    Box::new(e),
                     pos,
                 ))
             }
             Result::Fail(e) => {
-                return Err(error::Error::new_with_boxed_cause(
-                    "Invalid Token encountered",
+                return Err(error::Error::new(
+                    format!("Invalid Token encountered {}", e),
                     error::ErrorType::UnexpectedToken,
-                    Box::new(e),
                     pos,
                 ))
             }
             Result::Incomplete(_offset) => {
                 return Err(error::Error::new(
-                    "Invalid Token encountered",
+                    "Incomplete Token encountered",
                     error::ErrorType::IncompleteParsing,
                     pos,
                 ))
@@ -439,7 +449,7 @@ pub fn tokenize(input: OffsetStrIter) -> std::result::Result<Vec<Token>, error::
 /// Clones a token.
 ///
 /// This is necessary to allow the match_type and match_token macros to work.
-pub fn token_clone(t: &Token) -> std::result::Result<Token, Error> {
+pub fn token_clone(t: &Token) -> std::result::Result<Token, Error<SliceIter<Token>>> {
     Ok(t.clone())
 }
 
@@ -517,7 +527,7 @@ macro_rules! match_type {
 
         let mut _i = $i.clone();
         if eoi(_i.clone()).is_complete() {
-            Result::Fail(Error::new(format!("End of Input! {}", $msg), &$i))
+            Result::Fail(Error::new(format!("End of Input! {}", $msg), Box::new(_i)))
         } else {
             match _i.next() {
                 Some(tok) => {
@@ -525,14 +535,14 @@ macro_rules! match_type {
                         match $h(tok) {
                             std::result::Result::Ok(v) => Result::Complete(_i.clone(), v),
                             std::result::Result::Err(e) => {
-                                Result::Fail(Error::caused_by($msg, &_i, Box::new(e)))
+                                Result::Fail(Error::caused_by($msg, Box::new(e), Box::new(_i)))
                             }
                         }
                     } else {
-                        Result::Fail(Error::new($msg.to_string(), &$i))
+                        Result::Fail(Error::new($msg.to_string(), Box::new($i)))
                     }
                 }
-                None => Result::Fail(Error::new($msg.to_string(), &$i)),
+                None => Result::Fail(Error::new($msg.to_string(), Box::new($i))),
             }
         }
     }};
@@ -575,17 +585,17 @@ macro_rules! match_token {
                 match $h(tok) {
                     std::result::Result::Ok(v) => Result::Complete(i_.clone(), v),
                     std::result::Result::Err(e) => {
-                        Result::Fail(Error::caused_by($msg, &i_, Box::new(e)))
+                        Result::Fail(Error::caused_by($msg, Box::new(e), Box::new(i_)))
                     }
                 }
             } else {
                 Result::Fail(Error::new(
                     format!("Expected {} Instead is ({})", $msg, tok.fragment),
-                    &i_,
+                    Box::new(i_),
                 ))
             }
         } else {
-            Result::Fail(Error::new("Unexpected End Of Input", &i_))
+            Result::Fail(Error::new("Unexpected End Of Input", Box::new(i_)))
         }
     }};
 }

@@ -101,7 +101,8 @@ fn test_string_with_escaping() {
 
 #[test]
 fn test_tokenize_bareword_with_dash() {
-    let result = tokenize(OffsetStrIter::new("foo-bar "));
+    let input = OffsetStrIter::new("foo-bar ");
+    let result = tokenize(&input);
     assert!(result.is_ok(), format!("result {:?} is not ok", result));
     if let Ok(toks) = result {
         assert_eq!(toks.len(), 2);
@@ -165,10 +166,11 @@ fn test_lteqtok() {
 
 #[test]
 fn test_tokenize_one_of_each() {
-    let result = tokenize(OffsetStrIter::new(
+    let input = OffsetStrIter::new(
         "map out filter assert let import macro select as => [ ] { } ; = % / * \
          + - . ( ) , 1 . foo \"bar\" // comment\n ; true false == < > <= >= !=",
-    ));
+    );
+    let result = tokenize(&input);
     assert!(result.is_ok(), format!("result {:?} is not ok", result));
     let v = result.unwrap();
     for (i, t) in v.iter().enumerate() {
@@ -180,7 +182,8 @@ fn test_tokenize_one_of_each() {
 
 #[test]
 fn test_parse_has_end() {
-    let result = tokenize(OffsetStrIter::new("foo"));
+    let input = OffsetStrIter::new("foo");
+    let result = tokenize(&input);
     assert!(result.is_ok());
     let v = result.unwrap();
     assert_eq!(v.len(), 2);

@@ -10,7 +10,7 @@ keywords    = ["compiler", "config"]
 license     = "Apache-2.0"
 
 [dependencies]
-abortable_parser = "~0.1.0"
+abortable_parser = "~0.2.0"
 clap         = "~2.26.0"
 serde_json   = "~1.0.9"
 simple-error = "0.1"

@@ -81,7 +81,6 @@ impl Error {
         cause: Box<error::Error>,
         pos: Position,
     ) -> Self {
-        // FIXME(jwall): This should take a real position instead of this fake one.
         let mut e = Self::new(msg, t, pos);
         e.cause = Some(cause);
         return e;
