@@ -20,7 +20,7 @@ use abortable_parser::iter::SliceIter;
 use abortable_parser::{Error, Offsetable, Result};
 
 use ast::*;
-use error;
+use error::StackPrinter;
 use iter::OffsetStrIter;
 
 fn is_symbol_char<'a>(i: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, u8> {
@@ -144,27 +144,27 @@ make_fn!(booleantok<OffsetStrIter, Token>,
 macro_rules! do_text_token_tok {
     ($i:expr, $type:expr, $text_token:expr, WS) => {
         do_each!($i,
-                                                        span => input!(),
-                                                        frag => text_token!($text_token),
-                                                        _ => either!(whitespace, comment),
-                                                        (Token {
-                                                            typ: $type,
-                                                            pos: Position::from(&span),
-                                                            fragment: frag.to_string(),
-                                                        })
-                                                        )
+                                                                span => input!(),
+                                                                frag => text_token!($text_token),
+                                                                _ => either!(whitespace, comment),
+                                                                (Token {
+                                                                    typ: $type,
+                                                                    pos: Position::from(&span),
+                                                                    fragment: frag.to_string(),
+                                                                })
+                                                                )
     };
 
     ($i:expr, $type:expr, $text_token:expr) => {
         do_each!($i,
-                                                        span => input!(),
-                                                        frag => text_token!($text_token),
-                                                        (Token {
-                                                            typ: $type,
-                                                            pos: Position::from(&span),
-                                                            fragment: frag.to_string(),
-                                                        })
-                                                        )
+                                                                span => input!(),
+                                                                frag => text_token!($text_token),
+                                                                (Token {
+                                                                    typ: $type,
+                                                                    pos: Position::from(&span),
+                                                                    fragment: frag.to_string(),
+                                                                })
+                                                                )
     };
 }
 
@@ -397,35 +397,37 @@ fn token<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Token> {
 }
 
 /// Consumes an input OffsetStrIter and returns either a Vec<Token> or a error::Error.
-pub fn tokenize(input: &OffsetStrIter) -> std::result::Result<Vec<Token>, error::Error> {
+pub fn tokenize<'a>(input: OffsetStrIter<'a>) -> std::result::Result<Vec<Token>, String> {
     let mut out = Vec::new();
     let mut i = input.clone();
     loop {
         if let Result::Complete(_, _) = eoi(i.clone()) {
             break;
         }
-        let pos: Position = Position::from(&i);
         match token(i.clone()) {
             Result::Abort(e) => {
-                return Err(error::Error::new(
-                    format!("Invalid Token encountered {}", e),
-                    error::ErrorType::UnexpectedToken,
-                    pos,
-                ))
+                let err = abortable_parser::Error::caused_by(
+                    "Invalid Token encountered",
+                    Box::new(e),
+                    Box::new(i.clone()),
+                );
+                let ctx_err = StackPrinter { err: err };
+                return Err(format!("{}", ctx_err));
             }
             Result::Fail(e) => {
-                return Err(error::Error::new(
-                    format!("Invalid Token encountered {}", e),
-                    error::ErrorType::UnexpectedToken,
-                    pos,
-                ))
+                let err = abortable_parser::Error::caused_by(
+                    "Invalid Token encountered",
+                    Box::new(e),
+                    Box::new(i.clone()),
+                );
+                let ctx_err = StackPrinter { err: err };
+                return Err(format!("{}", ctx_err));
             }
             Result::Incomplete(_offset) => {
-                return Err(error::Error::new(
-                    "Incomplete Token encountered",
-                    error::ErrorType::IncompleteParsing,
-                    pos,
-                ))
+                let err =
+                    abortable_parser::Error::new("Invalid Token encountered", Box::new(i.clone()));
+                let ctx_err = StackPrinter { err: err };
+                return Err(format!("{}", ctx_err));
             }
             Result::Complete(rest, tok) => {
                 i = rest;

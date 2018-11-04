@@ -24,7 +24,7 @@ macro_rules! assert_parse {
     };
     ($i:expr, $f:expr, $out:expr) => {{
         let input = OffsetStrIter::new($i);
-        match tokenize(&input) {
+        match tokenize(input.clone()) {
             Err(e) => assert!(false, format!("Tokenizer Error: {:?}", e)),
             Ok(val) => match $f(SliceIter::new(val.as_slice())) {
                 Result::Complete(_, result) => assert_eq!(result, $out),
@@ -40,7 +40,7 @@ macro_rules! assert_fail {
     };
     ($i:expr, $f:expr) => {{
         let input = OffsetStrIter::new($i);
-        match tokenize(&input) {
+        match tokenize(input.clone()) {
             Err(_) => assert!(true),
             Ok(val) => {
                 let result = $f(SliceIter::new(val.as_slice()));
@@ -56,7 +56,7 @@ macro_rules! assert_abort {
     };
     ($i:expr, $f:expr) => {{
         let input = OffsetStrIter::new($i);
-        match tokenize(&input) {
+        match tokenize(input.clone()) {
             Err(_) => assert!(true),
             Ok(val) => {
                 let result = $f(SliceIter::new(val.as_slice()));
@@ -84,11 +84,11 @@ fn test_null_parsing() {
 fn test_boolean_parsing() {
     assert_parse!(
         boolean_value("true"),
-        Value::Boolean(Positioned::new(true, Position::new(1, 1, 0)))
+        Value::Boolean(PositionedItem::new(true, Position::new(1, 1, 0)))
     );
     assert_parse!(
         boolean_value("false"),
-        Value::Boolean(Positioned::new(false, Position::new(1, 1, 0)))
+        Value::Boolean(PositionedItem::new(false, Position::new(1, 1, 0)))
     );
     assert_fail!(boolean_value("truth"));
 }
@@ -141,7 +141,7 @@ fn test_selector_parsing() {
         Value::Selector(
             make_selector!(Expression::Grouped(Box::new(Expression::Simple(
             Value::Tuple(value_node!(
-                vec![(make_tok!("foo", Position::new(1, 3, 2)), Expression::Simple(Value::Int(Positioned::new(1, Position::new(1, 7, 6)))))],
+                vec![(make_tok!("foo", Position::new(1, 3, 2)), Expression::Simple(Value::Int(PositionedItem::new(1, Position::new(1, 7, 6)))))],
                 Position::new(1, 3, 3)))
             ))) => [ make_tok!("foo", Position::new(1, 11, 10)) ] => Position::new(1, 2, 1))
         )

@@ -24,7 +24,7 @@ use abortable_parser::{Error, Peekable, Result};
 
 use self::precedence::op_expression;
 use ast::*;
-use error;
+use error::StackPrinter;
 use iter::OffsetStrIter;
 use tokenizer::*;
 
@@ -291,7 +291,7 @@ make_fn!(
     boolean_value<SliceIter<Token>, Value>,
     do_each!(
         b => match_type!(BOOLEAN),
-        (Value::Boolean(Positioned{
+        (Value::Boolean(PositionedItem{
             val: b.fragment == "true",
             pos: b.pos,
         }))
@@ -535,7 +535,7 @@ fn tuple_to_macro<'a>(
     };
     let arglist = default_args
         .drain(0..)
-        .map(|s| Positioned {
+        .map(|s| PositionedItem {
             pos: s.pos().clone(),
             val: s.to_string(),
         }).collect();
@@ -922,11 +922,11 @@ fn statement(i: SliceIter<Token>) -> Result<SliceIter<Token>, Statement> {
 //trace_macros!(false);
 
 /// Parses a LocatedSpan into a list of Statements or an `error::Error`.
-pub fn parse(input: OffsetStrIter) -> std::result::Result<Vec<Statement>, error::Error> {
-    match tokenize(&input) {
+pub fn parse<'a>(input: OffsetStrIter<'a>) -> std::result::Result<Vec<Statement>, String> {
+    match tokenize(input.clone()) {
         Ok(tokenized) => {
             let mut out = Vec::new();
-            let mut i_ = SliceIter::from(&tokenized);
+            let mut i_ = SliceIter::new(&tokenized);
             loop {
                 let i = i_.clone();
                 if let Some(tok) = i.peek_next() {
@@ -936,31 +936,30 @@ pub fn parse(input: OffsetStrIter) -> std::result::Result<Vec<Statement>, error:
                 }
                 match statement(i.clone()) {
                     Result::Abort(e) => {
-                        let pos: Position = (&i).into();
-                        let err = error::Error::new(
-                            format!("Statement Parse Error {}", e),
-                            error::ErrorType::ParseError,
-                            pos,
+                        let err = abortable_parser::Error::caused_by(
+                            "Statement Parse Error",
+                            Box::new(e),
+                            Box::new(i.clone()),
                         );
-                        return Err(err);
+                        let ctx_err = StackPrinter { err: err };
+                        return Err(format!("{}", ctx_err));
                     }
                     Result::Fail(e) => {
-                        let pos: Position = (&i).into();
-                        let err = error::Error::new(
-                            format!("Statement Parse Error {}", e),
-                            error::ErrorType::ParseError,
-                            pos,
+                        let err = abortable_parser::Error::caused_by(
+                            "Statement Parse Error",
+                            Box::new(e),
+                            Box::new(i.clone()),
                         );
-                        return Err(err);
+                        let ctx_err = StackPrinter { err: err };
+                        return Err(format!("{}", ctx_err));
                     }
                     Result::Incomplete(_ei) => {
-                        let pos: Position = (&i).into();
-                        let err = error::Error::new(
+                        let err = abortable_parser::Error::new(
                             "Unexpected end of parse input",
-                            error::ErrorType::IncompleteParsing,
-                            pos,
+                            Box::new(i.clone()),
                         );
-                        return Err(err);
+                        let ctx_err = StackPrinter { err: err };
+                        return Err(format!("{}", ctx_err));
                     }
                     Result::Complete(rest, stmt) => {
                         out.push(stmt);
@@ -974,12 +973,7 @@ pub fn parse(input: OffsetStrIter) -> std::result::Result<Vec<Statement>, error:
             return Ok(out);
         }
         Err(e) => {
-            let err = error::Error::new_with_cause(
-                "Tokenization Error",
-                error::ErrorType::UnexpectedToken,
-                e,
-            );
-            return Err(err);
+            return Err(e);
         }
     }
 }

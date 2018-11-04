@@ -18,7 +18,7 @@ pub enum Val {
     Float(f64),
     Str(String),
     List(Vec<Rc<Val>>),
-    Tuple(Vec<(Positioned<String>, Rc<Val>)>),
+    Tuple(Vec<(PositionedItem<String>, Rc<Val>)>),
     Macro(MacroDef),
 }
 
@@ -114,7 +114,7 @@ impl Val {
     }
 
     /// Returns the fields if this Val is a tuple. None otherwise.
-    pub fn get_fields(&self) -> Option<&Vec<(Positioned<String>, Rc<Val>)>> {
+    pub fn get_fields(&self) -> Option<&Vec<(PositionedItem<String>, Rc<Val>)>> {
         if let &Val::Tuple(ref fs) = self {
             Some(fs)
         } else {

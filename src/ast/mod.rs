@@ -25,6 +25,8 @@ use std::fmt;
 use std::hash::Hash;
 use std::hash::Hasher;
 
+use abortable_parser;
+
 macro_rules! enum_type_equality {
     ( $slf:ident, $r:expr, $( $l:pat ),* ) => {
         match $slf {
@@ -110,6 +112,15 @@ impl Token {
     }
 }
 
+impl abortable_parser::Positioned for Token {
+    fn line(&self) -> usize {
+        self.pos.line
+    }
+    fn column(&self) -> usize {
+        self.pos.column
+    }
+}
+
 impl Borrow<str> for Token {
     fn borrow(&self) -> &str {
         &self.fragment
@@ -119,7 +130,7 @@ impl Borrow<str> for Token {
 /// Helper macro for making a Positioned Value.
 macro_rules! value_node {
     ($v:expr, $p:expr) => {
-        Positioned::new_with_pos($v, $p)
+        PositionedItem::new_with_pos($v, $p)
     };
 }
 
@@ -159,11 +170,14 @@ macro_rules! make_tok {
 #[allow(unused_macros)]
 macro_rules! make_expr {
     ($e:expr, $i:expr) => {
-        Expression::Simple(Value::Symbol(Positioned::new_with_pos($e.to_string(), $i)))
+        Expression::Simple(Value::Symbol(PositionedItem::new_with_pos(
+            $e.to_string(),
+            $i,
+        )))
     };
 
     ($e:expr => int, $i:expr) => {
-        Expression::Simple(Value::Int(Positioned::new_with_pos($e, $i)))
+        Expression::Simple(Value::Int(PositionedItem::new_with_pos($e, $i)))
     };
 }
 
@@ -323,13 +337,13 @@ impl SelectorDef {
 pub enum Value {
     // Constant Values
     Empty(Position),
-    Boolean(Positioned<bool>),
-    Int(Positioned<i64>),
-    Float(Positioned<f64>),
-    Str(Positioned<String>),
-    Symbol(Positioned<String>),
+    Boolean(PositionedItem<bool>),
+    Int(PositionedItem<i64>),
+    Float(PositionedItem<f64>),
+    Str(PositionedItem<String>),
+    Symbol(PositionedItem<String>),
     // Complex Values
-    Tuple(Positioned<FieldList>),
+    Tuple(PositionedItem<FieldList>),
     List(ListDef),
     Selector(SelectorDef),
 }
@@ -434,18 +448,18 @@ pub struct SelectDef {
 
 /// Adds position information to any type `T`.
 #[derive(Debug, Clone)]
-pub struct Positioned<T> {
+pub struct PositionedItem<T> {
     pub pos: Position,
     pub val: T,
 }
 
-impl<T: std::fmt::Display> std::fmt::Display for Positioned<T> {
+impl<T: std::fmt::Display> std::fmt::Display for PositionedItem<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         write!(f, "{}", self.val)
     }
 }
 
-impl<T> Positioned<T> {
+impl<T> PositionedItem<T> {
     /// Constructs a new Positioned<T> with a value, line, and column information.
     pub fn new<P: Into<Position>>(v: T, p: P) -> Self {
         Self::new_with_pos(v, p.into())
@@ -453,48 +467,48 @@ impl<T> Positioned<T> {
 
     /// Constructs a new Positioned<T> with a value and a Position.
     pub fn new_with_pos(v: T, pos: Position) -> Self {
-        Positioned { pos: pos, val: v }
+        PositionedItem { pos: pos, val: v }
     }
 }
 
-impl<T: PartialEq> PartialEq for Positioned<T> {
+impl<T: PartialEq> PartialEq for PositionedItem<T> {
     fn eq(&self, other: &Self) -> bool {
         self.val == other.val
     }
 }
 
-impl<T: Eq> Eq for Positioned<T> {}
+impl<T: Eq> Eq for PositionedItem<T> {}
 
-impl<T: Ord> Ord for Positioned<T> {
+impl<T: Ord> Ord for PositionedItem<T> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.val.cmp(&other.val)
     }
 }
 
-impl<T: PartialOrd> PartialOrd for Positioned<T> {
+impl<T: PartialOrd> PartialOrd for PositionedItem<T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.val.partial_cmp(&other.val)
     }
 }
 
-impl<T: Hash> Hash for Positioned<T> {
+impl<T: Hash> Hash for PositionedItem<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.val.hash(state);
     }
 }
 
-impl<'a> From<&'a Token> for Positioned<String> {
-    fn from(t: &'a Token) -> Positioned<String> {
-        Positioned {
+impl<'a> From<&'a Token> for PositionedItem<String> {
+    fn from(t: &'a Token) -> PositionedItem<String> {
+        PositionedItem {
             pos: t.pos.clone(),
             val: t.fragment.to_string(),
         }
     }
 }
 
-impl<'a> From<&'a Positioned<String>> for Positioned<String> {
-    fn from(t: &Positioned<String>) -> Positioned<String> {
-        Positioned {
+impl<'a> From<&'a PositionedItem<String>> for PositionedItem<String> {
+    fn from(t: &PositionedItem<String>) -> PositionedItem<String> {
+        PositionedItem {
             pos: t.pos.clone(),
             val: t.val.clone(),
         }
@@ -508,7 +522,7 @@ impl<'a> From<&'a Positioned<String>> for Positioned<String> {
 /// any values except what is defined in their arguments.
 #[derive(PartialEq, Debug, Clone)]
 pub struct MacroDef {
-    pub argdefs: Vec<Positioned<String>>,
+    pub argdefs: Vec<PositionedItem<String>>,
     pub fields: FieldList,
     pub pos: Position,
 }

@@ -44,7 +44,7 @@ impl MacroDef {
         cache: Rc<RefCell<assets::Cache>>,
         env: Rc<Val>,
         mut args: Vec<Rc<Val>>,
-    ) -> Result<Vec<(Positioned<String>, Rc<Val>)>, Box<Error>> {
+    ) -> Result<Vec<(PositionedItem<String>, Rc<Val>)>, Box<Error>> {
         // Error conditions. If the args don't match the length and types of the argdefs then this is
         // macro call error.
         if args.len() > self.argdefs.len() {
@@ -61,12 +61,12 @@ impl MacroDef {
         // If the expressions reference Symbols not defined in the MacroDef that is also an error.
         // TODO(jwall): We should probably enforce that the Expression Symbols must be in argdefs rules
         // at Macro definition time not evaluation time.
-        let mut scope = HashMap::<Positioned<String>, Rc<Val>>::new();
+        let mut scope = HashMap::<PositionedItem<String>, Rc<Val>>::new();
         for (i, arg) in args.drain(0..).enumerate() {
             scope.entry(self.argdefs[i].clone()).or_insert(arg.clone());
         }
         let b = Builder::new_with_env_and_scope(root, cache, scope, env);
-        let mut result: Vec<(Positioned<String>, Rc<Val>)> = Vec::new();
+        let mut result: Vec<(PositionedItem<String>, Rc<Val>)> = Vec::new();
         for &(ref key, ref expr) in self.fields.iter() {
             // We clone the expressions here because this macro may be consumed
             // multiple times in the future.
@@ -81,7 +81,7 @@ impl MacroDef {
 type BuildResult = Result<(), Box<Error>>;
 
 /// Defines a set of values in a parsed file.
-type ValueMap = HashMap<Positioned<String>, Rc<Val>>;
+type ValueMap = HashMap<PositionedItem<String>, Rc<Val>>;
 
 /// AssertCollector collects the results of assertions in the UCG AST.
 pub struct AssertCollector {
@@ -136,7 +136,7 @@ macro_rules! eval_binary_expr {
 impl<'a> Builder<'a> {
     // TOOD(jwall): This needs some unit tests.
     fn tuple_to_val(&self, fields: &Vec<(Token, Expression)>) -> Result<Rc<Val>, Box<Error>> {
-        let mut new_fields = Vec::<(Positioned<String>, Rc<Val>)>::new();
+        let mut new_fields = Vec::<(PositionedItem<String>, Rc<Val>)>::new();
         for &(ref name, ref expr) in fields.iter() {
             let val = try!(self.eval_expr(expr));
             new_fields.push((name.into(), val));
@@ -190,10 +190,10 @@ impl<'a> Builder<'a> {
         cache: Rc<RefCell<assets::Cache>>,
         scope: ValueMap,
     ) -> Self {
-        let env_vars: Vec<(Positioned<String>, Rc<Val>)> = env::vars()
+        let env_vars: Vec<(PositionedItem<String>, Rc<Val>)> = env::vars()
             .map(|t| {
                 (
-                    Positioned::new(t.0, Position::new(0, 0, 0)),
+                    PositionedItem::new(t.0, Position::new(0, 0, 0)),
                     Rc::new(t.1.into()),
                 )
             }).collect();
@@ -225,7 +225,7 @@ impl<'a> Builder<'a> {
 
     /// Returns a Val by name from previously built UCG.
     pub fn get_out_by_name(&self, name: &str) -> Option<Rc<Val>> {
-        let key = Positioned {
+        let key = PositionedItem {
             pos: Position::new(0, 0, 0),
             val: name.to_string(),
         };
@@ -249,8 +249,7 @@ impl<'a> Builder<'a> {
     }
 
     fn eval_span(&mut self, input: OffsetStrIter) -> Result<Rc<Val>, Box<Error>> {
-        // TODO(jwall): This should really return a better error.
-        match parse(input) {
+        match parse(input.clone()) {
             Ok(stmts) => {
                 //panic!("Successfully parsed {}", input);
                 let mut out: Option<Rc<Val>> = None;
@@ -262,13 +261,10 @@ impl<'a> Builder<'a> {
                     Some(val) => Ok(val),
                 }
             }
-            Err(err) => Err(Box::new(error::Error::new_with_cause(
-                format!(
-                    "Error while parsing file: {}",
-                    self.curr_file.unwrap_or("<eval>")
-                ),
+            Err(err) => Err(Box::new(error::Error::new(
+                format!("{}", err,),
                 error::ErrorType::ParseError,
-                err,
+                (&input).into(),
             ))),
         }
     }
@@ -301,7 +297,8 @@ impl<'a> Builder<'a> {
                 let mut b = Self::new(normalized.clone(), self.assets.clone());
                 let filepath = normalized.to_str().unwrap().clone();
                 try!(b.build_file(filepath));
-                let fields: Vec<(Positioned<String>, Rc<Val>)> = b.build_output.drain().collect();
+                let fields: Vec<(PositionedItem<String>, Rc<Val>)> =
+                    b.build_output.drain().collect();
                 Rc::new(Val::Tuple(fields))
             }
         };
@@ -366,7 +363,7 @@ impl<'a> Builder<'a> {
         }
     }
 
-    fn lookup_sym(&self, sym: &Positioned<String>) -> Option<Rc<Val>> {
+    fn lookup_sym(&self, sym: &PositionedItem<String>) -> Option<Rc<Val>> {
         if &sym.val == "env" {
             return Some(self.env.clone());
         }
@@ -376,7 +373,10 @@ impl<'a> Builder<'a> {
         None
     }
 
-    fn find_in_fieldlist(target: &str, fs: &Vec<(Positioned<String>, Rc<Val>)>) -> Option<Rc<Val>> {
+    fn find_in_fieldlist(
+        target: &str,
+        fs: &Vec<(PositionedItem<String>, Rc<Val>)>,
+    ) -> Option<Rc<Val>> {
         for (key, val) in fs.iter().cloned() {
             if target == &key.val {
                 return Some(val.clone());
@@ -390,7 +390,7 @@ impl<'a> Builder<'a> {
         stack: &mut VecDeque<Rc<Val>>,
         sl: &SelectorList,
         next: (&Position, &str),
-        fs: &Vec<(Positioned<String>, Rc<Val>)>,
+        fs: &Vec<(PositionedItem<String>, Rc<Val>)>,
     ) -> Result<(), Box<Error>> {
         if let Some(vv) = Self::find_in_fieldlist(next.1, fs) {
             stack.push_back(vv.clone());
@@ -781,7 +781,7 @@ impl<'a> Builder<'a> {
     fn eval_copy(&self, def: &CopyDef) -> Result<Rc<Val>, Box<Error>> {
         let v = try!(self.lookup_selector(&def.selector.sel));
         if let Val::Tuple(ref src_fields) = *v {
-            let mut m = HashMap::<Positioned<String>, (i32, Rc<Val>)>::new();
+            let mut m = HashMap::<PositionedItem<String>, (i32, Rc<Val>)>::new();
             // loop through fields and build  up a hashmap
             let mut count = 0;
             for &(ref key, ref val) in src_fields.iter() {
@@ -830,7 +830,7 @@ impl<'a> Builder<'a> {
                     }
                 };
             }
-            let mut new_fields: Vec<(Positioned<String>, (i32, Rc<Val>))> = m.drain().collect();
+            let mut new_fields: Vec<(PositionedItem<String>, (i32, Rc<Val>))> = m.drain().collect();
             // We want to maintain our order for the fields to make comparing tuples
             // easier in later code. So we sort by the field order before constructing a new tuple.
             new_fields.sort_by(|a, b| {

@@ -1,9 +1,0 @@
----
-db_conn1: "db1.prod.net:3306/testdb"
-db_conn2: "db2.prod.net:3306/testdb"
-tmpldir: "./templates"
-prefix:
-  foo: bar
-l:
-  - foo
-  - bar

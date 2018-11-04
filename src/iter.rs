@@ -2,9 +2,7 @@ use std::convert::From;
 use std::iter::Iterator;
 
 use abortable_parser::iter::{SliceIter, StrIter};
-use abortable_parser::{
-    InputIter, Offsetable, Peekable, Seekable, Span, SpanRange, TextPositionTracker,
-};
+use abortable_parser::{InputIter, Offsetable, Peekable, Positioned, Seekable, Span, SpanRange};
 
 use ast::{Position, Token};
 
@@ -81,7 +79,7 @@ impl<'a> Peekable<&'a u8> for OffsetStrIter<'a> {
     }
 }
 
-impl<'a> TextPositionTracker for OffsetStrIter<'a> {
+impl<'a> Positioned for OffsetStrIter<'a> {
     fn line(&self) -> usize {
         self.contained.line() + self.line_offset
     }

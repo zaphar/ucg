@@ -17,7 +17,7 @@ use std;
 use std::io::{Cursor, Write};
 use std::rc::Rc;
 
-use ast::{Position, Positioned};
+use ast::{Position, PositionedItem};
 use build::Val;
 use build::Val::Tuple;
 use convert;
@@ -49,7 +49,7 @@ impl ExecConverter {
                     Position::new(0, 0, 0),
                 )));
             }
-            let mut env: Option<&Vec<(Positioned<String>, Rc<Val>)>> = None;
+            let mut env: Option<&Vec<(PositionedItem<String>, Rc<Val>)>> = None;
             let mut command: Option<&str> = None;
             let mut args: Option<&Vec<Rc<Val>>> = None;
             for &(ref name, ref val) in fields.iter() {
