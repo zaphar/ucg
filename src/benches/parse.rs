@@ -16,17 +16,20 @@
 
 #[macro_use]
 extern crate bencher;
+extern crate abortable_parser;
 extern crate cpuprofiler;
-extern crate nom_locate;
 extern crate ucglib;
 
 use bencher::Bencher;
+
+use ucglib::iter::OffsetStrIter;
+
 //use cpuprofiler::PROFILER;
 
 use ucglib::parse::*;
 
 fn do_parse(i: &str) {
-    parse(nom_locate::LocatedSpan::new(i));
+    parse(OffsetStrIter::new(i));
 }
 
 fn parse_int(b: &mut Bencher) {

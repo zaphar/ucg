@@ -17,21 +17,23 @@ use super::*;
 #[test]
 pub fn test_macro_validation_happy_path() {
     let def = MacroDef {
-        argdefs: vec![value_node!("foo".to_string(), 1, 0)],
+        argdefs: vec![value_node!("foo".to_string(), Position::new(1, 0, 0))],
         fields: vec![(
-            make_tok!("f1", 1, 1),
+            make_tok!("f1", Position::new(1, 1, 0)),
             Expression::Binary(BinaryOpDef {
                 kind: BinaryExprType::Add,
                 left: Box::new(Expression::Simple(Value::Symbol(value_node!(
                     "foo".to_string(),
-                    1,
-                    1
+                    Position::new(1, 1, 0)
                 )))),
-                right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
-                pos: Position::new(1, 0),
+                right: Box::new(Expression::Simple(Value::Int(value_node!(
+                    1,
+                    Position::new(1, 1, 0)
+                )))),
+                pos: Position::new(1, 0, 0),
             }),
         )],
-        pos: Position::new(1, 0),
+        pos: Position::new(1, 0, 0),
     };
     assert!(def.validate_symbols().unwrap() == ());
 }
@@ -39,21 +41,23 @@ pub fn test_macro_validation_happy_path() {
 #[test]
 pub fn test_macro_validation_fail() {
     let def = MacroDef {
-        argdefs: vec![value_node!("foo".to_string(), 1, 0)],
+        argdefs: vec![value_node!("foo".to_string(), Position::new(1, 0, 0))],
         fields: vec![(
-            make_tok!("f1", 1, 1),
+            make_tok!("f1", Position::new(1, 1, 0)),
             Expression::Binary(BinaryOpDef {
                 kind: BinaryExprType::Add,
                 left: Box::new(Expression::Simple(Value::Symbol(value_node!(
                     "bar".to_string(),
-                    1,
-                    1
+                    Position::new(1, 1, 0)
                 )))),
-                right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
-                pos: Position::new(1, 0),
+                right: Box::new(Expression::Simple(Value::Int(value_node!(
+                    1,
+                    Position::new(1, 1, 0)
+                )))),
+                pos: Position::new(1, 0, 0),
             }),
         )],
-        pos: Position::new(1, 0),
+        pos: Position::new(1, 0, 0),
     };
     let mut expected = HashSet::new();
     expected.insert("bar".to_string());
@@ -63,20 +67,23 @@ pub fn test_macro_validation_fail() {
 #[test]
 pub fn test_macro_validation_selector_happy_path() {
     let def = MacroDef {
-        argdefs: vec![value_node!("foo".to_string(), 1, 0)],
+        argdefs: vec![value_node!("foo".to_string(), Position::new(1, 0, 0))],
         fields: vec![(
-            make_tok!("f1", 1, 1),
+            make_tok!("f1", Position::new(1, 1, 0)),
             Expression::Binary(BinaryOpDef {
                 kind: BinaryExprType::Add,
-                left: Box::new(Expression::Simple(Value::Selector(
-                    make_selector!(make_expr!("foo", 1, 1) => [
-                    make_tok!("quux", 1, 1) ] => 1, 1),
-                ))),
-                right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
-                pos: Position::new(1, 0),
+                left: Box::new(Expression::Simple(Value::Selector(make_selector!(
+                        make_expr!("foo", Position::new(1, 1, 0)) => [
+                            make_tok!("quux", Position::new(1, 1, 0)) ]
+                        => Position::new(1, 1, 0))))),
+                right: Box::new(Expression::Simple(Value::Int(value_node!(
+                    1,
+                    Position::new(1, 1, 0)
+                )))),
+                pos: Position::new(1, 0, 0),
             }),
         )],
-        pos: Position::new(1, 0),
+        pos: Position::new(1, 0, 0),
     };
     assert!(def.validate_symbols().unwrap() == ());
 }
@@ -84,20 +91,23 @@ pub fn test_macro_validation_selector_happy_path() {
 #[test]
 pub fn test_macro_validation_selector_fail() {
     let def = MacroDef {
-        argdefs: vec![value_node!("foo".to_string(), 1, 0)],
+        argdefs: vec![value_node!("foo".to_string(), Position::new(1, 0, 0))],
         fields: vec![(
-            make_tok!("f1", 1, 1),
+            make_tok!("f1", Position::new(1, 1, 0)),
             Expression::Binary(BinaryOpDef {
                 kind: BinaryExprType::Add,
                 left: Box::new(Expression::Simple(Value::Selector(
-                    make_selector!(make_expr!("bar", 1, 1) => [
-                    make_tok!("quux", 1, 1) ] => 1, 1),
+                    make_selector!(make_expr!("bar", Position::new(1, 1, 0)) => [
+                    make_tok!("quux", Position::new(1, 1, 0)) ] => Position::new(1, 1, 0)),
                 ))),
-                right: Box::new(Expression::Simple(Value::Int(value_node!(1, 1, 1)))),
-                pos: Position::new(1, 0),
+                right: Box::new(Expression::Simple(Value::Int(value_node!(
+                    1,
+                    Position::new(1, 1, 0)
+                )))),
+                pos: Position::new(1, 0, 0),
             }),
         )],
-        pos: Position::new(1, 0),
+        pos: Position::new(1, 0, 0),
     };
     let mut expected = HashSet::new();
     expected.insert("bar".to_string());

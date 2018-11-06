@@ -25,7 +25,7 @@ impl YamlConverter {
 
     fn convert_tuple(
         &self,
-        items: &Vec<(ast::Positioned<String>, Rc<Val>)>,
+        items: &Vec<(ast::PositionedItem<String>, Rc<Val>)>,
     ) -> std::io::Result<serde_yaml::Value> {
         let mut mapping = serde_yaml::Mapping::new();
         for &(ref k, ref v) in items.iter() {

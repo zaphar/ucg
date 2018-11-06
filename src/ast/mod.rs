@@ -21,10 +21,11 @@ use std::cmp::PartialEq;
 use std::cmp::PartialOrd;
 use std::collections::HashSet;
 use std::convert::Into;
+use std::fmt;
 use std::hash::Hash;
 use std::hash::Hasher;
 
-use std::fmt;
+use abortable_parser;
 
 macro_rules! enum_type_equality {
     ( $slf:ident, $r:expr, $( $l:pat ),* ) => {
@@ -50,15 +51,23 @@ macro_rules! enum_type_equality {
 pub struct Position {
     pub line: usize,
     pub column: usize,
+    pub offset: usize,
 }
 
 impl Position {
     /// Construct a new Position.
-    pub fn new(line: usize, column: usize) -> Self {
+    pub fn new(line: usize, column: usize, offset: usize) -> Self {
         Position {
             line: line,
             column: column,
+            offset: offset,
         }
+    }
+}
+
+impl<'a> From<&'a Position> for Position {
+    fn from(source: &'a Position) -> Self {
+        source.clone()
     }
 }
 
@@ -89,8 +98,8 @@ pub struct Token {
 
 impl Token {
     /// Constructs a new Token with a type and line and column information.
-    pub fn new<S: Into<String>>(f: S, typ: TokenType, line: usize, col: usize) -> Self {
-        Self::new_with_pos(f, typ, Position::new(line, col))
+    pub fn new<S: Into<String>, P: Into<Position>>(f: S, typ: TokenType, p: P) -> Self {
+        Self::new_with_pos(f, typ, p.into())
     }
 
     // Constructs a new Token with a type and a Position.
@@ -103,6 +112,15 @@ impl Token {
     }
 }
 
+impl abortable_parser::Positioned for Token {
+    fn line(&self) -> usize {
+        self.pos.line
+    }
+    fn column(&self) -> usize {
+        self.pos.column
+    }
+}
+
 impl Borrow<str> for Token {
     fn borrow(&self) -> &str {
         &self.fragment
@@ -112,58 +130,54 @@ impl Borrow<str> for Token {
 /// Helper macro for making a Positioned Value.
 macro_rules! value_node {
     ($v:expr, $p:expr) => {
-        Positioned::new_with_pos($v, $p)
-    };
-    ($v:expr, $l:expr, $c:expr) => {
-        Positioned::new($v, $l, $c)
+        PositionedItem::new_with_pos($v, $p)
     };
 }
 
 /// Helper macro for making a Token.
 #[allow(unused_macros)]
 macro_rules! make_tok {
-    (EOF => $l:expr, $c:expr) => {
-        Token::new("", TokenType::END, $l, $c)
+    (EOF => $i:expr) => {
+        Token::new("", TokenType::END, &$i)
     };
 
-    (WS => $l:expr, $c:expr) => {
-        Token::new("", TokenType::WS, $l, $c)
+    (WS => $i:expr) => {
+        Token::new("", TokenType::WS, &$i)
     };
 
-    (CMT => $e:expr, $l:expr, $c:expr) => {
-        Token::new($e, TokenType::COMMENT, $l, $c)
+    (CMT => $e:expr, $i:expr) => {
+        Token::new($e, TokenType::COMMENT, &$i)
     };
 
-    (QUOT => $e:expr, $l:expr, $c:expr) => {
-        Token::new($e, TokenType::QUOTED, $l, $c)
+    (QUOT => $e:expr, $i:expr) => {
+        Token::new($e, TokenType::QUOTED, &$i)
     };
 
-    (PUNCT => $e:expr, $l:expr, $c:expr) => {
-        Token::new($e, TokenType::PUNCT, $l, $c)
+    (PUNCT => $e:expr, $i:expr) => {
+        Token::new($e, TokenType::PUNCT, &$i)
     };
 
-    (DIGIT => $e:expr, $l:expr, $c:expr) => {
-        Token::new($e, TokenType::DIGIT, $l, $c)
+    (DIGIT => $e:expr, $i:expr) => {
+        Token::new($e, TokenType::DIGIT, &$i)
     };
 
-    ($e:expr, $l:expr, $c:expr) => {
-        Token::new($e, TokenType::BAREWORD, $l, $c)
+    ($e:expr, $i:expr) => {
+        Token::new($e, TokenType::BAREWORD, &$i)
     };
 }
 
 /// Helper macro for making expressions.
 #[allow(unused_macros)]
 macro_rules! make_expr {
-    ($e:expr) => {
-        make_expr!($e, 1, 1)
+    ($e:expr, $i:expr) => {
+        Expression::Simple(Value::Symbol(PositionedItem::new_with_pos(
+            $e.to_string(),
+            $i,
+        )))
     };
 
-    ($e:expr, $l:expr, $c:expr) => {
-        Expression::Simple(Value::Symbol(Positioned::new($e.to_string(), $l, $c)))
-    };
-
-    ($e:expr => int, $l:expr, $c:expr) => {
-        Expression::Simple(Value::Int(Positioned::new($e, $l, $c)))
+    ($e:expr => int, $i:expr) => {
+        Expression::Simple(Value::Int(PositionedItem::new_with_pos($e, $i)))
     };
 }
 
@@ -180,30 +194,26 @@ macro_rules! make_expr {
 /// ```
 #[allow(unused_macros)]
 macro_rules! make_selector {
-    ( $h:expr ) => {
-        make_selector!($h, 1, 0)
-    };
-
-    ( $h:expr, $l:expr, $c:expr ) => {
+    ( $h:expr, $i:expr) => {
         SelectorDef::new(
             SelectorList{head: Box::new($h), tail: None},
-            $l, $c)
+            $i)
     };
 
-    ( $h: expr, $list:expr, $l:expr, $c:expr) => {
+    ( $h: expr, $list:expr, $i:expr) => {
         SelectorDef::new(
             SelectorList{head: Box::new($h), tail: Some($list)},
-            $l, $c)
+            $i)
     };
 
     // Tokens
-    ( $h:expr => [ $( $item:expr ),* ] ) => {
+    ( $h:expr => [ $( $item:expr ),* ], $i:expr ) => {
         {
-            make_selector!($h => [ $( $item, )* ] => 1, 1)
+            make_selector!($h => [ $( $item, )* ] => $i)
         }
     };
 
-    ( $h:expr => [ $( $item:expr ),* ] => $l:expr, $c:expr ) => {
+    ( $h:expr => [ $( $item:expr ),* ] => $i:expr ) => {
         {
             let mut list: Vec<Token> = Vec::new();
 
@@ -211,7 +221,7 @@ macro_rules! make_selector {
                 list.push($item);
             )*
 
-            make_selector!($h, list, $l, $c)
+            make_selector!($h, list, $i)
         }
     };
 
@@ -223,14 +233,14 @@ macro_rules! make_selector {
             let mut list: Vec<Token> = Vec::new();
 
             $(
-                list.push(make_tok!($item, 1, col));
+                list.push(make_tok!($item, Position::new(1, col, col)));
                 col += $item.len() + 1;
             )*
 
             // Shut up the lint about unused code;
             assert!(col != 0);
 
-            make_selector!($h, list, 1, 1)
+            make_selector!($h, list, Position::new(1, 1, 1))
         }
 
     };
@@ -241,14 +251,14 @@ macro_rules! make_selector {
             let mut list: Vec<Token> = Vec::new();
 
             $(
-                list.push(make_tok!($item, $l, col));
+                list.push(make_tok!($item, Position::new($l, col, col)));
                 col += $item.len() + 1;
             )*
 
             // Shut up the linter about unused code;
             assert!(col != 0);
 
-            make_selector!($h, list, $l, $c)
+            make_selector!($h, list, Position::new($l, $c, $c))
         }
     };
 }
@@ -314,9 +324,9 @@ pub struct SelectorDef {
 
 impl SelectorDef {
     /// Constructs a new SelectorDef.
-    pub fn new(sel: SelectorList, line: usize, col: usize) -> Self {
+    pub fn new<P: Into<Position>>(sel: SelectorList, p: P) -> Self {
         SelectorDef {
-            pos: Position::new(line, col),
+            pos: p.into(),
             sel: sel,
         }
     }
@@ -327,13 +337,13 @@ impl SelectorDef {
 pub enum Value {
     // Constant Values
     Empty(Position),
-    Boolean(Positioned<bool>),
-    Int(Positioned<i64>),
-    Float(Positioned<f64>),
-    Str(Positioned<String>),
-    Symbol(Positioned<String>),
+    Boolean(PositionedItem<bool>),
+    Int(PositionedItem<i64>),
+    Float(PositionedItem<f64>),
+    Str(PositionedItem<String>),
+    Symbol(PositionedItem<String>),
     // Complex Values
-    Tuple(Positioned<FieldList>),
+    Tuple(PositionedItem<FieldList>),
     List(ListDef),
     Selector(SelectorDef),
 }
@@ -438,67 +448,67 @@ pub struct SelectDef {
 
 /// Adds position information to any type `T`.
 #[derive(Debug, Clone)]
-pub struct Positioned<T> {
+pub struct PositionedItem<T> {
     pub pos: Position,
     pub val: T,
 }
 
-impl<T: std::fmt::Display> std::fmt::Display for Positioned<T> {
+impl<T: std::fmt::Display> std::fmt::Display for PositionedItem<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         write!(f, "{}", self.val)
     }
 }
 
-impl<T> Positioned<T> {
+impl<T> PositionedItem<T> {
     /// Constructs a new Positioned<T> with a value, line, and column information.
-    pub fn new(v: T, l: usize, c: usize) -> Self {
-        Self::new_with_pos(v, Position::new(l, c))
+    pub fn new<P: Into<Position>>(v: T, p: P) -> Self {
+        Self::new_with_pos(v, p.into())
     }
 
     /// Constructs a new Positioned<T> with a value and a Position.
     pub fn new_with_pos(v: T, pos: Position) -> Self {
-        Positioned { pos: pos, val: v }
+        PositionedItem { pos: pos, val: v }
     }
 }
 
-impl<T: PartialEq> PartialEq for Positioned<T> {
+impl<T: PartialEq> PartialEq for PositionedItem<T> {
     fn eq(&self, other: &Self) -> bool {
         self.val == other.val
     }
 }
 
-impl<T: Eq> Eq for Positioned<T> {}
+impl<T: Eq> Eq for PositionedItem<T> {}
 
-impl<T: Ord> Ord for Positioned<T> {
+impl<T: Ord> Ord for PositionedItem<T> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.val.cmp(&other.val)
     }
 }
 
-impl<T: PartialOrd> PartialOrd for Positioned<T> {
+impl<T: PartialOrd> PartialOrd for PositionedItem<T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.val.partial_cmp(&other.val)
     }
 }
 
-impl<T: Hash> Hash for Positioned<T> {
+impl<T: Hash> Hash for PositionedItem<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.val.hash(state);
     }
 }
 
-impl<'a> From<&'a Token> for Positioned<String> {
-    fn from(t: &'a Token) -> Positioned<String> {
-        Positioned {
+impl<'a> From<&'a Token> for PositionedItem<String> {
+    fn from(t: &'a Token) -> PositionedItem<String> {
+        PositionedItem {
             pos: t.pos.clone(),
             val: t.fragment.to_string(),
         }
     }
 }
 
-impl<'a> From<&'a Positioned<String>> for Positioned<String> {
-    fn from(t: &Positioned<String>) -> Positioned<String> {
-        Positioned {
+impl<'a> From<&'a PositionedItem<String>> for PositionedItem<String> {
+    fn from(t: &PositionedItem<String>) -> PositionedItem<String> {
+        PositionedItem {
             pos: t.pos.clone(),
             val: t.val.clone(),
         }
@@ -512,7 +522,7 @@ impl<'a> From<&'a Positioned<String>> for Positioned<String> {
 /// any values except what is defined in their arguments.
 #[derive(PartialEq, Debug, Clone)]
 pub struct MacroDef {
-    pub argdefs: Vec<Positioned<String>>,
+    pub argdefs: Vec<PositionedItem<String>>,
     pub fields: FieldList,
     pub pos: Position,
 }

@@ -82,21 +82,21 @@ mod test {
     #[test]
     fn test_format_happy_path() {
         let formatter = Formatter::new("foo @ @ \\@", vec!["bar", "quux"]);
-        let pos = Position { line: 0, column: 0 };
+        let pos = Position::new(0, 0, 0);
         assert_eq!(formatter.render(&pos).unwrap(), "foo bar quux @");
     }
 
     #[test]
     fn test_format_happy_wrong_too_few_args() {
         let formatter = Formatter::new("foo @ @ \\@", vec!["bar"]);
-        let pos = Position { line: 0, column: 0 };
+        let pos = Position::new(0, 0, 0);
         assert!(formatter.render(&pos).is_err());
     }
 
     #[test]
     fn test_format_happy_wrong_too_many_args() {
         let formatter = Formatter::new("foo @ @ \\@", vec!["bar", "quux", "baz"]);
-        let pos = Position { line: 0, column: 0 };
+        let pos = Position::new(0, 0, 0);
         assert!(formatter.render(&pos).is_err());
     }
 }

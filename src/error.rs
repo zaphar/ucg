@@ -15,10 +15,11 @@
 //! Errors for use by the ucg compiler.
 use std::error;
 use std::fmt;
+use std::fmt::Debug;
+
+use abortable_parser::Positioned;
 
 use ast::*;
-
-use nom;
 
 /// ErrorType defines the various types of errors that can result from compiling UCG into an
 /// output format.
@@ -62,7 +63,6 @@ pub struct Error {
     pub err_type: ErrorType,
     pub pos: Position,
     pub msg: String,
-    pub cause: Option<Box<Error>>,
     _pkgonly: (),
 }
 
@@ -72,51 +72,21 @@ impl Error {
             err_type: t,
             pos: pos,
             msg: msg.into(),
-            cause: None,
             _pkgonly: (),
-        }
-    }
-
-    pub fn new_with_boxed_cause<S: Into<String>>(msg: S, t: ErrorType, cause: Box<Self>) -> Self {
-        let mut e = Self::new(msg, t, cause.pos.clone());
-        e.cause = Some(cause);
-        return e;
-    }
-
-    pub fn new_with_cause<S: Into<String>>(msg: S, t: ErrorType, cause: Self) -> Self {
-        Self::new_with_boxed_cause(msg, t, Box::new(cause))
-    }
-
-    pub fn new_with_errorkind<S: Into<String>>(
-        msg: S,
-        t: ErrorType,
-        pos: Position,
-        cause: nom::ErrorKind<Error>,
-    ) -> Self {
-        match cause {
-            nom::ErrorKind::Custom(e) => Self::new_with_cause(msg, t, e),
-            e => Self::new_with_cause(
-                msg,
-                t,
-                Error::new(format!("ErrorKind: {}", e), ErrorType::Unsupported, pos),
-            ),
         }
     }
 
     fn render(&self, w: &mut fmt::Formatter) -> fmt::Result {
         try!(write!(
             w,
-            "{}: \"{}\" at line: {} column: {}",
-            self.err_type, self.msg, self.pos.line, self.pos.column
+            "{} at line: {} column: {}\nCaused By:\n\t{} ",
+            self.err_type, self.pos.line, self.pos.column, self.msg
         ));
-        if let Some(ref cause) = self.cause {
-            try!(write!(w, "\n\tCaused By: {}", cause));
-        }
         Ok(())
     }
 }
 
-impl fmt::Debug for Error {
+impl Debug for Error {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
         self.render(w)
     }
@@ -131,5 +101,52 @@ impl fmt::Display for Error {
 impl error::Error for Error {
     fn description(&self) -> &str {
         &self.msg
+    }
+}
+
+#[derive(Debug)]
+pub struct StackPrinter<C: abortable_parser::Positioned> {
+    pub err: abortable_parser::Error<C>,
+}
+
+impl<C> StackPrinter<C>
+where
+    C: abortable_parser::Positioned,
+{
+    pub fn render(&self, w: &mut fmt::Formatter) -> fmt::Result {
+        let mut curr_err = Some(&self.err);
+        let mut tabstop = "";
+        loop {
+            match curr_err {
+                // our exit condition;
+                None => break,
+                Some(err) => {
+                    let context = err.get_context();
+                    try!(write!(
+                        w,
+                        "{}{}: line: {}, column: {}\n",
+                        tabstop,
+                        err.get_msg(),
+                        context.line(),
+                        context.column(),
+                    ));
+                    tabstop = "\t";
+                    curr_err = err.get_cause();
+                    if curr_err.is_some() {
+                        try!(write!(w, "Caused by: \n"));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<C> fmt::Display for StackPrinter<C>
+where
+    C: Positioned,
+{
+    fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
+        self.render(w)
     }
 }

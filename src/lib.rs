@@ -444,9 +444,7 @@
 // to succeed.
 #![recursion_limit = "128"]
 #[macro_use]
-extern crate nom;
-#[macro_use]
-extern crate nom_locate;
+extern crate abortable_parser;
 extern crate serde_json;
 extern crate serde_yaml;
 extern crate simple_error;
@@ -458,6 +456,7 @@ pub mod tokenizer;
 pub mod build;
 pub mod convert;
 pub mod error;
+pub mod iter;
 pub mod parse;
 
 mod format;

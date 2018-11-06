@@ -16,7 +16,7 @@
 use std::io::Write;
 use std::rc::Rc;
 
-use ast::Positioned;
+use ast::PositionedItem;
 use build::Val;
 use convert::traits::{Converter, Result};
 
@@ -29,7 +29,11 @@ impl EnvConverter {
         EnvConverter {}
     }
 
-    fn convert_tuple(&self, flds: &Vec<(Positioned<String>, Rc<Val>)>, w: &mut Write) -> Result {
+    fn convert_tuple(
+        &self,
+        flds: &Vec<(PositionedItem<String>, Rc<Val>)>,
+        w: &mut Write,
+    ) -> Result {
         for &(ref name, ref val) in flds.iter() {
             if val.is_tuple() {
                 eprintln!("Skipping embedded tuple...");

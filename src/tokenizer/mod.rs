@@ -12,415 +12,424 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-//! The tokenization stage of the ucg compiler.
-use ast::*;
-use error;
-use nom;
-use nom::{alpha, digit, is_alphanumeric, multispace};
-use nom::{InputIter, InputLength, Slice};
-use nom_locate::LocatedSpan;
+//! The tokenization stext_tokene of the ucg compiler.
 use std;
-use std::result::Result;
 
-pub type Span<'a> = LocatedSpan<&'a str>;
+use abortable_parser::combinators::*;
+use abortable_parser::iter::SliceIter;
+use abortable_parser::{Error, Offsetable, Result};
 
-impl<'a> From<Span<'a>> for Position {
-    fn from(s: Span) -> Position {
-        Position {
-            line: s.line as usize,
-            column: s.get_column() as usize,
+use ast::*;
+use error::StackPrinter;
+use iter::OffsetStrIter;
+
+fn is_symbol_char<'a>(i: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, u8> {
+    let mut _i = i.clone();
+    let c = match _i.next() {
+        Some(c) => *c,
+        None => {
+            return Result::Fail(Error::new(
+                "Unexpected End of Input".to_string(),
+                Box::new(_i.clone()),
+            ))
         }
+    };
+    if (c as char).is_ascii_alphanumeric() || c == b'-' || c == b'_' {
+        Result::Complete(_i, c)
+    } else {
+        Result::Fail(Error::new(
+            "Not a symbol character".to_string(),
+            Box::new(_i.clone()),
+        ))
     }
 }
 
-fn is_symbol_char(c: char) -> bool {
-    is_alphanumeric(c as u8) || c == '-' as char || c == '_' as char
-}
-
-fn escapequoted(input: Span) -> nom::IResult<Span, String> {
+fn escapequoted<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, String> {
     // loop until we find a " that is not preceded by \.
     // Collapse all \<char> to just char  for escaping.
     let mut frag = String::new();
     let mut escape = false;
-    for (i, c) in input.iter_indices() {
-        if c == '\\' && !escape {
+    let mut _input = input.clone();
+    loop {
+        let c = match _input.next() {
+            Some(c) => *c,
+            None => break,
+        };
+        if c == '\\' as u8 && !escape {
             // eat this slash and set our escaping sentinel
             escape = true;
-        } else if c == '"' && !escape {
+        } else if c == '"' as u8 && !escape {
             // Bail if this is an unescaped "
             // we exit here.
-            return nom::IResult::Done(input.slice(i..), frag);
+            return Result::Complete(_input, frag);
         } else {
             // we accumulate this character.
-            frag.push(c);
+            frag.push(c as char);
             escape = false; // reset our escaping sentinel
         }
     }
-    return nom::IResult::Incomplete(nom::Needed::Unknown);
+    return Result::Incomplete(_input.clone());
 }
 
-named!(strtok( Span ) -> Token,
-       do_parse!(
-           span: position!() >>
-               tag!("\"") >>
-               frag: escapequoted >>
-               tag!("\"") >>
+make_fn!(strtok<OffsetStrIter, Token>,
+       do_each!(
+           span => input!(),
+           _    => text_token!("\""),
+           frag => escapequoted,
            (Token{
                typ: TokenType::QUOTED,
-               pos: Position::from(span),
-               fragment: frag,
+               pos: Position::from(&span),
+               fragment: frag.to_string(),
            })
        )
 );
 
-named!(pipequotetok( Span ) -> Token,
-       do_parse!(
-           span: position!() >>
-               tag!("|") >>
-               frag: take_until!("|") >>
-               tag!("|") >>
+make_fn!(pipequotetok<OffsetStrIter, Token>,
+       do_each!(
+           p    => input!(),
+           _    => text_token!("|"),
+           frag => until!(text_token!("|")),
+           _    => text_token!("|"),
            (Token{
                typ: TokenType::PIPEQUOTE,
-               pos: Position::from(span),
-               fragment: frag.fragment.to_string(),
+               pos: Position::from(&p),
+               fragment: frag.to_string(),
            })
        )
 );
 
-named!(barewordtok( Span ) -> Token,
-       do_parse!(
-           span: position!() >>
-           frag: preceded!(peek!(alpha), take_while!(is_symbol_char)) >>
+make_fn!(barewordtok<OffsetStrIter, Token>,
+       do_each!(
+           span => input!(),
+           _    => peek!(ascii_alpha),
+           frag => consume_all!(is_symbol_char),
            (Token{
                typ: TokenType::BAREWORD,
-               pos: Position::from(span),
-               fragment: frag.fragment.to_string(),
+               pos: Position::from(&span),
+               fragment: frag.to_string(),
            })
        )
 );
 
-named!(digittok( Span ) -> Token,
-       do_parse!(
-           span: position!() >>
-               digits: digit >>
-               (Token{
-                   typ: TokenType::DIGIT,
-                   pos: Position::from(span),
-                   fragment: digits.fragment.to_string(),
-               })
+make_fn!(digittok<OffsetStrIter, Token>,
+       do_each!(
+           span => input!(),
+           _ => peek!(ascii_digit),
+           digits => consume_all!(ascii_digit),
+           (Token{
+               typ: TokenType::DIGIT,
+               pos: Position::from(&span),
+               fragment: digits.to_string(),
+           })
        )
 );
 
-named!(booleantok( Span ) -> Token,
-    do_parse!(
-        span: position!() >>
-        b: alt!(
-            tag!("true") |
-            tag!("false")
-        ) >>
+make_fn!(booleantok<OffsetStrIter, Token>,
+    do_each!(
+        span => input!(),
+        token => either!(
+            text_token!("true"),
+            text_token!("false")
+        ),
         (Token{
             typ: TokenType::BOOLEAN,
-            pos: Position::from(span),
-            fragment: b.fragment.to_string(),
+            pos: Position::from(&span),
+            fragment: token.to_string(),
         })
     )
 );
 
-/// do_tag_tok! is a helper macro to make building a simple tag token
+/// do_text_token_tok! is a helper macro to make building a simple text_token token
 /// less code.
-macro_rules! do_tag_tok {
-    // NOTE(jwall): Nom macros do magic with their inputs. They in fact
-    // rewrite your macro argumets for you by adding an initial argument
-    // for all their sub-macros. Which means we require this $i paramater
-    // on the first macro invocation but not the rest.
-    ($i:expr, $type:expr, $tag:expr,WS) => {
-        do_parse!(
-            $i,
-            span: position!() >> frag: tag!($tag) >> alt!(whitespace | comment) >> (Token {
-                typ: $type,
-                pos: Position::from(span),
-                fragment: frag.fragment.to_string(),
-            })
-        )
+macro_rules! do_text_token_tok {
+    ($i:expr, $type:expr, $text_token:expr, WS) => {
+        do_each!($i,
+                                                                span => input!(),
+                                                                frag => text_token!($text_token),
+                                                                _ => either!(whitespace, comment),
+                                                                (Token {
+                                                                    typ: $type,
+                                                                    pos: Position::from(&span),
+                                                                    fragment: frag.to_string(),
+                                                                })
+                                                                )
     };
-    ($i:expr, $type:expr, $tag:expr) => {
-        do_parse!(
-            $i,
-            span: position!() >> frag: tag!($tag) >> (Token {
-                typ: $type,
-                pos: Position::from(span),
-                fragment: frag.fragment.to_string(),
-            })
-        )
+
+    ($i:expr, $type:expr, $text_token:expr) => {
+        do_each!($i,
+                                                                span => input!(),
+                                                                frag => text_token!($text_token),
+                                                                (Token {
+                                                                    typ: $type,
+                                                                    pos: Position::from(&span),
+                                                                    fragment: frag.to_string(),
+                                                                })
+                                                                )
     };
 }
 
-named!(emptytok( Span ) -> Token,
-       do_tag_tok!(TokenType::EMPTY, "NULL")
+make_fn!(emptytok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::EMPTY, "NULL")
 );
 
-named!(commatok( Span ) -> Token,
-       do_tag_tok!(TokenType::PUNCT, ",")
+make_fn!(commatok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, ",")
 );
 
-named!(lbracetok( Span ) -> Token,
-       do_tag_tok!(TokenType::PUNCT, "{")
+make_fn!(lbracetok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, "{")
 );
 
-named!(rbracetok( Span ) -> Token,
-       do_tag_tok!(TokenType::PUNCT, "}")
+make_fn!(rbracetok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, "}")
 );
 
-named!(lparentok( Span ) -> Token,
-       do_tag_tok!(TokenType::PUNCT, "(")
+make_fn!(lparentok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, "(")
 );
 
-named!(rparentok( Span ) -> Token,
-       do_tag_tok!(TokenType::PUNCT, ")")
+make_fn!(rparentok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, ")")
 );
 
-named!(dottok( Span ) -> Token,
-       do_tag_tok!(TokenType::PUNCT, ".")
+make_fn!(dottok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, ".")
 );
 
-named!(plustok( Span ) -> Token,
-       do_tag_tok!(TokenType::PUNCT, "+")
+make_fn!(plustok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, "+")
 );
 
-named!(dashtok( Span ) -> Token,
-       do_tag_tok!(TokenType::PUNCT, "-")
+make_fn!(dashtok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, "-")
 );
 
-named!(startok( Span ) -> Token,
-       do_tag_tok!(TokenType::PUNCT, "*")
+make_fn!(startok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, "*")
 );
 
-named!(slashtok( Span ) -> Token,
-       do_tag_tok!(TokenType::PUNCT, "/")
+make_fn!(slashtok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, "/")
 );
 
-named!(pcttok( Span ) -> Token,
-       do_tag_tok!(TokenType::PUNCT, "%")
+make_fn!(pcttok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, "%")
 );
 
-named!(eqeqtok( Span ) -> Token,
-       do_tag_tok!(TokenType::PUNCT, "==")
+make_fn!(eqeqtok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, "==")
 );
 
-named!(notequaltok( Span ) -> Token,
-       do_tag_tok!(TokenType::PUNCT, "!=")
+make_fn!(notequaltok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, "!=")
 );
 
-named!(gttok( Span ) -> Token,
-       do_tag_tok!(TokenType::PUNCT, ">")
+make_fn!(gttok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, ">")
 );
 
-named!(gtequaltok( Span ) -> Token,
-       do_tag_tok!(TokenType::PUNCT, ">=")
+make_fn!(gtequaltok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, ">=")
 );
 
-named!(ltequaltok( Span ) -> Token,
-       do_tag_tok!(TokenType::PUNCT, "<=")
+make_fn!(ltequaltok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, "<=")
 );
 
-named!(lttok( Span ) -> Token,
-       do_tag_tok!(TokenType::PUNCT, "<")
+make_fn!(lttok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, "<")
 );
 
-named!(equaltok( Span ) -> Token,
-       do_tag_tok!(TokenType::PUNCT, "=")
+make_fn!(equaltok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, "=")
 );
 
-named!(semicolontok( Span ) -> Token,
-       do_tag_tok!(TokenType::PUNCT, ";")
+make_fn!(semicolontok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, ";")
 );
 
-named!(leftsquarebracket( Span ) -> Token,
-    do_tag_tok!(TokenType::PUNCT, "[")
+make_fn!(leftsquarebracket<OffsetStrIter, Token>,
+    do_text_token_tok!(TokenType::PUNCT, "[")
 );
 
-named!(rightsquarebracket( Span ) -> Token,
-    do_tag_tok!(TokenType::PUNCT, "]")
+make_fn!(rightsquarebracket<OffsetStrIter, Token>,
+    do_text_token_tok!(TokenType::PUNCT, "]")
 );
 
-named!(fatcommatok( Span ) -> Token,
-       do_tag_tok!(TokenType::PUNCT, "=>")
+make_fn!(fatcommatok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, "=>")
 );
 
-named!(selecttok( Span ) -> Token,
-       do_tag_tok!(TokenType::BAREWORD, "select", WS)
+make_fn!(selecttok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::BAREWORD, "select", WS)
 );
 
-named!(macrotok( Span ) -> Token,
-       do_tag_tok!(TokenType::BAREWORD, "macro", WS)
+make_fn!(macrotok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::BAREWORD, "macro", WS)
 );
 
-named!(lettok( Span ) -> Token,
-       do_tag_tok!(TokenType::BAREWORD, "let", WS)
+make_fn!(lettok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::BAREWORD, "let", WS)
 );
 
-named!(importtok( Span ) -> Token,
-       do_tag_tok!(TokenType::BAREWORD, "import", WS)
+make_fn!(importtok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::BAREWORD, "import", WS)
 );
 
-named!(asserttok( Span ) -> Token,
-       do_tag_tok!(TokenType::BAREWORD, "assert", WS)
+make_fn!(asserttok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::BAREWORD, "assert", WS)
 );
 
-named!(outtok( Span ) -> Token,
-       do_tag_tok!(TokenType::BAREWORD, "out", WS)
+make_fn!(outtok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::BAREWORD, "out", WS)
 );
 
-named!(astok( Span ) -> Token,
-       do_tag_tok!(TokenType::BAREWORD, "as", WS)
+make_fn!(astok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::BAREWORD, "as", WS)
 );
 
-named!(maptok( Span ) -> Token,
-       do_tag_tok!(TokenType::BAREWORD, "map", WS)
+make_fn!(maptok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::BAREWORD, "map", WS)
 );
 
-named!(filtertok( Span ) -> Token,
-       do_tag_tok!(TokenType::BAREWORD, "filter", WS)
+make_fn!(filtertok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::BAREWORD, "filter", WS)
 );
 
-fn end_of_input(input: Span) -> nom::IResult<Span, Token> {
-    match eof!(input,) {
-        nom::IResult::Done(_, _) => {
-            return nom::IResult::Done(
-                input,
-                make_tok!(EOF => input.line as usize,
-                                                input.get_column() as usize),
-            );
-        }
-        nom::IResult::Incomplete(_) => {
-            return nom::IResult::Incomplete(nom::Needed::Unknown);
-        }
-        nom::IResult::Error(e) => {
-            return nom::IResult::Error(e);
-        }
-    }
-}
-
-fn comment(input: Span) -> nom::IResult<Span, Token> {
-    match tag!(input, "//") {
-        nom::IResult::Done(rest, _) => {
-            match alt!(
+fn comment(input: OffsetStrIter) -> Result<OffsetStrIter, Token> {
+    match text_token!(input, "//") {
+        Result::Complete(rest, _) => {
+            match until!(
                 rest,
-                take_until_and_consume!("\r\n") | take_until_and_consume!("\n")
+                either!(
+                    eoi,
+                    discard!(text_token!("\r\n")),
+                    discard!(text_token!("\n"))
+                )
             ) {
-                nom::IResult::Done(rest, cmt) => {
-                    return nom::IResult::Done(
-                        rest,
-                        make_tok!(CMT => cmt.fragment.to_string(),
-                                  input.line as usize,
-                                  input.get_column() as usize),
-                    );
+                Result::Complete(rest, cmt) => {
+                    return Result::Complete(rest, make_tok!(CMT => cmt.to_string(), input));
                 }
                 // If we didn't find a new line then we just grab everything.
                 _ => {
-                    let blen = rest.input_len();
-                    let next = rest.slice(blen..);
-                    let tok = rest.slice(..blen);
-                    return nom::IResult::Done(
-                        next,
-                        make_tok!(CMT => tok.fragment.to_string(),
-                                  input.line as usize, input.get_column() as usize
-                    ),
-                    );
+                    return Result::Abort(Error::new(
+                        "Unparsable comment".to_string(),
+                        Box::new(rest.clone()),
+                    ));
                 }
             }
         }
-        nom::IResult::Incomplete(i) => return nom::IResult::Incomplete(i),
-        nom::IResult::Error(e) => return nom::IResult::Error(e),
+        Result::Incomplete(ctx) => return Result::Incomplete(ctx),
+        Result::Fail(e) => return Result::Fail(e),
+        Result::Abort(e) => return Result::Abort(e),
     }
 }
 
-named!(whitespace( Span ) -> Token,
-    do_parse!(
-        span: position!() >>
-        many1!(multispace) >>
+make_fn!(whitespace<OffsetStrIter, Token>,
+    do_each!(
+        span => input!(),
+        _ => peek!(ascii_ws),
+        _ => repeat!(ascii_ws),
          (Token{
             typ: TokenType::WS,
-            pos: Position::from(span),
+            pos: Position::from(&span),
             fragment: String::new(),
          })
     )
 );
 
-named!(token( Span ) -> Token,
-    alt!(
-        strtok |
-        pipequotetok |
-        emptytok | // This must come before the barewordtok
-        digittok |
-        commatok |
-        rbracetok |
-        lbracetok |
-        lparentok |
-        rparentok |
-        dottok |
-        plustok |
-        dashtok |
-        startok |
-        comment | // Note comment must come before slashtok
-        slashtok |
-        pcttok |
-        eqeqtok |
-        notequaltok |
-        complete!(gtequaltok) |
-        complete!(ltequaltok) |
-        gttok |
-        lttok |
-        fatcommatok | // Note fatcommatok must come before equaltok
-        equaltok |
-        semicolontok |
-        leftsquarebracket |
-        rightsquarebracket |
-        booleantok |
-        lettok |
-        outtok |
-        selecttok |
-        asserttok |
-        macrotok |
-        importtok |
-        astok |
-        maptok |
-        filtertok |
-        barewordtok |
-        whitespace |
-        end_of_input)
+make_fn!(end_of_input<OffsetStrIter, Token>,
+    do_each!(
+        span => input!(),
+        _ => eoi,
+        (Token{
+            typ: TokenType::END,
+            pos: Position::from(&span),
+            fragment: String::new(),
+        })
+    )
 );
 
-/// Consumes an input Span and returns either a Vec<Token> or a nom::ErrorKind.
-pub fn tokenize(input: Span) -> Result<Vec<Token>, error::Error> {
+fn token<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Token> {
+    either!(
+        input,
+        strtok,
+        pipequotetok,
+        emptytok, // This must come before the barewordtok
+        digittok,
+        commatok,
+        rbracetok,
+        lbracetok,
+        lparentok,
+        rparentok,
+        dottok,
+        plustok,
+        dashtok,
+        startok,
+        comment, // Note comment must come before slashtok
+        slashtok,
+        pcttok,
+        eqeqtok,
+        notequaltok,
+        complete!("Not >=".to_string(), gtequaltok),
+        complete!("Not <=".to_string(), ltequaltok),
+        gttok,
+        lttok,
+        fatcommatok, // Note fatcommatok must come before equaltok
+        equaltok,
+        semicolontok,
+        leftsquarebracket,
+        rightsquarebracket,
+        booleantok,
+        lettok,
+        outtok,
+        selecttok,
+        asserttok,
+        macrotok,
+        importtok,
+        astok,
+        maptok,
+        filtertok,
+        barewordtok,
+        whitespace,
+        end_of_input
+    )
+}
+
+/// Consumes an input OffsetStrIter and returns either a Vec<Token> or a error::Error.
+pub fn tokenize<'a>(input: OffsetStrIter<'a>) -> std::result::Result<Vec<Token>, String> {
     let mut out = Vec::new();
-    let mut i = input;
+    let mut i = input.clone();
     loop {
-        if i.input_len() == 0 {
+        if let Result::Complete(_, _) = eoi(i.clone()) {
             break;
         }
-        match token(i) {
-            nom::IResult::Error(_e) => {
-                return Err(error::Error::new(
+        match token(i.clone()) {
+            Result::Abort(e) => {
+                let err = abortable_parser::Error::caused_by(
                     "Invalid Token encountered",
-                    error::ErrorType::UnexpectedToken,
-                    Position {
-                        line: i.line as usize,
-                        column: i.get_column() as usize,
-                    },
-                ));
+                    Box::new(e),
+                    Box::new(i.clone()),
+                );
+                let ctx_err = StackPrinter { err: err };
+                return Err(format!("{}", ctx_err));
             }
-            nom::IResult::Incomplete(_) => {
-                return Err(error::Error::new(
-                    "Unexepcted end of Input",
-                    error::ErrorType::UnexpectedToken,
-                    Position {
-                        line: i.line as usize,
-                        column: i.get_column() as usize,
-                    },
-                ));
+            Result::Fail(e) => {
+                let err = abortable_parser::Error::caused_by(
+                    "Invalid Token encountered",
+                    Box::new(e),
+                    Box::new(i.clone()),
+                );
+                let ctx_err = StackPrinter { err: err };
+                return Err(format!("{}", ctx_err));
             }
-            nom::IResult::Done(rest, tok) => {
+            Result::Incomplete(_offset) => {
+                let err =
+                    abortable_parser::Error::new("Invalid Token encountered", Box::new(i.clone()));
+                let ctx_err = StackPrinter { err: err };
+                return Err(format!("{}", ctx_err));
+            }
+            Result::Complete(rest, tok) => {
                 i = rest;
                 if tok.typ == TokenType::COMMENT || tok.typ == TokenType::WS {
                     // we skip comments and whitespace
@@ -434,10 +443,7 @@ pub fn tokenize(input: Span) -> Result<Vec<Token>, error::Error> {
     out.push(Token {
         fragment: String::new(),
         typ: TokenType::END,
-        pos: Position {
-            line: i.line as usize,
-            column: i.get_column() as usize,
-        },
+        pos: Position::from(&i),
     });
     Ok(out)
 }
@@ -445,7 +451,7 @@ pub fn tokenize(input: Span) -> Result<Vec<Token>, error::Error> {
 /// Clones a token.
 ///
 /// This is necessary to allow the match_type and match_token macros to work.
-pub fn token_clone(t: &Token) -> Result<Token, error::Error> {
+pub fn token_clone(t: &Token) -> std::result::Result<Token, Error<SliceIter<Token>>> {
     Ok(t.clone())
 }
 
@@ -517,28 +523,28 @@ macro_rules! match_type {
     };
 
     ($i:expr, $t:expr, $msg:expr, $h:expr) => {{
-        let i_ = $i.clone();
-        use nom::Slice;
-        use std::convert::Into;
-        if i_.input_len() == 0 {
-            nom::IResult::Error(nom::ErrorKind::Custom(error::Error::new(
-                format!("End of Input! {}", $msg),
-                error::ErrorType::IncompleteParsing,
-                Position { line: 0, column: 0 },
-            )))
+        use abortable_parser::combinators::eoi;
+        use abortable_parser::{Error, Result};
+        use std;
+
+        let mut _i = $i.clone();
+        if eoi(_i.clone()).is_complete() {
+            Result::Fail(Error::new(format!("End of Input! {}", $msg), Box::new(_i)))
         } else {
-            let tok = &(i_[0]);
-            if tok.typ == $t {
-                match $h(tok) {
-                    Result::Ok(v) => nom::IResult::Done($i.slice(1..), v),
-                    Result::Err(e) => nom::IResult::Error(nom::ErrorKind::Custom(e.into())),
+            match _i.next() {
+                Some(tok) => {
+                    if tok.typ == $t {
+                        match $h(tok) {
+                            std::result::Result::Ok(v) => Result::Complete(_i.clone(), v),
+                            std::result::Result::Err(e) => {
+                                Result::Fail(Error::caused_by($msg, Box::new(e), Box::new(_i)))
+                            }
+                        }
+                    } else {
+                        Result::Fail(Error::new($msg.to_string(), Box::new($i)))
+                    }
                 }
-            } else {
-                nom::IResult::Error(nom::ErrorKind::Custom(error::Error::new(
-                    $msg.to_string(),
-                    error::ErrorType::UnexpectedToken,
-                    tok.pos.clone(),
-                )))
+                None => Result::Fail(Error::new($msg.to_string(), Box::new($i))),
             }
         }
     }};
@@ -553,7 +559,7 @@ macro_rules! match_token {
     }};
 
     ($i:expr,PUNCT => $f:expr, $h:expr) => {
-        match_token!($i, TokenType::PUNCT, $f, format!("Not PUNCT ({})", $f), $h)
+        match_token!($i, TokenType::PUNCT, $f, format!("({})", $f), $h)
     };
 
     ($i:expr,BAREWORD => $f:expr) => {{
@@ -572,22 +578,26 @@ macro_rules! match_token {
     };
 
     ($i:expr, $t:expr, $f:expr, $msg:expr, $h:expr) => {{
-        let i_ = $i.clone();
-        use nom;
-        use nom::Slice;
-        use std::convert::Into;
-        let tok = &(i_[0]);
-        if tok.typ == $t && &tok.fragment == $f {
-            match $h(tok) {
-                Result::Ok(v) => nom::IResult::Done($i.slice(1..), v),
-                Result::Err(e) => nom::IResult::Error(nom::ErrorKind::Custom(e.into())),
+        use abortable_parser::Result;
+        use std;
+        let mut i_ = $i.clone();
+        let tok = i_.next();
+        if let Some(tok) = tok {
+            if tok.typ == $t && &tok.fragment == $f {
+                match $h(tok) {
+                    std::result::Result::Ok(v) => Result::Complete(i_.clone(), v),
+                    std::result::Result::Err(e) => {
+                        Result::Fail(Error::caused_by($msg, Box::new(e), Box::new(i_)))
+                    }
+                }
+            } else {
+                Result::Fail(Error::new(
+                    format!("Expected {} Instead is ({})", $msg, tok.fragment),
+                    Box::new(i_),
+                ))
             }
         } else {
-            nom::IResult::Error(nom::ErrorKind::Custom(error::Error::new(
-                format!("{} Instead is ({})", $msg, tok.fragment),
-                error::ErrorType::UnexpectedToken,
-                tok.pos.clone(),
-            )))
+            Result::Fail(Error::new("Unexpected End Of Input", Box::new(i_)))
         }
     }};
 }
@@ -607,103 +617,12 @@ macro_rules! word {
 }
 
 /// pos gets the current position from a TokenIter input without consuming it.
-pub fn pos(i: TokenIter) -> nom::IResult<TokenIter, Position, error::Error> {
-    let tok = &i[0];
+pub fn pos<'a>(i: SliceIter<'a, Token>) -> Result<SliceIter<'a, Token>, Position> {
+    let mut _i = i.clone();
+    let tok = _i.next().unwrap();
     let line = tok.pos.line;
     let column = tok.pos.column;
-    nom::IResult::Done(
-        i.clone(),
-        Position {
-            line: line,
-            column: column,
-        },
-    )
-}
-
-/// TokenIter wraps a slice of Tokens and implements the various necessary
-/// nom traits to use it as an input to nom parsers.
-#[derive(Clone, Debug, PartialEq)]
-pub struct TokenIter<'a> {
-    pub source: &'a [Token],
-}
-
-impl<'a> TokenIter<'a> {
-    pub fn len(&self) -> usize {
-        self.source.len()
-    }
-}
-
-impl<'a> nom::InputLength for TokenIter<'a> {
-    fn input_len(&self) -> usize {
-        self.source.input_len()
-    }
-}
-
-macro_rules! impl_token_iter_slice {
-    ($r:ty) => {
-        impl<'a> nom::Slice<$r> for TokenIter<'a> {
-            fn slice(&self, range: $r) -> Self {
-                TokenIter {
-                    source: self.source.slice(range),
-                }
-            }
-        }
-    };
-}
-
-impl_token_iter_slice!(std::ops::Range<usize>);
-impl_token_iter_slice!(std::ops::RangeTo<usize>);
-impl_token_iter_slice!(std::ops::RangeFrom<usize>);
-impl_token_iter_slice!(std::ops::RangeFull);
-
-impl<'a> std::ops::Index<usize> for TokenIter<'a> {
-    type Output = Token;
-
-    fn index(&self, i: usize) -> &Self::Output {
-        &self.source[i]
-    }
-}
-
-impl<'a> InputIter for TokenIter<'a> {
-    type Item = &'a Token;
-    type RawItem = Token;
-
-    type Iter = std::iter::Enumerate<std::slice::Iter<'a, Self::RawItem>>;
-    type IterElem = std::slice::Iter<'a, Self::RawItem>;
-
-    fn iter_indices(&self) -> Self::Iter {
-        self.source.iter().enumerate()
-    }
-
-    fn iter_elements(&self) -> Self::IterElem {
-        self.source.iter()
-    }
-
-    fn position<P>(&self, predicate: P) -> Option<usize>
-    where
-        P: Fn(Self::RawItem) -> bool,
-    {
-        for (o, v) in self.iter_indices() {
-            if predicate(v.clone()) {
-                return Some(o);
-            }
-        }
-        None
-    }
-
-    fn slice_index(&self, count: usize) -> Option<usize> {
-        let mut cnt = 0;
-        for (index, _) in self.iter_indices() {
-            if cnt == count {
-                return Some(index);
-            }
-            cnt += 1;
-        }
-        if cnt == count {
-            return Some(self.len());
-        }
-        None
-    }
+    Result::Complete(i.clone(), Position::new(line, column, i.get_offset()))
 }
 
 #[cfg(test)]
