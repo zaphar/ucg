@@ -25,6 +25,8 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::string::ToString;
 
+use simple_error;
+
 use ast::*;
 use error;
 use format;
@@ -248,7 +250,7 @@ impl<'a> Builder<'a> {
         Ok(())
     }
 
-    fn eval_span(&mut self, input: OffsetStrIter) -> Result<Rc<Val>, Box<Error>> {
+    fn eval_input(&mut self, input: OffsetStrIter) -> Result<Rc<Val>, Box<Error>> {
         match parse(input.clone()) {
             Ok(stmts) => {
                 //panic!("Successfully parsed {}", input);
@@ -271,7 +273,7 @@ impl<'a> Builder<'a> {
 
     /// Evaluate an input string as UCG.
     pub fn eval_string(&mut self, input: &str) -> Result<Rc<Val>, Box<Error>> {
-        self.eval_span(OffsetStrIter::new(input))
+        self.eval_input(OffsetStrIter::new(input))
     }
 
     /// Builds a ucg file at the named path.
@@ -280,8 +282,19 @@ impl<'a> Builder<'a> {
         let mut f = try!(File::open(name));
         let mut s = String::new();
         try!(f.read_to_string(&mut s));
-        self.last = Some(try!(self.eval_string(&s)));
-        Ok(())
+        let eval_result = self.eval_string(&s);
+        match eval_result {
+            Ok(v) => {
+                self.last = Some(v);
+                Ok(())
+            }
+            Err(e) => {
+                let err = simple_error::SimpleError::new(
+                    format!("Error building file: {}\n{}", name, e.as_ref()).as_ref(),
+                );
+                Err(Box::new(err))
+            }
+        }
     }
 
     fn build_import(&mut self, def: &ImportDef) -> Result<Rc<Val>, Box<Error>> {
@@ -993,13 +1006,10 @@ impl<'a> Builder<'a> {
             // we are not in validate_mode then build_asserts are noops.
             return Ok(Rc::new(Val::Empty));
         }
-        let mut expr_as_stmt = String::new();
         let expr = &tok.fragment;
-        expr_as_stmt.push_str(expr);
-        expr_as_stmt.push_str(";");
         let assert_input =
-            OffsetStrIter::new_with_offsets(&expr_as_stmt, tok.pos.line - 1, tok.pos.column - 1);
-        let ok = match self.eval_span(assert_input) {
+            OffsetStrIter::new_with_offsets(expr, tok.pos.line - 1, tok.pos.column - 1);
+        let ok = match self.eval_input(assert_input) {
             Ok(v) => v,
             Err(e) => {
                 // failure!

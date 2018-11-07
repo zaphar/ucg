@@ -843,9 +843,10 @@ fn tuple_to_let(tok: Token, expr: Expression) -> Statement {
 make_fn!(
     let_stmt_body<SliceIter<Token>, Statement>,
     do_each!(
-        name => match_type!(BAREWORD),
+        name => wrap_err!(match_type!(BAREWORD), "Expected name for binding"),
         _ => punct!("="),
-        val => trace_nom!(expression),
+        // TODO(jwall): Wrap this error with an appropriate abortable_parser::Error
+        val => wrap_err!(trace_nom!(expression), "Expected Expression"),
         _ => punct!(";"),
         (tuple_to_let(name, val))
     )
@@ -870,9 +871,9 @@ fn tuple_to_import(tok: Token, tok2: Token) -> Statement {
 make_fn!(
     import_stmt_body<SliceIter<Token>, Statement>,
     do_each!(
-        path => match_type!(STR),
+        path => wrap_err!(match_type!(STR), "Expected import path"),
         _ => word!("as"),
-        name => match_type!(BAREWORD),
+        name => wrap_err!(match_type!(BAREWORD), "Expected import name"),
         _ => punct!(";"),
         (tuple_to_import(path, name))
     )
@@ -902,8 +903,8 @@ make_fn!(
     out_statement<SliceIter<Token>, Statement>,
     do_each!(
         _ => word!("out"),
-        typ => must!(match_type!(BAREWORD)),
-        expr => must!(expression),
+        typ => wrap_err!(must!(match_type!(BAREWORD)), "Expected converter name"),
+        expr => wrap_err!(must!(expression), "Expected Expression to export"),
         _ => must!(punct!(";")),
         (Statement::Output(typ.clone(), expr.clone()))
     )

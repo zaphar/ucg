@@ -409,15 +409,19 @@
 //!
 //! The assert statement defines an expression that must evaluate to either true or false. Assert statements are noops except
 //! during a validation compile. They give you a way to assert certains properties about your data and can be used as a form
-//! of unit testing for your configurations. It starts with the assert keyword followed by a valid boolean ucg expression
-//! delimited by `|` characters.
+//! of unit testing for your configurations. It starts with the assert keyword followed by a valid block of ucg statements
+//! delimited by `|` characters. The final statement in the in the block must evaluate to a boolean expression.
 //!
 //! ```ucg
-//! assert host == "www.example.com";
-//! assert |select qa, 443, {
-//!   qa = 80,
-//!   prod = 443,
-//! } == 443|;
+//! assert |
+//!     host == "www.example.com";
+//! |;
+//! assert |
+//!     select qa, 443, {
+//!       qa = 80,
+//!       prod = 443,
+//!     } == 443;
+//! |;
 //! ```
 //!
 //! When _test.ucg files are run in a validation run then ucg will output a log of all the assertions

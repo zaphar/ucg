@@ -11,8 +11,12 @@ let defaultgot = select badwant, "OOPS", {
     door2 = "you lose",
 };
 
-assert |got == "grand prize"|;
-assert |defaultgot == "OOPS"|;
+assert |
+    got == "grand prize";
+|;
+assert |
+    defaultgot == "OOPS";
+|;
 
 // select inside a macro
 
@@ -25,6 +29,12 @@ let condmacro = macro(arg) => {
 
 let result = condmacro("opt1");
 
-assert |condmacro("opt1") == {output = "yay"}|;
-assert |condmacro("opt2") == {output = "boo"}|;
-assert |condmacro("invalid") == {output = NULL}|;
+assert |
+    condmacro("opt1") == {output = "yay"};
+|;
+assert |
+    condmacro("opt2") == {output = "boo"};
+|;
+assert |
+    condmacro("invalid") == {output = NULL};
+|;

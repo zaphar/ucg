@@ -2,4 +2,6 @@ let empty = NULL;
 let tpl = {
     foo = NULL,
 };
-assert |tpl.foo == empty|;
+assert |
+    tpl.foo == empty;
+|;
