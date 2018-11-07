@@ -425,10 +425,22 @@
 //!
 //! * Out statement
 //!
-//! The out statement defined the output for a UCG file. It identifies an expression that will be output as a
-//! compiled artifact by the UCG compiler was well as the artifact type. The artifact type is expected to be one
-//! of the registered converters (e.g. json, exec) and the artifact file will take the same name as the ucg file
-//! with the extension replaced by the defined extension for that converter.
+//! The out statement defines the output for a UCG file. It identifies the output converter type and an
+//! expression that will be output. The output converter type is expected to be one of the registered converters
+//! (e.g. json, exec) and the artifact file will take the same name as the ucg file with the extension replaced by
+//! the defined extension for that converter.
+//!
+//! For a file named api_config.ucg with the following contents:
+//!
+//! ```ucg
+//! let myconf = {
+//!     api_url = "https://example.org/api/v1/",
+//!     api_token = env.API_TOKEN,
+//! };
+//! out json myconf;
+//! ```
+//!
+//! ucg will output the myconf tuple as json to a file called api_config.json
 //!
 //! ### Converters
 //!
