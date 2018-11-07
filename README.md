@@ -64,7 +64,7 @@ ARGS:
 
 ## Testing
  ```sh
- CCheck a list of ucg files for errors and run test assertions.
+ Check a list of ucg files for errors and run test assertions.
 
 USAGE:
     ucg test [FLAGS] -r [INPUT]...
@@ -76,6 +76,7 @@ FLAGS:
 
 ARGS:
     <INPUT>...    Input ucg files or directories to run test assertions for. If not provided it will scan the current directory for files with _test.ucg
+```
 
 ## Language Reference
 
