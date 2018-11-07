@@ -112,7 +112,7 @@ fn do_compile(file: &str, cache: Rc<RefCell<Cache>>, registry: &ConverterRegistr
     let builder = match build_file(file, false, cache.clone()) {
         Ok(builder) => builder,
         Err(err) => {
-            eprintln!("{:?}", err);
+            eprintln!("{}", err);
             return false;
         }
     };
@@ -161,10 +161,10 @@ fn visit_ucg_files(
             let next_path = next_item.path();
             let path_as_string = String::from(next_path.to_string_lossy());
             if next_path.is_dir() && recurse {
-                if let Err(msg) =
+                if let Err(e) =
                     visit_ucg_files(&next_path, recurse, validate, cache.clone(), registry)
                 {
-                    eprintln!("Err: {}", msg);
+                    eprintln!("{}", e);
                     result = false;
                 }
             } else {
