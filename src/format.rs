@@ -45,7 +45,7 @@ impl<V: Into<String> + Clone> Formatter<V> {
         for c in self.tmpl.chars() {
             if c == '@' && !should_escape {
                 if count == self.args.len() {
-                    return Err(Box::new(error::Error::new(
+                    return Err(Box::new(error::BuildError::new(
                         "Too few arguments to string \
                          formatter.",
                         error::ErrorType::FormatError,
@@ -63,7 +63,7 @@ impl<V: Into<String> + Clone> Formatter<V> {
             }
         }
         if self.args.len() != count {
-            return Err(Box::new(error::Error::new(
+            return Err(Box::new(error::BuildError::new(
                 "Too many arguments to string \
                  formatter.",
                 error::ErrorType::FormatError,

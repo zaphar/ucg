@@ -58,7 +58,7 @@ impl Val {
         target: &Self,
         file_name: &str,
         pos: Position,
-    ) -> Result<bool, error::Error> {
+    ) -> Result<bool, error::BuildError> {
         // first we do a type equality comparison
         match (self, target) {
             // Empty values are always equal.
@@ -100,12 +100,12 @@ impl Val {
                     Ok(true)
                 }
             }
-            (&Val::Macro(_), &Val::Macro(_)) => Err(error::Error::new(
+            (&Val::Macro(_), &Val::Macro(_)) => Err(error::BuildError::new(
                 format!("Macros are not comparable in file: {}", file_name),
                 error::ErrorType::TypeFail,
                 pos,
             )),
-            (me, tgt) => Err(error::Error::new(
+            (me, tgt) => Err(error::BuildError::new(
                 format!("Types differ for {}, {} in file: {}", me, tgt, file_name),
                 error::ErrorType::TypeFail,
                 pos,

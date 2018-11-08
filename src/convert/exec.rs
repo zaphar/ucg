@@ -22,7 +22,7 @@ use build::Val;
 use build::Val::Tuple;
 use convert;
 use convert::traits::{Converter, Result};
-use error::Error;
+use error::BuildError;
 use error::ErrorType;
 
 pub struct ExecConverter {}
@@ -43,7 +43,7 @@ impl ExecConverter {
         if let &Tuple(ref fields) = v {
             // We expect no more than three fields in our exec tuple.
             if fields.len() > 3 {
-                return Err(Box::new(Error::new(
+                return Err(Box::new(BuildError::new(
                     "Exec tuples must have no more than 3 fields",
                     ErrorType::TypeFail,
                     Position::new(0, 0, 0),
@@ -56,7 +56,7 @@ impl ExecConverter {
                 // We require a command field in our exec tuple.
                 if name.val == "command" {
                     if command.is_some() {
-                        return Err(Box::new(Error::new(
+                        return Err(Box::new(BuildError::new(
                             "There can only be one command field in an exec tuple",
                             ErrorType::TypeFail,
                             name.pos.clone(),
@@ -66,7 +66,7 @@ impl ExecConverter {
                         command = Some(s);
                         continue;
                     }
-                    return Err(Box::new(Error::new(
+                    return Err(Box::new(BuildError::new(
                         "The command field of an exec tuple must be a string",
                         ErrorType::TypeFail,
                         name.pos.clone(),
@@ -76,7 +76,7 @@ impl ExecConverter {
                 if name.val == "env" {
                     if let &Val::Tuple(ref l) = val.as_ref() {
                         if env.is_some() {
-                            return Err(Box::new(Error::new(
+                            return Err(Box::new(BuildError::new(
                                 "There can only be one env field in an exec tuple",
                                 ErrorType::TypeFail,
                                 name.pos.clone(),
@@ -85,7 +85,7 @@ impl ExecConverter {
                         env = Some(l);
                         continue;
                     }
-                    return Err(Box::new(Error::new(
+                    return Err(Box::new(BuildError::new(
                         "The env field of an exec tuple must be a list",
                         ErrorType::TypeFail,
                         name.pos.clone(),
@@ -95,7 +95,7 @@ impl ExecConverter {
                 if name.val == "args" {
                     if let &Val::List(ref l) = val.as_ref() {
                         if args.is_some() {
-                            return Err(Box::new(Error::new(
+                            return Err(Box::new(BuildError::new(
                                 "There can only be one args field of an exec tuple",
                                 ErrorType::TypeFail,
                                 name.pos.clone(),
@@ -104,7 +104,7 @@ impl ExecConverter {
                         args = Some(l);
                         continue;
                     }
-                    return Err(Box::new(Error::new(
+                    return Err(Box::new(BuildError::new(
                         "The args field of an exec tuple must be a list",
                         ErrorType::TypeFail,
                         name.pos.clone(),
@@ -112,7 +112,7 @@ impl ExecConverter {
                 }
             }
             if command.is_none() {
-                return Err(Box::new(Error::new(
+                return Err(Box::new(BuildError::new(
                     "An exec tuple must have a command field",
                     ErrorType::TypeFail,
                     Position::new(0, 0, 0),
@@ -133,7 +133,7 @@ impl ExecConverter {
                         try!(write!(script, "{}=\"{}\"\n", name.val, s));
                         continue;
                     }
-                    return Err(Box::new(Error::new(
+                    return Err(Box::new(BuildError::new(
                         "The env fields of an exec tuple must contain only string values",
                         ErrorType::TypeFail,
                         name.pos.clone(),
@@ -154,7 +154,7 @@ impl ExecConverter {
                         }
                         &Val::Tuple(_) => try!(flag_converter.convert(v.clone(), &mut script)),
                         _ => {
-                            return Err(Box::new(Error::new(
+                            return Err(Box::new(BuildError::new(
                                 "Exec args must be a list of strings or tuples of strings.",
                                 ErrorType::TypeFail,
                                 Position::new(0, 0, 0),
@@ -170,7 +170,7 @@ impl ExecConverter {
             return Ok(());
         }
 
-        Err(Box::new(Error::new(
+        Err(Box::new(BuildError::new(
             "Exec outputs must be of type Tuple",
             ErrorType::TypeFail,
             Position::new(0, 0, 0),

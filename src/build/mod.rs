@@ -50,7 +50,7 @@ impl MacroDef {
         // Error conditions. If the args don't match the length and types of the argdefs then this is
         // macro call error.
         if args.len() > self.argdefs.len() {
-            return Err(Box::new(error::Error::new(
+            return Err(Box::new(error::BuildError::new(
                 format!(
                     "Macro called with too many args in file: {}",
                     root.to_string_lossy()
@@ -125,7 +125,7 @@ macro_rules! eval_binary_expr {
                 return Ok(Rc::new($result));
             }
             val => {
-                return Err(Box::new(error::Error::new(
+                return Err(Box::new(error::BuildError::new(
                     format!("Expected {} but got {}", $msg, val),
                     error::ErrorType::TypeFail,
                     $pos.clone(),
@@ -163,7 +163,7 @@ impl<'a> Builder<'a> {
             &Value::Str(ref s) => Ok(Rc::new(Val::Str(s.val.to_string()))),
             &Value::Symbol(ref s) => {
                 self.lookup_sym(&(s.into()))
-                    .ok_or(Box::new(error::Error::new(
+                    .ok_or(Box::new(error::BuildError::new(
                         format!(
                             "Unable to find {} in file: {}",
                             s.val,
@@ -263,7 +263,7 @@ impl<'a> Builder<'a> {
                     Some(val) => Ok(val),
                 }
             }
-            Err(err) => Err(Box::new(error::Error::new(
+            Err(err) => Err(Box::new(error::BuildError::new(
                 format!("{}", err,),
                 error::ErrorType::ParseError,
                 (&input).into(),
@@ -317,7 +317,7 @@ impl<'a> Builder<'a> {
         };
         let key = sym.into();
         if self.build_output.contains_key(&key) {
-            return Err(Box::new(error::Error::new(
+            return Err(Box::new(error::BuildError::new(
                 format!("Binding for import name {} already exists", sym.fragment),
                 error::ErrorType::DuplicateBinding,
                 def.path.pos.clone(),
@@ -333,7 +333,7 @@ impl<'a> Builder<'a> {
         let name = &def.name;
         match self.build_output.entry(name.into()) {
             Entry::Occupied(e) => {
-                return Err(Box::new(error::Error::new(
+                return Err(Box::new(error::BuildError::new(
                     format!(
                         "Binding \
                          for {:?} already \
@@ -366,7 +366,7 @@ impl<'a> Builder<'a> {
                     self.out_lock = Some((typ.fragment.to_string(), val.clone()));
                     Ok(val)
                 } else {
-                    Err(Box::new(error::Error::new(
+                    Err(Box::new(error::BuildError::new(
                         format!("You can only have one output per file."),
                         error::ErrorType::DuplicateBinding,
                         typ.pos.clone(),
@@ -408,7 +408,7 @@ impl<'a> Builder<'a> {
         if let Some(vv) = Self::find_in_fieldlist(next.1, fs) {
             stack.push_back(vv.clone());
         } else {
-            return Err(Box::new(error::Error::new(
+            return Err(Box::new(error::BuildError::new(
                 format!(
                     "Unable to \
                      match element {} in selector \
@@ -435,7 +435,7 @@ impl<'a> Builder<'a> {
         if idx < elems.len() {
             stack.push_back(elems[idx].clone());
         } else {
-            return Err(Box::new(error::Error::new(
+            return Err(Box::new(error::BuildError::new(
                 format!(
                     "Unable to \
                      match element {} in selector \
@@ -495,7 +495,7 @@ impl<'a> Builder<'a> {
                         continue;
                     }
                     _ => {
-                        return Err(Box::new(error::Error::new(
+                        return Err(Box::new(error::BuildError::new(
                             format!("{} is not a Tuple or List", vref),
                             error::ErrorType::TypeFail,
                             next.pos.clone(),
@@ -526,7 +526,7 @@ impl<'a> Builder<'a> {
                     return Ok(Rc::new(Val::Str([s.to_string(), ss.clone()].concat())))
                 }
                 val => {
-                    return Err(Box::new(error::Error::new(
+                    return Err(Box::new(error::BuildError::new(
                         format!(
                             "Expected \
                              String \
@@ -547,7 +547,7 @@ impl<'a> Builder<'a> {
                     return Ok(Rc::new(Val::List(new_vec)));
                 }
                 val => {
-                    return Err(Box::new(error::Error::new(
+                    return Err(Box::new(error::BuildError::new(
                         format!(
                             "Expected \
                              List \
@@ -561,7 +561,7 @@ impl<'a> Builder<'a> {
                 }
             },
             ref expr => {
-                return Err(Box::new(error::Error::new(
+                return Err(Box::new(error::BuildError::new(
                     format!("{} does not support the '+' operation", expr.type_name()),
                     error::ErrorType::Unsupported,
                     pos.clone(),
@@ -584,7 +584,7 @@ impl<'a> Builder<'a> {
                 eval_binary_expr!(&Val::Float(ff), pos, right, Val::Float(f - ff), "Float")
             }
             ref expr => {
-                return Err(Box::new(error::Error::new(
+                return Err(Box::new(error::BuildError::new(
                     format!("{} does not support the '-' operation", expr.type_name()),
                     error::ErrorType::Unsupported,
                     pos.clone(),
@@ -607,7 +607,7 @@ impl<'a> Builder<'a> {
                 eval_binary_expr!(&Val::Float(ff), pos, right, Val::Float(f * ff), "Float")
             }
             ref expr => {
-                return Err(Box::new(error::Error::new(
+                return Err(Box::new(error::BuildError::new(
                     format!("{} does not support the '*' operation", expr.type_name()),
                     error::ErrorType::Unsupported,
                     pos.clone(),
@@ -630,7 +630,7 @@ impl<'a> Builder<'a> {
                 eval_binary_expr!(&Val::Float(ff), pos, right, Val::Float(f / ff), "Float")
             }
             ref expr => {
-                return Err(Box::new(error::Error::new(
+                return Err(Box::new(error::BuildError::new(
                     format!("{} does not support the '*' operation", expr.type_name()),
                     error::ErrorType::Unsupported,
                     pos.clone(),
@@ -677,7 +677,7 @@ impl<'a> Builder<'a> {
                 return Ok(Rc::new(Val::Boolean(l > r)));
             }
         }
-        Err(Box::new(error::Error::new(
+        Err(Box::new(error::BuildError::new(
             format!(
                 "Incompatible types for numeric comparison {} with {}",
                 left.type_name(),
@@ -700,7 +700,7 @@ impl<'a> Builder<'a> {
                 return Ok(Rc::new(Val::Boolean(l < r)));
             }
         }
-        Err(Box::new(error::Error::new(
+        Err(Box::new(error::BuildError::new(
             format!(
                 "Incompatible types for numeric comparison {} with {}",
                 left.type_name(),
@@ -727,7 +727,7 @@ impl<'a> Builder<'a> {
                 return Ok(Rc::new(Val::Boolean(l <= r)));
             }
         }
-        Err(Box::new(error::Error::new(
+        Err(Box::new(error::BuildError::new(
             format!(
                 "Incompatible types for numeric comparison {} with {}",
                 left.type_name(),
@@ -754,7 +754,7 @@ impl<'a> Builder<'a> {
                 return Ok(Rc::new(Val::Boolean(l >= r)));
             }
         }
-        Err(Box::new(error::Error::new(
+        Err(Box::new(error::BuildError::new(
             format!(
                 "Incompatible types for numeric comparison {} with {}",
                 left.type_name(),
@@ -802,7 +802,7 @@ impl<'a> Builder<'a> {
                     v.insert((count, val.clone()));
                     count += 1;
                 } else {
-                    return Err(Box::new(error::Error::new(
+                    return Err(Box::new(error::BuildError::new(
                         format!(
                             "Duplicate \
                              field: {} in \
@@ -829,7 +829,7 @@ impl<'a> Builder<'a> {
                         if src_val.1.type_equal(&expr_result) {
                             v.insert((src_val.0, expr_result));
                         } else {
-                            return Err(Box::new(error::Error::new(
+                            return Err(Box::new(error::BuildError::new(
                                 format!(
                                     "Expected type {} for field {} but got {}",
                                     src_val.1.type_name(),
@@ -861,7 +861,7 @@ impl<'a> Builder<'a> {
                     }).collect(),
             )));
         }
-        Err(Box::new(error::Error::new(
+        Err(Box::new(error::BuildError::new(
             format!("Expected Tuple got {}", v),
             error::ErrorType::TypeFail,
             def.selector.pos.clone(),
@@ -898,7 +898,7 @@ impl<'a> Builder<'a> {
             ));
             return Ok(Rc::new(Val::Tuple(fields)));
         }
-        Err(Box::new(error::Error::new(
+        Err(Box::new(error::BuildError::new(
             // We should pretty print the selectors here.
             format!("{} is not a Macro", v),
             error::ErrorType::TypeFail,
@@ -909,7 +909,7 @@ impl<'a> Builder<'a> {
     fn eval_macro_def(&self, def: &MacroDef) -> Result<Rc<Val>, Box<Error>> {
         match def.validate_symbols() {
             Ok(()) => Ok(Rc::new(Val::Macro(def.clone()))),
-            Err(set) => Err(Box::new(error::Error::new(
+            Err(set) => Err(Box::new(error::BuildError::new(
                 format!(
                     "Macro has the following \
                      undefined symbols: {:?}",
@@ -939,7 +939,7 @@ impl<'a> Builder<'a> {
             // Otherwise return the default.
             return self.eval_expr(def_expr);
         } else {
-            return Err(Box::new(error::Error::new(
+            return Err(Box::new(error::BuildError::new(
                 format!(
                     "Expected String but got \
                      {} in Select expression",
@@ -956,7 +956,7 @@ impl<'a> Builder<'a> {
         let l = match maybe_list.as_ref() {
             &Val::List(ref elems) => elems,
             other => {
-                return Err(Box::new(error::Error::new(
+                return Err(Box::new(error::BuildError::new(
                     format!("Expected List as target but got {:?}", other.type_name()),
                     error::ErrorType::TypeFail,
                     def.target.pos().clone(),
@@ -994,7 +994,7 @@ impl<'a> Builder<'a> {
             }
             return Ok(Rc::new(Val::List(out)));
         }
-        return Err(Box::new(error::Error::new(
+        return Err(Box::new(error::BuildError::new(
             format!("Expected macro but got {:?}", mac),
             error::ErrorType::TypeFail,
             def.pos.clone(),

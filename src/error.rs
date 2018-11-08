@@ -27,14 +27,11 @@ pub enum ErrorType {
     // Build Errors
     TypeFail,
     DuplicateBinding,
-    IncompleteParsing,
     Unsupported,
     NoSuchSymbol,
     BadArgLen,
     FormatError,
     // Parsing Errors
-    UnexpectedToken,
-    EmptyExpression,
     ParseError,
     AssertError,
 }
@@ -44,13 +41,10 @@ impl fmt::Display for ErrorType {
         let name = match self {
             &ErrorType::TypeFail => "TypeFail",
             &ErrorType::DuplicateBinding => "DuplicateBinding",
-            &ErrorType::IncompleteParsing => "IncompleteParsing",
             &ErrorType::Unsupported => "Unsupported",
             &ErrorType::NoSuchSymbol => "NoSuchSymbol",
             &ErrorType::BadArgLen => "BadArgLen",
             &ErrorType::FormatError => "FormatError",
-            &ErrorType::UnexpectedToken => "UnexpectedToken",
-            &ErrorType::EmptyExpression => "EmptyExpression",
             &ErrorType::ParseError => "ParseError",
             &ErrorType::AssertError => "AssertError",
         };
@@ -59,16 +53,16 @@ impl fmt::Display for ErrorType {
 }
 
 /// Error defines an Error type for parsing and building UCG code.
-pub struct Error {
+pub struct BuildError {
     pub err_type: ErrorType,
     pub pos: Position,
     pub msg: String,
     _pkgonly: (),
 }
 
-impl Error {
+impl BuildError {
     pub fn new<S: Into<String>>(msg: S, t: ErrorType, pos: Position) -> Self {
-        Error {
+        BuildError {
             err_type: t,
             pos: pos,
             msg: msg.into(),
@@ -86,19 +80,19 @@ impl Error {
     }
 }
 
-impl Debug for Error {
+impl Debug for BuildError {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
         self.render(w)
     }
 }
 
-impl fmt::Display for Error {
+impl fmt::Display for BuildError {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
         self.render(w)
     }
 }
 
-impl error::Error for Error {
+impl error::Error for BuildError {
     fn description(&self) -> &str {
         &self.msg
     }

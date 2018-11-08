@@ -846,7 +846,7 @@ make_fn!(
         name => wrap_err!(match_type!(BAREWORD), "Expected name for binding"),
         _ => punct!("="),
         // TODO(jwall): Wrap this error with an appropriate abortable_parser::Error
-        val => wrap_err!(trace_nom!(expression), "Expected Expression"),
+        val => with_err!(trace_nom!(expression), "Expected Expression"),
         _ => punct!(";"),
         (tuple_to_let(name, val))
     )
@@ -904,7 +904,7 @@ make_fn!(
     do_each!(
         _ => word!("out"),
         typ => wrap_err!(must!(match_type!(BAREWORD)), "Expected converter name"),
-        expr => wrap_err!(must!(expression), "Expected Expression to export"),
+        expr => with_err!(must!(expression), "Expected Expression to export"),
         _ => must!(punct!(";")),
         (Statement::Output(typ.clone(), expr.clone()))
     )
@@ -937,21 +937,11 @@ pub fn parse<'a>(input: OffsetStrIter<'a>) -> std::result::Result<Vec<Statement>
                 }
                 match statement(i.clone()) {
                     Result::Abort(e) => {
-                        let err = abortable_parser::Error::caused_by(
-                            "Statement Parse Error",
-                            Box::new(e),
-                            Box::new(i.clone()),
-                        );
-                        let ctx_err = StackPrinter { err: err };
+                        let ctx_err = StackPrinter { err: e };
                         return Err(format!("{}", ctx_err));
                     }
                     Result::Fail(e) => {
-                        let err = abortable_parser::Error::caused_by(
-                            "Statement Parse Error",
-                            Box::new(e),
-                            Box::new(i.clone()),
-                        );
-                        let ctx_err = StackPrinter { err: err };
+                        let ctx_err = StackPrinter { err: e };
                         return Err(format!("{}", ctx_err));
                     }
                     Result::Incomplete(_ei) => {
