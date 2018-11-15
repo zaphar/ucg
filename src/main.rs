@@ -153,7 +153,6 @@ fn visit_ucg_files(
             let entry = match dir_iter.next() {
                 Some(e) => e,
                 None => {
-                    println!("Exiting the loop");
                     break;
                 }
             };
@@ -194,7 +193,7 @@ fn visit_ucg_files(
             result = false;
         }
     }
-    if validate {
+    if validate && !summary.is_empty() {
         println!("RESULTS:");
         println!("{}", summary);
     }
@@ -257,6 +256,7 @@ fn build_command(
         if let Ok(false) = ok {
             process::exit(1)
         }
+        process::exit(0);
     }
     for file in files.unwrap() {
         let pb = PathBuf::from(file);
