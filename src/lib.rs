@@ -40,7 +40,7 @@
 //!
 //! ## Syntax
 //!
-//! A valid ucg file is composesed of a series of statements. Stataments start with an
+//! A valid ucg file is composed of a series of statements. Statements start with an
 //! optional keyword and terminate with a semicolon.
 //!
 //! ### Reserved words
@@ -488,6 +488,7 @@ extern crate abortable_parser;
 extern crate serde_json;
 extern crate serde_yaml;
 extern crate simple_error;
+extern crate toml;
 
 #[macro_use]
 pub mod ast;

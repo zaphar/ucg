@@ -1,0 +1,12 @@
+let config = {
+    format = "toml",
+    app = {
+        name = "app",
+        version = "v0.0.0",
+    },
+    metadata = {
+        tags = ["foo", "bar"],
+    },
+};
+
+out toml config;
