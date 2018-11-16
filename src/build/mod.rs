@@ -67,7 +67,7 @@ impl MacroDef {
         for (i, arg) in args.drain(0..).enumerate() {
             scope.entry(self.argdefs[i].clone()).or_insert(arg.clone());
         }
-        let b = Builder::new_with_env_and_scope(root, cache, scope, env);
+        let mut b = Builder::new_with_env_and_scope(root, cache, scope, env);
         let mut result: Vec<(PositionedItem<String>, Rc<Val>)> = Vec::new();
         for &(ref key, ref expr) in self.fields.iter() {
             // We clone the expressions here because this macro may be consumed
@@ -114,6 +114,7 @@ pub struct Builder<'a> {
     /// build_output is our built output.
     build_output: ValueMap,
     /// last is the result of the last statement.
+    pub stack: Option<Vec<Rc<Val>>>,
     pub last: Option<Rc<Val>>,
     pub out_lock: Option<(String, Rc<Val>)>,
 }
@@ -137,7 +138,7 @@ macro_rules! eval_binary_expr {
 
 impl<'a> Builder<'a> {
     // TOOD(jwall): This needs some unit tests.
-    fn tuple_to_val(&self, fields: &Vec<(Token, Expression)>) -> Result<Rc<Val>, Box<Error>> {
+    fn tuple_to_val(&mut self, fields: &Vec<(Token, Expression)>) -> Result<Rc<Val>, Box<Error>> {
         let mut new_fields = Vec::<(PositionedItem<String>, Rc<Val>)>::new();
         for &(ref name, ref expr) in fields.iter() {
             let val = try!(self.eval_expr(expr));
@@ -146,7 +147,7 @@ impl<'a> Builder<'a> {
         Ok(Rc::new(Val::Tuple(new_fields)))
     }
 
-    fn list_to_val(&self, def: &ListDef) -> Result<Rc<Val>, Box<Error>> {
+    fn list_to_val(&mut self, def: &ListDef) -> Result<Rc<Val>, Box<Error>> {
         let mut vals = Vec::new();
         for expr in def.elems.iter() {
             vals.push(try!(self.eval_expr(expr)));
@@ -154,7 +155,7 @@ impl<'a> Builder<'a> {
         Ok(Rc::new(Val::List(vals)))
     }
 
-    fn value_to_val(&self, v: &Value) -> Result<Rc<Val>, Box<Error>> {
+    fn value_to_val(&mut self, v: &Value) -> Result<Rc<Val>, Box<Error>> {
         match v {
             &Value::Empty(_) => Ok(Rc::new(Val::Empty)),
             &Value::Boolean(ref b) => Ok(Rc::new(Val::Boolean(b.val))),
@@ -221,6 +222,7 @@ impl<'a> Builder<'a> {
             assets: cache,
             build_output: scope,
             out_lock: None,
+            stack: None,
             last: None,
         }
     }
@@ -380,6 +382,10 @@ impl<'a> Builder<'a> {
         if &sym.val == "env" {
             return Some(self.env.clone());
         }
+        if &sym.val == "self" {
+            // TODO(jwall): we need to look at the current tuple in the stack.
+            return self.peek_val();
+        }
         if self.build_output.contains_key(sym) {
             return Some(self.build_output[sym].clone());
         }
@@ -451,7 +457,7 @@ impl<'a> Builder<'a> {
         Ok(())
     }
 
-    fn lookup_selector(&self, sl: &SelectorList) -> Result<Rc<Val>, Box<Error>> {
+    fn lookup_selector(&mut self, sl: &SelectorList) -> Result<Rc<Val>, Box<Error>> {
         let first = try!(self.eval_expr(&sl.head));
         // First we ensure that the result is a tuple or a list.
         let mut stack = VecDeque::new();
@@ -765,7 +771,7 @@ impl<'a> Builder<'a> {
         )))
     }
 
-    fn eval_binary(&self, def: &BinaryOpDef) -> Result<Rc<Val>, Box<Error>> {
+    fn eval_binary(&mut self, def: &BinaryOpDef) -> Result<Rc<Val>, Box<Error>> {
         let kind = &def.kind;
         let left = try!(self.eval_expr(&def.left));
         let right = try!(self.eval_expr(&def.right));
@@ -777,7 +783,7 @@ impl<'a> Builder<'a> {
         }
     }
 
-    fn eval_compare(&self, def: &ComparisonDef) -> Result<Rc<Val>, Box<Error>> {
+    fn eval_compare(&mut self, def: &ComparisonDef) -> Result<Rc<Val>, Box<Error>> {
         let kind = &def.kind;
         let left = try!(self.eval_expr(&def.left));
         let right = try!(self.eval_expr(&def.right));
@@ -791,9 +797,36 @@ impl<'a> Builder<'a> {
         }
     }
 
-    fn eval_copy(&self, def: &CopyDef) -> Result<Rc<Val>, Box<Error>> {
+    fn push_val(&mut self, tuple: Rc<Val>) {
+        if let Some(ref mut v) = self.stack {
+            v.push(tuple);
+        } else {
+            let mut v = Vec::new();
+            v.push(tuple);
+            self.stack = Some(v);
+        }
+    }
+
+    fn pop_val(&mut self) -> Option<Rc<Val>> {
+        if let Some(ref mut v) = self.stack {
+            v.pop()
+        } else {
+            None
+        }
+    }
+
+    fn peek_val(&self) -> Option<Rc<Val>> {
+        if let Some(ref v) = self.stack {
+            v.first().map(|v| v.clone())
+        } else {
+            None
+        }
+    }
+
+    fn eval_copy(&mut self, def: &CopyDef) -> Result<Rc<Val>, Box<Error>> {
         let v = try!(self.lookup_selector(&def.selector.sel));
-        if let Val::Tuple(ref src_fields) = *v {
+        if let &Val::Tuple(ref src_fields) = v.as_ref() {
+            self.push_val(v.clone());
             let mut m = HashMap::<PositionedItem<String>, (i32, Rc<Val>)>::new();
             // loop through fields and build  up a hashmap
             let mut count = 0;
@@ -802,6 +835,7 @@ impl<'a> Builder<'a> {
                     v.insert((count, val.clone()));
                     count += 1;
                 } else {
+                    self.pop_val();
                     return Err(Box::new(error::BuildError::new(
                         format!(
                             "Duplicate \
@@ -815,6 +849,7 @@ impl<'a> Builder<'a> {
                 }
             }
             for &(ref key, ref val) in def.fields.iter() {
+                // TODO(jwall): Allow the special value self to refer to the base tuple.
                 let expr_result = try!(self.eval_expr(val));
                 match m.entry(key.into()) {
                     // brand new field here.
@@ -829,6 +864,7 @@ impl<'a> Builder<'a> {
                         if src_val.1.type_equal(&expr_result) {
                             v.insert((src_val.0, expr_result));
                         } else {
+                            self.pop_val();
                             return Err(Box::new(error::BuildError::new(
                                 format!(
                                     "Expected type {} for field {} but got {}",
@@ -843,6 +879,7 @@ impl<'a> Builder<'a> {
                     }
                 };
             }
+            self.pop_val();
             let mut new_fields: Vec<(PositionedItem<String>, (i32, Rc<Val>))> = m.drain().collect();
             // We want to maintain our order for the fields to make comparing tuples
             // easier in later code. So we sort by the field order before constructing a new tuple.
@@ -868,7 +905,7 @@ impl<'a> Builder<'a> {
         )))
     }
 
-    fn eval_format(&self, def: &FormatDef) -> Result<Rc<Val>, Box<Error>> {
+    fn eval_format(&mut self, def: &FormatDef) -> Result<Rc<Val>, Box<Error>> {
         let tmpl = &def.template;
         let args = &def.args;
         let mut vals = Vec::new();
@@ -880,7 +917,7 @@ impl<'a> Builder<'a> {
         Ok(Rc::new(Val::Str(try!(formatter.render(&def.pos)))))
     }
 
-    fn eval_call(&self, def: &CallDef) -> Result<Rc<Val>, Box<Error>> {
+    fn eval_call(&mut self, def: &CallDef) -> Result<Rc<Val>, Box<Error>> {
         let sel = &def.macroref;
         let args = &def.arglist;
         let v = try!(self.lookup_selector(&sel.sel));
@@ -921,7 +958,7 @@ impl<'a> Builder<'a> {
         }
     }
 
-    fn eval_select(&self, def: &SelectDef) -> Result<Rc<Val>, Box<Error>> {
+    fn eval_select(&mut self, def: &SelectDef) -> Result<Rc<Val>, Box<Error>> {
         let target = &def.val;
         let def_expr = &def.default;
         let fields = &def.tuple;
@@ -951,7 +988,7 @@ impl<'a> Builder<'a> {
         }
     }
 
-    fn eval_list_op(&self, def: &ListOpDef) -> Result<Rc<Val>, Box<Error>> {
+    fn eval_list_op(&mut self, def: &ListOpDef) -> Result<Rc<Val>, Box<Error>> {
         let maybe_list = try!(self.eval_expr(&def.target));
         let l = match maybe_list.as_ref() {
             &Val::List(ref elems) => elems,
@@ -1058,7 +1095,7 @@ impl<'a> Builder<'a> {
 
     // Evals a single Expression in the context of a running Builder.
     // It does not mutate the builders collected state at all.
-    pub fn eval_expr(&self, expr: &Expression) -> Result<Rc<Val>, Box<Error>> {
+    pub fn eval_expr(&mut self, expr: &Expression) -> Result<Rc<Val>, Box<Error>> {
         match expr {
             &Expression::Simple(ref val) => self.value_to_val(val),
             &Expression::Binary(ref def) => self.eval_binary(def),

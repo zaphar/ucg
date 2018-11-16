@@ -19,7 +19,7 @@ use std;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-fn test_expr_to_val(mut cases: Vec<(Expression, Val)>, b: Builder) {
+fn test_expr_to_val(mut cases: Vec<(Expression, Val)>, mut b: Builder) {
     for tpl in cases.drain(0..) {
         assert_eq!(b.eval_expr(&tpl.0).unwrap(), Rc::new(tpl.1));
     }

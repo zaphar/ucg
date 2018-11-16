@@ -38,3 +38,31 @@ assert |
 assert |
     nestedtpl.list.3 == 4;
 |;
+
+let nestedcopy = nestedtpl{
+    inner = self.inner{
+        inner = {
+            field3 = "three",
+        },
+        field2 = 2,
+    },
+};
+
+let deepnestedcopy = nestedcopy{
+    ignoreme = "ignored",
+    inner = self.inner{
+        inner = self.inner{
+            field4 = 4,
+        },
+    },
+};
+
+assert |
+    nestedcopy.inner.field2 == 2;
+|;
+assert |
+    nestedcopy.inner.inner.field3 == "three";
+|;
+assert |
+    deepnestedcopy.inner.inner.field4 == 4;
+|;

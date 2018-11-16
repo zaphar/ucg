@@ -47,6 +47,7 @@
 //!
 //! The following words are reserved in ucg and can't be used as named bindings.
 //!
+//! * self
 //! * assert
 //! * true
 //! * false
@@ -272,6 +273,29 @@
 //!     field1 = 300, // Error!!! must be a string.
 //! };
 //!
+//! ```
+//! When you are copying a tuple you can use the special symbol  `self` to refer to the tuple you are copying.
+//! This allows you to override fields in nested tuples with an concise syntax. Self always refers
+//! to the innermost tuple you are copying.
+//!
+//! ```ucg
+//! let nestedtpl = {
+//!     field1 = "value1",
+//!     inner = {
+//!         field2 = 2
+//!         inner = {
+//!             field3 = "three",
+//!         },
+//!     },
+//! };
+//!
+//! let copiedtpl = nestedtpl{
+//!     inner = self.inner{
+//!         inner = self.inner{
+//!             field4 = 4,
+//!         },
+//!     },
+//! };
 //! ```
 //!
 //! #### Conditional data
