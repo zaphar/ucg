@@ -1,0 +1,40 @@
+let bucketbase = macro(name, project, location) => {
+    name = name,
+    type = "storage.v1.bucket",
+    properties = {
+        bucket = name,
+        project = project,
+        location = location,
+        acl = [
+            {
+                entity = "project-owners-ucg-configuration-project",
+                role = "OWNER",
+            },
+            {
+                entity = "project-editors-ucg-configuration-project",
+                role = "WRITER",
+            },
+            {
+                entity = "project-viewers-ucg-configuration-project",
+                role = "READER",
+            },
+        ],
+        defaultObjectAcl = [
+            {
+                entity = "allUsers",
+                role = "READER",
+            },
+        ],
+
+    },
+};
+
+let bucketSelfLink = macro(bucket) => {
+    name = "@selfLink" % (bucket),
+    value = "https://console.cloud.google.com/storage/browser/@" % (bucket),
+};
+
+let bucketGsLink = macro(bucket) => {
+    name = "@gsLink" % (bucket),
+    value = "gs://@" % (bucket),
+};

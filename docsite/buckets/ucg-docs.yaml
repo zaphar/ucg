@@ -1,0 +1,26 @@
+---
+resources:
+  - name: ucg.marzhillstudios.com
+    type: storage.v1.bucket
+    properties:
+      bucket: ucg.marzhillstudios.com
+      project: "ucg-configuration-project"
+      location: "us-east1"
+      acl:
+        - entity: "project-owners-ucg-configuration-project"
+          role: OWNER
+        - entity: "project-editors-ucg-configuration-project"
+          role: WRITER
+        - entity: "project-viewers-ucg-configuration-project"
+          role: READER
+      defaultObjectAcl:
+        - entity: allUsers
+          role: READER
+      website:
+        notFoundPage: 404.html
+        mainPageSuffix: index.html
+outputs:
+  - name: ucg.marzhillstudios.comselfLink
+    value: "https://console.cloud.google.com/storage/browser/ucg.marzhillstudios.com"
+  - name: ucg.marzhillstudios.comgsLink
+    value: "gs://ucg.marzhillstudios.com"

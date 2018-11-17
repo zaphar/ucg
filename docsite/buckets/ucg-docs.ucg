@@ -1,0 +1,27 @@
+import "../ucglib/globals.ucg" as globals;
+import "../ucglib/macros.ucg" as mks;
+
+let doc_bucket_name = "ucg.marzhillstudios.com";
+
+let doc_site_bucket = mks.bucketbase(doc_bucket_name, globals.project, globals.location);
+
+let resources = [
+    doc_site_bucket{
+        properties = self.properties{
+            website = {
+                notFoundPage = "404.html",
+                mainPageSuffix = "index.html",
+            },
+        },
+    },
+];
+
+let deployment = {
+    resources = resources,
+    outputs = [
+        mks.bucketSelfLink(doc_bucket_name),
+        mks.bucketGsLink(doc_bucket_name),
+    ],
+};
+
+out yaml deployment;
