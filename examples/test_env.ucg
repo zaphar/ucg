@@ -1,0 +1,8 @@
+let vars = {
+    USER = "me",
+    HOSTNAME = "localhost",
+    TWO = 2,
+    VERBOSE = true,
+};
+
+out env vars;

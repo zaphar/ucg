@@ -1,0 +1,15 @@
+let args = {
+    port = 8080,
+    listen = "0.0.0.0",
+    verbose = NULL,
+    dir = [
+        "some/dir",
+        "some/other/dir",
+    ],
+    log = {
+        debug = true,
+        format = "json",
+    },
+};
+
+out flags args;

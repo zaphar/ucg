@@ -80,4 +80,4 @@ ARGS:
 
 ## Language Reference
 
-https://docs.rs/ucg/
+https://ucg.marzhillstudios.com/reference/
