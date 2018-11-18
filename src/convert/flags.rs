@@ -61,7 +61,7 @@ impl FlagConverter {
                 return Ok(());
             }
             &Val::Boolean(b) => {
-                try!(write!(w, "{}", if b { "true" } else { "false" }));
+                try!(write!(w, "{} ", if b { "true" } else { "false" }));
             }
             &Val::Float(ref f) => {
                 try!(write!(w, "{} ", f));
