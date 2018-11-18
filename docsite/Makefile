@@ -20,9 +20,14 @@ all: build test
 test:
 	ucg test -r
 
-gensite:
+content := $(shell find site/content -type f -iname *.md)
+
+site/.built: $(content)
 	cd site; \
 	gutenberg build -o generated
+	touch site/.built
+
+gensite: site/.built
 
 deploysite: gensite
 	cd site/; \

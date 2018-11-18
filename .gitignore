@@ -1,5 +1,6 @@
 target
 .libtarget
+.built
 .vscode/settings.json
 docsite/site/generated
 docsite/site/public
