@@ -240,4 +240,4 @@ let my_dbconf = mymacro("couchdb.example.org", "9090");
 let my_dbhost = dbconf.host;
 ```
 
-Next: <a href="statements">Statements</a>
+Next: <a href="/reference/statements">Statements</a>

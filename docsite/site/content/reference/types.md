@@ -84,4 +84,4 @@ are allowed.
 let list = [1, "two", {three = 3},];
 ```
 
-Next: <a href="expressions">Expressions</a>
+Next: <a href="/reference/expressions">Expressions</a>
