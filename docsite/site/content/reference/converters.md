@@ -35,7 +35,7 @@ rules for each type.
   * Nested tuples concatenate the field names to create the field.
   * Nested Lists generate a new `--field listitem` pair for each item in the list.
   * For fields that are just one character in length use a single `-`. Use double
-    dashes for fields of longer than one character.
+    dashes `--` for fields that are longer than one character.
 
 ### Example
 
@@ -69,7 +69,7 @@ translation rules.
 
 * Booleans, Integers, Floats, and Strings are output as is.
 * Lists are not output.
-* Tuples are output as a `FIELD=value` for each field with strings surrounded by double
+* Tuples are output as a `FIELD=value` for each field with strings surrounded by single
   quotes.
   * Nested Tuples are not output.
 
@@ -117,7 +117,7 @@ let common_flags = {
 
 let script = {
     env = {
-        apikey = "foo-key-and-stuff",
+        API_KEY = "foo-key-and-stuff",
     },
     command = "my-app",
     args = [
@@ -136,7 +136,7 @@ The script tuple above will generate the following bash script:
 # Turn on unofficial Bash-Strict-Mode
 set -euo pipefail
 
-VERBOSE_LOG="true"
+API_KEY="foo-key-and-stuff"
 
 exec my-app --log-level debug --maxMem 2048M serve --port 8080
 ```

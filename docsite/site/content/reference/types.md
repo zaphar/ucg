@@ -29,7 +29,7 @@ An Integer is any 64 bit integer number.
 
 ### Float
 
-A Float is any 64 bit floating point numer. You indicate a number is a Float by
+A Float is any 64 bit floating point number. You indicate a number is a Float by
 including a decimal point. Any number with a decimal point is a float.
 
 ```
@@ -40,10 +40,11 @@ including a decimal point. Any number with a decimal point is a float.
 
 ### String
 
-Strings are any double quoted text.
+Strings are any double quoted text. You can use the `\` to esacpe characters in the text.
 
 ```
 "This is a string";
+"This is an escaped \"string\"";
 ```
 
 ### NULL or the Empty type

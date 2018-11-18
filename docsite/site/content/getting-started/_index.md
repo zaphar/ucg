@@ -73,26 +73,28 @@ Ucg will generate the yaml file with the same name as the file containing the ou
 The ucg command line
 -----------
 
-Ucg has builtin help on the command line. You can 
+Ucg has builtin help on the command line. 
 
-    $> ucg help
-    ucg 0.2.2
-    Jeremy Wall <jeremy@marzhillstudios.com>
-    Universal Configuration Grammar compiler.
-    
-    USAGE:
-        ucg [SUBCOMMAND]
-    
-    FLAGS:
-        -h, --help       Prints help information
-        -V, --version    Prints version information
-    
-    SUBCOMMANDS:
-        build         Build a list of ucg files.
-        converters    list the available converters
-        help          Prints this message or the help of the given subcommand(s)
-        inspect       Inspect a specific symbol in a ucg file.
-        test          Check a list of ucg files for errors and run test assertions.
+```
+$> ucg help
+ucg 0.2.2
+Jeremy Wall <jeremy@marzhillstudios.com>
+Universal Configuration Grammar compiler.
+
+USAGE:
+    ucg [SUBCOMMAND]
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+SUBCOMMANDS:
+    build         Build a list of ucg files.
+    converters    list the available converters
+    help          Prints this message or the help of the given subcommand(s)
+    inspect       Inspect a specific symbol in a ucg file.
+    test          Check a list of ucg files for errors and run test assertions.
+```
 
 * build will build a list of files or directories of files.
 * inspect will allow you to print out the contents of a specific named binding in a ucg file.

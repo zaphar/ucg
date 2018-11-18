@@ -11,7 +11,7 @@ a script to launch the container.
 First lets define some docker configuration values that we'll use later.
 
 ```
-let image_conf = {
+let container_conf = {
     port = 8888,
     hostMount = "~/iJulia/notebooks",
     mountPoint = "/var/iJulia/notebooks",
@@ -26,8 +26,8 @@ let map_to_container = macro (host, container) => {
     result = "@:@" % (host, container)
 };
 
-let publish = map_to_container(docker_conf.port, docker_conf.port);
-let volumes = map_to_container(docker_conf.hostMount, docker_conf.mountPoint);
+let publish = map_to_container(container_conf.port, container_conf.port);
+let volumes = map_to_container(container_conf.hostMount, container_conf.mountPoint);
 ```
 
 Now we set up our docker run flags.
@@ -48,7 +48,7 @@ Finally we are ready to define our jupyter specific flags.
 
 ```
 let jupyter_flags = {
-    notebook-dir = docker_conf.mountPoint
+    notebook-dir = container_conf.mountPoint
 };
 ```
 
