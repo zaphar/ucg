@@ -61,16 +61,16 @@ impl EnvConverter {
                 return Ok(());
             }
             &Val::Boolean(b) => {
-                try!(write!(w, "{} ", if b { "true" } else { "false" }));
+                try!(write!(w, "{}\n", if b { "true" } else { "false" }));
             }
             &Val::Float(ref f) => {
-                try!(write!(w, "{} ", f));
+                try!(write!(w, "{}\n", f));
             }
             &Val::Int(ref i) => {
-                try!(write!(w, "{} ", i));
+                try!(write!(w, "{}\n", i));
             }
             &Val::Str(ref s) => {
-                try!(write!(w, "'{}' ", s));
+                try!(write!(w, "'{}'\n", s));
             }
             &Val::List(ref items) => {
                 try!(self.convert_list(items, w));
