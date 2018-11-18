@@ -79,7 +79,7 @@ impl JsonConverter {
 
     fn write(&self, v: &Val, w: &mut Write) -> Result {
         let jsn_val = try!(self.convert_value(v));
-        try!(serde_json::to_writer(w, &jsn_val));
+        try!(serde_json::to_writer_pretty(w, &jsn_val));
         Ok(())
     }
 }
