@@ -1,3 +1,7 @@
+let noargmacro = macro() => {
+    field1 = "value",
+};
+
 let simplemacro = macro(arg1, arg2, arg3) => {
     field1 = arg1,
     field2 = arg2,
@@ -11,9 +15,13 @@ let cplxmacro = macro(argint, argstr, argfloat) => {
     boolfield = argint == 1,
 };
 
+let noargresult = noargmacro();
 let simpleresult = simplemacro(1, 2, 3);
 let cplxresult = cplxmacro(1, "We", 3.0);
 
+assert |
+    noargresult.field1 == "value";
+|;
 assert |
     simpleresult.field1 == 1;
 |;

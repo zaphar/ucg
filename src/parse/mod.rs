@@ -661,12 +661,12 @@ make_fn!(
 fn tuple_to_call<'a>(
     input: SliceIter<'a, Token>,
     val: Value,
-    exprs: Vec<Expression>,
+    exprs: Option<Vec<Expression>>,
 ) -> ParseResult<'a, Expression> {
     if let Value::Selector(def) = val {
         Ok(Expression::Call(CallDef {
             macroref: def,
-            arglist: exprs,
+            arglist: exprs.unwrap_or_else(|| Vec::new()),
             pos: (&input).into(),
         }))
     } else {
@@ -693,7 +693,7 @@ fn call_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expressi
     let parsed = do_each!(input.clone(),
         macroname => trace_nom!(selector_value),
         _ => punct!("("),
-        args => separated!(punct!(","), trace_nom!(expression)),
+        args => optional!(separated!(punct!(","), trace_nom!(expression))),
         _ => punct!(")"),
         (macroname, args)
     );

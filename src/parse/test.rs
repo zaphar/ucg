@@ -887,6 +887,18 @@ fn test_call_parse() {
             pos: Position::new(1, 1, 0),
         })
     );
+
+    assert_parse!(
+        call_expression("foo ()"),
+        Expression::Call(CallDef {
+            macroref: make_selector!(
+                make_expr!("foo", Position::new(1, 1, 0)),
+                Position::new(1, 1, 0)
+            ),
+            arglist: Vec::new(),
+            pos: Position::new(1, 1, 0),
+        })
+    );
 }
 
 #[test]
