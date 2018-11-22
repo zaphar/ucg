@@ -331,9 +331,9 @@ make_fn!(
     )
 );
 
-fn tuple_to_list<Sp: Into<Position>>(pos: Sp, elems: Vec<Expression>) -> Value {
+fn tuple_to_list<Sp: Into<Position>>(pos: Sp, elems: Option<Vec<Expression>>) -> Value {
     Value::List(ListDef {
-        elems: elems,
+        elems: elems.unwrap_or_else(|| Vec::new()),
         pos: pos.into(),
     })
 }
@@ -342,7 +342,7 @@ make_fn!(
     list_value<SliceIter<Token>, Value>,
     do_each!(
         start => punct!("["),
-        elements => separated!(punct!(","), expression),
+        elements => optional!(separated!(punct!(","), expression)),
         _ => optional!(punct!(",")), // nom's opt! macro doesn't preserve error types properly but this one does.
         _ => punct!("]"),
         (tuple_to_list(start.pos, elements))

@@ -34,6 +34,11 @@ fn test_tuples() {
 }
 
 #[test]
+fn test_lists() {
+    assert_build(include_str!("../../integration_tests/list_test.ucg"));
+}
+
+#[test]
 fn test_comparisons() {
     assert_build(include_str!("../../integration_tests/comparisons_test.ucg"));
 }
