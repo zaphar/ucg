@@ -71,6 +71,10 @@ impl JsonConverter {
                 eprintln!("Skipping macro encoding as null...");
                 serde_json::Value::Null
             }
+            &Val::Module(_) => {
+                eprintln!("Skipping module encoding as null...");
+                serde_json::Value::Null
+            }
             &Val::List(ref l) => try!(self.convert_list(l)),
             &Val::Tuple(ref t) => try!(self.convert_tuple(t)),
         };

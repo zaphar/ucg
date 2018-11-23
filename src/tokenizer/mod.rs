@@ -268,6 +268,10 @@ make_fn!(macrotok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "macro", WS)
 );
 
+make_fn!(moduletok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::BAREWORD, "module", WS)
+);
+
 make_fn!(lettok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "let", WS)
 );
@@ -386,6 +390,7 @@ fn token<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Token> {
         selecttok,
         asserttok,
         macrotok,
+        moduletok,
         importtok,
         astok,
         maptok,

@@ -110,11 +110,14 @@ pub struct Builder<'a> {
     /// are keyed by the canonicalized import path. This acts as a cache
     /// so multiple imports of the same file don't have to be parsed
     /// multiple times.
+    // FIXME(jwall): This probably needs to be running in a separate thread
+    //   with some sort of RPC mechanism instead.
     assets: Rc<RefCell<assets::Cache>>,
     /// build_output is our built output.
     build_output: ValueMap,
     /// last is the result of the last statement.
     pub stack: Option<Vec<Rc<Val>>>,
+    pub is_module: bool,
     pub last: Option<Rc<Val>>,
     pub out_lock: Option<(String, Rc<Val>)>,
 }
@@ -223,6 +226,7 @@ impl<'a> Builder<'a> {
             build_output: scope,
             out_lock: None,
             stack: None,
+            is_module: false,
             last: None,
         }
     }
@@ -301,20 +305,26 @@ impl<'a> Builder<'a> {
 
     fn build_import(&mut self, def: &ImportDef) -> Result<Rc<Val>, Box<Error>> {
         let sym = &def.name;
-        let mut normalized = self.root.to_path_buf();
-        normalized.push(&def.path.fragment);
+        let mut normalized = self.root.clone();
+        let import_path = PathBuf::from(&def.path.fragment);
+        if import_path.is_relative() {
+            normalized.push(&def.path.fragment);
+        } else {
+            normalized = import_path;
+        }
+        normalized = try!(normalized.canonicalize());
         eprintln!("processing import for {}", normalized.to_string_lossy());
+        // Introduce a scope so the above borrow is dropped before we modify
+        // the cache below.
         // Only parse the file once on import.
-        let mut shared_assets = self.assets.borrow_mut();
-        let result = match try!(shared_assets.get(&normalized)) {
+        let maybe_asset = try!(self.assets.borrow().get(&normalized));
+        let result = match maybe_asset {
             Some(v) => v.clone(),
             None => {
                 let mut b = Self::new(normalized.clone(), self.assets.clone());
                 let filepath = normalized.to_str().unwrap().clone();
                 try!(b.build_file(filepath));
-                let fields: Vec<(PositionedItem<String>, Rc<Val>)> =
-                    b.build_output.drain().collect();
-                Rc::new(Val::Tuple(fields))
+                b.get_outputs_as_val()
             }
         };
         let key = sym.into();
@@ -326,7 +336,8 @@ impl<'a> Builder<'a> {
             )));
         }
         self.build_output.insert(key, result.clone());
-        try!(shared_assets.stash(normalized.clone(), result.clone()));
+        let mut mut_assets_cache = self.assets.borrow_mut();
+        try!(mut_assets_cache.stash(normalized.clone(), result.clone()));
         return Ok(result);
     }
 
@@ -383,7 +394,7 @@ impl<'a> Builder<'a> {
             return Some(self.env.clone());
         }
         if &sym.val == "self" {
-            // TODO(jwall): we need to look at the current tuple in the stack.
+            eprintln!("XXX: In tuple self is {:?}", self.peek_val());
             return self.peek_val();
         }
         if self.build_output.contains_key(sym) {
@@ -823,83 +834,143 @@ impl<'a> Builder<'a> {
         }
     }
 
+    fn get_outputs_as_val(&mut self) -> Rc<Val> {
+        let fields: Vec<(PositionedItem<String>, Rc<Val>)> = self.build_output.drain().collect();
+        Rc::new(Val::Tuple(fields))
+    }
+
+    fn copy_from_base(
+        &mut self,
+        src_fields: &Vec<(PositionedItem<String>, Rc<Val>)>,
+        overrides: &Vec<(Token, Expression)>,
+    ) -> Result<Rc<Val>, Box<Error>> {
+        let mut m = HashMap::<PositionedItem<String>, (i32, Rc<Val>)>::new();
+        // loop through fields and build  up a hashmap
+        let mut count = 0;
+        for &(ref key, ref val) in src_fields.iter() {
+            if let Entry::Vacant(v) = m.entry(key.clone()) {
+                v.insert((count, val.clone()));
+                count += 1;
+            } else {
+                self.pop_val();
+                return Err(Box::new(error::BuildError::new(
+                    format!(
+                        "Duplicate \
+                         field: {} in \
+                         tuple",
+                        key.val
+                    ),
+                    error::ErrorType::TypeFail,
+                    key.pos.clone(),
+                )));
+            }
+        }
+        for &(ref key, ref val) in overrides.iter() {
+            let expr_result = try!(self.eval_expr(val));
+            match m.entry(key.into()) {
+                // brand new field here.
+                Entry::Vacant(v) => {
+                    v.insert((count, expr_result));
+                    count += 1;
+                }
+                Entry::Occupied(mut v) => {
+                    // overriding field here.
+                    // Ensure that the new type matches the old type.
+                    let src_val = v.get().clone();
+                    if src_val.1.type_equal(&expr_result) {
+                        v.insert((src_val.0, expr_result));
+                    } else {
+                        self.pop_val();
+                        return Err(Box::new(error::BuildError::new(
+                            format!(
+                                "Expected type {} for field {} but got {}",
+                                src_val.1.type_name(),
+                                key.fragment,
+                                expr_result.type_name()
+                            ),
+                            error::ErrorType::TypeFail,
+                            key.pos.clone(),
+                        )));
+                    }
+                }
+            };
+        }
+        self.pop_val();
+        let mut new_fields: Vec<(PositionedItem<String>, (i32, Rc<Val>))> = m.drain().collect();
+        // We want to maintain our order for the fields to make comparing tuples
+        // easier in later code. So we sort by the field order before constructing a new tuple.
+        new_fields.sort_by(|a, b| {
+            let ta = a.1.clone();
+            let tb = b.1.clone();
+            ta.0.cmp(&tb.0)
+        });
+        return Ok(Rc::new(Val::Tuple(
+            new_fields
+                .iter()
+                .map(|a| {
+                    let first = a.0.clone();
+                    let t = a.1.clone();
+                    (first, t.1)
+                }).collect(),
+        )));
+    }
+
     fn eval_copy(&mut self, def: &CopyDef) -> Result<Rc<Val>, Box<Error>> {
         let v = try!(self.lookup_selector(&def.selector.sel));
         if let &Val::Tuple(ref src_fields) = v.as_ref() {
             self.push_val(v.clone());
-            let mut m = HashMap::<PositionedItem<String>, (i32, Rc<Val>)>::new();
-            // loop through fields and build  up a hashmap
-            let mut count = 0;
-            for &(ref key, ref val) in src_fields.iter() {
-                if let Entry::Vacant(v) = m.entry(key.clone()) {
-                    v.insert((count, val.clone()));
-                    count += 1;
-                } else {
-                    self.pop_val();
-                    return Err(Box::new(error::BuildError::new(
-                        format!(
-                            "Duplicate \
-                             field: {} in \
-                             tuple",
-                            key.val
-                        ),
-                        error::ErrorType::TypeFail,
-                        key.pos.clone(),
-                    )));
+            return self.copy_from_base(&src_fields, &def.fields);
+        }
+        if let &Val::Module(ref mod_def) = v.as_ref() {
+            let maybe_tpl = mod_def.clone().arg_tuple.unwrap().clone();
+            if let &Val::Tuple(ref src_fields) = maybe_tpl.as_ref() {
+                // 1. First we create a builder.
+                let mut b = Self::new(self.root.clone(), self.assets.clone());
+                b.is_module = true;
+                // 2. We construct an argument tuple by copying from the defs
+                //    argset.
+                // Push our base tuple on the stack so the copy can use
+                // self to reference it.
+                b.push_val(maybe_tpl.clone());
+                let mod_args = try!(self.copy_from_base(src_fields, &def.fields));
+                // put our copied parameters tuple in our builder under the mod key.
+                let mod_key =
+                    PositionedItem::new_with_pos(String::from("mod"), Position::new(0, 0, 0));
+                match b.build_output.entry(mod_key) {
+                    Entry::Occupied(e) => {
+                        return Err(Box::new(error::BuildError::new(
+                            format!(
+                                "Binding \
+                                 for {:?} already \
+                                 exists in module",
+                                e.key(),
+                            ),
+                            error::ErrorType::DuplicateBinding,
+                            mod_def.pos.clone(),
+                        )));
+                    }
+                    Entry::Vacant(e) => {
+                        e.insert(mod_args.clone());
+                    }
                 }
+                // 4. Evaluate all the statements using the builder.
+                try!(b.build(&mod_def.statements));
+                // 5. Take all of the bindings in the module and construct a new
+                //    tuple using them.
+                return Ok(b.get_outputs_as_val());
+            } else {
+                return Err(Box::new(error::BuildError::new(
+                    format!(
+                        "Weird value stored in our module parameters slot {:?}",
+                        mod_def.arg_tuple
+                    ),
+                    error::ErrorType::TypeFail,
+                    def.selector.pos.clone(),
+                )));
             }
-            for &(ref key, ref val) in def.fields.iter() {
-                // TODO(jwall): Allow the special value self to refer to the base tuple.
-                let expr_result = try!(self.eval_expr(val));
-                match m.entry(key.into()) {
-                    // brand new field here.
-                    Entry::Vacant(v) => {
-                        v.insert((count, expr_result));
-                        count += 1;
-                    }
-                    Entry::Occupied(mut v) => {
-                        // overriding field here.
-                        // Ensure that the new type matches the old type.
-                        let src_val = v.get().clone();
-                        if src_val.1.type_equal(&expr_result) {
-                            v.insert((src_val.0, expr_result));
-                        } else {
-                            self.pop_val();
-                            return Err(Box::new(error::BuildError::new(
-                                format!(
-                                    "Expected type {} for field {} but got {}",
-                                    src_val.1.type_name(),
-                                    key.fragment,
-                                    expr_result.type_name()
-                                ),
-                                error::ErrorType::TypeFail,
-                                key.pos.clone(),
-                            )));
-                        }
-                    }
-                };
-            }
-            self.pop_val();
-            let mut new_fields: Vec<(PositionedItem<String>, (i32, Rc<Val>))> = m.drain().collect();
-            // We want to maintain our order for the fields to make comparing tuples
-            // easier in later code. So we sort by the field order before constructing a new tuple.
-            new_fields.sort_by(|a, b| {
-                let ta = a.1.clone();
-                let tb = b.1.clone();
-                ta.0.cmp(&tb.0)
-            });
-            return Ok(Rc::new(Val::Tuple(
-                new_fields
-                    .iter()
-                    .map(|a| {
-                        let first = a.0.clone();
-                        let t = a.1.clone();
-                        (first, t.1)
-                    }).collect(),
-            )));
         }
         Err(Box::new(error::BuildError::new(
-            format!("Expected Tuple got {}", v),
+            format!("Expected Tuple or Module got {}", v),
             error::ErrorType::TypeFail,
             def.selector.pos.clone(),
         )))
@@ -917,6 +988,7 @@ impl<'a> Builder<'a> {
         Ok(Rc::new(Val::Str(try!(formatter.render(&def.pos)))))
     }
 
+    // FIXME(jwall): Handle module calls as well?
     fn eval_call(&mut self, def: &CallDef) -> Result<Rc<Val>, Box<Error>> {
         let sel = &def.macroref;
         let args = &def.arglist;
@@ -956,6 +1028,24 @@ impl<'a> Builder<'a> {
                 def.pos.clone(),
             ))),
         }
+    }
+
+    fn eval_module_def(&mut self, def: &ModuleDef) -> Result<Rc<Val>, Box<Error>> {
+        // Always work on a copy. The original should not be modified.
+        let mut def = def.clone();
+        // First we rewrite the imports to be absolute paths.
+        let root = if self.root.is_file() {
+            // Only use the dirname portion if the root is a file.
+            self.root.parent().unwrap().to_path_buf()
+        } else {
+            // otherwise use clone of the root..
+            self.root.clone()
+        };
+        def.imports_to_absolute(root);
+        // Then we create our tuple default.
+        def.arg_tuple = Some(try!(self.tuple_to_val(&def.arg_set)));
+        // Then we construct a new Val::Module
+        Ok(Rc::new(Val::Module(def)))
     }
 
     fn eval_select(&mut self, def: &SelectDef) -> Result<Rc<Val>, Box<Error>> {
@@ -1105,6 +1195,7 @@ impl<'a> Builder<'a> {
             &Expression::Format(ref def) => self.eval_format(def),
             &Expression::Call(ref def) => self.eval_call(def),
             &Expression::Macro(ref def) => self.eval_macro_def(def),
+            &Expression::Module(ref def) => self.eval_module_def(def),
             &Expression::Select(ref def) => self.eval_select(def),
             &Expression::ListOp(ref def) => self.eval_list_op(def),
         }

@@ -1,0 +1,25 @@
+let site_mod = module{
+    hostname="",
+    port=0,
+    db="localhost",
+    db_user="admin",
+    db_pass="password"
+} => { // mods do not close over their environment.
+    
+    // this binding is not visible outside of the module. should be at the time of definition?
+    // or path should be rewritten to be absolue before instantiation.
+    import "../../shared.ucg" as shared;
+
+    // processing should be delayed till module instantiation.
+    let base_config = shared.mk_site_config(mod.hostname, mod.port); 
+
+    let config = base_config{ // processing should also be delayed.
+        dbs = [
+            {
+                database = mod.db,
+                user = mod.db_user,
+                pass = mod.db_pass,
+            },
+        ],
+    };
+};

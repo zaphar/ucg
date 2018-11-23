@@ -1,1 +1,7 @@
 let port = 3306;
+
+let mk_site_config = macro(hostname, port) => {
+    base_url = "https://@/" % (hostname),
+    port = port,
+    dbs = [],
+};

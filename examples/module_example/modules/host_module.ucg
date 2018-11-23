@@ -1,0 +1,11 @@
+let host_mod = module{
+    hostname="",
+    mem=2048,
+    cpu=2,
+} => {
+    let config = {
+        hostname = mod.hostname,
+        memory_size = mod.mem,
+        cpu_count = mod.cpu,
+    };
+};

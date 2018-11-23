@@ -65,6 +65,10 @@ impl TomlConverter {
                 let err = SimpleError::new("Macros are not allowed in Toml Conversions!");
                 return Err(Box::new(err));
             }
+            &Val::Module(_) => {
+                let err = SimpleError::new("Modules are not allowed in Toml Conversions!");
+                return Err(Box::new(err));
+            }
             &Val::List(ref l) => try!(self.convert_list(l)),
             &Val::Tuple(ref t) => try!(self.convert_tuple(t)),
         };

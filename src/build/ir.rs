@@ -20,6 +20,7 @@ pub enum Val {
     List(Vec<Rc<Val>>),
     Tuple(Vec<(PositionedItem<String>, Rc<Val>)>),
     Macro(MacroDef),
+    Module(ModuleDef),
 }
 
 impl Val {
@@ -34,6 +35,7 @@ impl Val {
             &Val::List(_) => "List".to_string(),
             &Val::Tuple(_) => "Tuple".to_string(),
             &Val::Macro(_) => "Macro".to_string(),
+            &Val::Module(_) => "Module".to_string(),
         }
     }
 
@@ -49,7 +51,8 @@ impl Val {
             &Val::Str(_),
             &Val::List(_),
             &Val::Tuple(_),
-            &Val::Macro(_)
+            &Val::Macro(_),
+            &Val::Module(_)
         )
     }
 
@@ -102,6 +105,11 @@ impl Val {
             }
             (&Val::Macro(_), &Val::Macro(_)) => Err(error::BuildError::new(
                 format!("Macros are not comparable in file: {}", file_name),
+                error::ErrorType::TypeFail,
+                pos,
+            )),
+            (&Val::Module(_), &Val::Module(_)) => Err(error::BuildError::new(
+                format!("Module are not comparable in file: {}", file_name),
                 error::ErrorType::TypeFail,
                 pos,
             )),
@@ -188,6 +196,7 @@ impl Display for Val {
                 write!(f, "]")
             }
             &Val::Macro(_) => write!(f, "Macro(..)"),
+            &Val::Module(_) => write!(f, "Module{{..}}"),
             &Val::Tuple(ref def) => {
                 try!(write!(f, "Tuple(\n"));
                 for v in def.iter() {

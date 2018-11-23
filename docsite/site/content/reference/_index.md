@@ -26,6 +26,7 @@ Some words are reserved in ucg and can not be used as a named binding.
 * as
 * select
 * macro
+* module
 * env
 * map
 * filter

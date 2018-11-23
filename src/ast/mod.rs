@@ -24,8 +24,12 @@ use std::convert::Into;
 use std::fmt;
 use std::hash::Hash;
 use std::hash::Hasher;
+use std::path::PathBuf;
+use std::rc::Rc;
 
 use abortable_parser;
+
+use build::Val;
 
 macro_rules! enum_type_equality {
     ( $slf:ident, $r:expr, $( $l:pat ),* ) => {
@@ -612,6 +616,10 @@ impl MacroDef {
                         // noop
                         continue;
                     }
+                    &Expression::Module(_) => {
+                        // noop
+                        continue;
+                    }
                     &Expression::ListOp(_) => {
                         // noop
                         continue;
@@ -705,6 +713,43 @@ pub struct ListOpDef {
     pub pos: Position,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct ModuleDef {
+    pub pos: Position,
+    pub arg_set: FieldList,
+    // FIXME(jwall): this should probably be moved to a Val::Module IR type.
+    pub arg_tuple: Option<Rc<Val>>,
+    pub statements: Vec<Statement>,
+}
+
+impl ModuleDef {
+    pub fn new<P: Into<Position>>(arg_set: FieldList, stmts: Vec<Statement>, pos: P) -> Self {
+        ModuleDef {
+            pos: pos.into(),
+            arg_set: arg_set,
+            // TODO(jwall): Should this get moved to a Val version of our ModuleDef?
+            arg_tuple: None,
+            statements: stmts,
+        }
+    }
+
+    pub fn imports_to_absolute(&mut self, base: PathBuf) {
+        for stmt in self.statements.iter_mut() {
+            if let &mut Statement::Import(ref mut def) = stmt {
+                let mut path = PathBuf::from(&def.path.fragment);
+                if path.is_relative() {
+                    def.path.fragment = base
+                        .join(path)
+                        .canonicalize()
+                        .unwrap()
+                        .to_string_lossy()
+                        .to_string();
+                }
+            }
+        }
+    }
+}
+
 /// Encodes a ucg expression. Expressions compute a value from.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
@@ -724,6 +769,7 @@ pub enum Expression {
     Macro(MacroDef),
     Select(SelectDef),
     ListOp(ListOpDef),
+    Module(ModuleDef),
 }
 
 impl Expression {
@@ -738,6 +784,7 @@ impl Expression {
             &Expression::Format(ref def) => &def.pos,
             &Expression::Call(ref def) => &def.pos,
             &Expression::Macro(ref def) => &def.pos,
+            &Expression::Module(ref def) => &def.pos,
             &Expression::Select(ref def) => &def.pos,
             &Expression::ListOp(ref def) => &def.pos,
         }
@@ -774,6 +821,9 @@ impl fmt::Display for Expression {
             &Expression::Macro(_) => {
                 try!(write!(w, "<Macro>"));
             }
+            &Expression::Module(_) => {
+                try!(write!(w, "<Module>"));
+            }
             &Expression::Select(_) => {
                 try!(write!(w, "<Select>"));
             }
@@ -783,21 +833,21 @@ impl fmt::Display for Expression {
 }
 
 /// Encodes a let statement in the UCG AST.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LetDef {
     pub name: Token,
     pub value: Expression,
 }
 
 /// Encodes an import statement in the UCG AST.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ImportDef {
     pub path: Token,
     pub name: Token,
 }
 
 /// Encodes a parsed statement in the UCG AST.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
     // simple expression
     Expression(Expression),

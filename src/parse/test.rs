@@ -929,6 +929,28 @@ fn test_select_parse() {
 }
 
 #[test]
+fn test_module_expression_parsing() {
+    assert_fail!(module_expression("foo"));
+    assert_fail!(module_expression("module"));
+    assert_fail!(module_expression("module("));
+    assert_fail!(module_expression("module["));
+    assert_fail!(module_expression("module {"));
+    assert_fail!(module_expression("module {}"));
+    assert_fail!(module_expression("module {} =>"));
+    assert_fail!(module_expression("module {} => {"));
+
+    assert_parse!(
+        module_expression("module {} => {}"),
+        Expression::Module(ModuleDef {
+            pos: Position::new(1, 1, 0),
+            arg_set: Vec::new(),
+            arg_tuple: None,
+            statements: Vec::new(),
+        })
+    );
+}
+
+#[test]
 fn test_macro_expression_parsing() {
     assert_fail!(macro_expression("foo"));
     assert_fail!(macro_expression("macro \"foo\""));

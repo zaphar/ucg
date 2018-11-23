@@ -49,6 +49,11 @@ fn test_macros() {
 }
 
 #[test]
+fn test_modules() {
+    assert_build(include_str!("../../integration_tests/modules_test.ucg"));
+}
+
+#[test]
 fn test_selectors() {
     assert_build(include_str!("../../integration_tests/selectors_test.ucg"));
 }

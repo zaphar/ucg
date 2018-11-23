@@ -557,6 +557,37 @@ make_fn!(
     separated!(punct!(","), symbol)
 );
 
+fn module_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expression> {
+    let parsed = do_each!(input,
+        pos => pos,
+        _ => word!("module"),
+        _ => punct!("{"),
+        arglist => trace_nom!(optional!(field_list)),
+        _ => optional!(punct!(",")),
+        _ => punct!("}"),
+        _ => punct!("=>"),
+        _ => punct!("{"),
+        stmt_list =>  trace_nom!(repeat!(statement)),
+        _ => punct!("}"),
+        (pos, arglist, stmt_list)
+    );
+    match parsed {
+        Result::Abort(e) => Result::Abort(e),
+        Result::Fail(e) => Result::Fail(e),
+        Result::Incomplete(offset) => Result::Incomplete(offset),
+        Result::Complete(rest, (pos, arglist, stmt_list)) => {
+            let def = ModuleDef::new(arglist.unwrap_or_else(|| Vec::new()), stmt_list, pos);
+            //eprintln!(
+            //    "module def at: {:?} arg_typle len {} stmts len {}",
+            //    def.pos,
+            //    def.arg_set.len(),
+            //    def.statements.len()
+            //);
+            Result::Complete(rest, Expression::Module(def))
+        }
+    }
+}
+
 fn macro_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expression> {
     let parsed = do_each!(input,
         pos => pos,
@@ -691,11 +722,11 @@ make_fn!(
 
 fn call_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expression> {
     let parsed = do_each!(input.clone(),
-        macroname => trace_nom!(selector_value),
+        callee_name => trace_nom!(selector_value),
         _ => punct!("("),
         args => optional!(separated!(punct!(","), trace_nom!(expression))),
         _ => punct!(")"),
-        (macroname, args)
+        (callee_name, args)
     );
     match parsed {
         Result::Abort(e) => Result::Abort(e),
@@ -806,6 +837,7 @@ make_fn!(
     alt_peek!(
          either!(word!("map"), word!("filter")) => trace_nom!(list_op_expression) |
          word!("macro") => trace_nom!(macro_expression) |
+         word!("module") => trace_nom!(module_expression) |
          word!("select") => trace_nom!(select_expression) |
          punct!("(") => trace_nom!(grouped_expression) |
          trace_nom!(unprefixed_expression))
@@ -846,7 +878,7 @@ make_fn!(
         name => wrap_err!(match_type!(BAREWORD), "Expected name for binding"),
         _ => punct!("="),
         // TODO(jwall): Wrap this error with an appropriate abortable_parser::Error
-        val => with_err!(trace_nom!(expression), "Expected Expression"),
+        val => wrap_err!(trace_nom!(expression), "Expected Expression"),
         _ => punct!(";"),
         (tuple_to_let(name, val))
     )
@@ -904,7 +936,7 @@ make_fn!(
     do_each!(
         _ => word!("out"),
         typ => wrap_err!(must!(match_type!(BAREWORD)), "Expected converter name"),
-        expr => with_err!(must!(expression), "Expected Expression to export"),
+        expr => wrap_err!(must!(expression), "Expected Expression to export"),
         _ => must!(punct!(";")),
         (Statement::Output(typ.clone(), expr.clone()))
     )

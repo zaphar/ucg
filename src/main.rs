@@ -76,7 +76,10 @@ fn build_file(
     validate: bool,
     cache: Rc<RefCell<Cache>>,
 ) -> Result<build::Builder, Box<Error>> {
-    let root = PathBuf::from(file);
+    let mut root = PathBuf::from(file);
+    if root.is_relative() {
+        root = std::env::current_dir().unwrap().join(root);
+    }
     let mut builder = build::Builder::new(root.parent().unwrap(), cache);
     if validate {
         builder.enable_validate_mode();

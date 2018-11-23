@@ -98,6 +98,10 @@ impl FlagConverter {
                 // This is ignored
                 eprintln!("Skipping macro...");
             }
+            &Val::Module(ref _def) => {
+                // This is ignored
+                eprintln!("Skipping module...");
+            }
         }
         Ok(())
     }

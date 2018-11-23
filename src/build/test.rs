@@ -161,7 +161,7 @@ fn test_expr_copy_no_such_tuple() {
 }
 
 #[test]
-#[should_panic(expected = "Expected Tuple got Int(1)")]
+#[should_panic(expected = "Expected Tuple or Module got Int(1)")]
 fn test_expr_copy_not_a_tuple() {
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
     let mut b = Builder::new(std::env::current_dir().unwrap(), cache);

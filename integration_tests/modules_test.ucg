@@ -1,0 +1,45 @@
+let test_empty_mod = module {
+} => {
+};
+
+let empty_mod_instance = test_empty_mod{};
+
+let test_simple_mod = module {
+    arg = "value",
+} => {
+    let value = mod.arg;
+};
+
+let simple_mod_instance = test_simple_mod{};
+assert |
+    simple_mod_instance.value == "value";
+|;
+
+let simple_mod_with_args = test_simple_mod{arg = "othervalue"};
+assert |
+    simple_mod_with_args.value == "othervalue";
+|;
+
+let embedded_mod = module {
+    deep_value = "None",
+} => {
+    let embedded_def = module {
+        deep_value = "None",
+    } => {
+        let value = mod.deep_value;
+    };
+
+    let embedded = embedded_def{deep_value = mod.deep_value};
+};
+
+let embedded_default_params = embedded_mod{};
+
+assert |
+    embedded_default_params.embedded.value == "None";
+|;
+
+let embedded_with_params = embedded_mod{deep_value = "Some"};
+
+assert |
+    embedded_with_params.embedded.value == "Some";
+|;
