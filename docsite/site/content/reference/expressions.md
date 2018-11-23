@@ -246,4 +246,47 @@ let my_dbconf = mymacro("couchdb.example.org", "9090");
 let my_dbhost = dbconf.host;
 ```
 
+Modules
+-------
+
+UCG has another form of reusable execution that is a little more composable than macros
+are. Modules allow you to parameterize a set of statements and build the statements
+later. Modules are an expression. They can be bound to a value and then reused later.
+Modules do not close over their environment by they can import other ucg files into
+the module using import statements.
+
+Module expressions start with the module keyword followed by a tuple representing their
+parameters with any associated default values. The body of the module is separated from
+the parameter tuple by the `=>` symbol and is delimited by `{` and `}` respectively.
+
+The body of the module can contain any valid ucg statement.
+
+```
+let top_mod = module {
+    deep_value = "None",
+} => {
+    import "shared.ucg" as shared_macros;
+
+    let embedded_def = module {
+        deep_value = "None",
+    } => {
+        let value = mod.deep_value;
+    };
+
+    let embedded = embedded_def{deep_value = mod.deep_value};
+};
+```
+
+You instantiate a module via the copy expression. The resulting module instance can
+reference the bindings in the module similarly to selecting a tuple field or a binding
+from an imported file.
+
+```
+let embedded_default_params = top_mod{};
+embedded_default_params.embedded.value == "None";
+
+let embedded_with_params = embedded_mod{deep_value = "Some"};
+embedded_with_params.embedded.value == "Some";
+```
+
 Next: <a href="/reference/statements">Statements</a>
