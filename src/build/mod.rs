@@ -877,7 +877,10 @@ impl<'a> Builder<'a> {
                     // overriding field here.
                     // Ensure that the new type matches the old type.
                     let src_val = v.get().clone();
-                    if src_val.1.type_equal(&expr_result) {
+                    if src_val.1.type_equal(&expr_result)
+                        || src_val.1.is_empty()
+                        || expr_result.is_empty()
+                    {
                         v.insert((src_val.0, expr_result));
                     } else {
                         self.pop_val();

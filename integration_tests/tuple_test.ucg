@@ -12,6 +12,7 @@ let nestedtpl = {
     },
     scalar = 1,
     list = [1, 2, 3, 4],
+    maybe_val = NULL,
 };
 
 assert |
@@ -22,6 +23,9 @@ assert |
 |;
 assert |
     nestedtpl.scalar == 1;
+|;
+assert |
+    nestedtpl.maybe_val == NULL;
 |;
 assert |
     nestedtpl.inner.field == "value";
@@ -46,6 +50,7 @@ let nestedcopy = nestedtpl{
         },
         field2 = 2,
     },
+    maybe_val = "some val",
 };
 
 let deepnestedcopy = nestedcopy{
@@ -65,4 +70,19 @@ assert |
 |;
 assert |
     deepnestedcopy.inner.inner.field4 == 4;
+|;
+assert |
+    deepnestedcopy.maybe_val == "some val";
+|;
+
+let base_maybe = {
+    real = "A real value",
+};
+
+let copy_maybe = base_maybe{
+    real = NULL,
+};
+
+assert |
+    copy_maybe.real == NULL;
 |;
