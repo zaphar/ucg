@@ -32,6 +32,7 @@ let tuple = {
         field = "value",
     },
     list = [1, 2, 3],
+    "quoted field" = "quoted value",
 };
 
 // reference the field in the inner tuple in our tuple defined above.
@@ -39,6 +40,12 @@ tuple.inner.field;
 
 // reference the field in the list contained in our tuple defined above.
 tuple.list.0;
+```
+
+Selectors can quote fields in the selector if there are quoted fields with spaces in them.
+
+```
+tuple."quoted field";
 ```
 
 ### The environment Selector

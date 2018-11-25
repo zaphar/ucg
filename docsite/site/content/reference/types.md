@@ -65,6 +65,7 @@ UCG also has two complex types.
 
 Tuples are an ordered set of name value pairs. They are delimited by braces and should
 contain 1 or more `name = expression` pairs separated by commas. Trailing commas are allowed.
+Field names can be barewords with no spaces or they can be quoted strings.
 
 ```
 let tuple = {
@@ -72,6 +73,7 @@ let tuple = {
     inner = {
         number = 1,
     },
+    "quoted field" = "quotd value",
 };
 ```
 
