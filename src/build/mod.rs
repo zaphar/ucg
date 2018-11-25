@@ -94,7 +94,7 @@ pub struct AssertCollector {
 
 /// Builder handles building ucg code for a single file..
 pub struct Builder<'a> {
-    root: PathBuf,
+    file: PathBuf,
     curr_file: Option<&'a str>,
     validate_mode: bool,
     pub assert_collector: AssertCollector,
@@ -171,7 +171,7 @@ impl<'a> Builder<'a> {
                         format!(
                             "Unable to find {} in file: {}",
                             s.val,
-                            self.root.to_string_lossy()
+                            self.file.to_string_lossy()
                         ),
                         error::ErrorType::NoSuchSymbol,
                         v.pos().clone(),
@@ -213,7 +213,7 @@ impl<'a> Builder<'a> {
         env: Rc<Val>,
     ) -> Self {
         Builder {
-            root: root.into(),
+            file: root.into(),
             curr_file: None,
             validate_mode: false,
             assert_collector: AssertCollector {
@@ -305,7 +305,7 @@ impl<'a> Builder<'a> {
 
     fn build_import(&mut self, def: &ImportDef) -> Result<Rc<Val>, Box<Error>> {
         let sym = &def.name;
-        let mut normalized = self.root.clone();
+        let mut normalized = self.file.clone();
         let import_path = PathBuf::from(&def.path.fragment);
         if import_path.is_relative() {
             normalized.push(&def.path.fragment);
@@ -352,7 +352,7 @@ impl<'a> Builder<'a> {
                          for {:?} already \
                          exists in file: {}",
                         e.key(),
-                        self.root.to_string_lossy(),
+                        self.file.to_string_lossy(),
                     ),
                     error::ErrorType::DuplicateBinding,
                     def.name.pos.clone(),
@@ -432,7 +432,7 @@ impl<'a> Builder<'a> {
                      path [{}] in file: {}",
                     next.1,
                     sl,
-                    self.root.to_string_lossy(),
+                    self.file.to_string_lossy(),
                 ),
                 error::ErrorType::NoSuchSymbol,
                 next.0.clone(),
@@ -459,7 +459,7 @@ impl<'a> Builder<'a> {
                      path [{}] in file: {}",
                     next.1,
                     sl,
-                    self.root.to_string_lossy(),
+                    self.file.to_string_lossy(),
                 ),
                 error::ErrorType::NoSuchSymbol,
                 next.0.clone(),
@@ -664,7 +664,7 @@ impl<'a> Builder<'a> {
     ) -> Result<Rc<Val>, Box<Error>> {
         Ok(Rc::new(Val::Boolean(try!(left.equal(
             right.as_ref(),
-            &self.root.to_string_lossy(),
+            &self.file.to_string_lossy(),
             pos.clone()
         )))))
     }
@@ -677,7 +677,7 @@ impl<'a> Builder<'a> {
     ) -> Result<Rc<Val>, Box<Error>> {
         Ok(Rc::new(Val::Boolean(!try!(left.equal(
             right.as_ref(),
-            &self.root.to_string_lossy(),
+            &self.file.to_string_lossy(),
             pos.clone()
         )))))
     }
@@ -925,7 +925,7 @@ impl<'a> Builder<'a> {
             let maybe_tpl = mod_def.clone().arg_tuple.unwrap().clone();
             if let &Val::Tuple(ref src_fields) = maybe_tpl.as_ref() {
                 // 1. First we create a builder.
-                let mut b = Self::new(self.root.clone(), self.assets.clone());
+                let mut b = Self::new(self.file.clone(), self.assets.clone());
                 b.is_module = true;
                 // 2. We construct an argument tuple by copying from the defs
                 //    argset.
@@ -1000,7 +1000,7 @@ impl<'a> Builder<'a> {
                 argvals.push(try!(self.eval_expr(arg)));
             }
             let fields = try!(m.eval(
-                self.root.clone(),
+                self.file.clone(),
                 self.assets.clone(),
                 self.env.clone(),
                 argvals
@@ -1030,17 +1030,21 @@ impl<'a> Builder<'a> {
         }
     }
 
+    fn file_dir(&self) -> PathBuf {
+        return if self.file.is_file() {
+            // Only use the dirname portion if the root is a file.
+            self.file.parent().unwrap().to_path_buf()
+        } else {
+            // otherwise use clone of the root..
+            self.file.clone()
+        };
+    }
+
     fn eval_module_def(&mut self, def: &ModuleDef) -> Result<Rc<Val>, Box<Error>> {
+        let root = self.file_dir();
         // Always work on a copy. The original should not be modified.
         let mut def = def.clone();
         // First we rewrite the imports to be absolute paths.
-        let root = if self.root.is_file() {
-            // Only use the dirname portion if the root is a file.
-            self.root.parent().unwrap().to_path_buf()
-        } else {
-            // otherwise use clone of the root..
-            self.root.clone()
-        };
         def.imports_to_absolute(root);
         // Then we create our tuple default.
         def.arg_tuple = Some(try!(self.tuple_to_val(&def.arg_set)));
@@ -1096,7 +1100,7 @@ impl<'a> Builder<'a> {
             for item in l.iter() {
                 let argvals = vec![item.clone()];
                 let fields = try!(macdef.eval(
-                    self.root.clone(),
+                    self.file.clone(),
                     self.assets.clone(),
                     self.env.clone(),
                     argvals
