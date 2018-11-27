@@ -234,7 +234,7 @@ dependencies = [
 
 [[package]]
 name = "ucg"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "abortable_parser 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "bencher 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
