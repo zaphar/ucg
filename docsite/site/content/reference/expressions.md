@@ -53,8 +53,10 @@ tuple."quoted field";
 There is a special selector in ucg for obtaining a value from the environment.
 The `env` selector references the environment variables in environment at the
 time of the build. You reference an environment variable just like it was in a
-tuple. Attempting to reference a variable that doesn't exist will be a compile
-error.
+tuple. By default, attempting to reference a variable that doesn't exist will
+be a compile error. You can turn this behavior off with the `--nostrict`
+argument to the compiler. When in nostrict mode nonexistent variables will
+result in a warning and be set to the NULL empty value.
 
 ```
 let env_name = env.DEPLOY_ENV;
