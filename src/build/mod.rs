@@ -92,7 +92,7 @@ pub struct AssertCollector {
     pub failures: String,
 }
 
-/// Builder handles building ucg code for a single file..
+/// Builder handles building ucg code for a single file.
 pub struct Builder<'a> {
     file: PathBuf,
     curr_file: Option<&'a str>,
@@ -107,12 +107,10 @@ pub struct Builder<'a> {
     // compile time memory safety for runtime checks. However it's
     // acceptable in this case since I can't figure out a better way to
     // handle it.
-    /// The assets are other parsed files from import statements. They
-    /// are keyed by the canonicalized import path. This acts as a cache
-    /// so multiple imports of the same file don't have to be parsed
-    /// multiple times.
-    // FIXME(jwall): This probably needs to be running in a separate thread
-    //   with some sort of RPC mechanism instead.
+    // The assets are other parsed files from import statements. They
+    // are keyed by the canonicalized import path. This acts as a cache
+    // so multiple imports of the same file don't have to be parsed
+    // multiple times.
     assets: Rc<RefCell<assets::Cache>>,
     /// build_output is our built output.
     build_output: ValueMap,
