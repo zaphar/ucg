@@ -212,9 +212,10 @@ Conditionals
 
 UCG supports a limited conditional expression called a select. A select
 expression starts with the `select` keyword and is followed by a an expression
-resolving to a string naming the field to select, an expression resolving to
-the default value, and finally a tuple literal to select the field from. If the
-field selected is not in the tuple then the default value will be used.
+resolving to a string or boolean naming the field to select, an expression
+resolving to the default value, and finally a tuple literal to select the field
+from. If the field selected is not in the tuple then the default value will be
+used.
 
 ```
 let want = "baz";
@@ -230,6 +231,11 @@ select "quack", "quux", {
     baz = "foo",
     fuzz = "bang",
 }; // result will be "quux"
+
+let ifresult = select true, NULL, {
+    true = "true result",
+    false = "false result",
+}; // result will be "true result"
 ```
 
 Macros

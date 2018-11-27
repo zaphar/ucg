@@ -38,3 +38,12 @@ assert |
 assert |
     condmacro("invalid") == {output = NULL};
 |;
+
+let iflike = select true, "default", {
+    true = "I was true",
+    false = "I was false",
+};
+
+assert |
+    iflike == "I was true";
+|;

@@ -1132,6 +1132,17 @@ impl<'a> Builder<'a> {
             }
             // Otherwise return the default.
             return self.eval_expr(def_expr);
+        } else if let &Val::Boolean(b) = v.deref() {
+            for &(ref fname, ref val_expr) in fields.iter() {
+                if &fname.fragment == "true" && b {
+                    // Fourth return the result of evaluating that field.
+                    return self.eval_expr(val_expr);
+                } else if &fname.fragment == "false" && !b {
+                    return self.eval_expr(val_expr);
+                }
+            }
+            // Otherwise return the default.
+            return self.eval_expr(def_expr);
         } else {
             return Err(Box::new(error::BuildError::new(
                 format!(

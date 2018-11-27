@@ -301,7 +301,7 @@ make_fn!(
 make_fn!(
     field_value<SliceIter<Token>, (Token, Expression)>,
     do_each!(
-            field => wrap_err!(either!(match_type!(BAREWORD), match_type!(STR)),
+            field => wrap_err!(either!(match_type!(BOOLEAN), match_type!(BAREWORD), match_type!(STR)),
                                "Field names must be a bareword or a string."),
             _ => punct!("="),
             value => expression,
