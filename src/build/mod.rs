@@ -303,8 +303,27 @@ impl<'a> Builder<'a> {
         }
     }
 
+    fn check_reserved_word(name: &str) -> bool {
+        match name {
+            "self" | "assert" | "true" | "false" | "let" | "import" | "as" | "select" | "macro"
+            | "module" | "env" | "map" | "filter" | "NULL" | "out" => true,
+            _ => false,
+        }
+    }
+
     fn build_import(&mut self, def: &ImportDef) -> Result<Rc<Val>, Box<Error>> {
         let sym = &def.name;
+        // TODO(jwall): Enforce reserved word restriction here.
+        if Self::check_reserved_word(&sym.fragment) {
+            return Err(Box::new(error::BuildError::new(
+                format!(
+                    "Import {} binding collides with reserved word",
+                    sym.fragment
+                ),
+                error::ErrorType::ReservedWordError,
+                sym.pos.clone(),
+            )));
+        }
         let mut normalized = self.file.clone();
         let import_path = PathBuf::from(&def.path.fragment);
         if import_path.is_relative() {
@@ -344,6 +363,14 @@ impl<'a> Builder<'a> {
     fn build_let(&mut self, def: &LetDef) -> Result<Rc<Val>, Box<Error>> {
         let val = try!(self.eval_expr(&def.value));
         let name = &def.name;
+        // TODO(jwall): Enforce the reserved words list here.
+        if Self::check_reserved_word(&name.fragment) {
+            return Err(Box::new(error::BuildError::new(
+                format!("Let {} binding collides with reserved word", name.fragment),
+                error::ErrorType::ReservedWordError,
+                name.pos.clone(),
+            )));
+        }
         match self.build_output.entry(name.into()) {
             Entry::Occupied(e) => {
                 return Err(Box::new(error::BuildError::new(

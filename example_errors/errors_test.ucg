@@ -8,8 +8,10 @@ assert |=|;
 assert |let |;
 assert |let foo |;
 assert |let foo =|;
-//assert |import |;
-//assert |import foo |;
-//assert |out |;
-//assert |out "|;
-//assert |out json|;
+assert |import |;
+assert |import foo |;
+assert |out |;
+assert |out "|;
+assert |out json|;
+
+assert |let env = 1;|;

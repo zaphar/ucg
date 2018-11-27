@@ -31,6 +31,7 @@ pub enum ErrorType {
     NoSuchSymbol,
     BadArgLen,
     FormatError,
+    ReservedWordError,
     // Parsing Errors
     ParseError,
     AssertError,
@@ -45,6 +46,7 @@ impl fmt::Display for ErrorType {
             &ErrorType::NoSuchSymbol => "NoSuchSymbol",
             &ErrorType::BadArgLen => "BadArgLen",
             &ErrorType::FormatError => "FormatError",
+            &ErrorType::ReservedWordError => "ReservedWordError",
             &ErrorType::ParseError => "ParseError",
             &ErrorType::AssertError => "AssertError",
         };

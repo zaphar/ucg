@@ -24,7 +24,7 @@ let embedded_mod = module {
     deep_value = "None",
     env = "None",
 } => {
-    let env = select mod.env, "qa", {
+    let env_name = select mod.env, "qa", {
         None = "qa",
         prod = "prod",
         qa = "qa",
@@ -46,7 +46,7 @@ assert |
 |;
 
 assert |
-    embedded_default_params.env == "qa";
+    embedded_default_params.env_name == "qa";
 |;
 
 let embedded_with_params = embedded_mod{deep_value = "Some"};
