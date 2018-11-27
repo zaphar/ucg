@@ -19,6 +19,7 @@ pub enum Val {
     Str(String),
     List(Vec<Rc<Val>>),
     Tuple(Vec<(PositionedItem<String>, Rc<Val>)>),
+    Env(Vec<(String, String)>),
     Macro(MacroDef),
     Module(ModuleDef),
 }
@@ -34,6 +35,7 @@ impl Val {
             &Val::Str(_) => "String".to_string(),
             &Val::List(_) => "List".to_string(),
             &Val::Tuple(_) => "Tuple".to_string(),
+            &Val::Env(_) => "Env".to_string(),
             &Val::Macro(_) => "Macro".to_string(),
             &Val::Module(_) => "Module".to_string(),
         }
@@ -51,6 +53,7 @@ impl Val {
             &Val::Str(_),
             &Val::List(_),
             &Val::Tuple(_),
+            &Val::Env(_),
             &Val::Macro(_),
             &Val::Module(_)
         )
@@ -165,6 +168,13 @@ impl Val {
         return false;
     }
 
+    pub fn is_env(&self) -> bool {
+        if let &Val::Env(_) = self {
+            return true;
+        }
+        return false;
+    }
+
     pub fn is_list(&self) -> bool {
         if let &Val::List(_) = self {
             return true;
@@ -201,6 +211,13 @@ impl Display for Val {
                 try!(write!(f, "Tuple(\n"));
                 for v in def.iter() {
                     try!(write!(f, "\t{} = {},\n", v.0.val, v.1));
+                }
+                write!(f, ")")
+            }
+            &Val::Env(ref def) => {
+                try!(write!(f, "Env(\n"));
+                for v in def.iter() {
+                    try!(write!(f, "\t{}=\"{}\"\n", v.0, v.1));
                 }
                 write!(f, ")")
             }

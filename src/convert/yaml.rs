@@ -23,6 +23,17 @@ impl YamlConverter {
         Ok(serde_yaml::Value::Sequence(v))
     }
 
+    fn convert_env(&self, items: &Vec<(String, String)>) -> std::io::Result<serde_yaml::Value> {
+        let mut mp = serde_yaml::Mapping::new();
+        for &(ref k, ref v) in items.iter() {
+            mp.insert(
+                serde_yaml::Value::String(k.clone()),
+                serde_yaml::Value::String(v.clone()),
+            );
+        }
+        Ok(serde_yaml::Value::Mapping(mp))
+    }
+
     fn convert_tuple(
         &self,
         items: &Vec<(ast::PositionedItem<String>, Rc<Val>)>,
@@ -58,6 +69,7 @@ impl YamlConverter {
                 eprintln!("Skipping module encoding as null...");
                 serde_yaml::Value::Null
             }
+            &Val::Env(ref fs) => try!(self.convert_env(fs)),
             &Val::List(ref l) => try!(self.convert_list(l)),
             &Val::Tuple(ref t) => try!(self.convert_tuple(t)),
         };

@@ -50,6 +50,15 @@ impl TomlConverter {
         Ok(toml::Value::Table(mp))
     }
 
+    fn convert_env(&self, items: &Vec<(String, String)>) -> ConvertResult {
+        let mut mp = toml::value::Table::new();
+        for &(ref k, ref v) in items.iter() {
+            mp.entry(k.clone())
+                .or_insert(toml::Value::String(v.clone()));
+        }
+        Ok(toml::Value::Table(mp))
+    }
+
     fn convert_value(&self, v: &Val) -> ConvertResult {
         let toml_val = match v {
             &Val::Boolean(b) => toml::Value::Boolean(b),
@@ -69,6 +78,7 @@ impl TomlConverter {
                 let err = SimpleError::new("Modules are not allowed in Toml Conversions!");
                 return Err(Box::new(err));
             }
+            &Val::Env(ref fs) => try!(self.convert_env(fs)),
             &Val::List(ref l) => try!(self.convert_list(l)),
             &Val::Tuple(ref t) => try!(self.convert_tuple(t)),
         };

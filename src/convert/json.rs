@@ -46,6 +46,15 @@ impl JsonConverter {
         Ok(serde_json::Value::Object(mp))
     }
 
+    fn convert_env(&self, items: &Vec<(String, String)>) -> std::io::Result<serde_json::Value> {
+        let mut mp = serde_json::Map::new();
+        for &(ref k, ref v) in items.iter() {
+            mp.entry(k.clone())
+                .or_insert(serde_json::Value::String(v.clone()));
+        }
+        Ok(serde_json::Value::Object(mp))
+    }
+
     fn convert_value(&self, v: &Val) -> std::io::Result<serde_json::Value> {
         let jsn_val = match v {
             &Val::Boolean(b) => serde_json::Value::Bool(b),
@@ -75,6 +84,7 @@ impl JsonConverter {
                 eprintln!("Skipping module encoding as null...");
                 serde_json::Value::Null
             }
+            &Val::Env(ref fs) => try!(self.convert_env(fs)),
             &Val::List(ref l) => try!(self.convert_list(l)),
             &Val::Tuple(ref t) => try!(self.convert_tuple(t)),
         };

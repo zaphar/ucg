@@ -98,6 +98,10 @@ impl FlagConverter {
                 // This is ignored
                 eprintln!("Skipping macro...");
             }
+            &Val::Env(ref _fs) => {
+                // This is ignored
+                eprintln!("Skipping env...");
+            }
             &Val::Module(ref _def) => {
                 // This is ignored
                 eprintln!("Skipping module...");

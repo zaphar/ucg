@@ -98,6 +98,7 @@ pub struct Builder<'a> {
     curr_file: Option<&'a str>,
     validate_mode: bool,
     pub assert_collector: AssertCollector,
+    strict: bool,
     env: Rc<Val>,
     // NOTE(jwall): We use interior mutability here because we need
     // our asset cache to be shared by multiple different sub-builders.
@@ -140,6 +141,51 @@ macro_rules! eval_binary_expr {
 }
 
 impl<'a> Builder<'a> {
+    /// Constructs a new Builder.
+    pub fn new<P: Into<PathBuf>>(root: P, cache: Rc<RefCell<assets::Cache>>) -> Self {
+        Self::new_with_scope(root, cache, HashMap::new())
+    }
+
+    /// Constructs a new Builder with a provided scope.
+    pub fn new_with_scope<P: Into<PathBuf>>(
+        root: P,
+        cache: Rc<RefCell<assets::Cache>>,
+        scope: ValueMap,
+    ) -> Self {
+        let env_vars: Vec<(String, String)> = env::vars().collect();
+        Self::new_with_env_and_scope(root, cache, scope, Rc::new(Val::Env(env_vars)))
+    }
+
+    pub fn new_with_env_and_scope<P: Into<PathBuf>>(
+        root: P,
+        cache: Rc<RefCell<assets::Cache>>,
+        scope: ValueMap,
+        env: Rc<Val>,
+    ) -> Self {
+        Builder {
+            file: root.into(),
+            curr_file: None,
+            validate_mode: false,
+            assert_collector: AssertCollector {
+                success: true,
+                summary: String::new(),
+                failures: String::new(),
+            },
+            env: env,
+            strict: true,
+            assets: cache,
+            build_output: scope,
+            out_lock: None,
+            stack: None,
+            is_module: false,
+            last: None,
+        }
+    }
+
+    pub fn set_strict(&mut self, to: bool) {
+        self.strict = to;
+    }
+
     // TOOD(jwall): This needs some unit tests.
     fn tuple_to_val(&mut self, fields: &Vec<(Token, Expression)>) -> Result<Rc<Val>, Box<Error>> {
         let mut new_fields = Vec::<(PositionedItem<String>, Rc<Val>)>::new();
@@ -182,52 +228,6 @@ impl<'a> Builder<'a> {
             &Value::Selector(ref selector_list_node) => {
                 self.lookup_selector(&selector_list_node.sel)
             }
-        }
-    }
-
-    /// Constructs a new Builder.
-    pub fn new<P: Into<PathBuf>>(root: P, cache: Rc<RefCell<assets::Cache>>) -> Self {
-        Self::new_with_scope(root, cache, HashMap::new())
-    }
-
-    /// Constructs a new Builder with a provided scope.
-    pub fn new_with_scope<P: Into<PathBuf>>(
-        root: P,
-        cache: Rc<RefCell<assets::Cache>>,
-        scope: ValueMap,
-    ) -> Self {
-        let env_vars: Vec<(PositionedItem<String>, Rc<Val>)> = env::vars()
-            .map(|t| {
-                (
-                    PositionedItem::new(t.0, Position::new(0, 0, 0)),
-                    Rc::new(t.1.into()),
-                )
-            }).collect();
-        Self::new_with_env_and_scope(root, cache, scope, Rc::new(Val::Tuple(env_vars)))
-    }
-
-    pub fn new_with_env_and_scope<P: Into<PathBuf>>(
-        root: P,
-        cache: Rc<RefCell<assets::Cache>>,
-        scope: ValueMap,
-        env: Rc<Val>,
-    ) -> Self {
-        Builder {
-            file: root.into(),
-            curr_file: None,
-            validate_mode: false,
-            assert_collector: AssertCollector {
-                success: true,
-                summary: String::new(),
-                failures: String::new(),
-            },
-            env: env,
-            assets: cache,
-            build_output: scope,
-            out_lock: None,
-            stack: None,
-            is_module: false,
-            last: None,
         }
     }
 
@@ -442,6 +442,32 @@ impl<'a> Builder<'a> {
         return None;
     }
 
+    fn lookup_in_env(
+        &self,
+        search: &Token,
+        stack: &mut VecDeque<Rc<Val>>,
+        fs: &Vec<(String, String)>,
+    ) -> Result<(), Box<Error>> {
+        for &(ref name, ref val) in fs.iter() {
+            if &search.fragment == name {
+                stack.push_back(Rc::new(Val::Str(val.clone())));
+                return Ok(());
+            } else if !self.strict {
+                eprintln!(
+                    "Environment Variable {} not set using NULL instead.",
+                    search.fragment
+                );
+                stack.push_back(Rc::new(Val::Empty));
+                return Ok(());
+            }
+        }
+        return Err(Box::new(error::BuildError::new(
+            format!("Environment Variable {} not set", search.fragment),
+            error::ErrorType::NoSuchSymbol,
+            search.pos.clone(),
+        )));
+    }
+
     fn lookup_in_tuple(
         &self,
         stack: &mut VecDeque<Rc<Val>>,
@@ -506,6 +532,9 @@ impl<'a> Builder<'a> {
             &Val::List(_) => {
                 stack.push_back(first.clone());
             }
+            &Val::Env(_) => {
+                stack.push_back(first.clone());
+            }
             _ => {
                 // noop
             }
@@ -527,6 +556,10 @@ impl<'a> Builder<'a> {
                 match vref.as_ref() {
                     &Val::Tuple(ref fs) => {
                         try!(self.lookup_in_tuple(&mut stack, sl, (&next.pos, &next.fragment), fs));
+                        continue;
+                    }
+                    &Val::Env(ref fs) => {
+                        try!(self.lookup_in_env(&next, &mut stack, fs));
                         continue;
                     }
                     &Val::List(ref elems) => {
