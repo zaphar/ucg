@@ -36,6 +36,7 @@ fn do_flags<'a, 'b>() -> clap::App<'a, 'b> {
             (version: crate_version!())
             (author: crate_authors!())
             (about: "Universal Configuration Grammar compiler.")
+            (@arg nostrict: --("no-strict") "Turn off strict checking.")
             (@subcommand inspect =>
              (about: "Inspect a specific symbol in a ucg file.")
              (@arg sym: --sym +takes_value +required "Specify a specific binding in the ucg file to output.")
@@ -74,6 +75,7 @@ fn run_converter(c: &traits::Converter, v: Rc<Val>, f: Option<&str>) -> traits::
 fn build_file(
     file: &str,
     validate: bool,
+    strict: bool,
     cache: Rc<RefCell<Cache>>,
 ) -> Result<build::Builder, Box<Error>> {
     let mut root = PathBuf::from(file);
@@ -81,6 +83,7 @@ fn build_file(
         root = std::env::current_dir().unwrap().join(root);
     }
     let mut builder = build::Builder::new(root.parent().unwrap(), cache);
+    builder.set_strict(strict);
     if validate {
         builder.enable_validate_mode();
     }
@@ -91,9 +94,9 @@ fn build_file(
     Ok(builder)
 }
 
-fn do_validate(file: &str, cache: Rc<RefCell<Cache>>) -> bool {
+fn do_validate(file: &str, strict: bool, cache: Rc<RefCell<Cache>>) -> bool {
     println!("Validating {}", file);
-    match build_file(file, true, cache) {
+    match build_file(file, true, strict, cache) {
         Ok(b) => {
             if b.assert_collector.success {
                 println!("File {} Pass\n", file);
@@ -110,9 +113,14 @@ fn do_validate(file: &str, cache: Rc<RefCell<Cache>>) -> bool {
     return true;
 }
 
-fn do_compile(file: &str, cache: Rc<RefCell<Cache>>, registry: &ConverterRegistry) -> bool {
+fn do_compile(
+    file: &str,
+    strict: bool,
+    cache: Rc<RefCell<Cache>>,
+    registry: &ConverterRegistry,
+) -> bool {
     println!("Building {}", file);
-    let builder = match build_file(file, false, cache.clone()) {
+    let builder = match build_file(file, false, strict, cache.clone()) {
         Ok(builder) => builder,
         Err(err) => {
             eprintln!("{}", err);
@@ -143,6 +151,7 @@ fn visit_ucg_files(
     path: &Path,
     recurse: bool,
     validate: bool,
+    strict: bool,
     cache: Rc<RefCell<Cache>>,
     registry: &ConverterRegistry,
 ) -> Result<bool, Box<Error>> {
@@ -163,36 +172,41 @@ fn visit_ucg_files(
             let next_path = next_item.path();
             let path_as_string = String::from(next_path.to_string_lossy());
             if next_path.is_dir() && recurse {
-                if let Err(e) =
-                    visit_ucg_files(&next_path, recurse, validate, cache.clone(), registry)
-                {
+                if let Err(e) = visit_ucg_files(
+                    &next_path,
+                    recurse,
+                    validate,
+                    strict,
+                    cache.clone(),
+                    registry,
+                ) {
                     eprintln!("{}", e);
                     result = false;
                 }
             } else {
                 if validate && path_as_string.ends_with("_test.ucg") {
-                    if !do_validate(&path_as_string, cache.clone()) {
+                    if !do_validate(&path_as_string, strict, cache.clone()) {
                         result = false;
                         summary.push_str(format!("{} - FAIL\n", path_as_string).as_str())
                     } else {
                         summary.push_str(format!("{} - PASS\n", path_as_string).as_str())
                     }
                 } else if !validate && path_as_string.ends_with(".ucg") {
-                    if !do_compile(&path_as_string, cache.clone(), registry) {
+                    if !do_compile(&path_as_string, strict, cache.clone(), registry) {
                         result = false;
                     }
                 }
             }
         }
     } else if validate && our_path.ends_with("_test.ucg") {
-        if !do_validate(&our_path, cache) {
+        if !do_validate(&our_path, strict, cache) {
             result = false;
             summary.push_str(format!("{} - FAIL\n", our_path).as_str());
         } else {
             summary.push_str(format!("{} - PASS\n", &our_path).as_str());
         }
     } else if !validate {
-        if !do_compile(&our_path, cache, registry) {
+        if !do_compile(&our_path, strict, cache, registry) {
             result = false;
         }
     }
@@ -207,12 +221,14 @@ fn inspect_command(
     matches: &clap::ArgMatches,
     cache: Rc<RefCell<Cache>>,
     registry: &ConverterRegistry,
+    strict: bool,
 ) {
     let file = matches.value_of("INPUT").unwrap();
     let sym = matches.value_of("sym");
     let target = matches.value_of("target").unwrap();
     let root = PathBuf::from(file);
     let mut builder = build::Builder::new(root.parent().unwrap(), cache);
+    builder.set_strict(strict);
     match registry.get_converter(target) {
         Some(converter) => {
             // TODO(jwall): We should warn if this is a test file.
@@ -249,13 +265,21 @@ fn build_command(
     matches: &clap::ArgMatches,
     cache: Rc<RefCell<Cache>>,
     registry: &ConverterRegistry,
+    strict: bool,
 ) {
     let files = matches.values_of("INPUT");
     let recurse = matches.is_present("recurse");
     let mut ok = true;
     if files.is_none() {
         let curr_dir = std::env::current_dir().unwrap();
-        let ok = visit_ucg_files(curr_dir.as_path(), recurse, false, cache.clone(), &registry);
+        let ok = visit_ucg_files(
+            curr_dir.as_path(),
+            recurse,
+            false,
+            strict,
+            cache.clone(),
+            &registry,
+        );
         if let Ok(false) = ok {
             process::exit(1)
         }
@@ -263,7 +287,7 @@ fn build_command(
     }
     for file in files.unwrap() {
         let pb = PathBuf::from(file);
-        if let Ok(false) = visit_ucg_files(&pb, recurse, false, cache.clone(), &registry) {
+        if let Ok(false) = visit_ucg_files(&pb, recurse, false, strict, cache.clone(), &registry) {
             ok = false;
         }
     }
@@ -276,12 +300,20 @@ fn test_command(
     matches: &clap::ArgMatches,
     cache: Rc<RefCell<Cache>>,
     registry: &ConverterRegistry,
+    strict: bool,
 ) {
     let files = matches.values_of("INPUT");
     let recurse = matches.is_present("recurse");
     if files.is_none() {
         let curr_dir = std::env::current_dir().unwrap();
-        let ok = visit_ucg_files(curr_dir.as_path(), recurse, true, cache.clone(), &registry);
+        let ok = visit_ucg_files(
+            curr_dir.as_path(),
+            recurse,
+            true,
+            strict,
+            cache.clone(),
+            &registry,
+        );
         if let Ok(false) = ok {
             process::exit(1)
         }
@@ -290,9 +322,14 @@ fn test_command(
         for file in files.unwrap() {
             let pb = PathBuf::from(file);
             //if pb.is_dir() {
-            if let Ok(false) =
-                visit_ucg_files(pb.as_path(), recurse, true, cache.clone(), &registry)
-            {
+            if let Ok(false) = visit_ucg_files(
+                pb.as_path(),
+                recurse,
+                true,
+                strict,
+                cache.clone(),
+                &registry,
+            ) {
                 ok = false;
             }
         }
@@ -319,12 +356,17 @@ fn main() {
     let app_matches = app.clone().get_matches();
     let cache: Rc<RefCell<Cache>> = Rc::new(RefCell::new(MemoryCache::new()));
     let registry = ConverterRegistry::make_registry();
+    let strict = if app_matches.is_present("nostrict") {
+        false
+    } else {
+        true
+    };
     if let Some(matches) = app_matches.subcommand_matches("inspect") {
-        inspect_command(matches, cache, &registry);
+        inspect_command(matches, cache, &registry, strict);
     } else if let Some(matches) = app_matches.subcommand_matches("build") {
-        build_command(matches, cache, &registry);
+        build_command(matches, cache, &registry, strict);
     } else if let Some(matches) = app_matches.subcommand_matches("test") {
-        test_command(matches, cache, &registry);
+        test_command(matches, cache, &registry, strict);
     } else if let Some(_) = app_matches.subcommand_matches("converters") {
         converters_command(&registry)
     } else {
