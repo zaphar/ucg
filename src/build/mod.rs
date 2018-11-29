@@ -93,9 +93,8 @@ pub struct AssertCollector {
 }
 
 /// Builder handles building ucg code for a single file.
-pub struct Builder<'a> {
+pub struct Builder {
     file: PathBuf,
-    curr_file: Option<&'a str>,
     validate_mode: bool,
     pub assert_collector: AssertCollector,
     strict: bool,
@@ -138,10 +137,10 @@ macro_rules! eval_binary_expr {
     };
 }
 
-impl<'a> Builder<'a> {
+impl Builder {
     /// Constructs a new Builder.
-    pub fn new<P: Into<PathBuf>>(root: P, cache: Rc<RefCell<assets::Cache>>) -> Self {
-        Self::new_with_scope(root, cache, HashMap::new())
+    pub fn new<P: Into<PathBuf>>(file: P, cache: Rc<RefCell<assets::Cache>>) -> Self {
+        Self::new_with_scope(file, cache, HashMap::new())
     }
 
     /// Constructs a new Builder with a provided scope.
@@ -162,7 +161,6 @@ impl<'a> Builder<'a> {
     ) -> Self {
         Builder {
             file: root.into(),
-            curr_file: None,
             validate_mode: false,
             assert_collector: AssertCollector {
                 success: true,
@@ -281,9 +279,8 @@ impl<'a> Builder<'a> {
     }
 
     /// Builds a ucg file at the named path.
-    pub fn build_file(&mut self, name: &'a str) -> BuildResult {
-        self.curr_file = Some(name);
-        let mut f = try!(File::open(name));
+    pub fn build_file(&mut self) -> BuildResult {
+        let mut f = try!(File::open(&self.file));
         let mut s = String::new();
         try!(f.read_to_string(&mut s));
         let eval_result = self.eval_string(&s);
@@ -294,7 +291,11 @@ impl<'a> Builder<'a> {
             }
             Err(e) => {
                 let err = simple_error::SimpleError::new(
-                    format!("Error building file: {}\n{}", name, e.as_ref()).as_ref(),
+                    format!(
+                        "Error building file: {}\n{}",
+                        self.file.to_string_lossy(),
+                        e.as_ref()
+                    ).as_ref(),
                 );
                 Err(Box::new(err))
             }
@@ -322,10 +323,10 @@ impl<'a> Builder<'a> {
                 sym.pos.clone(),
             )));
         }
-        let mut normalized = self.file.clone();
+        let mut normalized = self.file.parent().unwrap().to_path_buf();
         let import_path = PathBuf::from(&def.path.fragment);
         if import_path.is_relative() {
-            normalized.push(&def.path.fragment);
+            normalized.push(&import_path);
         } else {
             normalized = import_path;
         }
@@ -339,8 +340,7 @@ impl<'a> Builder<'a> {
             Some(v) => v.clone(),
             None => {
                 let mut b = Self::new(normalized.clone(), self.assets.clone());
-                let filepath = normalized.to_str().unwrap().clone();
-                try!(b.build_file(filepath));
+                try!(b.build_file());
                 b.get_outputs_as_val()
             }
         };
