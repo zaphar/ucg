@@ -45,12 +45,12 @@ fn do_flags<'a, 'b>() -> clap::App<'a, 'b> {
             )
             (@subcommand build =>
              (about: "Build a list of ucg files.")
-             (@arg recurse: -r +required "Whether we should recurse in directories or not.")
+             (@arg recurse: -r "Whether we should recurse in directories or not.")
              (@arg INPUT: ... "Input ucg files or directories to build. If not provided then build the contents of the current directory.")
             )
             (@subcommand test =>
              (about: "Check a list of ucg files for errors and run test assertions.")
-             (@arg recurse: -r +required "Whether we should recurse or not.")
+             (@arg recurse: -r "Whether we should recurse or not.")
              (@arg INPUT: ... "Input ucg files or directories to run test assertions for. If not provided it will scan the current directory for files with _test.ucg")
             )
             (@subcommand converters =>
