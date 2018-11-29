@@ -87,7 +87,7 @@ fn build_file(
     if validate {
         builder.enable_validate_mode();
     }
-    try!(builder.build_file());
+    try!(builder.build());
     if validate {
         println!("{}", builder.assert_collector.summary);
     }
@@ -231,7 +231,7 @@ fn inspect_command(
     match registry.get_converter(target) {
         Some(converter) => {
             // TODO(jwall): We should warn if this is a test file.
-            let result = builder.build_file();
+            let result = builder.build();
             if !result.is_ok() {
                 eprintln!("{:?}", result.err().unwrap());
                 process::exit(1);

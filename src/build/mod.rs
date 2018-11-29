@@ -245,9 +245,9 @@ impl Builder {
     }
 
     /// Builds a list of parsed UCG Statements.
-    pub fn build(&mut self, ast: &Vec<Statement>) -> BuildResult {
+    pub fn eval_stmts(&mut self, ast: &Vec<Statement>) -> BuildResult {
         for stmt in ast.iter() {
-            try!(self.build_stmt(stmt));
+            try!(self.eval_stmt(stmt));
         }
         Ok(())
     }
@@ -258,7 +258,7 @@ impl Builder {
                 //panic!("Successfully parsed {}", input);
                 let mut out: Option<Rc<Val>> = None;
                 for stmt in stmts.iter() {
-                    out = Some(try!(self.build_stmt(stmt)));
+                    out = Some(try!(self.eval_stmt(stmt)));
                 }
                 match out {
                     None => return Ok(Rc::new(Val::Empty)),
@@ -279,7 +279,7 @@ impl Builder {
     }
 
     /// Builds a ucg file at the named path.
-    pub fn build_file(&mut self) -> BuildResult {
+    pub fn build(&mut self) -> BuildResult {
         let mut f = try!(File::open(&self.file));
         let mut s = String::new();
         try!(f.read_to_string(&mut s));
@@ -310,7 +310,7 @@ impl Builder {
         }
     }
 
-    fn build_import(&mut self, def: &ImportDef) -> Result<Rc<Val>, Box<Error>> {
+    fn eval_import(&mut self, def: &ImportDef) -> Result<Rc<Val>, Box<Error>> {
         let sym = &def.name;
         // TODO(jwall): Enforce reserved word restriction here.
         if Self::check_reserved_word(&sym.fragment) {
@@ -340,7 +340,7 @@ impl Builder {
             Some(v) => v.clone(),
             None => {
                 let mut b = Self::new(normalized.clone(), self.assets.clone());
-                try!(b.build_file());
+                try!(b.build());
                 b.get_outputs_as_val()
             }
         };
@@ -358,7 +358,7 @@ impl Builder {
         return Ok(result);
     }
 
-    fn build_let(&mut self, def: &LetDef) -> Result<Rc<Val>, Box<Error>> {
+    fn eval_let(&mut self, def: &LetDef) -> Result<Rc<Val>, Box<Error>> {
         let val = try!(self.eval_expr(&def.value));
         let name = &def.name;
         // TODO(jwall): Enforce the reserved words list here.
@@ -390,11 +390,11 @@ impl Builder {
         Ok(val)
     }
 
-    fn build_stmt(&mut self, stmt: &Statement) -> Result<Rc<Val>, Box<Error>> {
+    fn eval_stmt(&mut self, stmt: &Statement) -> Result<Rc<Val>, Box<Error>> {
         match stmt {
             &Statement::Assert(ref expr) => self.build_assert(&expr),
-            &Statement::Let(ref def) => self.build_let(def),
-            &Statement::Import(ref def) => self.build_import(def),
+            &Statement::Let(ref def) => self.eval_let(def),
+            &Statement::Import(ref def) => self.eval_import(def),
             &Statement::Expression(ref expr) => self.eval_expr(expr),
             // Only one output can be used per file. Right now we enforce this by
             // having a single builder per file.
@@ -1015,7 +1015,7 @@ impl Builder {
                     }
                 }
                 // 4. Evaluate all the statements using the builder.
-                try!(b.build(&mod_def.statements));
+                try!(b.eval_stmts(&mod_def.statements));
                 // 5. Take all of the bindings in the module and construct a new
                 //    tuple using them.
                 return Ok(b.get_outputs_as_val());
