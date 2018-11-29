@@ -140,7 +140,7 @@ fn test_eval_simple_lookup_error() {
 
 // Include nested for each.
 #[test]
-#[should_panic(expected = "Unable to find tpl1")]
+#[should_panic(expected = "Unable to find binding tpl1")]
 fn test_expr_copy_no_such_tuple() {
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
     let b = Builder::new(std::env::current_dir().unwrap(), cache);
@@ -221,7 +221,7 @@ fn test_expr_copy_field_type_error() {
 }
 
 #[test]
-#[should_panic(expected = "Unable to find arg1")]
+#[should_panic(expected = "Unable to find binding arg1")]
 fn test_macro_hermetic() {
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
     let mut b = Builder::new(std::env::current_dir().unwrap(), cache);

@@ -210,11 +210,7 @@ impl Builder {
             &Value::Symbol(ref s) => {
                 self.lookup_sym(&(s.into()))
                     .ok_or(Box::new(error::BuildError::new(
-                        format!(
-                            "Unable to find {} in file: {}",
-                            s.val,
-                            self.file.to_string_lossy()
-                        ),
+                        format!("Unable to find binding {}", s.val,),
                         error::ErrorType::NoSuchSymbol,
                         v.pos().clone(),
                     )))
@@ -375,9 +371,8 @@ impl Builder {
                     format!(
                         "Binding \
                          for {:?} already \
-                         exists in file: {}",
+                         exists",
                         e.key(),
-                        self.file.to_string_lossy(),
                     ),
                     error::ErrorType::DuplicateBinding,
                     def.name.pos.clone(),
@@ -480,10 +475,8 @@ impl Builder {
                 format!(
                     "Unable to \
                      match element {} in selector \
-                     path [{}] in file: {}",
-                    next.1,
-                    sl,
-                    self.file.to_string_lossy(),
+                     path [{}]",
+                    next.1, sl,
                 ),
                 error::ErrorType::NoSuchSymbol,
                 next.0.clone(),
@@ -507,10 +500,8 @@ impl Builder {
                 format!(
                     "Unable to \
                      match element {} in selector \
-                     path [{}] in file: {}",
-                    next.1,
-                    sl,
-                    self.file.to_string_lossy(),
+                     path [{}]",
+                    next.1, sl,
                 ),
                 error::ErrorType::NoSuchSymbol,
                 next.0.clone(),
@@ -720,11 +711,9 @@ impl Builder {
         left: Rc<Val>,
         right: Rc<Val>,
     ) -> Result<Rc<Val>, Box<Error>> {
-        Ok(Rc::new(Val::Boolean(try!(left.equal(
-            right.as_ref(),
-            &self.file.to_string_lossy(),
-            pos.clone()
-        )))))
+        Ok(Rc::new(Val::Boolean(try!(
+            left.equal(right.as_ref(), pos.clone())
+        ))))
     }
 
     fn do_not_deep_equal(
@@ -733,11 +722,9 @@ impl Builder {
         left: Rc<Val>,
         right: Rc<Val>,
     ) -> Result<Rc<Val>, Box<Error>> {
-        Ok(Rc::new(Val::Boolean(!try!(left.equal(
-            right.as_ref(),
-            &self.file.to_string_lossy(),
-            pos.clone()
-        )))))
+        Ok(Rc::new(Val::Boolean(!try!(
+            left.equal(right.as_ref(), pos.clone())
+        ))))
     }
 
     fn do_gt(&self, pos: &Position, left: Rc<Val>, right: Rc<Val>) -> Result<Rc<Val>, Box<Error>> {

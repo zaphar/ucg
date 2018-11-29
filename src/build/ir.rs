@@ -59,12 +59,7 @@ impl Val {
         )
     }
 
-    pub fn equal(
-        &self,
-        target: &Self,
-        file_name: &str,
-        pos: Position,
-    ) -> Result<bool, error::BuildError> {
+    pub fn equal(&self, target: &Self, pos: Position) -> Result<bool, error::BuildError> {
         // first we do a type equality comparison
         match (self, target) {
             // Empty values are always equal.
@@ -78,7 +73,7 @@ impl Val {
                     Ok(false)
                 } else {
                     for (i, lv) in ldef.iter().enumerate() {
-                        try!(lv.equal(rdef[i].as_ref(), file_name, pos.clone()));
+                        try!(lv.equal(rdef[i].as_ref(), pos.clone()));
                     }
                     Ok(true)
                 }
@@ -94,11 +89,7 @@ impl Val {
                             return Ok(false);
                         } else {
                             // field value equality.
-                            if !try!(lv.1.equal(
-                                field_target.1.as_ref(),
-                                file_name,
-                                lv.0.pos.clone()
-                            )) {
+                            if !try!(lv.1.equal(field_target.1.as_ref(), lv.0.pos.clone())) {
                                 return Ok(false);
                             }
                         }
@@ -107,17 +98,17 @@ impl Val {
                 }
             }
             (&Val::Macro(_), &Val::Macro(_)) => Err(error::BuildError::new(
-                format!("Macros are not comparable in file: {}", file_name),
+                "Macros are not comparable",
                 error::ErrorType::TypeFail,
                 pos,
             )),
             (&Val::Module(_), &Val::Module(_)) => Err(error::BuildError::new(
-                format!("Module are not comparable in file: {}", file_name),
+                "Module are not comparable",
                 error::ErrorType::TypeFail,
                 pos,
             )),
             (me, tgt) => Err(error::BuildError::new(
-                format!("Types differ for {}, {} in file: {}", me, tgt, file_name),
+                format!("Types differ for {}, {}", me, tgt),
                 error::ErrorType::TypeFail,
                 pos,
             )),
