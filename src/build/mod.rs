@@ -114,6 +114,7 @@ pub struct Builder {
     /// build_output is our built output.
     build_output: ValueMap,
     /// last is the result of the last statement.
+    import_stack: Vec<String>,
     pub stack: Option<Vec<Rc<Val>>>,
     pub is_module: bool,
     pub last: Option<Rc<Val>>,
@@ -154,13 +155,16 @@ impl Builder {
     }
 
     pub fn new_with_env_and_scope<P: Into<PathBuf>>(
-        root: P,
+        file: P,
         cache: Rc<RefCell<assets::Cache>>,
         scope: ValueMap,
         env: Rc<Val>,
     ) -> Self {
+        let file = file.into();
         Builder {
-            file: root.into(),
+            // Our import stack is initialized with ourself.
+            import_stack: vec![file.to_string_lossy().to_string()],
+            file: file,
             validate_mode: false,
             assert_collector: AssertCollector {
                 success: true,
@@ -180,6 +184,13 @@ impl Builder {
 
     pub fn set_strict(&mut self, to: bool) {
         self.strict = to;
+    }
+
+    pub fn prepend_import_stack(&mut self, imports: &Vec<String>) {
+        let mut new_stack = self.import_stack.clone();
+        new_stack.append(imports.clone().as_mut());
+        eprintln!("import stack: {:?}", new_stack);
+        self.import_stack = new_stack;
     }
 
     // TOOD(jwall): This needs some unit tests.
@@ -306,9 +317,12 @@ impl Builder {
         }
     }
 
+    fn detect_import_cycle(&self, path: &str) -> bool {
+        self.import_stack.iter().find(|p| *p == path).is_some()
+    }
+
     fn eval_import(&mut self, def: &ImportDef) -> Result<Rc<Val>, Box<Error>> {
         let sym = &def.name;
-        // TODO(jwall): Enforce reserved word restriction here.
         if Self::check_reserved_word(&sym.fragment) {
             return Err(Box::new(error::BuildError::new(
                 format!(
@@ -327,6 +341,17 @@ impl Builder {
             normalized = import_path;
         }
         normalized = try!(normalized.canonicalize());
+        if self.detect_import_cycle(normalized.to_string_lossy().as_ref()) {
+            return Err(Box::new(error::BuildError::new(
+                format!(
+                    "Import Cycle Detected!!!! {} is already in import stack: {:?}",
+                    normalized.to_string_lossy(),
+                    self.import_stack,
+                ),
+                error::ErrorType::Unsupported,
+                sym.pos.clone(),
+            )));
+        }
         eprintln!("processing import for {}", normalized.to_string_lossy());
         // Introduce a scope so the above borrow is dropped before we modify
         // the cache below.
@@ -336,6 +361,7 @@ impl Builder {
             Some(v) => v.clone(),
             None => {
                 let mut b = Self::new(normalized.clone(), self.assets.clone());
+                b.prepend_import_stack(&self.import_stack);
                 try!(b.build());
                 b.get_outputs_as_val()
             }

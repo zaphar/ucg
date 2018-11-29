@@ -1,0 +1,1 @@
+import "import_cycle2.ucg" as cycle2;
