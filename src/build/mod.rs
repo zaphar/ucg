@@ -72,7 +72,7 @@ impl MacroDef {
         for &(ref key, ref expr) in self.fields.iter() {
             // We clone the expressions here because this macro may be consumed
             // multiple times in the future.
-            let val = r#try!(b.eval_expr(expr));
+            let val = b.eval_expr(expr)?;
             result.push((key.into(), val.clone()));
         }
         Ok(result)
@@ -197,7 +197,7 @@ impl Builder {
     fn tuple_to_val(&mut self, fields: &Vec<(Token, Expression)>) -> Result<Rc<Val>, Box<Error>> {
         let mut new_fields = Vec::<(PositionedItem<String>, Rc<Val>)>::new();
         for &(ref name, ref expr) in fields.iter() {
-            let val = r#try!(self.eval_expr(expr));
+            let val = self.eval_expr(expr)?;
             new_fields.push((name.into(), val));
         }
         Ok(Rc::new(Val::Tuple(new_fields)))
@@ -206,7 +206,7 @@ impl Builder {
     fn list_to_val(&mut self, def: &ListDef) -> Result<Rc<Val>, Box<Error>> {
         let mut vals = Vec::new();
         for expr in def.elems.iter() {
-            vals.push(r#try!(self.eval_expr(expr)));
+            vals.push(self.eval_expr(expr)?);
         }
         Ok(Rc::new(Val::List(vals)))
     }
@@ -254,7 +254,7 @@ impl Builder {
     /// Builds a list of parsed UCG Statements.
     pub fn eval_stmts(&mut self, ast: &Vec<Statement>) -> BuildResult {
         for stmt in ast.iter() {
-            r#try!(self.eval_stmt(stmt));
+            self.eval_stmt(stmt)?;
         }
         Ok(())
     }
@@ -265,7 +265,7 @@ impl Builder {
                 //panic!("Successfully parsed {}", input);
                 let mut out: Option<Rc<Val>> = None;
                 for stmt in stmts.iter() {
-                    out = Some(r#try!(self.eval_stmt(stmt)));
+                    out = Some(self.eval_stmt(stmt)?);
                 }
                 match out {
                     None => return Ok(Rc::new(Val::Empty)),
@@ -287,9 +287,9 @@ impl Builder {
 
     /// Builds a ucg file at the named path.
     pub fn build(&mut self) -> BuildResult {
-        let mut f = r#try!(File::open(&self.file));
+        let mut f = File::open(&self.file)?;
         let mut s = String::new();
-        r#try!(f.read_to_string(&mut s));
+        f.read_to_string(&mut s)?;
         let eval_result = self.eval_string(&s);
         match eval_result {
             Ok(v) => {
@@ -340,7 +340,7 @@ impl Builder {
         } else {
             normalized = import_path;
         }
-        normalized = r#try!(normalized.canonicalize());
+        normalized = normalized.canonicalize()?;
         if self.detect_import_cycle(normalized.to_string_lossy().as_ref()) {
             return Err(Box::new(error::BuildError::new(
                 format!(
@@ -356,13 +356,13 @@ impl Builder {
         // Introduce a scope so the above borrow is dropped before we modify
         // the cache below.
         // Only parse the file once on import.
-        let maybe_asset = r#try!(self.assets.borrow().get(&normalized));
+        let maybe_asset = self.assets.borrow().get(&normalized)?;
         let result = match maybe_asset {
             Some(v) => v.clone(),
             None => {
                 let mut b = Self::new(normalized.clone(), self.assets.clone());
                 b.prepend_import_stack(&self.import_stack);
-                r#try!(b.build());
+                b.build()?;
                 b.get_outputs_as_val()
             }
         };
@@ -376,12 +376,12 @@ impl Builder {
         }
         self.build_output.insert(key, result.clone());
         let mut mut_assets_cache = self.assets.borrow_mut();
-        r#try!(mut_assets_cache.stash(normalized.clone(), result.clone()));
+        mut_assets_cache.stash(normalized.clone(), result.clone())?;
         return Ok(result);
     }
 
     fn eval_let(&mut self, def: &LetDef) -> Result<Rc<Val>, Box<Error>> {
-        let val = r#try!(self.eval_expr(&def.value));
+        let val = self.eval_expr(&def.value)?;
         let name = &def.name;
         // TODO(jwall): Enforce the reserved words list here.
         if Self::check_reserved_word(&name.fragment) {
@@ -421,7 +421,7 @@ impl Builder {
             // having a single builder per file.
             &Statement::Output(ref typ, ref expr) => {
                 if let None = self.out_lock {
-                    let val = r#try!(self.eval_expr(expr));
+                    let val = self.eval_expr(expr)?;
                     self.out_lock = Some((typ.fragment.to_string(), val.clone()));
                     Ok(val)
                 } else {
@@ -518,7 +518,7 @@ impl Builder {
         next: (&Position, &str),
         elems: &Vec<Rc<Val>>,
     ) -> Result<(), Box<Error>> {
-        let idx = r#try!(next.1.parse::<usize>());
+        let idx = next.1.parse::<usize>()?;
         if idx < elems.len() {
             stack.push_back(elems[idx].clone());
         } else {
@@ -537,7 +537,7 @@ impl Builder {
     }
 
     fn lookup_selector(&mut self, sl: &SelectorList) -> Result<Rc<Val>, Box<Error>> {
-        let first = r#try!(self.eval_expr(&sl.head));
+        let first = self.eval_expr(&sl.head)?;
         // First we ensure that the result is a tuple or a list.
         let mut stack = VecDeque::new();
         match first.as_ref() {
@@ -570,20 +570,20 @@ impl Builder {
                 let next = it.next().unwrap();
                 match vref.as_ref() {
                     &Val::Tuple(ref fs) => {
-                        r#try!(self.lookup_in_tuple(&mut stack, sl, (&next.pos, &next.fragment), fs));
+                        self.lookup_in_tuple(&mut stack, sl, (&next.pos, &next.fragment), fs)?;
                         continue;
                     }
                     &Val::Env(ref fs) => {
-                        r#try!(self.lookup_in_env(&next, &mut stack, fs));
+                        self.lookup_in_env(&next, &mut stack, fs)?;
                         continue;
                     }
                     &Val::List(ref elems) => {
-                        r#try!(self.lookup_in_list(
+                        self.lookup_in_list(
                             &mut stack,
                             sl,
                             (&next.pos, &next.fragment),
                             elems
-                        ));
+                        )?;
                         continue;
                     }
                     _ => {
@@ -737,9 +737,7 @@ impl Builder {
         left: Rc<Val>,
         right: Rc<Val>,
     ) -> Result<Rc<Val>, Box<Error>> {
-        Ok(Rc::new(Val::Boolean(r#try!(
-            left.equal(right.as_ref(), pos.clone())
-        ))))
+        Ok(Rc::new(Val::Boolean(left.equal(right.as_ref(), pos.clone())?)))
     }
 
     fn do_not_deep_equal(
@@ -748,9 +746,7 @@ impl Builder {
         left: Rc<Val>,
         right: Rc<Val>,
     ) -> Result<Rc<Val>, Box<Error>> {
-        Ok(Rc::new(Val::Boolean(!r#try!(
-            left.equal(right.as_ref(), pos.clone())
-        ))))
+        Ok(Rc::new(Val::Boolean(!left.equal(right.as_ref(), pos.clone())?)))
     }
 
     fn do_gt(&self, pos: &Position, left: Rc<Val>, right: Rc<Val>) -> Result<Rc<Val>, Box<Error>> {
@@ -855,8 +851,8 @@ impl Builder {
 
     fn eval_binary(&mut self, def: &BinaryOpDef) -> Result<Rc<Val>, Box<Error>> {
         let kind = &def.kind;
-        let left = r#try!(self.eval_expr(&def.left));
-        let right = r#try!(self.eval_expr(&def.right));
+        let left = self.eval_expr(&def.left)?;
+        let right = self.eval_expr(&def.right)?;
         match kind {
             &BinaryExprType::Add => self.add_vals(&def.pos, left, right),
             &BinaryExprType::Sub => self.subtract_vals(&def.pos, left, right),
@@ -867,8 +863,8 @@ impl Builder {
 
     fn eval_compare(&mut self, def: &ComparisonDef) -> Result<Rc<Val>, Box<Error>> {
         let kind = &def.kind;
-        let left = r#try!(self.eval_expr(&def.left));
-        let right = r#try!(self.eval_expr(&def.right));
+        let left = self.eval_expr(&def.left)?;
+        let right = self.eval_expr(&def.right)?;
         match kind {
             &CompareType::Equal => self.do_deep_equal(&def.pos, left, right),
             &CompareType::GT => self.do_gt(&def.pos, left, right),
@@ -937,7 +933,7 @@ impl Builder {
             }
         }
         for &(ref key, ref val) in overrides.iter() {
-            let expr_result = r#try!(self.eval_expr(val));
+            let expr_result = self.eval_expr(val)?;
             match m.entry(key.into()) {
                 // brand new field here.
                 Entry::Vacant(v) => {
@@ -990,7 +986,7 @@ impl Builder {
     }
 
     fn eval_copy(&mut self, def: &CopyDef) -> Result<Rc<Val>, Box<Error>> {
-        let v = r#try!(self.lookup_selector(&def.selector.sel));
+        let v = self.lookup_selector(&def.selector.sel)?;
         if let &Val::Tuple(ref src_fields) = v.as_ref() {
             self.push_val(v.clone());
             return self.copy_from_base(&src_fields, &def.fields);
@@ -1006,7 +1002,7 @@ impl Builder {
                 // Push our base tuple on the stack so the copy can use
                 // self to reference it.
                 b.push_val(maybe_tpl.clone());
-                let mod_args = r#try!(self.copy_from_base(src_fields, &def.fields));
+                let mod_args = self.copy_from_base(src_fields, &def.fields)?;
                 // put our copied parameters tuple in our builder under the mod key.
                 let mod_key =
                     PositionedItem::new_with_pos(String::from("mod"), Position::new(0, 0, 0));
@@ -1028,7 +1024,7 @@ impl Builder {
                     }
                 }
                 // 4. Evaluate all the statements using the builder.
-                r#try!(b.eval_stmts(&mod_def.statements));
+                b.eval_stmts(&mod_def.statements)?;
                 // 5. Take all of the bindings in the module and construct a new
                 //    tuple using them.
                 return Ok(b.get_outputs_as_val());
@@ -1055,30 +1051,30 @@ impl Builder {
         let args = &def.args;
         let mut vals = Vec::new();
         for v in args.iter() {
-            let rcv = r#try!(self.eval_expr(v));
+            let rcv = self.eval_expr(v)?;
             vals.push(rcv.deref().clone());
         }
         let formatter = format::Formatter::new(tmpl.clone(), vals);
-        Ok(Rc::new(Val::Str(r#try!(formatter.render(&def.pos)))))
+        Ok(Rc::new(Val::Str(formatter.render(&def.pos)?)))
     }
 
     // FIXME(jwall): Handle module calls as well?
     fn eval_call(&mut self, def: &CallDef) -> Result<Rc<Val>, Box<Error>> {
         let sel = &def.macroref;
         let args = &def.arglist;
-        let v = r#try!(self.lookup_selector(&sel.sel));
+        let v = self.lookup_selector(&sel.sel)?;
         if let &Val::Macro(ref m) = v.deref() {
             // Congratulations this is actually a macro.
             let mut argvals: Vec<Rc<Val>> = Vec::new();
             for arg in args.iter() {
-                argvals.push(r#try!(self.eval_expr(arg)));
+                argvals.push(self.eval_expr(arg)?);
             }
-            let fields = r#try!(m.eval(
+            let fields = m.eval(
                 self.file.clone(),
                 self.assets.clone(),
                 self.env.clone(),
                 argvals
-            ));
+            )?;
             return Ok(Rc::new(Val::Tuple(fields)));
         }
         Err(Box::new(error::BuildError::new(
@@ -1121,7 +1117,7 @@ impl Builder {
         // First we rewrite the imports to be absolute paths.
         def.imports_to_absolute(root);
         // Then we create our tuple default.
-        def.arg_tuple = Some(r#try!(self.tuple_to_val(&def.arg_set)));
+        def.arg_tuple = Some(self.tuple_to_val(&def.arg_set)?);
         // Then we construct a new Val::Module
         Ok(Rc::new(Val::Module(def)))
     }
@@ -1131,7 +1127,7 @@ impl Builder {
         let def_expr = &def.default;
         let fields = &def.tuple;
         // First resolve the target expression.
-        let v = r#try!(self.eval_expr(target));
+        let v = self.eval_expr(target)?;
         // Second ensure that the expression resolves to a string.
         if let &Val::Str(ref name) = v.deref() {
             // Third find the field with that name in the tuple.
@@ -1168,7 +1164,7 @@ impl Builder {
     }
 
     fn eval_list_op(&mut self, def: &ListOpDef) -> Result<Rc<Val>, Box<Error>> {
-        let maybe_list = r#try!(self.eval_expr(&def.target));
+        let maybe_list = self.eval_expr(&def.target)?;
         let l = match maybe_list.as_ref() {
             &Val::List(ref elems) => elems,
             other => {
@@ -1180,16 +1176,16 @@ impl Builder {
             }
         };
         let mac = &def.mac;
-        if let &Val::Macro(ref macdef) = r#try!(self.lookup_selector(&mac.sel)).as_ref() {
+        if let &Val::Macro(ref macdef) = self.lookup_selector(&mac.sel)?.as_ref() {
             let mut out = Vec::new();
             for item in l.iter() {
                 let argvals = vec![item.clone()];
-                let fields = r#try!(macdef.eval(
+                let fields = macdef.eval(
                     self.file.clone(),
                     self.assets.clone(),
                     self.env.clone(),
                     argvals
-                ));
+                )?;
                 if let Some(v) = Self::find_in_fieldlist(&def.field, &fields) {
                     match def.typ {
                         ListOpType::Map => {

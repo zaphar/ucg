@@ -18,7 +18,7 @@ impl YamlConverter {
     fn convert_list(&self, items: &Vec<Rc<Val>>) -> std::io::Result<serde_yaml::Value> {
         let mut v = Vec::new();
         for val in items.iter() {
-            v.push(r#try!(self.convert_value(val)));
+            v.push(self.convert_value(val)?);
         }
         Ok(serde_yaml::Value::Sequence(v))
     }
@@ -42,7 +42,7 @@ impl YamlConverter {
         for &(ref k, ref v) in items.iter() {
             mapping.insert(
                 serde_yaml::Value::String(k.val.clone()),
-                r#try!(self.convert_value(v)),
+                self.convert_value(v)?,
             );
         }
         Ok(serde_yaml::Value::Mapping(mapping))
@@ -69,16 +69,16 @@ impl YamlConverter {
                 eprintln!("Skipping module encoding as null...");
                 serde_yaml::Value::Null
             }
-            &Val::Env(ref fs) => r#try!(self.convert_env(fs)),
-            &Val::List(ref l) => r#try!(self.convert_list(l)),
-            &Val::Tuple(ref t) => r#try!(self.convert_tuple(t)),
+            &Val::Env(ref fs) => self.convert_env(fs)?,
+            &Val::List(ref l) => self.convert_list(l)?,
+            &Val::Tuple(ref t) => self.convert_tuple(t)?,
         };
         Ok(yaml_val)
     }
 
     fn write(&self, v: &Val, w: &mut Write) -> Result {
-        let jsn_val = r#try!(self.convert_value(v));
-        r#try!(serde_yaml::to_writer(w, &jsn_val));
+        let jsn_val = self.convert_value(v)?;
+        serde_yaml::to_writer(w, &jsn_val)?;
         Ok(())
     }
 }

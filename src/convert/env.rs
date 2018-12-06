@@ -43,8 +43,8 @@ impl EnvConverter {
                 eprintln!("Skipping empty variable: {}", name);
                 return Ok(());
             }
-            r#try!(write!(w, "{}=", name.val));
-            r#try!(self.write(&val, w));
+            write!(w, "{}=", name.val)?;
+            self.write(&val, w)?;
         }
         Ok(())
     }
@@ -61,22 +61,22 @@ impl EnvConverter {
                 return Ok(());
             }
             &Val::Boolean(b) => {
-                r#try!(write!(w, "{}\n", if b { "true" } else { "false" }));
+                write!(w, "{}\n", if b { "true" } else { "false" })?;
             }
             &Val::Float(ref f) => {
-                r#try!(write!(w, "{}\n", f));
+                write!(w, "{}\n", f)?;
             }
             &Val::Int(ref i) => {
-                r#try!(write!(w, "{}\n", i));
+                write!(w, "{}\n", i)?;
             }
             &Val::Str(ref s) => {
-                r#try!(write!(w, "'{}'\n", s));
+                write!(w, "'{}'\n", s)?;
             }
             &Val::List(ref items) => {
-                r#try!(self.convert_list(items, w));
+                self.convert_list(items, w)?;
             }
             &Val::Tuple(ref flds) => {
-                r#try!(self.convert_tuple(flds, w));
+                self.convert_tuple(flds, w)?;
             }
             &Val::Macro(ref _def) => {
                 // This is ignored

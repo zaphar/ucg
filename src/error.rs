@@ -73,11 +73,11 @@ impl BuildError {
     }
 
     fn render(&self, w: &mut fmt::Formatter) -> fmt::Result {
-        r#try!(write!(
+        write!(
             w,
             "{} at line: {} column: {}\nCaused By:\n\t{} ",
             self.err_type, self.pos.line, self.pos.column, self.msg
-        ));
+        )?;
         Ok(())
     }
 }
@@ -118,18 +118,18 @@ where
                 None => break,
                 Some(err) => {
                     let context = err.get_context();
-                    r#try!(write!(
+                    write!(
                         w,
                         "{}{}: line: {}, column: {}\n",
                         tabstop,
                         err.get_msg(),
                         context.line(),
                         context.column(),
-                    ));
+                    )?;
                     tabstop = "\t";
                     curr_err = err.get_cause();
                     if curr_err.is_some() {
-                        r#try!(write!(w, "Caused by: \n"));
+                        write!(w, "Caused by: \n")?;
                     }
                 }
             }

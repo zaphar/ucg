@@ -36,7 +36,7 @@ impl TomlConverter {
     fn convert_list(&self, items: &Vec<Rc<Val>>) -> ConvertResult {
         let mut v = Vec::new();
         for val in items.iter() {
-            v.push(r#try!(self.convert_value(val)));
+            v.push(self.convert_value(val)?);
         }
         Ok(toml::Value::Array(v))
     }
@@ -45,7 +45,7 @@ impl TomlConverter {
         let mut mp = toml::value::Table::new();
         for &(ref k, ref v) in items.iter() {
             mp.entry(k.val.clone())
-                .or_insert(r#try!(self.convert_value(v)));
+                .or_insert(self.convert_value(v)?);
         }
         Ok(toml::Value::Table(mp))
     }
@@ -78,17 +78,17 @@ impl TomlConverter {
                 let err = SimpleError::new("Modules are not allowed in Toml Conversions!");
                 return Err(Box::new(err));
             }
-            &Val::Env(ref fs) => r#try!(self.convert_env(fs)),
-            &Val::List(ref l) => r#try!(self.convert_list(l)),
-            &Val::Tuple(ref t) => r#try!(self.convert_tuple(t)),
+            &Val::Env(ref fs) => self.convert_env(fs)?,
+            &Val::List(ref l) => self.convert_list(l)?,
+            &Val::Tuple(ref t) => self.convert_tuple(t)?,
         };
         Ok(toml_val)
     }
 
     fn write(&self, v: &Val, w: &mut Write) -> Result {
-        let toml_val = r#try!(self.convert_value(v));
-        let toml_bytes = r#try!(toml::ser::to_string_pretty(&toml_val));
-        r#try!(write!(w, "{}", toml_bytes));
+        let toml_val = self.convert_value(v)?;
+        let toml_bytes = toml::ser::to_string_pretty(&toml_val)?;
+        write!(w, "{}", toml_bytes)?;
         Ok(())
     }
 }

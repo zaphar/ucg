@@ -121,16 +121,16 @@ impl ExecConverter {
             // Okay if we have made it this far then we are ready to start creating our script.
             let mut script = Cursor::new(vec![]);
             // 1. First the script prefix line.
-            r#try!(write!(script, "#!/usr/bin/env bash\n"));
+            write!(script, "#!/usr/bin/env bash\n")?;
             // 2. then some initial setup. for bash hygiene.
-            r#try!(write!(script, "# Turn on unofficial Bash-Strict-Mode\n"));
-            r#try!(write!(script, "set -euo pipefail\n"));
+            write!(script, "# Turn on unofficial Bash-Strict-Mode\n")?;
+            write!(script, "set -euo pipefail\n")?;
             // 3. Then assign our environment variables
             if let Some(env_list) = env {
                 for &(ref name, ref v) in env_list.iter() {
                     // We only allow string fields in our env tuple.
                     if let &Val::Str(ref s) = v.as_ref() {
-                        r#try!(write!(script, "{}=\"{}\"\n", name.val, s));
+                        write!(script, "{}=\"{}\"\n", name.val, s)?;
                         continue;
                     }
                     return Err(Box::new(BuildError::new(
@@ -140,19 +140,19 @@ impl ExecConverter {
                     )));
                 }
             }
-            r#try!(write!(script, "\n"));
+            write!(script, "\n")?;
             // TODO(jwall): Should Flag converter have a strict mode?
             let flag_converter = convert::flags::FlagConverter::new();
             // 4. Then construct our command line. (be sure to use exec)
-            r#try!(write!(script, "exec {} ", command.unwrap()));
+            write!(script, "exec {} ", command.unwrap())?;
             if let Some(arg_list) = args {
                 for v in arg_list.iter() {
                     // We only allow tuples or strings in our args list.
                     match v.as_ref() {
                         &Val::Str(ref s) => {
-                            r#try!(write!(script, "{} ", s));
+                            write!(script, "{} ", s)?;
                         }
-                        &Val::Tuple(_) => r#try!(flag_converter.convert(v.clone(), &mut script)),
+                        &Val::Tuple(_) => flag_converter.convert(v.clone(), &mut script)?,
                         _ => {
                             return Err(Box::new(BuildError::new(
                                 "Exec args must be a list of strings or tuples of strings.",
@@ -166,7 +166,7 @@ impl ExecConverter {
             // Put cursor to the beginning of our script so when we copy
             // we copy the whole thing.
             script.set_position(0);
-            r#try!(std::io::copy(&mut script, w));
+            std::io::copy(&mut script, w)?;
             return Ok(());
         }
 

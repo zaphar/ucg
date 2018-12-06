@@ -30,9 +30,9 @@ impl FlagConverter {
 
     fn write_flag_name(&self, pfx: &str, name: &str, w: &mut Write) -> Result {
         if name.chars().count() > 1 || pfx.chars().count() > 0 {
-            r#try!(write!(w, "--{}{} ", pfx, name));
+            write!(w, "--{}{} ", pfx, name)?;
         } else {
-            r#try!(write!(w, "-{} ", name));
+            write!(w, "-{} ", name)?;
         }
         return Ok(());
     }
@@ -47,8 +47,8 @@ impl FlagConverter {
                     pfx, name
                 );
             } else {
-                r#try!(self.write_flag_name(pfx, name, w));
-                r#try!(self.write(pfx, vref, w));
+                self.write_flag_name(pfx, name, w)?;
+                self.write(pfx, vref, w)?;
             }
         }
         return Ok(());
@@ -61,36 +61,36 @@ impl FlagConverter {
                 return Ok(());
             }
             &Val::Boolean(b) => {
-                r#try!(write!(w, "{} ", if b { "true" } else { "false" }));
+                write!(w, "{} ", if b { "true" } else { "false" })?;
             }
             &Val::Float(ref f) => {
-                r#try!(write!(w, "{} ", f));
+                write!(w, "{} ", f)?;
             }
             &Val::Int(ref i) => {
-                r#try!(write!(w, "{} ", i));
+                write!(w, "{} ", i)?;
             }
             &Val::Str(ref s) => {
-                r#try!(write!(w, "'{}' ", s));
+                write!(w, "'{}' ", s)?;
             }
             &Val::List(ref _def) => {
                 eprintln!("Skipping List...");
             }
             &Val::Tuple(ref flds) => for &(ref name, ref val) in flds.iter() {
                 if let &Val::Empty = val.as_ref() {
-                    r#try!(self.write_flag_name(pfx, &name.val, w));
+                    self.write_flag_name(pfx, &name.val, w)?;
                     continue;
                 }
                 match val.as_ref() {
                     &Val::Tuple(_) => {
                         let new_pfx = format!("{}{}.", pfx, name);
-                        r#try!(self.write(&new_pfx, val, w));
+                        self.write(&new_pfx, val, w)?;
                     }
                     &Val::List(ref def) => {
-                        r#try!(self.write_list_flag(pfx, &name.val, def, w));
+                        self.write_list_flag(pfx, &name.val, def, w)?;
                     }
                     _ => {
-                        r#try!(self.write_flag_name(pfx, &name.val, w));
-                        r#try!(self.write(pfx, &val, w));
+                        self.write_flag_name(pfx, &name.val, w)?;
+                        self.write(pfx, &val, w)?;
                     }
                 }
             },

@@ -304,10 +304,10 @@ impl fmt::Debug for SelectorList {
 
 impl fmt::Display for SelectorList {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
-        r#try!(write!(w, "{}", self.head));
+        write!(w, "{}", self.head)?;
         if let Some(ref tok_vec) = self.tail {
             for t in tok_vec.iter() {
-                r#try!(write!(w, ".{}", t.fragment));
+                write!(w, ".{}", t.fragment)?;
             }
         }
         return Ok(());
@@ -795,37 +795,37 @@ impl fmt::Display for Expression {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
         match self {
             &Expression::Simple(ref v) => {
-                r#try!(write!(w, "{}", v.to_string()));
+                write!(w, "{}", v.to_string())?;
             }
             &Expression::Binary(_) => {
-                r#try!(write!(w, "<Expr>"));
+                write!(w, "<Expr>")?;
             }
             &Expression::Compare(_) => {
-                r#try!(write!(w, "<Expr>"));
+                write!(w, "<Expr>")?;
             }
             &Expression::ListOp(_) => {
-                r#try!(write!(w, "<Expr>"));
+                write!(w, "<Expr>")?;
             }
             &Expression::Copy(_) => {
-                r#try!(write!(w, "<Copy>"));
+                write!(w, "<Copy>")?;
             }
             &Expression::Grouped(_) => {
-                r#try!(write!(w, "(<Expr>)"));
+                write!(w, "(<Expr>)")?;
             }
             &Expression::Format(_) => {
-                r#try!(write!(w, "<Format Expr>"));
+                write!(w, "<Format Expr>")?;
             }
             &Expression::Call(_) => {
-                r#try!(write!(w, "<MacroCall>"));
+                write!(w, "<MacroCall>")?;
             }
             &Expression::Macro(_) => {
-                r#try!(write!(w, "<Macro>"));
+                write!(w, "<Macro>")?;
             }
             &Expression::Module(_) => {
-                r#try!(write!(w, "<Module>"));
+                write!(w, "<Module>")?;
             }
             &Expression::Select(_) => {
-                r#try!(write!(w, "<Select>"));
+                write!(w, "<Select>")?;
             }
         }
         Ok(())
