@@ -29,7 +29,7 @@ use std::rc::Rc;
 
 use abortable_parser;
 
-use build::Val;
+use crate::build::Val;
 
 macro_rules! enum_type_equality {
     ( $slf:ident, $r:expr, $( $l:pat ),* ) => {
@@ -304,10 +304,10 @@ impl fmt::Debug for SelectorList {
 
 impl fmt::Display for SelectorList {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(w, "{}", self.head));
+        r#try!(write!(w, "{}", self.head));
         if let Some(ref tok_vec) = self.tail {
             for t in tok_vec.iter() {
-                try!(write!(w, ".{}", t.fragment));
+                r#try!(write!(w, ".{}", t.fragment));
             }
         }
         return Ok(());
@@ -736,7 +736,7 @@ impl ModuleDef {
     pub fn imports_to_absolute(&mut self, base: PathBuf) {
         for stmt in self.statements.iter_mut() {
             if let &mut Statement::Import(ref mut def) = stmt {
-                let mut path = PathBuf::from(&def.path.fragment);
+                let path = PathBuf::from(&def.path.fragment);
                 if path.is_relative() {
                     def.path.fragment = base
                         .join(path)
@@ -795,37 +795,37 @@ impl fmt::Display for Expression {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
         match self {
             &Expression::Simple(ref v) => {
-                try!(write!(w, "{}", v.to_string()));
+                r#try!(write!(w, "{}", v.to_string()));
             }
             &Expression::Binary(_) => {
-                try!(write!(w, "<Expr>"));
+                r#try!(write!(w, "<Expr>"));
             }
             &Expression::Compare(_) => {
-                try!(write!(w, "<Expr>"));
+                r#try!(write!(w, "<Expr>"));
             }
             &Expression::ListOp(_) => {
-                try!(write!(w, "<Expr>"));
+                r#try!(write!(w, "<Expr>"));
             }
             &Expression::Copy(_) => {
-                try!(write!(w, "<Copy>"));
+                r#try!(write!(w, "<Copy>"));
             }
             &Expression::Grouped(_) => {
-                try!(write!(w, "(<Expr>)"));
+                r#try!(write!(w, "(<Expr>)"));
             }
             &Expression::Format(_) => {
-                try!(write!(w, "<Format Expr>"));
+                r#try!(write!(w, "<Format Expr>"));
             }
             &Expression::Call(_) => {
-                try!(write!(w, "<MacroCall>"));
+                r#try!(write!(w, "<MacroCall>"));
             }
             &Expression::Macro(_) => {
-                try!(write!(w, "<Macro>"));
+                r#try!(write!(w, "<Macro>"));
             }
             &Expression::Module(_) => {
-                try!(write!(w, "<Module>"));
+                r#try!(write!(w, "<Module>"));
             }
             &Expression::Select(_) => {
-                try!(write!(w, "<Select>"));
+                r#try!(write!(w, "<Select>"));
             }
         }
         Ok(())

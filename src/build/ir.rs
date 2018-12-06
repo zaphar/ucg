@@ -6,8 +6,8 @@ use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use std::string::ToString;
 
-use ast::*;
-use error;
+use crate::ast::*;
+use crate::error;
 
 /// The Intermediate representation of a compiled UCG AST.
 #[derive(PartialEq, Debug, Clone)]
@@ -73,7 +73,7 @@ impl Val {
                     Ok(false)
                 } else {
                     for (i, lv) in ldef.iter().enumerate() {
-                        try!(lv.equal(rdef[i].as_ref(), pos.clone()));
+                        r#try!(lv.equal(rdef[i].as_ref(), pos.clone()));
                     }
                     Ok(true)
                 }
@@ -89,7 +89,7 @@ impl Val {
                             return Ok(false);
                         } else {
                             // field value equality.
-                            if !try!(lv.1.equal(field_target.1.as_ref(), lv.0.pos.clone())) {
+                            if !r#try!(lv.1.equal(field_target.1.as_ref(), lv.0.pos.clone())) {
                                 return Ok(false);
                             }
                         }
@@ -190,25 +190,25 @@ impl Display for Val {
             &Val::Int(ref i) => write!(f, "Int({})", i),
             &Val::Str(ref s) => write!(f, "String({})", s),
             &Val::List(ref def) => {
-                try!(write!(f, "[\n"));
+                r#try!(write!(f, "[\n"));
                 for v in def.iter() {
-                    try!(write!(f, "\t{},\n", v));
+                    r#try!(write!(f, "\t{},\n", v));
                 }
                 write!(f, "]")
             }
             &Val::Macro(_) => write!(f, "Macro(..)"),
             &Val::Module(_) => write!(f, "Module{{..}}"),
             &Val::Tuple(ref def) => {
-                try!(write!(f, "Tuple(\n"));
+                r#try!(write!(f, "Tuple(\n"));
                 for v in def.iter() {
-                    try!(write!(f, "\t{} = {},\n", v.0.val, v.1));
+                    r#try!(write!(f, "\t{} = {},\n", v.0.val, v.1));
                 }
                 write!(f, ")")
             }
             &Val::Env(ref def) => {
-                try!(write!(f, "Env(\n"));
+                r#try!(write!(f, "Env(\n"));
                 for v in def.iter() {
-                    try!(write!(f, "\t{}=\"{}\"\n", v.0, v.1));
+                    r#try!(write!(f, "\t{}=\"{}\"\n", v.0, v.1));
                 }
                 write!(f, ")")
             }

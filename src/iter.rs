@@ -4,7 +4,7 @@ use std::iter::Iterator;
 use abortable_parser::iter::{SliceIter, StrIter};
 use abortable_parser::{InputIter, Offsetable, Peekable, Positioned, Seekable, Span, SpanRange};
 
-use ast::{Position, Token};
+use crate::ast::{Position, Token};
 
 #[derive(Debug)]
 pub struct OffsetStrIter<'a> {

@@ -16,9 +16,9 @@
 use std::io::Write;
 use std::rc::Rc;
 
-use ast::PositionedItem;
-use build::Val;
-use convert::traits::{Converter, Result};
+use crate::ast::PositionedItem;
+use crate::build::Val;
+use crate::convert::traits::{Converter, Result};
 
 /// EnvConverter implements the conversion logic for converting a Val into a
 /// set of environment variables.
@@ -43,8 +43,8 @@ impl EnvConverter {
                 eprintln!("Skipping empty variable: {}", name);
                 return Ok(());
             }
-            try!(write!(w, "{}=", name.val));
-            try!(self.write(&val, w));
+            r#try!(write!(w, "{}=", name.val));
+            r#try!(self.write(&val, w));
         }
         Ok(())
     }
@@ -61,22 +61,22 @@ impl EnvConverter {
                 return Ok(());
             }
             &Val::Boolean(b) => {
-                try!(write!(w, "{}\n", if b { "true" } else { "false" }));
+                r#try!(write!(w, "{}\n", if b { "true" } else { "false" }));
             }
             &Val::Float(ref f) => {
-                try!(write!(w, "{}\n", f));
+                r#try!(write!(w, "{}\n", f));
             }
             &Val::Int(ref i) => {
-                try!(write!(w, "{}\n", i));
+                r#try!(write!(w, "{}\n", i));
             }
             &Val::Str(ref s) => {
-                try!(write!(w, "'{}'\n", s));
+                r#try!(write!(w, "'{}'\n", s));
             }
             &Val::List(ref items) => {
-                try!(self.convert_list(items, w));
+                r#try!(self.convert_list(items, w));
             }
             &Val::Tuple(ref flds) => {
-                try!(self.convert_tuple(flds, w));
+                r#try!(self.convert_tuple(flds, w));
             }
             &Val::Macro(ref _def) => {
                 // This is ignored

@@ -13,7 +13,7 @@
 //  limitations under the License.
 use super::assets::MemoryCache;
 use super::{Builder, CallDef, MacroDef, SelectDef, Val};
-use ast::*;
+use crate::ast::*;
 
 use std;
 use std::cell::RefCell;

@@ -16,8 +16,8 @@
 use std::clone::Clone;
 use std::error::Error;
 
-use ast::*;
-use error;
+use crate::ast::*;
+use crate::error;
 
 /// Implements the logic for format strings in UCG format expressions.
 pub struct Formatter<V: Into<String> + Clone> {
@@ -77,7 +77,7 @@ impl<V: Into<String> + Clone> Formatter<V> {
 #[cfg(test)]
 mod test {
     use super::Formatter;
-    use ast::Position;
+    use crate::ast::Position;
 
     #[test]
     fn test_format_happy_path() {

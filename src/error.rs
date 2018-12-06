@@ -19,7 +19,7 @@ use std::fmt::Debug;
 
 use abortable_parser::Positioned;
 
-use ast::*;
+use crate::ast::*;
 
 /// ErrorType defines the various types of errors that can result from compiling UCG into an
 /// output format.
@@ -73,7 +73,7 @@ impl BuildError {
     }
 
     fn render(&self, w: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(
+        r#try!(write!(
             w,
             "{} at line: {} column: {}\nCaused By:\n\t{} ",
             self.err_type, self.pos.line, self.pos.column, self.msg
@@ -118,7 +118,7 @@ where
                 None => break,
                 Some(err) => {
                     let context = err.get_context();
-                    try!(write!(
+                    r#try!(write!(
                         w,
                         "{}{}: line: {}, column: {}\n",
                         tabstop,
@@ -129,7 +129,7 @@ where
                     tabstop = "\t";
                     curr_err = err.get_cause();
                     if curr_err.is_some() {
-                        try!(write!(w, "Caused by: \n"));
+                        r#try!(write!(w, "Caused by: \n"));
                     }
                 }
             }

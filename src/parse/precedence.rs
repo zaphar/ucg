@@ -18,7 +18,7 @@ use abortable_parser::combinators::eoi;
 use abortable_parser::{Error, Result, SliceIter};
 
 use super::{non_op_expression, NomResult};
-use ast::*;
+use crate::ast::*;
 
 /// Defines the intermediate stages of our bottom up parser for precedence parsing.
 #[derive(Debug, PartialEq, Clone)]
@@ -333,7 +333,7 @@ pub fn op_expression<'a>(i: SliceIter<'a, Token>) -> Result<SliceIter<Token>, Ex
         }
         Result::Incomplete(i) => Result::Incomplete(i),
         Result::Complete(rest, oplist) => {
-            let mut i_ = SliceIter::new(&oplist);
+            let i_ = SliceIter::new(&oplist);
             let parse_result = either!(
                 i_.clone(),
                 trace_nom!(compare_expression),

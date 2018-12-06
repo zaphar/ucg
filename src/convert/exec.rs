@@ -17,13 +17,13 @@ use std;
 use std::io::{Cursor, Write};
 use std::rc::Rc;
 
-use ast::{Position, PositionedItem};
-use build::Val;
-use build::Val::Tuple;
-use convert;
-use convert::traits::{Converter, Result};
-use error::BuildError;
-use error::ErrorType;
+use crate::ast::{Position, PositionedItem};
+use crate::build::Val;
+use crate::build::Val::Tuple;
+use crate::convert;
+use crate::convert::traits::{Converter, Result};
+use crate::error::BuildError;
+use crate::error::ErrorType;
 
 pub struct ExecConverter {}
 
@@ -121,16 +121,16 @@ impl ExecConverter {
             // Okay if we have made it this far then we are ready to start creating our script.
             let mut script = Cursor::new(vec![]);
             // 1. First the script prefix line.
-            try!(write!(script, "#!/usr/bin/env bash\n"));
+            r#try!(write!(script, "#!/usr/bin/env bash\n"));
             // 2. then some initial setup. for bash hygiene.
-            try!(write!(script, "# Turn on unofficial Bash-Strict-Mode\n"));
-            try!(write!(script, "set -euo pipefail\n"));
+            r#try!(write!(script, "# Turn on unofficial Bash-Strict-Mode\n"));
+            r#try!(write!(script, "set -euo pipefail\n"));
             // 3. Then assign our environment variables
             if let Some(env_list) = env {
                 for &(ref name, ref v) in env_list.iter() {
                     // We only allow string fields in our env tuple.
                     if let &Val::Str(ref s) = v.as_ref() {
-                        try!(write!(script, "{}=\"{}\"\n", name.val, s));
+                        r#try!(write!(script, "{}=\"{}\"\n", name.val, s));
                         continue;
                     }
                     return Err(Box::new(BuildError::new(
@@ -140,19 +140,19 @@ impl ExecConverter {
                     )));
                 }
             }
-            try!(write!(script, "\n"));
+            r#try!(write!(script, "\n"));
             // TODO(jwall): Should Flag converter have a strict mode?
             let flag_converter = convert::flags::FlagConverter::new();
             // 4. Then construct our command line. (be sure to use exec)
-            try!(write!(script, "exec {} ", command.unwrap()));
+            r#try!(write!(script, "exec {} ", command.unwrap()));
             if let Some(arg_list) = args {
                 for v in arg_list.iter() {
                     // We only allow tuples or strings in our args list.
                     match v.as_ref() {
                         &Val::Str(ref s) => {
-                            try!(write!(script, "{} ", s));
+                            r#try!(write!(script, "{} ", s));
                         }
-                        &Val::Tuple(_) => try!(flag_converter.convert(v.clone(), &mut script)),
+                        &Val::Tuple(_) => r#try!(flag_converter.convert(v.clone(), &mut script)),
                         _ => {
                             return Err(Box::new(BuildError::new(
                                 "Exec args must be a list of strings or tuples of strings.",
@@ -166,7 +166,7 @@ impl ExecConverter {
             // Put cursor to the beginning of our script so when we copy
             // we copy the whole thing.
             script.set_position(0);
-            try!(std::io::copy(&mut script, w));
+            r#try!(std::io::copy(&mut script, w));
             return Ok(());
         }
 
@@ -195,9 +195,9 @@ impl Converter for ExecConverter {
 #[cfg(test)]
 mod exec_test {
     use super::*;
-    use build::assets::MemoryCache;
-    use build::Builder;
-    use convert::traits::Converter;
+    use crate::build::assets::MemoryCache;
+    use crate::build::Builder;
+    use crate::convert::traits::Converter;
 
     use std;
     use std::cell::RefCell;

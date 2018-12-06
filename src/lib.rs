@@ -39,10 +39,10 @@ pub mod parse;
 
 mod format;
 
-pub use ast::Expression;
-pub use ast::Statement;
-pub use ast::Value;
+pub use crate::ast::Expression;
+pub use crate::ast::Statement;
+pub use crate::ast::Value;
 
-pub use build::Builder;
-pub use build::Val;
-pub use parse::parse;
+pub use crate::build::Builder;
+pub use crate::build::Val;
+pub use crate::parse::parse;

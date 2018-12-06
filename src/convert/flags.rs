@@ -16,8 +16,8 @@
 use std::io::Write;
 use std::rc::Rc;
 
-use build::Val;
-use convert::traits::{Converter, Result};
+use crate::build::Val;
+use crate::convert::traits::{Converter, Result};
 
 /// FlagConverter implements the conversion logic for converting a Val into a set
 /// of command line flags.
@@ -30,9 +30,9 @@ impl FlagConverter {
 
     fn write_flag_name(&self, pfx: &str, name: &str, w: &mut Write) -> Result {
         if name.chars().count() > 1 || pfx.chars().count() > 0 {
-            try!(write!(w, "--{}{} ", pfx, name));
+            r#try!(write!(w, "--{}{} ", pfx, name));
         } else {
-            try!(write!(w, "-{} ", name));
+            r#try!(write!(w, "-{} ", name));
         }
         return Ok(());
     }
@@ -47,8 +47,8 @@ impl FlagConverter {
                     pfx, name
                 );
             } else {
-                try!(self.write_flag_name(pfx, name, w));
-                try!(self.write(pfx, vref, w));
+                r#try!(self.write_flag_name(pfx, name, w));
+                r#try!(self.write(pfx, vref, w));
             }
         }
         return Ok(());
@@ -61,36 +61,36 @@ impl FlagConverter {
                 return Ok(());
             }
             &Val::Boolean(b) => {
-                try!(write!(w, "{} ", if b { "true" } else { "false" }));
+                r#try!(write!(w, "{} ", if b { "true" } else { "false" }));
             }
             &Val::Float(ref f) => {
-                try!(write!(w, "{} ", f));
+                r#try!(write!(w, "{} ", f));
             }
             &Val::Int(ref i) => {
-                try!(write!(w, "{} ", i));
+                r#try!(write!(w, "{} ", i));
             }
             &Val::Str(ref s) => {
-                try!(write!(w, "'{}' ", s));
+                r#try!(write!(w, "'{}' ", s));
             }
             &Val::List(ref _def) => {
                 eprintln!("Skipping List...");
             }
             &Val::Tuple(ref flds) => for &(ref name, ref val) in flds.iter() {
                 if let &Val::Empty = val.as_ref() {
-                    try!(self.write_flag_name(pfx, &name.val, w));
+                    r#try!(self.write_flag_name(pfx, &name.val, w));
                     continue;
                 }
                 match val.as_ref() {
                     &Val::Tuple(_) => {
                         let new_pfx = format!("{}{}.", pfx, name);
-                        try!(self.write(&new_pfx, val, w));
+                        r#try!(self.write(&new_pfx, val, w));
                     }
                     &Val::List(ref def) => {
-                        try!(self.write_list_flag(pfx, &name.val, def, w));
+                        r#try!(self.write_list_flag(pfx, &name.val, def, w));
                     }
                     _ => {
-                        try!(self.write_flag_name(pfx, &name.val, w));
-                        try!(self.write(pfx, &val, w));
+                        r#try!(self.write_flag_name(pfx, &name.val, w));
+                        r#try!(self.write(pfx, &val, w));
                     }
                 }
             },

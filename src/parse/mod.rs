@@ -23,10 +23,10 @@ use abortable_parser::iter::SliceIter;
 use abortable_parser::{Error, Peekable, Result};
 
 use self::precedence::op_expression;
-use ast::*;
-use error::StackPrinter;
-use iter::OffsetStrIter;
-use tokenizer::*;
+use crate::ast::*;
+use crate::error::StackPrinter;
+use crate::iter::OffsetStrIter;
+use crate::tokenizer::*;
 
 // TODO(jwall): Rename this to something better.
 type NomResult<'a, O> = Result<SliceIter<'a, Token>, O>;
@@ -41,7 +41,7 @@ type ParseResult<'a, O> = std::result::Result<O, abortable_parser::Error<SliceIt
 macro_rules! trace_nom {
     ($i:expr, $rule:ident!( $($args:tt)* )) => {
         {
-            use parse::ENABLE_TRACE;
+            use crate::parse::ENABLE_TRACE;
             if ENABLE_TRACE {
                 eprintln!("Entering Rule: {:?} {:?}", stringify!($rule), $i);
             }
@@ -55,7 +55,7 @@ macro_rules! trace_nom {
 
     ($i:expr, $rule:ident) => {
         {
-            use parse::ENABLE_TRACE;
+            use crate::parse::ENABLE_TRACE;
             if ENABLE_TRACE {
                 eprintln!("Entering Rule: {:?} {:?}", stringify!($rule), $i);
             }

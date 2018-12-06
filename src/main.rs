@@ -65,7 +65,7 @@ fn run_converter(c: &traits::Converter, v: Rc<Val>, f: Option<&str>) -> traits::
             let mut path_buf = PathBuf::from(f);
             path_buf.set_extension(c.file_ext());
             let new_path = path_buf.to_str().unwrap();
-            Box::new(try!(File::create(&new_path)))
+            Box::new(r#try!(File::create(&new_path)))
         }
         None => Box::new(io::stdout()),
     };
@@ -87,7 +87,7 @@ fn build_file(
     if validate {
         builder.enable_validate_mode();
     }
-    try!(builder.build());
+    r#try!(builder.build());
     if validate {
         println!("{}", builder.assert_collector.summary);
     }
@@ -160,7 +160,7 @@ fn visit_ucg_files(
     // TODO(jwall): Report the failing files at the bottom.
     let mut summary = String::new();
     if path.is_dir() {
-        let mut dir_iter = try!(std::fs::read_dir(path)).peekable();
+        let mut dir_iter = r#try!(std::fs::read_dir(path)).peekable();
         loop {
             let entry = match dir_iter.next() {
                 Some(e) => e,
@@ -168,7 +168,7 @@ fn visit_ucg_files(
                     break;
                 }
             };
-            let next_item = try!(entry);
+            let next_item = r#try!(entry);
             let next_path = next_item.path();
             let path_as_string = String::from(next_path.to_string_lossy());
             if next_path.is_dir() && recurse {

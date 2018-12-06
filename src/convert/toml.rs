@@ -20,9 +20,9 @@ use std::rc::Rc;
 use simple_error::SimpleError;
 use toml;
 
-use ast;
-use build::Val;
-use convert::traits::{Converter, Result};
+use crate::ast;
+use crate::build::Val;
+use crate::convert::traits::{Converter, Result};
 
 pub struct TomlConverter {}
 
@@ -36,7 +36,7 @@ impl TomlConverter {
     fn convert_list(&self, items: &Vec<Rc<Val>>) -> ConvertResult {
         let mut v = Vec::new();
         for val in items.iter() {
-            v.push(try!(self.convert_value(val)));
+            v.push(r#try!(self.convert_value(val)));
         }
         Ok(toml::Value::Array(v))
     }
@@ -45,7 +45,7 @@ impl TomlConverter {
         let mut mp = toml::value::Table::new();
         for &(ref k, ref v) in items.iter() {
             mp.entry(k.val.clone())
-                .or_insert(try!(self.convert_value(v)));
+                .or_insert(r#try!(self.convert_value(v)));
         }
         Ok(toml::Value::Table(mp))
     }
@@ -78,17 +78,17 @@ impl TomlConverter {
                 let err = SimpleError::new("Modules are not allowed in Toml Conversions!");
                 return Err(Box::new(err));
             }
-            &Val::Env(ref fs) => try!(self.convert_env(fs)),
-            &Val::List(ref l) => try!(self.convert_list(l)),
-            &Val::Tuple(ref t) => try!(self.convert_tuple(t)),
+            &Val::Env(ref fs) => r#try!(self.convert_env(fs)),
+            &Val::List(ref l) => r#try!(self.convert_list(l)),
+            &Val::Tuple(ref t) => r#try!(self.convert_tuple(t)),
         };
         Ok(toml_val)
     }
 
     fn write(&self, v: &Val, w: &mut Write) -> Result {
-        let toml_val = try!(self.convert_value(v));
-        let toml_bytes = try!(toml::ser::to_string_pretty(&toml_val));
-        try!(write!(w, "{}", toml_bytes));
+        let toml_val = r#try!(self.convert_value(v));
+        let toml_bytes = r#try!(toml::ser::to_string_pretty(&toml_val));
+        r#try!(write!(w, "{}", toml_bytes));
         Ok(())
     }
 }

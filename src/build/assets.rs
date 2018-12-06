@@ -51,17 +51,17 @@ impl MemoryCache {
 
 impl Cache for MemoryCache {
     fn has_path(&self, path: &PathBuf) -> Result<bool> {
-        let new_path = try!(path.canonicalize());
+        let new_path = r#try!(path.canonicalize());
         Ok(self.map.contains_key(&new_path))
     }
 
     fn get(&self, path: &PathBuf) -> Result<Option<Rc<Val>>> {
-        let new_path = try!(path.canonicalize());
+        let new_path = r#try!(path.canonicalize());
         Ok(self.map.get(&new_path).map(|v| v.clone()))
     }
 
     fn stash(&mut self, path: PathBuf, asset: Rc<Val>) -> Result<()> {
-        let new_path = try!(path.canonicalize());
+        let new_path = r#try!(path.canonicalize());
         self.map.insert(new_path, asset);
         Ok(())
     }

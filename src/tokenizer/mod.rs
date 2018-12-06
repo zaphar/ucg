@@ -19,9 +19,9 @@ use abortable_parser::combinators::*;
 use abortable_parser::iter::SliceIter;
 use abortable_parser::{Error, Offsetable, Result};
 
-use ast::*;
-use error::StackPrinter;
-use iter::OffsetStrIter;
+use crate::ast::*;
+use crate::error::StackPrinter;
+use crate::iter::OffsetStrIter;
 
 fn is_symbol_char<'a>(i: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, u8> {
     let mut _i = i.clone();
@@ -559,7 +559,7 @@ macro_rules! match_type {
 /// conversion handlers for the matched Token.
 macro_rules! match_token {
     ($i:expr,PUNCT => $f:expr) => {{
-        use tokenizer::token_clone;
+        use crate::tokenizer::token_clone;
         match_token!($i, PUNCT => $f, token_clone)
     }};
 
@@ -568,7 +568,7 @@ macro_rules! match_token {
     };
 
     ($i:expr,BAREWORD => $f:expr) => {{
-        use tokenizer::token_clone;
+        use crate::tokenizer::token_clone;
         match_token!($i, BAREWORD => $f, token_clone)
     }};
 

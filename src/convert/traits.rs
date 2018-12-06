@@ -18,7 +18,7 @@ use std::io::Write;
 use std::rc::Rc;
 use std::result;
 
-use build::Val;
+use crate::build::Val;
 
 pub type Result = result::Result<(), Box<Error>>;
 

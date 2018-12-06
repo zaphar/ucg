@@ -2,7 +2,7 @@ use super::*;
 
 use abortable_parser::{Result, SliceIter};
 
-use iter::OffsetStrIter;
+use crate::iter::OffsetStrIter;
 
 #[test]
 fn test_empty_token() {

@@ -12,11 +12,11 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 use super::*;
-use tokenizer::tokenize;
+use crate::tokenizer::tokenize;
 
 use abortable_parser::{Result, SliceIter};
 
-use iter::OffsetStrIter;
+use crate::iter::OffsetStrIter;
 
 macro_rules! assert_parse {
     ($parsemac:ident($i:expr), $out:expr) => {
