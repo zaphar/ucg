@@ -35,6 +35,7 @@ use crate::parse::parse;
 
 pub mod assets;
 pub mod ir;
+pub mod typecheck;
 
 pub use self::ir::Val;
 
