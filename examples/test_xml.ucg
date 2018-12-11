@@ -1,0 +1,26 @@
+let make_element = macro(name, attrs, children) => {
+    name = name,
+    attrs = attrs,
+    children = children,
+};
+
+let doc = {
+    root = make_element(
+        "top",
+        {id = "foo"},
+        [
+            make_element(
+                "child1",
+                { attr1 = "value1", attr2 = "value2"},
+                [
+                    "inner text content",
+                    make_element(
+                        "grandchild",
+                        {},
+                        [{
+                            text = "Another text node",
+                        }]),
+                ])]),
+};
+
+out xml doc;

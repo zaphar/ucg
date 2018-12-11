@@ -1,3 +1,17 @@
+// Copyright 2018 Jeremy Wall <jeremy@marzhillstudios.com>
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
 use std;
 use std::error::Error;
 use std::io::Write;
@@ -72,14 +86,20 @@ impl XmlConverter {
                 //}
                 if field.val == "attrs" {
                     // This should be a tuple.
-                    attrs = Some(Self::get_tuple_val(val.as_ref())?);
+                    if !val.is_empty() {
+                        attrs = Some(Self::get_tuple_val(val.as_ref())?);
+                    }
                 }
                 if field.val == "children" {
                     // This should be a list of tuples.
-                    children = Some(Self::get_list_val(val.as_ref())?);
+                    if !val.is_empty() {
+                        children = Some(Self::get_list_val(val.as_ref())?);
+                    }
                 }
                 if field.val == "text" {
-                    text = Some(Self::get_str_val(val.as_ref())?);
+                    if !val.is_empty() {
+                        text = Some(Self::get_str_val(val.as_ref())?);
+                    }
                 }
             }
             if name.is_some() && text.is_some() {
@@ -93,6 +113,9 @@ impl XmlConverter {
                 let mut start = XmlEvent::start_element(name.unwrap());
                 if attrs.is_some() {
                     for (ref name, ref val) in attrs.unwrap().iter() {
+                        if val.is_empty() {
+                            continue;
+                        }
                         start = start.attr(name.val.as_ref(), Self::get_str_val(val.as_ref())?);
                     }
                 }
@@ -107,8 +130,7 @@ impl XmlConverter {
             if text.is_some() {
                 w.write(XmlEvent::characters(text.unwrap()))?;
             }
-        }
-        if let Val::Str(ref s) = v {
+        } else if let Val::Str(ref s) = v {
             w.write(XmlEvent::characters(s.as_ref()))?;
         } else {
             return Err(Box::new(BuildError::new(
@@ -127,7 +149,7 @@ impl XmlConverter {
             let mut standalone: Option<bool> = None;
             let mut root: Option<Rc<Val>> = None;
             for &(ref name, ref val) in fs.iter() {
-                if name.val == "versin" {
+                if name.val == "version" {
                     version = Some(Self::get_str_val(val)?);
                 }
                 if name.val == "encoding" {
