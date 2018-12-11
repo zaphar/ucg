@@ -243,35 +243,35 @@ macro_rules! alt_peek {
 // inputs. So handle with care.
 fn number(input: SliceIter<Token>) -> Result<SliceIter<Token>, Value> {
     let parsed = do_each!(input,
-            num => either!(
-                complete!(
-                     "Not a float",
-                     do_each!( // 1.0
-                         prefix => match_type!(DIGIT),
-                         has_dot => punct!("."),
-                         suffix => match_type!(DIGIT),
-                         (Some(prefix.clone()), Some(has_dot.clone()), Some(suffix.clone()))
-                )),
-                complete!(
-                     "Not a float",
-                     do_each!( // 1.
-                         prefix => match_type!(DIGIT),
-                         has_dot => punct!("."),
-                         (Some(prefix.clone()), Some(has_dot.clone()), None)
-                )),
-                complete!(
-                     "Not a float",
-                     do_each!( // .1
-                         has_dot => punct!("."),
-                         suffix => match_type!(DIGIT),
-                         (None, Some(has_dot.clone()), Some(suffix.clone()))
-                )),
-                do_each!( // 1
-                    prefix => match_type!(DIGIT),
-                    (Some(prefix.clone()), None, None)
-                )),
-            (num)
-       );
+         num => either!(
+             complete!(
+                  "Not a float",
+                  do_each!( // 1.0
+                      prefix => match_type!(DIGIT),
+                      has_dot => punct!("."),
+                      suffix => match_type!(DIGIT),
+                      (Some(prefix.clone()), Some(has_dot.clone()), Some(suffix.clone()))
+             )),
+             complete!(
+                  "Not a float",
+                  do_each!( // 1.
+                      prefix => match_type!(DIGIT),
+                      has_dot => punct!("."),
+                      (Some(prefix.clone()), Some(has_dot.clone()), None)
+             )),
+             complete!(
+                  "Not a float",
+                  do_each!( // .1
+                      has_dot => punct!("."),
+                      suffix => match_type!(DIGIT),
+                      (None, Some(has_dot.clone()), Some(suffix.clone()))
+             )),
+             do_each!( // 1
+                 prefix => match_type!(DIGIT),
+                 (Some(prefix.clone()), None, None)
+             )),
+         (num)
+    );
     match parsed {
         Result::Abort(e) => Result::Abort(e),
         Result::Fail(e) => Result::Fail(e),
@@ -538,7 +538,8 @@ fn tuple_to_macro<'a>(
         .map(|s| PositionedItem {
             pos: s.pos().clone(),
             val: s.to_string(),
-        }).collect();
+        })
+        .collect();
     match val {
         Value::Tuple(v) => Ok(Expression::Macro(MacroDef {
             argdefs: arglist,
@@ -945,12 +946,12 @@ make_fn!(
 //trace_macros!(true);
 fn statement(i: SliceIter<Token>) -> Result<SliceIter<Token>, Statement> {
     return alt_peek!(i,
-            word!("assert") => trace_nom!(assert_statement) |
-            word!("import") => trace_nom!(import_statement) |
-            word!("let") => trace_nom!(let_statement) |
-            word!("out") => trace_nom!(out_statement) |
-            trace_nom!(expression_statement)
-        );
+        word!("assert") => trace_nom!(assert_statement) |
+        word!("import") => trace_nom!(import_statement) |
+        word!("let") => trace_nom!(let_statement) |
+        word!("out") => trace_nom!(out_statement) |
+        trace_nom!(expression_statement)
+    );
 }
 //trace_macros!(false);
 

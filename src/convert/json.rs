@@ -40,8 +40,7 @@ impl JsonConverter {
     ) -> std::io::Result<serde_json::Value> {
         let mut mp = serde_json::Map::new();
         for &(ref k, ref v) in items.iter() {
-            mp.entry(k.val.clone())
-                .or_insert(self.convert_value(v)?);
+            mp.entry(k.val.clone()).or_insert(self.convert_value(v)?);
         }
         Ok(serde_json::Value::Object(mp))
     }

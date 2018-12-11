@@ -44,8 +44,7 @@ impl TomlConverter {
     fn convert_tuple(&self, items: &Vec<(ast::PositionedItem<String>, Rc<Val>)>) -> ConvertResult {
         let mut mp = toml::value::Table::new();
         for &(ref k, ref v) in items.iter() {
-            mp.entry(k.val.clone())
-                .or_insert(self.convert_value(v)?);
+            mp.entry(k.val.clone()).or_insert(self.convert_value(v)?);
         }
         Ok(toml::Value::Table(mp))
     }

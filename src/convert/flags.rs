@@ -75,25 +75,27 @@ impl FlagConverter {
             &Val::List(ref _def) => {
                 eprintln!("Skipping List...");
             }
-            &Val::Tuple(ref flds) => for &(ref name, ref val) in flds.iter() {
-                if let &Val::Empty = val.as_ref() {
-                    self.write_flag_name(pfx, &name.val, w)?;
-                    continue;
-                }
-                match val.as_ref() {
-                    &Val::Tuple(_) => {
-                        let new_pfx = format!("{}{}.", pfx, name);
-                        self.write(&new_pfx, val, w)?;
-                    }
-                    &Val::List(ref def) => {
-                        self.write_list_flag(pfx, &name.val, def, w)?;
-                    }
-                    _ => {
+            &Val::Tuple(ref flds) => {
+                for &(ref name, ref val) in flds.iter() {
+                    if let &Val::Empty = val.as_ref() {
                         self.write_flag_name(pfx, &name.val, w)?;
-                        self.write(pfx, &val, w)?;
+                        continue;
+                    }
+                    match val.as_ref() {
+                        &Val::Tuple(_) => {
+                            let new_pfx = format!("{}{}.", pfx, name);
+                            self.write(&new_pfx, val, w)?;
+                        }
+                        &Val::List(ref def) => {
+                            self.write_list_flag(pfx, &name.val, def, w)?;
+                        }
+                        _ => {
+                            self.write_flag_name(pfx, &name.val, w)?;
+                            self.write(pfx, &val, w)?;
+                        }
                     }
                 }
-            },
+            }
             &Val::Macro(ref _def) => {
                 // This is ignored
                 eprintln!("Skipping macro...");

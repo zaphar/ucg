@@ -605,9 +605,11 @@ impl MacroDef {
                             stack.push(expr);
                         }
                     }
-                    &Expression::Call(ref def) => for expr in def.arglist.iter() {
-                        stack.push(expr);
-                    },
+                    &Expression::Call(ref def) => {
+                        for expr in def.arglist.iter() {
+                            stack.push(expr);
+                        }
+                    }
                     &Expression::Simple(ref val) => {
                         let mut syms_set = self.validate_value_symbols(&mut stack, val);
                         bad_symbols.extend(syms_set.drain());

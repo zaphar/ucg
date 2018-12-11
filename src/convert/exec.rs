@@ -212,7 +212,8 @@ mod exec_test {
             "let script = {
             command = \"/bin/echo\",
         };",
-        ).unwrap();
+        )
+        .unwrap();
         let result = b.get_out_by_name("script").unwrap();
         let mut expected = "#!/usr/bin/env bash\n".to_string();
         expected.push_str("# Turn on unofficial Bash-Strict-Mode\n");
@@ -236,7 +237,8 @@ mod exec_test {
                 quux = \"baz\",
             },
         };",
-        ).unwrap();
+        )
+        .unwrap();
         let result = b.get_out_by_name("script").unwrap();
         let mut expected = "#!/usr/bin/env bash\n".to_string();
         expected.push_str("# Turn on unofficial Bash-Strict-Mode\n");
@@ -267,7 +269,8 @@ mod exec_test {
                 {flag1 = 1},
             ],
         };",
-        ).unwrap();
+        )
+        .unwrap();
         let result = b.get_out_by_name("script").unwrap();
         let mut expected = "#!/usr/bin/env bash\n".to_string();
         expected.push_str("# Turn on unofficial Bash-Strict-Mode\n");

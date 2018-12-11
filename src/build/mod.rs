@@ -302,7 +302,8 @@ impl Builder {
                         "Error building file: {}\n{}",
                         self.file.to_string_lossy(),
                         e.as_ref()
-                    ).as_ref(),
+                    )
+                    .as_ref(),
                 );
                 Err(Box::new(err))
             }
@@ -578,12 +579,7 @@ impl Builder {
                         continue;
                     }
                     &Val::List(ref elems) => {
-                        self.lookup_in_list(
-                            &mut stack,
-                            sl,
-                            (&next.pos, &next.fragment),
-                            elems
-                        )?;
+                        self.lookup_in_list(&mut stack, sl, (&next.pos, &next.fragment), elems)?;
                         continue;
                     }
                     _ => {
@@ -737,7 +733,9 @@ impl Builder {
         left: Rc<Val>,
         right: Rc<Val>,
     ) -> Result<Rc<Val>, Box<Error>> {
-        Ok(Rc::new(Val::Boolean(left.equal(right.as_ref(), pos.clone())?)))
+        Ok(Rc::new(Val::Boolean(
+            left.equal(right.as_ref(), pos.clone())?,
+        )))
     }
 
     fn do_not_deep_equal(
@@ -746,7 +744,9 @@ impl Builder {
         left: Rc<Val>,
         right: Rc<Val>,
     ) -> Result<Rc<Val>, Box<Error>> {
-        Ok(Rc::new(Val::Boolean(!left.equal(right.as_ref(), pos.clone())?)))
+        Ok(Rc::new(Val::Boolean(
+            !left.equal(right.as_ref(), pos.clone())?,
+        )))
     }
 
     fn do_gt(&self, pos: &Position, left: Rc<Val>, right: Rc<Val>) -> Result<Rc<Val>, Box<Error>> {
@@ -981,7 +981,8 @@ impl Builder {
                     let first = a.0.clone();
                     let t = a.1.clone();
                     (first, t.1)
-                }).collect(),
+                })
+                .collect(),
         )));
     }
 
@@ -1073,7 +1074,7 @@ impl Builder {
                 self.file.clone(),
                 self.assets.clone(),
                 self.env.clone(),
-                argvals
+                argvals,
             )?;
             return Ok(Rc::new(Val::Tuple(fields)));
         }
@@ -1184,7 +1185,7 @@ impl Builder {
                     self.file.clone(),
                     self.assets.clone(),
                     self.env.clone(),
-                    argvals
+                    argvals,
                 )?;
                 if let Some(v) = Self::find_in_fieldlist(&def.field, &fields) {
                     match def.typ {
