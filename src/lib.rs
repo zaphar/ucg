@@ -26,6 +26,7 @@ extern crate serde_json;
 extern crate serde_yaml;
 extern crate simple_error;
 extern crate toml;
+extern crate xml;
 
 #[macro_use]
 pub mod ast;

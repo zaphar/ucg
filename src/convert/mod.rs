@@ -19,6 +19,7 @@ pub mod flags;
 pub mod json;
 pub mod toml;
 pub mod traits;
+pub mod xml;
 pub mod yaml;
 
 use std::collections::HashMap;
@@ -49,6 +50,7 @@ impl ConverterRegistry {
         registry.register("exec", Box::new(exec::ExecConverter::new()));
         registry.register("yaml", Box::new(yaml::YamlConverter::new()));
         registry.register("toml", Box::new(toml::TomlConverter::new()));
+        registry.register("xml", Box::new(xml::XmlConverter {}));
         registry
     }
 
