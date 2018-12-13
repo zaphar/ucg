@@ -38,7 +38,7 @@ const ENABLE_TRACE: bool = false;
 
 type ParseResult<'a, O> = std::result::Result<O, abortable_parser::Error<SliceIter<'a, Token>>>;
 
-macro_rules! trace_nom {
+macro_rules! trace_parse {
     ($i:expr, $rule:ident!( $($args:tt)* )) => {
         {
             use crate::parse::ENABLE_TRACE;
@@ -343,7 +343,7 @@ make_fn!(
     do_each!(
         start => punct!("["),
         elements => optional!(separated!(punct!(","), expression)),
-        _ => optional!(punct!(",")), // nom's opt! macro doesn't preserve error types properly but this one does.
+        _ => optional!(punct!(",")),
         _ => punct!("]"),
         (tuple_to_list(start.pos, elements))
     )
@@ -360,18 +360,18 @@ make_fn!(
 
 make_fn!(
     compound_value<SliceIter<Token>, Value>,
-    either!(trace_nom!(list_value), trace_nom!(tuple))
+    either!(trace_parse!(list_value), trace_parse!(tuple))
 );
 
 make_fn!(
     value<SliceIter<Token>, Value>,
     either!(
-        trace_nom!(selector_value),
-        trace_nom!(compound_value),
-        trace_nom!(boolean_value),
-        trace_nom!(empty_value),
-        trace_nom!(number),
-        trace_nom!(quoted_value)
+        trace_parse!(selector_value),
+        trace_parse!(compound_value),
+        trace_parse!(boolean_value),
+        trace_parse!(empty_value),
+        trace_parse!(number),
+        trace_parse!(quoted_value)
     )
 );
 
@@ -382,7 +382,7 @@ fn value_to_expression(v: Value) -> Expression {
 make_fn!(
     simple_expression<SliceIter<Token>, Expression>,
     do_each!(
-        val => trace_nom!(value),
+        val => trace_parse!(value),
         _ => not!(either!(punct!("."), punct!("{"), punct!("["), punct!("("))),
         (value_to_expression(val))
     )
@@ -397,7 +397,7 @@ make_fn!(
     do_each!(
         _ => punct!("("),
         expr => do_each!(
-            expr => trace_nom!(expression),
+            expr => trace_parse!(expression),
             _ => punct!(")"),
             (expr)
         ),
@@ -515,9 +515,9 @@ make_fn!(
     copy_expression<SliceIter<Token>, Expression>,
     do_each!(
         pos => pos,
-        selector => trace_nom!(selector_list),
+        selector => trace_parse!(selector_list),
         _ => punct!("{"),
-        fields => optional!(trace_nom!(field_list)),
+        fields => optional!(trace_parse!(field_list)),
         _ => optional!(punct!(",")), // noms opt! macro does not preserve error types properly but this one does.
         _ => punct!("}"),
         (tuple_to_copy(SelectorDef::new(selector, pos), fields))
@@ -564,12 +564,12 @@ fn module_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expres
         pos => pos,
         _ => word!("module"),
         _ => punct!("{"),
-        arglist => trace_nom!(optional!(field_list)),
+        arglist => trace_parse!(optional!(field_list)),
         _ => optional!(punct!(",")),
         _ => punct!("}"),
         _ => punct!("=>"),
         _ => punct!("{"),
-        stmt_list =>  trace_nom!(repeat!(statement)),
+        stmt_list =>  trace_parse!(repeat!(statement)),
         _ => punct!("}"),
         (pos, arglist, stmt_list)
     );
@@ -595,10 +595,10 @@ fn macro_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Express
         pos => pos,
         _ => word!("macro"),
         _ => punct!("("),
-        arglist => trace_nom!(optional!(arglist)),
+        arglist => trace_parse!(optional!(arglist)),
         _ => punct!(")"),
         _ => punct!("=>"),
-        map =>  trace_nom!(tuple),
+        map =>  trace_parse!(tuple),
         (pos, arglist, map)
     );
     match parsed {
@@ -642,16 +642,16 @@ fn select_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expres
     let parsed = do_each!(input,
         _ => word!("select"),
         val => do_each!(
-            expr => trace_nom!(expression),
+            expr => trace_parse!(expression),
             _ => punct!(","),
             (expr)
         ),
         default => do_each!(
-            expr => trace_nom!(expression),
+            expr => trace_parse!(expression),
             _ => punct!(","),
             (expr)
         ),
-        map => trace_nom!(tuple),
+        map => trace_parse!(tuple),
         (val, default, map)
     );
     match parsed {
@@ -685,7 +685,7 @@ make_fn!(
         tmpl => match_type!(STR),
         _ => punct!("%"),
         _ => punct!("("),
-        args => separated!(punct!(","), trace_nom!(expression)),
+        args => separated!(punct!(","), trace_parse!(expression)),
         _ => punct!(")"),
         (tuple_to_format(tmpl, args))
     )
@@ -717,16 +717,16 @@ fn vec_to_selector_value(pos: Position, list: SelectorList) -> Value {
 make_fn!(
     selector_value<SliceIter<Token>, Value>,
     do_each!(
-        sl => trace_nom!(selector_list),
+        sl => trace_parse!(selector_list),
         (vec_to_selector_value(sl.head.pos().clone(), sl))
     )
 );
 
 fn call_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expression> {
     let parsed = do_each!(input.clone(),
-        callee_name => trace_nom!(selector_value),
+        callee_name => trace_parse!(selector_value),
         _ => punct!("("),
-        args => optional!(separated!(punct!(","), trace_nom!(expression))),
+        args => optional!(separated!(punct!(","), trace_parse!(expression))),
         _ => punct!(")"),
         (callee_name, args)
     );
@@ -812,8 +812,8 @@ make_fn!(
             do_each!(_ => word!("map"), (ListOpType::Map)),
             do_each!(_ => word!("filter"), (ListOpType::Filter))
         ),
-        macroname => trace_nom!(selector_value),
-        list => trace_nom!(non_op_expression),
+        macroname => trace_parse!(selector_value),
+        list => trace_parse!(non_op_expression),
         (tuple_to_list_op(&input, optype, macroname, list).unwrap())
     )
 );
@@ -822,29 +822,29 @@ fn unprefixed_expression(input: SliceIter<Token>) -> NomResult<Expression> {
     let _input = input.clone();
     either!(
         input,
-        trace_nom!(format_expression),
-        trace_nom!(simple_expression),
-        trace_nom!(call_expression),
-        trace_nom!(copy_expression)
+        trace_parse!(format_expression),
+        trace_parse!(simple_expression),
+        trace_parse!(call_expression),
+        trace_parse!(copy_expression)
     )
 }
 
 make_fn!(
     non_op_expression<SliceIter<Token>, Expression>,
     alt_peek!(
-         either!(word!("map"), word!("filter")) => trace_nom!(list_op_expression) |
-         word!("macro") => trace_nom!(macro_expression) |
-         word!("module") => trace_nom!(module_expression) |
-         word!("select") => trace_nom!(select_expression) |
-         punct!("(") => trace_nom!(grouped_expression) |
-         trace_nom!(unprefixed_expression))
+         either!(word!("map"), word!("filter")) => trace_parse!(list_op_expression) |
+         word!("macro") => trace_parse!(macro_expression) |
+         word!("module") => trace_parse!(module_expression) |
+         word!("select") => trace_parse!(select_expression) |
+         punct!("(") => trace_parse!(grouped_expression) |
+         trace_parse!(unprefixed_expression))
 );
 
 fn expression(input: SliceIter<Token>) -> NomResult<Expression> {
     let _input = input.clone();
-    match trace_nom!(_input, op_expression) {
+    match trace_parse!(_input, op_expression) {
         Result::Incomplete(i) => Result::Incomplete(i),
-        Result::Fail(_) => trace_nom!(input, non_op_expression),
+        Result::Fail(_) => trace_parse!(input, non_op_expression),
         Result::Abort(e) => Result::Abort(e),
         Result::Complete(rest, expr) => Result::Complete(rest, expr),
     }
@@ -854,7 +854,7 @@ make_fn!(
     expression_statement<SliceIter<Token>, Statement>,
     do_each!(
         e => do_each!(
-            expr => trace_nom!(expression),
+            expr => trace_parse!(expression),
             _ => punct!(";"),
             (expr)
         ),
@@ -875,7 +875,7 @@ make_fn!(
         name => wrap_err!(match_type!(BAREWORD), "Expected name for binding"),
         _ => punct!("="),
         // TODO(jwall): Wrap this error with an appropriate abortable_parser::Error
-        val => wrap_err!(trace_nom!(expression), "Expected Expression"),
+        val => wrap_err!(trace_parse!(expression), "Expected Expression"),
         _ => punct!(";"),
         (tuple_to_let(name, val))
     )
@@ -885,7 +885,7 @@ make_fn!(
     let_statement<SliceIter<Token>, Statement>,
     do_each!(
         _ => word!("let"),
-        stmt => trace_nom!(must!(let_stmt_body)),
+        stmt => trace_parse!(must!(let_stmt_body)),
         (stmt)
     )
 );
@@ -913,7 +913,7 @@ make_fn!(
     do_each!(
         _ => word!("import"),
         // past this point we know this is supposed to be an import statement.
-        stmt => trace_nom!(must!(import_stmt_body)),
+        stmt => trace_parse!(must!(import_stmt_body)),
         (stmt)
     )
 );
@@ -942,11 +942,11 @@ make_fn!(
 //trace_macros!(true);
 fn statement(i: SliceIter<Token>) -> Result<SliceIter<Token>, Statement> {
     return alt_peek!(i,
-        word!("assert") => trace_nom!(assert_statement) |
-        word!("import") => trace_nom!(import_statement) |
-        word!("let") => trace_nom!(let_statement) |
-        word!("out") => trace_nom!(out_statement) |
-        trace_nom!(expression_statement)
+        word!("assert") => trace_parse!(assert_statement) |
+        word!("import") => trace_parse!(import_statement) |
+        word!("let") => trace_parse!(let_statement) |
+        word!("out") => trace_parse!(out_statement) |
+        trace_parse!(expression_statement)
     );
 }
 //trace_macros!(false);

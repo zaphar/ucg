@@ -181,18 +181,18 @@ make_fn!(
     sum_expression<SliceIter<Element>, Expression>,
     do_binary_expr!(
         parse_sum_operator,
-        either!(trace_nom!(product_expression), trace_nom!(parse_expression))
+        either!(trace_parse!(product_expression), trace_parse!(parse_expression))
     )
 );
 
 make_fn!(
     product_expression<SliceIter<Element>, Expression>,
-    do_binary_expr!(parse_product_operator, trace_nom!(parse_expression))
+    do_binary_expr!(parse_product_operator, trace_parse!(parse_expression))
 );
 
 make_fn!(
     math_expression<SliceIter<Element>, Expression>,
-    either!(trace_nom!(sum_expression), trace_nom!(product_expression))
+    either!(trace_parse!(sum_expression), trace_parse!(product_expression))
 );
 
 // TODO(jwall): Change comparison operators to use the do_binary_expr! with precedence?
@@ -246,9 +246,9 @@ fn parse_compare_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, C
 make_fn!(
     compare_expression<SliceIter<Element>, Expression>,
     do_each!(
-        left => either!(trace_nom!(math_expression), trace_nom!(parse_expression)),
+        left => either!(trace_parse!(math_expression), trace_parse!(parse_expression)),
         typ => parse_compare_operator,
-        right => either!(trace_nom!(math_expression), trace_nom!(parse_expression)),
+        right => either!(trace_parse!(math_expression), trace_parse!(parse_expression)),
         (tuple_to_compare_expression(typ, left, right))
     )
 );
@@ -336,8 +336,8 @@ pub fn op_expression<'a>(i: SliceIter<'a, Token>) -> Result<SliceIter<Token>, Ex
             let i_ = SliceIter::new(&oplist);
             let parse_result = either!(
                 i_.clone(),
-                trace_nom!(compare_expression),
-                trace_nom!(math_expression)
+                trace_parse!(compare_expression),
+                trace_parse!(math_expression)
             );
 
             match parse_result {
