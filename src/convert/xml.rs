@@ -77,13 +77,33 @@ impl XmlConverter {
             let mut attrs: Option<&Vec<(PositionedItem<String>, Rc<Val>)>> = None;
             let mut children: Option<&Vec<Rc<Val>>> = None;
             let mut text: Option<&str> = None;
+            let mut ns: Option<(&str, &str)> = None;
             for (ref field, ref val) in fs.iter() {
                 if field.val == "name" {
                     name = Some(Self::get_str_val(val.as_ref())?);
                 }
-                //if field.val == "namespace" {
-                //    namespace = Some(Self::get_str_val(val.as_ref())?);
-                //}
+                if field.val == "ns" {
+                    if let Val::Tuple(ref fs) = val.as_ref() {
+                        let mut prefix = "";
+                        let mut uri = "";
+                        for (ref name, ref val) in fs.iter() {
+                            if val.is_empty() {
+                                continue;
+                            }
+                            if name.val == "uri" {
+                                uri = Self::get_str_val(val.as_ref())?;
+                            }
+                            if name.val == "prefix" {
+                                prefix = Self::get_str_val(val.as_ref())?;
+                            }
+                        }
+                        if uri != "" && prefix != "" {
+                            ns = Some((prefix, uri));
+                        }
+                    } else if let Val::Str(ref s) = val.as_ref() {
+                        ns = Some(("", s));
+                    }
+                }
                 if field.val == "attrs" {
                     // This should be a tuple.
                     if !val.is_empty() {
@@ -117,6 +137,13 @@ impl XmlConverter {
                             continue;
                         }
                         start = start.attr(name.val.as_ref(), Self::get_str_val(val.as_ref())?);
+                    }
+                }
+                if let Some((prefix, uri)) = ns {
+                    if prefix == "" {
+                        start = start.default_ns(uri);
+                    } else {
+                        start = start.ns(prefix, uri);
                     }
                 }
                 w.write(start)?;

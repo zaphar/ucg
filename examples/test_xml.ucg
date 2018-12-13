@@ -1,26 +1,30 @@
-let make_element = macro(name, attrs, children) => {
-    name = name,
-    attrs = attrs,
-    children = children,
-};
-
 let doc = {
-    root = make_element(
-        "top",
-        {id = "foo"},
-        [
-            make_element(
-                "child1",
-                { attr1 = "value1", attr2 = "value2"},
-                [
-                    "inner text content",
-                    make_element(
-                        "grandchild",
-                        {},
-                        [{
-                            text = "Another text node",
-                        }]),
-                ])]),
+    root = {
+        ns = {
+            prefix = "myns",
+            uri = "http://example.com",
+        },
+        name = "top",
+        attrs = {id = "foo"},
+        children = [
+            {
+                ns = "http://example.org/",
+                name = "child1",
+                attrs = { attr1 = "value1", attr2 = "value2"},
+                children = [
+                    "inner text node",
+                    {
+                        name = "myns:grandchild",
+                        children = [
+                            {
+                                text = "Another text node",
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+    },
 };
 
 out xml doc;
