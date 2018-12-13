@@ -189,7 +189,6 @@ impl Builder {
     pub fn prepend_import_stack(&mut self, imports: &Vec<String>) {
         let mut new_stack = self.import_stack.clone();
         new_stack.append(imports.clone().as_mut());
-        eprintln!("import stack: {:?}", new_stack);
         self.import_stack = new_stack;
     }
 
@@ -353,7 +352,6 @@ impl Builder {
                 sym.pos.clone(),
             )));
         }
-        eprintln!("processing import for {}", normalized.to_string_lossy());
         // Introduce a scope so the above borrow is dropped before we modify
         // the cache below.
         // Only parse the file once on import.
@@ -441,7 +439,6 @@ impl Builder {
             return Some(self.env.clone());
         }
         if &sym.val == "self" {
-            eprintln!("XXX: In tuple self is {:?}", self.peek_val());
             return self.peek_val();
         }
         if self.build_output.contains_key(sym) {
@@ -473,10 +470,6 @@ impl Builder {
                 stack.push_back(Rc::new(Val::Str(val.clone())));
                 return Ok(());
             } else if !self.strict {
-                eprintln!(
-                    "Environment Variable {} not set using NULL instead.",
-                    search.fragment
-                );
                 stack.push_back(Rc::new(Val::Empty));
                 return Ok(());
             }
