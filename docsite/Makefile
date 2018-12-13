@@ -34,4 +34,5 @@ deploysite: gensite
 	gsutil -m rsync -d -r generated gs://ucg.marzhillstudios.com/
 
 clean:
-	rm -f $(allyamls)
+	rm -f $(allyamls) site/.built
+	rm -rf site/generated/*
