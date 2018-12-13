@@ -365,13 +365,13 @@ make_fn!(
 
 make_fn!(
     value<SliceIter<Token>, Value>,
-    alt_peek!(
-        symbol_or_expression => trace_nom!(selector_value)
-        | either!(punct!("["), punct!("{")) => trace_nom!(compound_value)
-        | match_type!(BOOLEAN) => trace_nom!(boolean_value)
-        | match_type!(EMPTY) => trace_nom!(empty_value)
-        | either!(match_type!(DIGIT), punct!(".")) => trace_nom!(number)
-        | trace_nom!(quoted_value)
+    either!(
+        trace_nom!(selector_value),
+        trace_nom!(compound_value),
+        trace_nom!(boolean_value),
+        trace_nom!(empty_value),
+        trace_nom!(number),
+        trace_nom!(quoted_value)
     )
 );
 
@@ -383,6 +383,7 @@ make_fn!(
     simple_expression<SliceIter<Token>, Expression>,
     do_each!(
         val => trace_nom!(value),
+        _ => not!(either!(punct!("."), punct!("{"), punct!("["), punct!("("))),
         (value_to_expression(val))
     )
 );
@@ -819,18 +820,13 @@ make_fn!(
 
 fn unprefixed_expression(input: SliceIter<Token>) -> NomResult<Expression> {
     let _input = input.clone();
-    let attempt = either!(
+    either!(
         input,
+        trace_nom!(format_expression),
+        trace_nom!(simple_expression),
         trace_nom!(call_expression),
-        trace_nom!(copy_expression),
-        trace_nom!(format_expression)
-    );
-    match attempt {
-        Result::Incomplete(i) => Result::Incomplete(i),
-        Result::Complete(rest, expr) => Result::Complete(rest, expr),
-        Result::Fail(_) => trace_nom!(_input, simple_expression),
-        Result::Abort(e) => Result::Abort(e),
-    }
+        trace_nom!(copy_expression)
+    )
 }
 
 make_fn!(
