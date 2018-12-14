@@ -93,9 +93,9 @@ pub struct AssertCollector {
 }
 
 /// Builder handles building ucg code for a single file.
-pub struct Builder {
+pub struct Builder<'a> {
     file: PathBuf,
-    import_path: Vec<PathBuf>,
+    import_path: &'a Vec<PathBuf>,
     validate_mode: bool,
     pub assert_collector: AssertCollector,
     strict: bool,
@@ -139,24 +139,36 @@ macro_rules! eval_binary_expr {
     };
 }
 
-impl Builder {
+impl<'a> Builder<'a> {
     /// Constructs a new Builder.
-    pub fn new<P: Into<PathBuf>>(file: P, cache: Rc<RefCell<assets::Cache>>) -> Self {
-        Self::new_with_scope(file, cache, HashMap::new())
+    pub fn new<P: Into<PathBuf>>(
+        file: P,
+        import_paths: &'a Vec<PathBuf>,
+        cache: Rc<RefCell<assets::Cache>>,
+    ) -> Self {
+        Self::new_with_scope(file, import_paths, cache, HashMap::new())
     }
 
     /// Constructs a new Builder with a provided scope.
     pub fn new_with_scope<P: Into<PathBuf>>(
         root: P,
+        import_paths: &'a Vec<PathBuf>,
         cache: Rc<RefCell<assets::Cache>>,
         scope: ValueMap,
     ) -> Self {
         let env_vars: Vec<(String, String)> = env::vars().collect();
-        Self::new_with_env_and_scope(root, cache, scope, Rc::new(Val::Env(env_vars)))
+        Self::new_with_env_and_scope(
+            root,
+            import_paths,
+            cache,
+            scope,
+            Rc::new(Val::Env(env_vars)),
+        )
     }
 
     pub fn new_with_env_and_scope<P: Into<PathBuf>>(
         file: P,
+        import_paths: &'a Vec<PathBuf>,
         cache: Rc<RefCell<assets::Cache>>,
         scope: ValueMap,
         env: Rc<Val>,
@@ -166,7 +178,7 @@ impl Builder {
             // Our import stack is initialized with ourself.
             import_stack: vec![file.to_string_lossy().to_string()],
             file: file,
-            import_path: Vec::new(),
+            import_path: import_paths,
             validate_mode: false,
             assert_collector: AssertCollector {
                 success: true,
@@ -189,7 +201,7 @@ impl Builder {
             // Our import stack is initialized with ourself.
             import_stack: self.import_stack.clone(),
             file: file.into(),
-            import_path: self.import_path.clone(),
+            import_path: self.import_path,
             validate_mode: false,
             assert_collector: AssertCollector {
                 success: true,
@@ -213,10 +225,6 @@ impl Builder {
 
     pub fn set_strict(&mut self, to: bool) {
         self.strict = to;
-    }
-
-    pub fn set_import_paths(&mut self, paths: Vec<PathBuf>) {
-        self.import_path = paths;
     }
 
     pub fn prepend_import_stack(&mut self, imports: &Vec<String>) {

@@ -28,8 +28,9 @@ fn test_expr_to_val(mut cases: Vec<(Expression, Val)>, mut b: Builder) {
 #[test]
 #[should_panic(expected = "Expected Float")]
 fn test_eval_div_expr_fail() {
+    let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let b = Builder::new(std::env::current_dir().unwrap(), cache);
+    let b = Builder::new(std::env::current_dir().unwrap(), &i_paths, cache);
     test_expr_to_val(
         vec![(
             Expression::Binary(BinaryOpDef {
@@ -53,8 +54,9 @@ fn test_eval_div_expr_fail() {
 #[test]
 #[should_panic(expected = "Expected Float")]
 fn test_eval_mul_expr_fail() {
+    let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let b = Builder::new(std::env::current_dir().unwrap(), cache);
+    let b = Builder::new(std::env::current_dir().unwrap(), &i_paths, cache);
     test_expr_to_val(
         vec![(
             Expression::Binary(BinaryOpDef {
@@ -78,8 +80,9 @@ fn test_eval_mul_expr_fail() {
 #[test]
 #[should_panic(expected = "Expected Float")]
 fn test_eval_subtract_expr_fail() {
+    let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let b = Builder::new(std::env::current_dir().unwrap(), cache);
+    let b = Builder::new(std::env::current_dir().unwrap(), &i_paths, cache);
     test_expr_to_val(
         vec![(
             Expression::Binary(BinaryOpDef {
@@ -102,8 +105,9 @@ fn test_eval_subtract_expr_fail() {
 #[test]
 #[should_panic(expected = "Expected Float")]
 fn test_eval_add_expr_fail() {
+    let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let b = Builder::new(std::env::current_dir().unwrap(), cache);
+    let b = Builder::new(std::env::current_dir().unwrap(), &i_paths, cache);
     test_expr_to_val(
         vec![(
             Expression::Binary(BinaryOpDef {
@@ -126,8 +130,9 @@ fn test_eval_add_expr_fail() {
 
 #[test]
 fn test_eval_simple_lookup_error() {
+    let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let mut b = Builder::new(std::env::current_dir().unwrap(), cache);
+    let mut b = Builder::new(std::env::current_dir().unwrap(), &i_paths, cache);
     b.build_output
         .entry(value_node!("var1".to_string(), Position::new(1, 0, 0)))
         .or_insert(Rc::new(Val::Int(1)));
@@ -142,8 +147,9 @@ fn test_eval_simple_lookup_error() {
 #[test]
 #[should_panic(expected = "Unable to find binding tpl1")]
 fn test_expr_copy_no_such_tuple() {
+    let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let b = Builder::new(std::env::current_dir().unwrap(), cache);
+    let b = Builder::new(std::env::current_dir().unwrap(), &i_paths, cache);
     test_expr_to_val(
         vec![(
             Expression::Copy(CopyDef {
@@ -163,8 +169,9 @@ fn test_expr_copy_no_such_tuple() {
 #[test]
 #[should_panic(expected = "Expected Tuple or Module got Int(1)")]
 fn test_expr_copy_not_a_tuple() {
+    let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let mut b = Builder::new(std::env::current_dir().unwrap(), cache);
+    let mut b = Builder::new(std::env::current_dir().unwrap(), &i_paths, cache);
     b.build_output
         .entry(value_node!("tpl1".to_string(), Position::new(1, 0, 0)))
         .or_insert(Rc::new(Val::Int(1)));
@@ -187,8 +194,9 @@ fn test_expr_copy_not_a_tuple() {
 #[test]
 #[should_panic(expected = "Expected type Integer for field fld1 but got String")]
 fn test_expr_copy_field_type_error() {
+    let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let mut b = Builder::new(std::env::current_dir().unwrap(), cache);
+    let mut b = Builder::new(std::env::current_dir().unwrap(), &i_paths, cache);
     b.build_output
         .entry(value_node!("tpl1".to_string(), Position::new(1, 0, 0)))
         .or_insert(Rc::new(Val::Tuple(vec![(
@@ -223,8 +231,9 @@ fn test_expr_copy_field_type_error() {
 #[test]
 #[should_panic(expected = "Unable to find binding arg1")]
 fn test_macro_hermetic() {
+    let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let mut b = Builder::new(std::env::current_dir().unwrap(), cache);
+    let mut b = Builder::new(std::env::current_dir().unwrap(), &i_paths, cache);
     b.build_output
         .entry(value_node!("arg1".to_string(), Position::new(1, 0, 0)))
         .or_insert(Rc::new(Val::Str("bar".to_string())));
@@ -266,8 +275,9 @@ fn test_macro_hermetic() {
 #[test]
 #[should_panic(expected = "Expected String but got Integer in Select expression")]
 fn test_select_expr_not_a_string() {
+    let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let mut b = Builder::new(std::env::current_dir().unwrap(), cache);
+    let mut b = Builder::new(std::env::current_dir().unwrap(), &i_paths, cache);
     b.build_output
         .entry(value_node!("foo".to_string(), Position::new(1, 0, 0)))
         .or_insert(Rc::new(Val::Int(4)));

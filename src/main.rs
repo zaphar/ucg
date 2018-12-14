@@ -72,17 +72,18 @@ fn run_converter(c: &traits::Converter, v: Rc<Val>, f: Option<&str>) -> traits::
     c.convert(v, file.as_mut())
 }
 
-fn build_file(
-    file: &str,
+fn build_file<'a>(
+    file: &'a str,
     validate: bool,
     strict: bool,
+    import_paths: &'a Vec<PathBuf>,
     cache: Rc<RefCell<Cache>>,
-) -> Result<build::Builder, Box<Error>> {
+) -> Result<build::Builder<'a>, Box<Error>> {
     let mut file_path_buf = PathBuf::from(file);
     if file_path_buf.is_relative() {
         file_path_buf = std::env::current_dir().unwrap().join(file_path_buf);
     }
-    let mut builder = build::Builder::new(file_path_buf, cache);
+    let mut builder = build::Builder::new(file_path_buf, import_paths, cache);
     builder.set_strict(strict);
     if validate {
         builder.enable_validate_mode();
@@ -94,9 +95,14 @@ fn build_file(
     Ok(builder)
 }
 
-fn do_validate(file: &str, strict: bool, cache: Rc<RefCell<Cache>>) -> bool {
+fn do_validate(
+    file: &str,
+    strict: bool,
+    import_paths: &Vec<PathBuf>,
+    cache: Rc<RefCell<Cache>>,
+) -> bool {
     println!("Validating {}", file);
-    match build_file(file, true, strict, cache) {
+    match build_file(file, true, strict, import_paths, cache) {
         Ok(b) => {
             if b.assert_collector.success {
                 println!("File {} Pass\n", file);
@@ -116,11 +122,12 @@ fn do_validate(file: &str, strict: bool, cache: Rc<RefCell<Cache>>) -> bool {
 fn do_compile(
     file: &str,
     strict: bool,
+    import_paths: &Vec<PathBuf>,
     cache: Rc<RefCell<Cache>>,
     registry: &ConverterRegistry,
 ) -> bool {
     println!("Building {}", file);
-    let builder = match build_file(file, false, strict, cache.clone()) {
+    let builder = match build_file(file, false, strict, import_paths, cache.clone()) {
         Ok(builder) => builder,
         Err(err) => {
             eprintln!("{}", err);
@@ -152,6 +159,7 @@ fn visit_ucg_files(
     recurse: bool,
     validate: bool,
     strict: bool,
+    import_paths: &Vec<PathBuf>,
     cache: Rc<RefCell<Cache>>,
     registry: &ConverterRegistry,
 ) -> Result<bool, Box<Error>> {
@@ -177,6 +185,7 @@ fn visit_ucg_files(
                     recurse,
                     validate,
                     strict,
+                    import_paths,
                     cache.clone(),
                     registry,
                 ) {
@@ -185,28 +194,34 @@ fn visit_ucg_files(
                 }
             } else {
                 if validate && path_as_string.ends_with("_test.ucg") {
-                    if !do_validate(&path_as_string, strict, cache.clone()) {
+                    if !do_validate(&path_as_string, strict, import_paths, cache.clone()) {
                         result = false;
                         summary.push_str(format!("{} - FAIL\n", path_as_string).as_str())
                     } else {
                         summary.push_str(format!("{} - PASS\n", path_as_string).as_str())
                     }
                 } else if !validate && path_as_string.ends_with(".ucg") {
-                    if !do_compile(&path_as_string, strict, cache.clone(), registry) {
+                    if !do_compile(
+                        &path_as_string,
+                        strict,
+                        import_paths,
+                        cache.clone(),
+                        registry,
+                    ) {
                         result = false;
                     }
                 }
             }
         }
     } else if validate && our_path.ends_with("_test.ucg") {
-        if !do_validate(&our_path, strict, cache) {
+        if !do_validate(&our_path, strict, import_paths, cache) {
             result = false;
             summary.push_str(format!("{} - FAIL\n", our_path).as_str());
         } else {
             summary.push_str(format!("{} - PASS\n", &our_path).as_str());
         }
     } else if !validate {
-        if !do_compile(&our_path, strict, cache, registry) {
+        if !do_compile(&our_path, strict, import_paths, cache, registry) {
             result = false;
         }
     }
@@ -219,6 +234,7 @@ fn visit_ucg_files(
 
 fn inspect_command(
     matches: &clap::ArgMatches,
+    import_paths: &Vec<PathBuf>,
     cache: Rc<RefCell<Cache>>,
     registry: &ConverterRegistry,
     strict: bool,
@@ -226,7 +242,7 @@ fn inspect_command(
     let file = matches.value_of("INPUT").unwrap();
     let sym = matches.value_of("sym");
     let target = matches.value_of("target").unwrap();
-    let mut builder = build::Builder::new(file, cache);
+    let mut builder = build::Builder::new(file, import_paths, cache);
     builder.set_strict(strict);
     match registry.get_converter(target) {
         Some(converter) => {
@@ -262,6 +278,7 @@ fn inspect_command(
 
 fn build_command(
     matches: &clap::ArgMatches,
+    import_paths: &Vec<PathBuf>,
     cache: Rc<RefCell<Cache>>,
     registry: &ConverterRegistry,
     strict: bool,
@@ -276,6 +293,7 @@ fn build_command(
             recurse,
             false,
             strict,
+            import_paths,
             cache.clone(),
             &registry,
         );
@@ -286,7 +304,15 @@ fn build_command(
     }
     for file in files.unwrap() {
         let pb = PathBuf::from(file);
-        if let Ok(false) = visit_ucg_files(&pb, recurse, false, strict, cache.clone(), &registry) {
+        if let Ok(false) = visit_ucg_files(
+            &pb,
+            recurse,
+            false,
+            strict,
+            import_paths,
+            cache.clone(),
+            &registry,
+        ) {
             ok = false;
         }
     }
@@ -297,6 +323,7 @@ fn build_command(
 
 fn test_command(
     matches: &clap::ArgMatches,
+    import_paths: &Vec<PathBuf>,
     cache: Rc<RefCell<Cache>>,
     registry: &ConverterRegistry,
     strict: bool,
@@ -310,6 +337,7 @@ fn test_command(
             recurse,
             true,
             strict,
+            import_paths,
             cache.clone(),
             &registry,
         );
@@ -326,6 +354,7 @@ fn test_command(
                 recurse,
                 true,
                 strict,
+                import_paths,
                 cache.clone(),
                 &registry,
             ) {
@@ -355,17 +384,23 @@ fn main() {
     let app_matches = app.clone().get_matches();
     let cache: Rc<RefCell<Cache>> = Rc::new(RefCell::new(MemoryCache::new()));
     let registry = ConverterRegistry::make_registry();
+    let mut import_paths = Vec::new();
+    if let Ok(path_list_str) = std::env::var("UCG_IMPORT_PATH") {
+        for p in std::env::split_paths(&path_list_str) {
+            import_paths.push(p);
+        }
+    }
     let strict = if app_matches.is_present("nostrict") {
         false
     } else {
         true
     };
     if let Some(matches) = app_matches.subcommand_matches("inspect") {
-        inspect_command(matches, cache, &registry, strict);
+        inspect_command(matches, &import_paths, cache, &registry, strict);
     } else if let Some(matches) = app_matches.subcommand_matches("build") {
-        build_command(matches, cache, &registry, strict);
+        build_command(matches, &import_paths, cache, &registry, strict);
     } else if let Some(matches) = app_matches.subcommand_matches("test") {
-        test_command(matches, cache, &registry, strict);
+        test_command(matches, &import_paths, cache, &registry, strict);
     } else if let Some(_) = app_matches.subcommand_matches("converters") {
         converters_command(&registry)
     } else {
