@@ -55,6 +55,9 @@ fn do_flags<'a, 'b>() -> clap::App<'a, 'b> {
             (@subcommand converters =>
              (about: "list the available converters")
             )
+            (@subcommand env =>
+             (about: "Describe the environment variables ucg uses.")
+            )
     )
 }
 
@@ -377,6 +380,21 @@ fn converters_command(registry: &ConverterRegistry) {
     }
 }
 
+fn env_help() {
+    println!("Universal Configuration Grammar compiler.");
+    println!("");
+    println!("ENVIRONMENT VARIABLES:");
+    println!("");
+    println!(
+        "
+    UCG_IMPORT_PATH=\"{}\"
+      A list of paths to search for imports from. Uses the same syntax
+      as your platforms $PATH environment variable.
+",
+        std::env::var("UCG_IMPORT_PATH").unwrap_or(String::new())
+    );
+}
+
 fn main() {
     let mut app = do_flags();
     let app_matches = app.clone().get_matches();
@@ -401,6 +419,8 @@ fn main() {
         test_command(matches, &import_paths, cache, &registry, strict);
     } else if let Some(_) = app_matches.subcommand_matches("converters") {
         converters_command(&registry)
+    } else if let Some(_) = app_matches.subcommand_matches("env") {
+        env_help()
     } else {
         app.print_help().unwrap();
         println!("");

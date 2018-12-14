@@ -77,20 +77,20 @@ Ucg has builtin help on the command line.
 
 ```
 $> ucg help
-ucg 0.2.2
-Jeremy Wall <jeremy@marzhillstudios.com>
 Universal Configuration Grammar compiler.
 
 USAGE:
-    ucg [SUBCOMMAND]
+    ucg [FLAGS] [SUBCOMMAND]
 
 FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
+    -h, --help         Prints help information
+        --no-strict    Turn off strict checking.
+    -V, --version      Prints version information
 
 SUBCOMMANDS:
     build         Build a list of ucg files.
     converters    list the available converters
+    env           Describe the environment variables ucg uses.
     help          Prints this message or the help of the given subcommand(s)
     inspect       Inspect a specific symbol in a ucg file.
     test          Check a list of ucg files for errors and run test assertions.
