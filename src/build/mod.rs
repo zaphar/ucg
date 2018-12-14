@@ -43,8 +43,7 @@ impl MacroDef {
     pub fn eval(
         &self,
         root: PathBuf,
-        cache: Rc<RefCell<assets::Cache>>,
-        env: Rc<Val>,
+        parent_builder: &Builder,
         mut args: Vec<Rc<Val>>,
     ) -> Result<Vec<(PositionedItem<String>, Rc<Val>)>, Box<Error>> {
         // Error conditions. If the args don't match the length and types of the argdefs then this is
@@ -67,7 +66,8 @@ impl MacroDef {
         for (i, arg) in args.drain(0..).enumerate() {
             scope.entry(self.argdefs[i].clone()).or_insert(arg.clone());
         }
-        let mut b = Builder::new_with_env_and_scope(root, cache, scope, env);
+        let mut b = parent_builder.clone_builder(root);
+        b.set_scope(scope);
         let mut result: Vec<(PositionedItem<String>, Rc<Val>)> = Vec::new();
         for &(ref key, ref expr) in self.fields.iter() {
             // We clone the expressions here because this macro may be consumed
@@ -95,6 +95,7 @@ pub struct AssertCollector {
 /// Builder handles building ucg code for a single file.
 pub struct Builder {
     file: PathBuf,
+    import_path: Vec<PathBuf>,
     validate_mode: bool,
     pub assert_collector: AssertCollector,
     strict: bool,
@@ -165,6 +166,7 @@ impl Builder {
             // Our import stack is initialized with ourself.
             import_stack: vec![file.to_string_lossy().to_string()],
             file: file,
+            import_path: Vec::new(),
             validate_mode: false,
             assert_collector: AssertCollector {
                 success: true,
@@ -182,8 +184,39 @@ impl Builder {
         }
     }
 
+    pub fn clone_builder<P: Into<PathBuf>>(&self, file: P) -> Self {
+        Builder {
+            // Our import stack is initialized with ourself.
+            import_stack: self.import_stack.clone(),
+            file: file.into(),
+            import_path: self.import_path.clone(),
+            validate_mode: false,
+            assert_collector: AssertCollector {
+                success: true,
+                summary: String::new(),
+                failures: String::new(),
+            },
+            env: self.env.clone(),
+            strict: true,
+            assets: self.assets.clone(),
+            build_output: HashMap::new(),
+            out_lock: None,
+            stack: None,
+            is_module: false,
+            last: None,
+        }
+    }
+
+    pub fn set_scope(&mut self, scope: ValueMap) {
+        self.build_output = scope;
+    }
+
     pub fn set_strict(&mut self, to: bool) {
         self.strict = to;
+    }
+
+    pub fn set_import_paths(&mut self, paths: Vec<PathBuf>) {
+        self.import_path = paths;
     }
 
     pub fn prepend_import_stack(&mut self, imports: &Vec<String>) {
@@ -333,10 +366,22 @@ impl Builder {
                 sym.pos.clone(),
             )));
         }
+        // Try a relative path first.
         let mut normalized = self.file.parent().unwrap().to_path_buf();
         let import_path = PathBuf::from(&def.path.fragment);
         if import_path.is_relative() {
             normalized.push(&import_path);
+            // First see if the normalized file exists or not.
+            if !normalized.exists() {
+                // If it does not then look for it in the list of import_paths
+                for mut p in self.import_path.iter().cloned() {
+                    p.push(&import_path);
+                    if p.exists() {
+                        normalized = p;
+                        break;
+                    }
+                }
+            }
         } else {
             normalized = import_path;
         }
@@ -359,8 +404,7 @@ impl Builder {
         let result = match maybe_asset {
             Some(v) => v.clone(),
             None => {
-                let mut b = Self::new(normalized.clone(), self.assets.clone());
-                b.prepend_import_stack(&self.import_stack);
+                let mut b = self.clone_builder(normalized.clone());
                 b.build()?;
                 b.get_outputs_as_val()
             }
@@ -989,7 +1033,7 @@ impl Builder {
             let maybe_tpl = mod_def.clone().arg_tuple.unwrap().clone();
             if let &Val::Tuple(ref src_fields) = maybe_tpl.as_ref() {
                 // 1. First we create a builder.
-                let mut b = Self::new(self.file.clone(), self.assets.clone());
+                let mut b = self.clone_builder(self.file.clone());
                 b.is_module = true;
                 // 2. We construct an argument tuple by copying from the defs
                 //    argset.
@@ -1063,12 +1107,7 @@ impl Builder {
             for arg in args.iter() {
                 argvals.push(self.eval_expr(arg)?);
             }
-            let fields = m.eval(
-                self.file.clone(),
-                self.assets.clone(),
-                self.env.clone(),
-                argvals,
-            )?;
+            let fields = m.eval(self.file.clone(), self, argvals)?;
             return Ok(Rc::new(Val::Tuple(fields)));
         }
         Err(Box::new(error::BuildError::new(
@@ -1174,12 +1213,7 @@ impl Builder {
             let mut out = Vec::new();
             for item in l.iter() {
                 let argvals = vec![item.clone()];
-                let fields = macdef.eval(
-                    self.file.clone(),
-                    self.assets.clone(),
-                    self.env.clone(),
-                    argvals,
-                )?;
+                let fields = macdef.eval(self.file.clone(), self, argvals)?;
                 if let Some(v) = Self::find_in_fieldlist(&def.field, &fields) {
                     match def.typ {
                         ListOpType::Map => {
