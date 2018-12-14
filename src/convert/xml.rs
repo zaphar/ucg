@@ -73,7 +73,6 @@ impl XmlConverter {
         // First we determine if this is a tag or text node
         if let Val::Tuple(ref fs) = v {
             let mut name: Option<&str> = None;
-            // TODO let mut namespace: Option<&str> = None;
             let mut attrs: Option<&Vec<(PositionedItem<String>, Rc<Val>)>> = None;
             let mut children: Option<&Vec<Rc<Val>>> = None;
             let mut text: Option<&str> = None;

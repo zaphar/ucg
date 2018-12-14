@@ -715,11 +715,11 @@ pub struct ListOpDef {
     pub pos: Position,
 }
 
+// TODO(jwall): this should probably be moved to a Val::Module IR type.
 #[derive(Debug, PartialEq, Clone)]
 pub struct ModuleDef {
     pub pos: Position,
     pub arg_set: FieldList,
-    // FIXME(jwall): this should probably be moved to a Val::Module IR type.
     pub arg_tuple: Option<Rc<Val>>,
     pub statements: Vec<Statement>,
 }
@@ -729,7 +729,6 @@ impl ModuleDef {
         ModuleDef {
             pos: pos.into(),
             arg_set: arg_set,
-            // TODO(jwall): Should this get moved to a Val version of our ModuleDef?
             arg_tuple: None,
             statements: stmts,
         }

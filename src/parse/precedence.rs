@@ -17,7 +17,7 @@
 use abortable_parser::combinators::eoi;
 use abortable_parser::{Error, Result, SliceIter};
 
-use super::{non_op_expression, NomResult};
+use super::{non_op_expression, ParseResult};
 use crate::ast::*;
 
 /// Defines the intermediate stages of our bottom up parser for precedence parsing.
@@ -260,7 +260,7 @@ make_fn!(
 );
 
 /// Parse a list of expressions separated by operators into a Vec<Element>.
-fn parse_operand_list<'a>(i: SliceIter<'a, Token>) -> NomResult<'a, Vec<Element>> {
+fn parse_operand_list<'a>(i: SliceIter<'a, Token>) -> ParseResult<'a, Vec<Element>> {
     // 1. First try to parse a non_op_expression,
     let mut _i = i.clone();
     let mut list = Vec::new();

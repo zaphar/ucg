@@ -233,7 +233,6 @@ impl<'a> Builder<'a> {
         self.import_stack = new_stack;
     }
 
-    // TOOD(jwall): This needs some unit tests.
     fn tuple_to_val(&mut self, fields: &Vec<(Token, Expression)>) -> Result<Rc<Val>, Box<Error>> {
         let mut new_fields = Vec::<(PositionedItem<String>, Rc<Val>)>::new();
         for &(ref name, ref expr) in fields.iter() {
@@ -434,7 +433,6 @@ impl<'a> Builder<'a> {
     fn eval_let(&mut self, def: &LetDef) -> Result<Rc<Val>, Box<Error>> {
         let val = self.eval_expr(&def.value)?;
         let name = &def.name;
-        // TODO(jwall): Enforce the reserved words list here.
         if Self::check_reserved_word(&name.fragment) {
             return Err(Box::new(error::BuildError::new(
                 format!("Let {} binding collides with reserved word", name.fragment),
@@ -1104,7 +1102,6 @@ impl<'a> Builder<'a> {
         Ok(Rc::new(Val::Str(formatter.render(&def.pos)?)))
     }
 
-    // FIXME(jwall): Handle module calls as well?
     fn eval_call(&mut self, def: &CallDef) -> Result<Rc<Val>, Box<Error>> {
         let sel = &def.macroref;
         let args = &def.arglist;

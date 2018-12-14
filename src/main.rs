@@ -29,7 +29,6 @@ use ucglib::build::Val;
 use ucglib::convert::traits;
 use ucglib::convert::ConverterRegistry;
 
-// TODO(jwall): List the target output types automatically.
 fn do_flags<'a, 'b>() -> clap::App<'a, 'b> {
     clap_app!(
         ucg =>
@@ -165,7 +164,6 @@ fn visit_ucg_files(
 ) -> Result<bool, Box<Error>> {
     let our_path = String::from(path.to_string_lossy());
     let mut result = true;
-    // TODO(jwall): Report the failing files at the bottom.
     let mut summary = String::new();
     if path.is_dir() {
         let mut dir_iter = std::fs::read_dir(path)?.peekable();

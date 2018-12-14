@@ -28,15 +28,14 @@ use crate::error::StackPrinter;
 use crate::iter::OffsetStrIter;
 use crate::tokenizer::*;
 
-// TODO(jwall): Rename this to something better.
-type NomResult<'a, O> = Result<SliceIter<'a, Token>, O>;
+type ParseResult<'a, O> = Result<SliceIter<'a, Token>, O>;
 
 #[cfg(feature = "tracing")]
 const ENABLE_TRACE: bool = true;
 #[cfg(not(feature = "tracing"))]
 const ENABLE_TRACE: bool = false;
 
-type ParseResult<'a, O> = std::result::Result<O, abortable_parser::Error<SliceIter<'a, Token>>>;
+type ConvertResult<'a, O> = std::result::Result<O, abortable_parser::Error<SliceIter<'a, Token>>>;
 
 macro_rules! trace_parse {
     ($i:expr, $rule:ident!( $($args:tt)* )) => {
@@ -68,7 +67,7 @@ macro_rules! trace_parse {
     };
 }
 
-fn symbol_to_value(s: &Token) -> ParseResult<Value> {
+fn symbol_to_value(s: &Token) -> ConvertResult<Value> {
     Ok(Value::Symbol(value_node!(
         s.fragment.to_string(),
         s.pos.clone()
@@ -81,7 +80,7 @@ make_fn!(
     match_type!(BAREWORD => symbol_to_value)
 );
 
-fn str_to_value(s: &Token) -> ParseResult<Value> {
+fn str_to_value(s: &Token) -> ConvertResult<Value> {
     Ok(Value::Str(value_node!(
         s.fragment.to_string(),
         s.pos.clone()
@@ -98,7 +97,7 @@ make_fn!(
 fn triple_to_number<'a>(
     input: SliceIter<'a, Token>,
     v: (Option<Token>, Option<Token>, Option<Token>),
-) -> ParseResult<'a, Value> {
+) -> ConvertResult<'a, Value> {
     let (pref, mut pref_pos) = match v.0 {
         None => ("", Position::new(0, 0, 0)),
         Some(ref bs) => (bs.fragment.borrow(), bs.pos.clone()),
@@ -139,94 +138,6 @@ fn triple_to_number<'a>(
         }
     };
     return Ok(Value::Float(value_node!(f, pref_pos)));
-}
-
-// FIXME(jwall): This should actually be unnecessary now.
-
-/// alt_peek conditionally runs a combinator if a lookahead combinator matches.
-macro_rules! alt_peek {
-    (__inner $i:expr, $peekrule:ident!( $($peekargs:tt)* ) => $parserule:ident | $($rest:tt)* ) => (
-        alt_peek!(__inner $i, $peekrule!($($peekargs)*) => run!($parserule) | $($rest)* )
-    );
-
-    (__inner $i:expr, $peekrule:ident => $($rest:tt)* ) => (
-        alt_peek!(__inner $i, run!($peekrule) => $($rest)* )
-    );
-
-    (__inner $i:expr, $peekrule:ident!( $($peekargs:tt)* ) => $parserule:ident!( $($parseargs:tt)* ) | $($rest:tt)* ) => (
-        {
-            let _i = $i.clone();
-            let pre_res = peek!(_i, $peekrule!($($peekargs)*));
-            match pre_res {
-                // if the peek was incomplete then it might still match so return incomplete.
-                Result::Incomplete(i) => Result::Incomplete(i),
-                // If the peek was in error then try the next peek => parse pair.
-                Result::Fail(_) =>  {
-                    alt_peek!(__inner $i, $($rest)*)
-                },
-                Result::Abort(e) => Result::Abort(e),
-                // If the peek was successful then return the result of the parserule
-                // regardless of it's result.
-                Result::Complete(_i, _) => {
-                    $parserule!(_i, $($parseargs)*)
-                },
-            }
-        }
-    );
-
-    // These are our no fallback termination cases.
-    (__inner $i:expr, $peekrule:ident!( $($peekargs:tt)* ) => $parserule:ident, __end ) => (
-        alt_peek!(__inner $i, $peekrule!($($peekargs)*) => call!($parserule), __end )
-    );
-
-    (__inner $i:expr, $peekrule:ident!( $($peekargs:tt)* ) => $parserule:ident!( $($parseargs:tt)* ), __end ) => (
-        {
-            let _i = $i.clone();
-            let pre_res = peek!(_i, $peekrule!($($peekargs)*));
-            match pre_res {
-                // if the peek was incomplete then it might still match so return incomplete.
-                Result::Incomplete(i) => Result::Incomplete(i),
-                // If the peek was in error then try the next peek => parse pair.
-                Result::Fail(_) =>  {
-                    alt_peek!(__inner $i, __end)
-                },
-                Result::Abort(e) => Result::Abort(e),
-                // If the peek was successful then return the result of the parserule
-                // regardless of it's result.
-                Result::Complete(_i, _) => {
-                    $parserule!(_i, $($parseargs)*)
-                },
-            }
-        }
-    );
-
-    // These are our fallback termination cases.
-    (__inner $i:expr, $fallback:ident, __end) => (
-        {
-            let _i = $i.clone();
-            run!(_i, $fallback)
-        }
-    );
-    // In the case of a fallback rule with no peek we just return whatever
-    // the fallback rule returns.
-    (__inner $i:expr, $fallback:ident!( $($args:tt)* ), __end) => (
-        {
-            let _i = $i.clone();
-            $fallback!(_i, $($args)*)
-        }
-    );
-
-    // This is our default termination case.
-    // If there is no fallback then we return an Error.
-    (__inner $i:expr, __end) => {
-        compile_error!("alt_peek! requirs a fallback case");
-    };
-
-    // alt_peek entry_point.
-    ($i:expr, $($rest:tt)*) => {
-        // We use __end to define the termination token the recursive rule should consume.
-        alt_peek!(__inner $i, $($rest)*, __end)
-    };
 }
 
 // trace_macros!(true);
@@ -405,7 +316,7 @@ make_fn!(
     )
 );
 
-fn symbol_or_expression(input: SliceIter<Token>) -> NomResult<Expression> {
+fn symbol_or_expression(input: SliceIter<Token>) -> ParseResult<Expression> {
     let _i = input.clone();
     let scalar_head = do_each!(input,
         sym => either!(symbol, compound_value),
@@ -445,7 +356,7 @@ fn symbol_or_expression(input: SliceIter<Token>) -> NomResult<Expression> {
     }
 }
 
-fn selector_list(input: SliceIter<Token>) -> NomResult<SelectorList> {
+fn selector_list(input: SliceIter<Token>) -> ParseResult<SelectorList> {
     let (rest, head) = match symbol_or_expression(input) {
         Result::Complete(rest, val) => (rest, val),
         Result::Fail(e) => {
@@ -529,7 +440,7 @@ fn tuple_to_macro<'a>(
     pos: Position,
     vals: Option<Vec<Value>>,
     val: Value,
-) -> ParseResult<'a, Expression> {
+) -> ConvertResult<'a, Expression> {
     let mut default_args = match vals {
         None => Vec::new(),
         Some(vals) => vals,
@@ -623,7 +534,7 @@ fn tuple_to_select<'a>(
     e1: Expression,
     e2: Expression,
     val: Value,
-) -> ParseResult<'a, Expression> {
+) -> ConvertResult<'a, Expression> {
     match val {
         Value::Tuple(v) => Ok(Expression::Select(SelectDef {
             val: Box::new(e1),
@@ -695,7 +606,7 @@ fn tuple_to_call<'a>(
     input: SliceIter<'a, Token>,
     val: Value,
     exprs: Option<Vec<Expression>>,
-) -> ParseResult<'a, Expression> {
+) -> ConvertResult<'a, Expression> {
     if let Value::Selector(def) = val {
         Ok(Expression::Call(CallDef {
             macroref: def,
@@ -750,7 +661,7 @@ fn tuple_to_list_op<'a>(
     kind: ListOpType,
     macroname: Value,
     list: Expression,
-) -> ParseResult<'a, Expression> {
+) -> ConvertResult<'a, Expression> {
     if let Value::Selector(mut def) = macroname {
         // First of all we need to assert that this is a selector of at least
         // two sections.
@@ -818,7 +729,7 @@ make_fn!(
     )
 );
 
-fn unprefixed_expression(input: SliceIter<Token>) -> NomResult<Expression> {
+fn unprefixed_expression(input: SliceIter<Token>) -> ParseResult<Expression> {
     let _input = input.clone();
     either!(
         input,
@@ -831,16 +742,17 @@ fn unprefixed_expression(input: SliceIter<Token>) -> NomResult<Expression> {
 
 make_fn!(
     non_op_expression<SliceIter<Token>, Expression>,
-    alt_peek!(
-         either!(word!("map"), word!("filter")) => trace_parse!(list_op_expression) |
-         word!("macro") => trace_parse!(macro_expression) |
-         word!("module") => trace_parse!(module_expression) |
-         word!("select") => trace_parse!(select_expression) |
-         punct!("(") => trace_parse!(grouped_expression) |
-         trace_parse!(unprefixed_expression))
+    either!(
+        trace_parse!(list_op_expression),
+        trace_parse!(macro_expression),
+        trace_parse!(module_expression),
+        trace_parse!(select_expression),
+        trace_parse!(grouped_expression),
+        trace_parse!(unprefixed_expression)
+    )
 );
 
-fn expression(input: SliceIter<Token>) -> NomResult<Expression> {
+fn expression(input: SliceIter<Token>) -> ParseResult<Expression> {
     let _input = input.clone();
     match trace_parse!(_input, op_expression) {
         Result::Incomplete(i) => Result::Incomplete(i),
@@ -874,7 +786,6 @@ make_fn!(
     do_each!(
         name => wrap_err!(match_type!(BAREWORD), "Expected name for binding"),
         _ => punct!("="),
-        // TODO(jwall): Wrap this error with an appropriate abortable_parser::Error
         val => wrap_err!(trace_parse!(expression), "Expected Expression"),
         _ => punct!(";"),
         (tuple_to_let(name, val))
@@ -941,11 +852,12 @@ make_fn!(
 
 //trace_macros!(true);
 fn statement(i: SliceIter<Token>) -> Result<SliceIter<Token>, Statement> {
-    return alt_peek!(i,
-        word!("assert") => trace_parse!(assert_statement) |
-        word!("import") => trace_parse!(import_statement) |
-        word!("let") => trace_parse!(let_statement) |
-        word!("out") => trace_parse!(out_statement) |
+    return either!(
+        i,
+        trace_parse!(assert_statement),
+        trace_parse!(import_statement),
+        trace_parse!(let_statement),
+        trace_parse!(out_statement),
         trace_parse!(expression_statement)
     );
 }
