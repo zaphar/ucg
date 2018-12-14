@@ -181,7 +181,10 @@ make_fn!(
     sum_expression<SliceIter<Element>, Expression>,
     do_binary_expr!(
         parse_sum_operator,
-        either!(trace_parse!(product_expression), trace_parse!(parse_expression))
+        either!(
+            trace_parse!(product_expression),
+            trace_parse!(parse_expression)
+        )
     )
 );
 
@@ -192,7 +195,10 @@ make_fn!(
 
 make_fn!(
     math_expression<SliceIter<Element>, Expression>,
-    either!(trace_parse!(sum_expression), trace_parse!(product_expression))
+    either!(
+        trace_parse!(sum_expression),
+        trace_parse!(product_expression)
+    )
 );
 
 // TODO(jwall): Change comparison operators to use the do_binary_expr! with precedence?
