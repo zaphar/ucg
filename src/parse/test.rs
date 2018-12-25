@@ -619,8 +619,8 @@ fn test_expression_parse() {
     );
     assert_parse!(
         expression("1 > 1"),
-        Expression::Compare(ComparisonDef {
-            kind: CompareType::GT,
+        Expression::Binary(BinaryOpDef {
+            kind: BinaryExprType::GT,
             left: Box::new(Expression::Simple(Value::Int(value_node!(
                 1,
                 Position::new(1, 1, 0)
@@ -634,8 +634,8 @@ fn test_expression_parse() {
     );
     assert_parse!(
         expression("1 < 1"),
-        Expression::Compare(ComparisonDef {
-            kind: CompareType::LT,
+        Expression::Binary(BinaryOpDef {
+            kind: BinaryExprType::LT,
             left: Box::new(Expression::Simple(Value::Int(value_node!(
                 1,
                 Position::new(1, 1, 0)
@@ -649,8 +649,8 @@ fn test_expression_parse() {
     );
     assert_parse!(
         expression("1 <= 1"),
-        Expression::Compare(ComparisonDef {
-            kind: CompareType::LTEqual,
+        Expression::Binary(BinaryOpDef {
+            kind: BinaryExprType::LTEqual,
             left: Box::new(Expression::Simple(Value::Int(value_node!(
                 1,
                 Position::new(1, 1, 0)
@@ -664,8 +664,8 @@ fn test_expression_parse() {
     );
     assert_parse!(
         expression("1 >= 1"),
-        Expression::Compare(ComparisonDef {
-            kind: CompareType::GTEqual,
+        Expression::Binary(BinaryOpDef {
+            kind: BinaryExprType::GTEqual,
             left: Box::new(Expression::Simple(Value::Int(value_node!(
                 1,
                 Position::new(1, 1, 0)

@@ -286,6 +286,7 @@ macro_rules! make_selector {
 #[derive(PartialEq, Clone)]
 pub struct SelectorList {
     pub head: Box<Expression>,
+    // TODO This should now work more like a binary operator. Perhaps move into the precendence parser code?
     pub tail: Option<Vec<Token>>,
 }
 
@@ -579,10 +580,6 @@ impl MacroDef {
                         stack.push(&bexpr.left);
                         stack.push(&bexpr.right);
                     }
-                    &Expression::Compare(ref cexpr) => {
-                        stack.push(&cexpr.left);
-                        stack.push(&cexpr.right);
-                    }
                     &Expression::Grouped(ref expr) => {
                         stack.push(expr);
                     }
@@ -644,26 +641,14 @@ pub enum BinaryExprType {
     Sub,
     Mul,
     Div,
-}
-
-/// CompareType signals the type of a comparison for a binary expression.
-#[derive(Debug, PartialEq, Clone)]
-pub enum CompareType {
+    // Comparison
     Equal,
     GT,
     LT,
     NotEqual,
     GTEqual,
     LTEqual,
-}
-
-/// ComparisonDef Represents a comparison between two expressions.
-#[derive(Debug, PartialEq, Clone)]
-pub struct ComparisonDef {
-    pub kind: CompareType,
-    pub left: Box<Expression>,
-    pub right: Box<Expression>,
-    pub pos: Position,
+    // TODO DOT Selector operator
 }
 
 /// Represents an expression with a left and a right side.
@@ -759,7 +744,6 @@ pub enum Expression {
 
     // Binary expressions
     Binary(BinaryOpDef),
-    Compare(ComparisonDef),
 
     // Complex Expressions
     Copy(CopyDef),
@@ -779,7 +763,6 @@ impl Expression {
         match self {
             &Expression::Simple(ref v) => v.pos(),
             &Expression::Binary(ref def) => &def.pos,
-            &Expression::Compare(ref def) => &def.pos,
             &Expression::Copy(ref def) => &def.pos,
             &Expression::Grouped(ref expr) => expr.pos(),
             &Expression::Format(ref def) => &def.pos,
@@ -799,9 +782,6 @@ impl fmt::Display for Expression {
                 write!(w, "{}", v.to_string())?;
             }
             &Expression::Binary(_) => {
-                write!(w, "<Expr>")?;
-            }
-            &Expression::Compare(_) => {
                 write!(w, "<Expr>")?;
             }
             &Expression::ListOp(_) => {

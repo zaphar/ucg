@@ -866,20 +866,12 @@ impl<'a> FileBuilder<'a> {
             &BinaryExprType::Sub => self.subtract_vals(&def.pos, left, right),
             &BinaryExprType::Mul => self.multiply_vals(&def.pos, left, right),
             &BinaryExprType::Div => self.divide_vals(&def.pos, left, right),
-        }
-    }
-
-    fn eval_compare(&mut self, def: &ComparisonDef, scope: &Scope) -> Result<Rc<Val>, Box<Error>> {
-        let kind = &def.kind;
-        let left = self.eval_expr(&def.left, scope)?;
-        let right = self.eval_expr(&def.right, scope)?;
-        match kind {
-            &CompareType::Equal => self.do_deep_equal(&def.pos, left, right),
-            &CompareType::GT => self.do_gt(&def.pos, left, right),
-            &CompareType::LT => self.do_lt(&def.pos, left, right),
-            &CompareType::GTEqual => self.do_gtequal(&def.pos, left, right),
-            &CompareType::LTEqual => self.do_ltequal(&def.pos, left, right),
-            &CompareType::NotEqual => self.do_not_deep_equal(&def.pos, left, right),
+            &BinaryExprType::Equal => self.do_deep_equal(&def.pos, left, right),
+            &BinaryExprType::GT => self.do_gt(&def.pos, left, right),
+            &BinaryExprType::LT => self.do_lt(&def.pos, left, right),
+            &BinaryExprType::GTEqual => self.do_gtequal(&def.pos, left, right),
+            &BinaryExprType::LTEqual => self.do_ltequal(&def.pos, left, right),
+            &BinaryExprType::NotEqual => self.do_not_deep_equal(&def.pos, left, right),
         }
     }
 
@@ -1247,7 +1239,6 @@ impl<'a> FileBuilder<'a> {
         match expr {
             &Expression::Simple(ref val) => self.eval_value(val, scope),
             &Expression::Binary(ref def) => self.eval_binary(def, scope),
-            &Expression::Compare(ref def) => self.eval_compare(def, scope),
             &Expression::Copy(ref def) => self.eval_copy(def, scope),
             &Expression::Grouped(ref expr) => self.eval_expr(expr, scope),
             &Expression::Format(ref def) => self.eval_format(def, scope),

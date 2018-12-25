@@ -24,8 +24,7 @@ use crate::ast::*;
 #[derive(Debug, PartialEq, Clone)]
 pub enum Element {
     Expr(Expression),
-    MathOp(BinaryExprType),
-    CompareOp(CompareType),
+    Op(BinaryExprType),
 }
 
 make_fn!(
@@ -33,16 +32,16 @@ make_fn!(
     either!(
         do_each!(
             _ => punct!("+"),
-            (Element::MathOp(BinaryExprType::Add))),
+            (Element::Op(BinaryExprType::Add))),
         do_each!(
             _ => punct!("-"),
-            (Element::MathOp(BinaryExprType::Sub))),
+            (Element::Op(BinaryExprType::Sub))),
         do_each!(
             _ => punct!("*"),
-            (Element::MathOp(BinaryExprType::Mul))),
+            (Element::Op(BinaryExprType::Mul))),
         do_each!(
             _ => punct!("/"),
-            (Element::MathOp(BinaryExprType::Div)))
+            (Element::Op(BinaryExprType::Div)))
     )
 );
 
@@ -76,7 +75,7 @@ fn parse_sum_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, Binar
         ));
     }
     let el = i_.next();
-    if let Some(&Element::MathOp(ref op)) = el {
+    if let Some(&Element::Op(ref op)) = el {
         match op {
             &BinaryExprType::Add => {
                 return Result::Complete(i_.clone(), op.clone());
@@ -121,7 +120,7 @@ fn parse_product_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, B
         ));
     }
     let el = i_.next();
-    if let Some(&Element::MathOp(ref op)) = el {
+    if let Some(&Element::Op(ref op)) = el {
         match op {
             &BinaryExprType::Mul => {
                 return Result::Complete(i_.clone(), op.clone());
@@ -201,34 +200,19 @@ make_fn!(
     )
 );
 
-// TODO(jwall): Change comparison operators to use the do_binary_expr! with precedence?
-fn tuple_to_compare_expression(
-    kind: CompareType,
-    left: Expression,
-    right: Expression,
-) -> Expression {
-    let pos = left.pos().clone();
-    Expression::Compare(ComparisonDef {
-        kind: kind,
-        left: Box::new(left),
-        right: Box::new(right),
-        pos: pos,
-    })
-}
-
 make_fn!(
     compare_op_type<SliceIter<Token>, Element>,
     either!(
-        do_each!(_ => punct!("=="), (Element::CompareOp(CompareType::Equal))),
-        do_each!(_ => punct!("!="), (Element::CompareOp(CompareType::NotEqual))),
-        do_each!(_ => punct!("<="), (Element::CompareOp(CompareType::LTEqual))),
-        do_each!(_ => punct!(">="), (Element::CompareOp(CompareType::GTEqual))),
-        do_each!(_ => punct!("<"),  (Element::CompareOp(CompareType::LT))),
-        do_each!(_ => punct!(">"),  (Element::CompareOp(CompareType::GT)))
+        do_each!(_ => punct!("=="), (Element::Op(BinaryExprType::Equal))),
+        do_each!(_ => punct!("!="), (Element::Op(BinaryExprType::NotEqual))),
+        do_each!(_ => punct!("<="), (Element::Op(BinaryExprType::LTEqual))),
+        do_each!(_ => punct!(">="), (Element::Op(BinaryExprType::GTEqual))),
+        do_each!(_ => punct!("<"),  (Element::Op(BinaryExprType::LT))),
+        do_each!(_ => punct!(">"),  (Element::Op(BinaryExprType::GT)))
     )
 );
 
-fn parse_compare_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, CompareType> {
+fn parse_compare_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, BinaryExprType> {
     let mut i_ = i.clone();
     if eoi(i_.clone()).is_complete() {
         return Result::Fail(Error::new(
@@ -237,8 +221,20 @@ fn parse_compare_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, C
         ));
     }
     let el = i_.next();
-    if let Some(&Element::CompareOp(ref op)) = el {
-        return Result::Complete(i_.clone(), op.clone());
+    if let Some(&Element::Op(ref op)) = el {
+        match op {
+            &BinaryExprType::GT
+            | &BinaryExprType::GTEqual
+            | &BinaryExprType::LT
+            | &BinaryExprType::LTEqual
+            | &BinaryExprType::NotEqual
+            | &BinaryExprType::Equal => {
+                return Result::Complete(i_.clone(), op.clone());
+            }
+            _other => {
+                // noop
+            }
+        };
     }
     return Result::Fail(Error::new(
         format!(
@@ -250,12 +246,18 @@ fn parse_compare_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, C
 }
 
 make_fn!(
+    binary_expression<SliceIter<Element>, Expression>,
+    either!(compare_expression, math_expression, parse_expression)
+);
+
+make_fn!(
     compare_expression<SliceIter<Element>, Expression>,
-    do_each!(
-        left => either!(trace_parse!(math_expression), trace_parse!(parse_expression)),
-        typ => parse_compare_operator,
-        right => either!(trace_parse!(math_expression), trace_parse!(parse_expression)),
-        (tuple_to_compare_expression(typ, left, right))
+    do_binary_expr!(
+        parse_compare_operator,
+        either!(
+            trace_parse!(math_expression),
+            trace_parse!(parse_expression)
+        )
     )
 );
 
@@ -340,11 +342,7 @@ pub fn op_expression<'a>(i: SliceIter<'a, Token>) -> Result<SliceIter<Token>, Ex
         Result::Incomplete(i) => Result::Incomplete(i),
         Result::Complete(rest, oplist) => {
             let i_ = SliceIter::new(&oplist);
-            let parse_result = either!(
-                i_.clone(),
-                trace_parse!(compare_expression),
-                trace_parse!(math_expression)
-            );
+            let parse_result = binary_expression(i_);
 
             match parse_result {
                 Result::Fail(_e) => {

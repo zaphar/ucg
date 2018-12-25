@@ -277,6 +277,8 @@ make_fn!(
 make_fn!(
     value<SliceIter<Token>, Value>,
     either!(
+        // TODO This should move to op_expression instead of a value now.
+        // We probably still need a bareword parser though?
         trace_parse!(selector_value),
         trace_parse!(compound_value),
         trace_parse!(boolean_value),
@@ -426,6 +428,7 @@ make_fn!(
     copy_expression<SliceIter<Token>, Expression>,
     do_each!(
         pos => pos,
+        // TODO This should become just a bareword symbol now
         selector => trace_parse!(selector_list),
         _ => punct!("{"),
         fields => optional!(trace_parse!(field_list)),
@@ -635,6 +638,7 @@ make_fn!(
 
 fn call_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expression> {
     let parsed = do_each!(input.clone(),
+        // TODO This should become just a bareword symbol now
         callee_name => trace_parse!(selector_value),
         _ => punct!("("),
         args => optional!(separated!(punct!(","), trace_parse!(expression))),
@@ -723,6 +727,7 @@ make_fn!(
             do_each!(_ => word!("map"), (ListOpType::Map)),
             do_each!(_ => word!("filter"), (ListOpType::Filter))
         ),
+        // TODO This should become just a bareword symbol now
         macroname => trace_parse!(selector_value),
         list => trace_parse!(non_op_expression),
         (tuple_to_list_op(&input, optype, macroname, list).unwrap())
