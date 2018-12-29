@@ -22,9 +22,9 @@ assert |
 
 let embedded_mod = module {
     deep_value = "None",
-    env = "None",
+    environ = "None",
 } => {
-    let env_name = select mod.env, "qa", {
+    let env_name = select mod.environ, "qa", {
         None = "qa",
         prod = "prod",
         qa = "qa",

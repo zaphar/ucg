@@ -15,7 +15,7 @@
 //! Bottom up parser for precedence parsing of expressions separated by binary
 //! operators.
 use abortable_parser::combinators::eoi;
-use abortable_parser::{Error, Result, SliceIter};
+use abortable_parser::{Error, Peekable, Result, SliceIter};
 
 use super::{non_op_expression, ParseResult};
 use crate::ast::*;
@@ -132,20 +132,6 @@ fn parse_sum_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, Binar
     ));
 }
 
-fn tuple_to_binary_expression(
-    kind: BinaryExprType,
-    left: Expression,
-    right: Expression,
-) -> Expression {
-    let pos = left.pos().clone();
-    Expression::Binary(BinaryOpDef {
-        kind: kind,
-        left: Box::new(left),
-        right: Box::new(right),
-        pos: pos,
-    })
-}
-
 fn parse_product_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, BinaryExprType> {
     let mut i_ = i.clone();
     if eoi(i_.clone()).is_complete() {
@@ -176,68 +162,6 @@ fn parse_product_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, B
         Box::new(i_),
     ));
 }
-
-/// do_binary_expr implements precedence based parsing where the more tightly bound
-/// parsers are passed in as lowerrule parsers. We default to any non_op_expression
-/// as the most tightly bound expressions.
-macro_rules! do_binary_expr {
-    ($i:expr, $oprule:ident, $lowerrule:ident) => {
-        do_binary_expr!($i, run!($oprule), $lowerrule)
-    };
-
-    ($i:expr, $oprule:ident, $lowerrule:ident!( $($lowerargs:tt)* )) => {
-        do_binary_expr!($i, run!($oprule), $lowerrule!($($lowerargs)*))
-    };
-
-    ($i:expr, $oprule:ident) => {
-        do_binary_expr!($i, run!($oprule))
-    };
-
-    ($i:expr, $oprule:ident!( $($args:tt)* )) => {
-        do_binary_expr!($i, $oprule!($($args)*), parse_expression)
-    };
-
-    ($i:expr, $oprule:ident!( $($args:tt)* ), $lowerrule:ident) => {
-        do_binary_expr!($i, $oprule!($($args)*), run!($lowerrule))
-    };
-
-    ($i:expr, $oprule:ident!( $($args:tt)* ), $lowerrule:ident!( $($lowerargs:tt)* )) => {
-        do_each!($i,
-            left => $lowerrule!($($lowerargs)*),
-                typ => $oprule!($($args)*),
-                right => $lowerrule!($($lowerargs)*),
-                (tuple_to_binary_expression(typ, left, right))
-        )
-    };
-}
-
-make_fn!(
-    sum_expression<SliceIter<Element>, Expression>,
-    do_binary_expr!(
-        parse_sum_operator,
-        either!(
-            trace_parse!(product_expression),
-            trace_parse!(dot_expression),
-            trace_parse!(parse_expression)
-        )
-    )
-);
-
-make_fn!(
-    product_expression<SliceIter<Element>, Expression>,
-    do_binary_expr!(
-        parse_product_operator,
-        either!(trace_parse!(dot_expression), trace_parse!(parse_expression))
-    )
-);
-
-make_fn!(
-    math_expression<SliceIter<Element>, Expression>,
-    either!(
-        trace_parse!(sum_expression),
-        trace_parse!(product_expression)
-    )
-);
 
 make_fn!(
     compare_op_type<SliceIter<Token>, Element>,
@@ -284,33 +208,6 @@ fn parse_compare_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, B
     ));
 }
 
-make_fn!(
-    binary_expression<SliceIter<Element>, Expression>,
-    either!(
-        compare_expression,
-        math_expression,
-        dot_expression,
-        parse_expression
-    )
-);
-
-make_fn!(
-    dot_expression<SliceIter<Element>, Expression>,
-    do_binary_expr!(parse_dot_operator, trace_parse!(parse_expression))
-);
-
-make_fn!(
-    compare_expression<SliceIter<Element>, Expression>,
-    do_binary_expr!(
-        parse_compare_operator,
-        either!(
-            trace_parse!(math_expression),
-            trace_parse!(dot_expression),
-            trace_parse!(parse_expression)
-        )
-    )
-);
-
 /// Parse a list of expressions separated by operators into a Vec<Element>.
 fn parse_operand_list<'a>(i: SliceIter<'a, Token>) -> ParseResult<'a, Vec<Element>> {
     // 1. First try to parse a non_op_expression,
@@ -340,7 +237,6 @@ fn parse_operand_list<'a>(i: SliceIter<'a, Token>) -> ParseResult<'a, Vec<Elemen
             }
         }
         // 3. Parse an operator.
-        // TODO(jwall): Parse the dot operator.
         match either!(_i.clone(), dot_op_type, math_op_type, compare_op_type) {
             Result::Fail(e) => {
                 if firstrun {
@@ -370,8 +266,87 @@ fn parse_operand_list<'a>(i: SliceIter<'a, Token>) -> ParseResult<'a, Vec<Elemen
     return Result::Complete(_i, list);
 }
 
+make_fn!(
+    parse_operator_element<SliceIter<Element>, BinaryExprType>,
+    either!(
+        parse_dot_operator,
+        parse_sum_operator,
+        parse_product_operator,
+        parse_compare_operator
+    )
+);
+
+macro_rules! try_parse {
+    ($r:expr) => {
+        match $r {
+            Result::Abort(e) => return Result::Abort(e),
+            Result::Fail(e) => return Result::Fail(e),
+            Result::Incomplete(i) => return Result::Incomplete(i),
+            Result::Complete(rest, op_type) => (rest, op_type),
+        }
+    };
+}
+
+fn parse_op(
+    mut lhs: Expression,
+    mut i: SliceIter<Element>,
+    min_precedence: u32,
+) -> Result<SliceIter<Element>, Expression> {
+    // Termination condition
+    if eoi(i.clone()).is_complete() {
+        return Result::Complete(i, lhs);
+    }
+    let (_, mut lookahead_op) = try_parse!(parse_operator_element(i.clone()));
+    while !eoi(i.clone()).is_complete() && (lookahead_op.precedence_level() >= min_precedence) {
+        // Stash a copy of our lookahead operator for future use.
+        let op = lookahead_op.clone();
+        // Advance to next element.
+        i.next();
+        let (rest, mut rhs) = try_parse!(parse_expression(i.clone()));
+        i = rest;
+        if !eoi(i.clone()).is_complete() {
+            let (_, peek_op) = try_parse!(parse_operator_element(i.clone()));
+            lookahead_op = peek_op;
+        } else {
+        }
+        while !eoi(i.clone()).is_complete()
+            && (lookahead_op.precedence_level() > op.precedence_level())
+        {
+            let (rest, inner_rhs) =
+                try_parse!(parse_op(rhs, i.clone(), lookahead_op.precedence_level()));
+            i = rest;
+            rhs = inner_rhs;
+            // Before we check for another operator we should see
+            // if we are at the end of the input.
+            if eoi(i.clone()).is_complete() {
+                break;
+            }
+            let (_, peek_op) = try_parse!(parse_operator_element(i.clone()));
+            lookahead_op = peek_op;
+        }
+        let pos = lhs.pos().clone();
+        lhs = Expression::Binary(BinaryOpDef {
+            kind: op.clone(),
+            left: Box::new(lhs.clone()),
+            right: Box::new(rhs),
+            pos: pos,
+        });
+    }
+    return Result::Complete(i, lhs);
+}
+
+pub fn parse_precedence(i: SliceIter<Element>) -> Result<SliceIter<Element>, Expression> {
+    match parse_expression(i) {
+        Result::Abort(e) => Result::Abort(e),
+        Result::Fail(e) => Result::Fail(e),
+        Result::Incomplete(i) => Result::Incomplete(i),
+        Result::Complete(rest, expr) => parse_op(expr, rest, 0),
+    }
+}
+
 /// Parse a binary operator expression.
 pub fn op_expression<'a>(i: SliceIter<'a, Token>) -> Result<SliceIter<Token>, Expression> {
+    // TODO(jwall): We need to implement the full on precedence climbing method here.
     let preparse = parse_operand_list(i.clone());
     match preparse {
         Result::Fail(e) => {
@@ -393,11 +368,9 @@ pub fn op_expression<'a>(i: SliceIter<'a, Token>) -> Result<SliceIter<Token>, Ex
         Result::Incomplete(i) => Result::Incomplete(i),
         Result::Complete(rest, oplist) => {
             let i_ = SliceIter::new(&oplist);
-            let parse_result = binary_expression(i_);
-
+            let parse_result = parse_precedence(i_);
             match parse_result {
                 Result::Fail(_e) => {
-                    // TODO(jwall): It would be good to be able to use caused_by here.
                     let err = Error::new(
                         "Failed while parsing operator expression",
                         Box::new(rest.clone()),
@@ -406,13 +379,18 @@ pub fn op_expression<'a>(i: SliceIter<'a, Token>) -> Result<SliceIter<Token>, Ex
                 }
                 Result::Abort(_e) => {
                     let err = Error::new(
-                        "Failed while parsing operator expression",
+                        "Abort while parsing operator expression",
                         Box::new(rest.clone()),
                     );
                     Result::Abort(err)
                 }
                 Result::Incomplete(_) => Result::Incomplete(i.clone()),
-                Result::Complete(_, expr) => Result::Complete(rest.clone(), expr),
+                Result::Complete(_rest_ops, expr) => {
+                    if _rest_ops.peek_next().is_some() {
+                        panic!("premature abort parsing Operator expression!");
+                    }
+                    Result::Complete(rest.clone(), expr)
+                }
             }
         }
     }

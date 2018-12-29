@@ -499,6 +499,31 @@ pub enum BinaryExprType {
     DOT,
 }
 
+impl BinaryExprType {
+    /// Returns the precedence level for the binary operator.
+    ///
+    /// Higher values bind tighter than lower values.
+    pub fn precedence_level(&self) -> u32 {
+        match self {
+            // Equality operators are least tightly bound
+            BinaryExprType::Equal => 1,
+            BinaryExprType::NotEqual => 1,
+            BinaryExprType::GTEqual => 1,
+            BinaryExprType::LTEqual => 1,
+            BinaryExprType::GT => 1,
+            BinaryExprType::LT => 1,
+            // Sum operators are next least tightly bound
+            BinaryExprType::Add => 2,
+            BinaryExprType::Sub => 2,
+            // Product operators are next tightly bound
+            BinaryExprType::Mul => 3,
+            BinaryExprType::Div => 3,
+            // Dot operators are most tightly bound.
+            BinaryExprType::DOT => 4,
+        }
+    }
+}
+
 /// Represents an expression with a left and a right side.
 #[derive(Debug, PartialEq, Clone)]
 pub struct BinaryOpDef {

@@ -1,10 +1,26 @@
 use std::clone::Clone;
 use std::collections::HashMap;
+use std::convert::AsRef;
 use std::convert::Into;
+use std::error::Error;
 use std::rc::Rc;
 
+use crate::ast::Position;
 use crate::ast::PositionedItem;
 use crate::build::ir::Val;
+use crate::error;
+
+pub fn find_in_fieldlist(
+    target: &str,
+    fs: &Vec<(PositionedItem<String>, Rc<Val>)>,
+) -> Option<Rc<Val>> {
+    for (key, val) in fs.iter().cloned() {
+        if target == &key.val {
+            return Some(val.clone());
+        }
+    }
+    return None;
+}
 
 /// Defines a set of values in a parsed file.
 pub type ValueMap = HashMap<PositionedItem<String>, Rc<Val>>;
@@ -23,6 +39,7 @@ pub struct Scope {
     pub env: Rc<Val>,
     pub curr_val: Option<Rc<Val>>,
     pub build_output: ValueMap,
+    pub search_curr_val: bool,
 }
 
 impl Scope {
@@ -35,6 +52,7 @@ impl Scope {
             // (eg: Tuple, List. left side of a dot selection.)
             curr_val: None,
             build_output: HashMap::new(),
+            search_curr_val: false,
         }
     }
 
@@ -47,6 +65,7 @@ impl Scope {
             // Children start with no current val
             curr_val: None,
             build_output: self.build_output.clone(),
+            search_curr_val: false,
         }
     }
 
@@ -57,6 +76,7 @@ impl Scope {
             // Children start with no current val
             curr_val: None,
             build_output: HashMap::new(),
+            search_curr_val: false,
         }
     }
 
@@ -74,6 +94,20 @@ impl Scope {
     /// Set the current value for our execution context.
     pub fn set_curr_val(&mut self, val: Rc<Val>) {
         self.curr_val = Some(val);
+    }
+
+    /// Lookup up a list index in the current value
+    pub fn lookup_idx(&self, pos: &Position, idx: &Val) -> Result<Rc<Val>, Box<Error>> {
+        if self.search_curr_val && self.curr_val.is_some() {
+            if let &Val::List(ref fs) = self.curr_val.as_ref().unwrap().as_ref() {
+                return Self::lookup_in_list(pos, idx, fs);
+            }
+        }
+        Err(Box::new(error::BuildError::new(
+            "Not a list in index lookup.",
+            error::ErrorType::TypeFail,
+            pos.clone(),
+        )))
     }
 
     /// Lookup a symbol in the current execution context.
@@ -95,6 +129,64 @@ impl Scope {
         if self.build_output.contains_key(sym) {
             return Some(self.build_output[sym].clone());
         }
+        if self.search_curr_val && self.curr_val.is_some() {
+            return match self.curr_val.as_ref().unwrap().as_ref() {
+                &Val::Tuple(ref fs) => match Self::lookup_in_tuple(&sym.pos, &sym.val, fs) {
+                    Ok(v) => Some(v),
+                    Err(_) => None,
+                },
+                &Val::List(ref fs) => {
+                    match Self::lookup_in_list(&sym.pos, &Val::Str(sym.val.clone()), fs) {
+                        Ok(v) => Some(v),
+                        Err(_) => None,
+                    }
+                }
+                _ => None,
+            };
+        }
         None
+    }
+
+    fn lookup_in_tuple(
+        pos: &Position,
+        field: &str,
+        fs: &Vec<(PositionedItem<String>, Rc<Val>)>,
+    ) -> Result<Rc<Val>, Box<Error>> {
+        if let Some(vv) = find_in_fieldlist(&field, fs) {
+            Ok(vv)
+        } else {
+            Err(Box::new(error::BuildError::new(
+                format!("Unable to {} match element in tuple.", field,),
+                error::ErrorType::NoSuchSymbol,
+                pos.clone(),
+            )))
+        }
+    }
+
+    fn lookup_in_list(
+        pos: &Position,
+        field: &Val,
+        elems: &Vec<Rc<Val>>,
+    ) -> Result<Rc<Val>, Box<Error>> {
+        let idx = match field {
+            &Val::Int(i) => i as usize,
+            &Val::Str(ref s) => s.parse::<usize>()?,
+            _ => {
+                return Err(Box::new(error::BuildError::new(
+                    format!("Invalid idx type {} for list lookup", field),
+                    error::ErrorType::TypeFail,
+                    pos.clone(),
+                )))
+            }
+        };
+        if idx < elems.len() {
+            Ok(elems[idx].clone())
+        } else {
+            Err(Box::new(error::BuildError::new(
+                format!("idx {} out of bounds in list", idx),
+                error::ErrorType::NoSuchSymbol,
+                pos.clone(),
+            )))
+        }
     }
 }

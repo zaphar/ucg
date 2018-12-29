@@ -277,8 +277,6 @@ make_fn!(
 make_fn!(
     value<SliceIter<Token>, Value>,
     either!(
-        // TODO This should move to op_expression instead of a value now.
-        // We probably still need a bareword parser though?
         trace_parse!(symbol),
         trace_parse!(compound_value),
         trace_parse!(boolean_value),
@@ -296,7 +294,7 @@ make_fn!(
     simple_expression<SliceIter<Token>, Expression>,
     do_each!(
         val => trace_parse!(value),
-        _ => not!(either!(punct!("."), punct!("{"), punct!("["), punct!("("))),
+        _ => not!(either!(punct!("{"), punct!("["), punct!("("))),
         (value_to_expression(val))
     )
 );

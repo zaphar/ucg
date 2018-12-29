@@ -28,7 +28,7 @@ use std::string::ToString;
 use simple_error;
 
 use crate::ast::*;
-use crate::build::scope::{Scope, ValueMap};
+use crate::build::scope::{find_in_fieldlist, Scope, ValueMap};
 use crate::error;
 use crate::format;
 use crate::iter::OffsetStrIter;
@@ -459,103 +459,6 @@ impl<'a> FileBuilder<'a> {
         }
     }
 
-    fn find_in_fieldlist(
-        target: &str,
-        fs: &Vec<(PositionedItem<String>, Rc<Val>)>,
-    ) -> Option<Rc<Val>> {
-        for (key, val) in fs.iter().cloned() {
-            if target == &key.val {
-                return Some(val.clone());
-            }
-        }
-        return None;
-    }
-
-    fn lookup_in_env(
-        &self,
-        pos: &Position,
-        field: &Rc<Val>,
-        fs: &Vec<(String, String)>,
-    ) -> Result<Rc<Val>, Box<Error>> {
-        let field = if let &Val::Str(ref name) = field.as_ref() {
-            name
-        } else {
-            return Err(Box::new(error::BuildError::new(
-                format!("Invalid type {} for field lookup in env", field),
-                error::ErrorType::TypeFail,
-                pos.clone(),
-            )));
-        };
-        for &(ref name, ref val) in fs.iter() {
-            if field == name {
-                return Ok(Rc::new(Val::Str(val.clone())));
-            } else if !self.strict {
-                return Ok(Rc::new(Val::Empty));
-            }
-        }
-        return Err(Box::new(error::BuildError::new(
-            format!("Environment Variable {} not set", field),
-            error::ErrorType::NoSuchSymbol,
-            pos.clone(),
-        )));
-    }
-
-    // TODO: Do as part of a binary operator selector lookup.
-    fn lookup_in_tuple(
-        &self,
-        pos: &Position,
-        field: &Val,
-        fs: &Vec<(PositionedItem<String>, Rc<Val>)>,
-    ) -> Result<Rc<Val>, Box<Error>> {
-        let field = if let &Val::Str(ref name) = field {
-            name
-        } else {
-            return Err(Box::new(error::BuildError::new(
-                format!("Invalid type {} for field lookup in tuple", field),
-                error::ErrorType::TypeFail,
-                pos.clone(),
-            )));
-        };
-        if let Some(vv) = Self::find_in_fieldlist(&field, fs) {
-            Ok(vv)
-        } else {
-            Err(Box::new(error::BuildError::new(
-                format!("Unable to {} match element in tuple.", field,),
-                error::ErrorType::NoSuchSymbol,
-                pos.clone(),
-            )))
-        }
-    }
-
-    // TODO: Do as part of a binary operator selector lookup.
-    fn lookup_in_list(
-        &self,
-        pos: &Position,
-        field: &Rc<Val>,
-        elems: &Vec<Rc<Val>>,
-    ) -> Result<Rc<Val>, Box<Error>> {
-        let idx = match field.as_ref() {
-            &Val::Int(i) => i as usize,
-            &Val::Str(ref s) => s.parse::<usize>()?,
-            _ => {
-                return Err(Box::new(error::BuildError::new(
-                    format!("Invalid idx type {} for list lookup", field),
-                    error::ErrorType::TypeFail,
-                    pos.clone(),
-                )))
-            }
-        };
-        if idx < elems.len() {
-            Ok(elems[idx].clone())
-        } else {
-            Err(Box::new(error::BuildError::new(
-                format!("idx {} out of bounds in list", idx),
-                error::ErrorType::NoSuchSymbol,
-                pos.clone(),
-            )))
-        }
-    }
-
     fn add_vals(
         &self,
         pos: &Position,
@@ -809,29 +712,37 @@ impl<'a> FileBuilder<'a> {
         )))
     }
 
-    fn do_dot_lookup(
-        &mut self,
-        pos: &Position,
-        left: Rc<Val>,
-        right: Rc<Val>,
-        scope: &Scope,
-    ) -> Result<Rc<Val>, Box<Error>> {
-        match left.as_ref() {
-            &Val::Tuple(ref fs) => self.lookup_in_tuple(pos, &right, fs),
-            &Val::List(ref fs) => self.lookup_in_list(pos, &right, fs),
-            &Val::Env(ref fs) => self.lookup_in_env(pos, &right, fs),
-            _ => Err(Box::new(error::BuildError::new(
-                "Invalid type left operand for dot lookup",
-                error::ErrorType::TypeFail,
-                pos.clone(),
-            ))),
+    fn do_dot_lookup(&mut self, right: &Expression, scope: &Scope) -> Result<Rc<Val>, Box<Error>> {
+        match right {
+            Expression::Copy(_) => return self.eval_expr(right, scope),
+            Expression::Call(_) => return self.eval_expr(right, scope),
+            Expression::Simple(Value::Symbol(ref s)) => {
+                self.eval_value(&Value::Symbol(s.clone()), scope)
+            }
+            Expression::Simple(Value::Str(ref s)) => {
+                self.eval_value(&Value::Symbol(s.clone()), scope)
+            }
+            Expression::Simple(Value::Int(ref i)) => {
+                scope.lookup_idx(right.pos(), &Val::Int(i.val))
+            }
+            _ => self.eval_expr(right, scope),
         }
     }
 
     fn eval_binary(&mut self, def: &BinaryOpDef, scope: &Scope) -> Result<Rc<Val>, Box<Error>> {
         let kind = &def.kind;
         let left = self.eval_expr(&def.left, scope)?;
-        let right = self.eval_expr(&def.right, scope)?;
+        let mut child_scope = scope.spawn_child();
+        child_scope.set_curr_val(left.clone());
+        child_scope.search_curr_val = true;
+        if let &BinaryExprType::DOT = kind {
+            return self.do_dot_lookup(&def.right, &child_scope);
+        };
+        // TODO(jwall): We need to handle call and copy expressions specially.
+        let right = match self.eval_expr(&def.right, scope) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
         match kind {
             // Handle math and concatenation operators here
             &BinaryExprType::Add => self.add_vals(&def.pos, left, right),
@@ -846,7 +757,7 @@ impl<'a> FileBuilder<'a> {
             &BinaryExprType::LTEqual => self.do_ltequal(&def.pos, left, right),
             &BinaryExprType::NotEqual => self.do_not_deep_equal(&def.pos, left, right),
             // TODO Handle the whole selector lookup logic here.
-            &BinaryExprType::DOT => self.do_dot_lookup(&def.pos, left, right, scope),
+            &BinaryExprType::DOT => panic!("Unraeachable"),
         }
     }
 
@@ -1120,12 +1031,12 @@ impl<'a> FileBuilder<'a> {
             }
         };
         let mac_sym = Value::Symbol(def.mac.clone());
-        if let &Val::Macro(ref macdef) = self.eval_value(&mac_sym, &self.scope)?.as_ref() {
+        if let &Val::Macro(ref macdef) = self.eval_value(&mac_sym, &self.scope.clone())?.as_ref() {
             let mut out = Vec::new();
             for item in l.iter() {
                 let argvals = vec![item.clone()];
                 let fields = macdef.eval(self.file.clone(), self, argvals)?;
-                if let Some(v) = Self::find_in_fieldlist(&def.field.val, &fields) {
+                if let Some(v) = find_in_fieldlist(&def.field.val, &fields) {
                     match def.typ {
                         ListOpType::Map => {
                             out.push(v.clone());
