@@ -72,10 +72,10 @@ pub fn test_macro_validation_selector_happy_path() {
             make_tok!("f1", Position::new(1, 1, 0)),
             Expression::Binary(BinaryOpDef {
                 kind: BinaryExprType::Add,
-                left: Box::new(Expression::Simple(Value::Selector(make_selector!(
-                        make_expr!("foo", Position::new(1, 1, 0)) => [
-                            make_tok!("quux", Position::new(1, 1, 0)) ]
-                        => Position::new(1, 1, 0))))),
+                left: Box::new(Expression::Simple(Value::Symbol(PositionedItem::new(
+                    "foo".to_string(),
+                    Position::new(1, 1, 0),
+                )))),
                 right: Box::new(Expression::Simple(Value::Int(value_node!(
                     1,
                     Position::new(1, 1, 0)
@@ -96,10 +96,10 @@ pub fn test_macro_validation_selector_fail() {
             make_tok!("f1", Position::new(1, 1, 0)),
             Expression::Binary(BinaryOpDef {
                 kind: BinaryExprType::Add,
-                left: Box::new(Expression::Simple(Value::Selector(
-                    make_selector!(make_expr!("bar", Position::new(1, 1, 0)) => [
-                    make_tok!("quux", Position::new(1, 1, 0)) ] => Position::new(1, 1, 0)),
-                ))),
+                left: Box::new(Expression::Simple(Value::Symbol(PositionedItem::new(
+                    "bar".to_string(),
+                    Position::new(1, 1, 0),
+                )))),
                 right: Box::new(Expression::Simple(Value::Int(value_node!(
                     1,
                     Position::new(1, 1, 0)

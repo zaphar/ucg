@@ -279,7 +279,7 @@ make_fn!(
     either!(
         // TODO This should move to op_expression instead of a value now.
         // We probably still need a bareword parser though?
-        trace_parse!(selector_value),
+        trace_parse!(symbol),
         trace_parse!(compound_value),
         trace_parse!(boolean_value),
         trace_parse!(empty_value),
@@ -318,107 +318,14 @@ make_fn!(
     )
 );
 
-fn symbol_or_expression(input: SliceIter<Token>) -> ParseResult<Expression> {
-    let _i = input.clone();
-    let scalar_head = do_each!(input,
-        sym => either!(symbol, compound_value),
-        (sym)
-    );
-
-    match scalar_head {
-        Result::Incomplete(offset) => Result::Incomplete(offset),
-        Result::Fail(_) => grouped_expression(_i),
-        Result::Abort(e) => Result::Abort(e),
-        Result::Complete(rest, val) => {
-            let res = peek!(rest.clone(), punct!("."));
-            match val {
-                Value::Tuple(_) => {
-                    if res.is_complete() {
-                        Result::Complete(rest, Expression::Simple(val))
-                    } else {
-                        return Result::Fail(Error::new(
-                            "Expected (.) but no dot found".to_string(),
-                            Box::new(rest.clone()),
-                        ));
-                    }
-                }
-                Value::List(_) => {
-                    if res.is_complete() {
-                        Result::Complete(rest, Expression::Simple(val))
-                    } else {
-                        return Result::Fail(Error::new(
-                            "Expected (.) but no dot found".to_string(),
-                            Box::new(rest.clone()),
-                        ));
-                    }
-                }
-                _ => Result::Complete(rest, Expression::Simple(val)),
-            }
-        }
-    }
-}
-
-fn selector_list(input: SliceIter<Token>) -> ParseResult<SelectorList> {
-    let (rest, head) = match symbol_or_expression(input) {
-        Result::Complete(rest, val) => (rest, val),
-        Result::Fail(e) => {
-            return Result::Fail(e);
-        }
-        Result::Incomplete(i) => {
-            return Result::Incomplete(i);
-        }
-        Result::Abort(e) => return Result::Abort(e),
-    };
-
-    let (rest, is_dot) = match punct!(rest, ".") {
-        Result::Complete(rest, tok) => (rest, Some(tok)),
-        Result::Incomplete(i) => {
-            return Result::Incomplete(i);
-        }
-        Result::Fail(_) => (rest, None),
-        Result::Abort(e) => return Result::Abort(e),
-    };
-
-    let (rest, list) = if is_dot.is_some() {
-        let (rest, list) = match separated!(
-            rest,
-            punct!("."),
-            either!(match_type!(BAREWORD), match_type!(DIGIT), match_type!(STR))
-        ) {
-            Result::Complete(rest, val) => (rest, val),
-            Result::Incomplete(i) => return Result::Incomplete(i),
-            Result::Fail(e) => return Result::Fail(e),
-            Result::Abort(e) => return Result::Abort(e),
-        };
-
-        if list.is_empty() {
-            return Result::Fail(Error::new(
-                "(.) with no selector fields after".to_string(),
-                Box::new(rest.clone()),
-            ));
-        } else {
-            (rest, Some(list))
-        }
-    } else {
-        (rest, None)
-    };
-
-    let sel_list = SelectorList {
-        head: Box::new(head),
-        tail: list,
-    };
-
-    return Result::Complete(rest, sel_list);
-}
-
-fn tuple_to_copy(def: SelectorDef, fields: Option<FieldList>) -> Expression {
-    let pos = def.pos.clone();
+fn tuple_to_copy(sym: Value, fields: Option<FieldList>) -> Expression {
+    let pos = sym.pos().clone();
     let fields = match fields {
         Some(fields) => fields,
         None => Vec::new(),
     };
     Expression::Copy(CopyDef {
-        selector: def,
+        selector: sym,
         fields: fields,
         pos: pos,
     })
@@ -427,14 +334,13 @@ fn tuple_to_copy(def: SelectorDef, fields: Option<FieldList>) -> Expression {
 make_fn!(
     copy_expression<SliceIter<Token>, Expression>,
     do_each!(
-        pos => pos,
         // TODO This should become just a bareword symbol now
-        selector => trace_parse!(selector_list),
+        sym => trace_parse!(symbol),
         _ => punct!("{"),
         fields => optional!(trace_parse!(field_list)),
         _ => optional!(punct!(",")), // noms opt! macro does not preserve error types properly but this one does.
         _ => punct!("}"),
-        (tuple_to_copy(SelectorDef::new(selector, pos), fields))
+        (tuple_to_copy(sym, fields))
     )
 );
 
@@ -610,9 +516,9 @@ fn tuple_to_call<'a>(
     val: Value,
     exprs: Option<Vec<Expression>>,
 ) -> ConvertResult<'a, Expression> {
-    if let Value::Selector(def) = val {
+    if let Value::Symbol(_) = val {
         Ok(Expression::Call(CallDef {
-            macroref: def,
+            macroref: val,
             arglist: exprs.unwrap_or_else(|| Vec::new()),
             pos: (&input).into(),
         }))
@@ -624,22 +530,10 @@ fn tuple_to_call<'a>(
     }
 }
 
-fn vec_to_selector_value(pos: Position, list: SelectorList) -> Value {
-    Value::Selector(SelectorDef::new(list, pos))
-}
-
-make_fn!(
-    selector_value<SliceIter<Token>, Value>,
-    do_each!(
-        sl => trace_parse!(selector_list),
-        (vec_to_selector_value(sl.head.pos().clone(), sl))
-    )
-);
-
 fn call_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expression> {
     let parsed = do_each!(input.clone(),
         // TODO This should become just a bareword symbol now
-        callee_name => trace_parse!(selector_value),
+        callee_name => trace_parse!(symbol),
         _ => punct!("("),
         args => optional!(separated!(punct!(","), trace_parse!(expression))),
         _ => punct!(")"),
@@ -664,59 +558,34 @@ fn tuple_to_list_op<'a>(
     input: &'a SliceIter<Token>,
     kind: ListOpType,
     macroname: Value,
+    outfield: Value,
     list: Expression,
 ) -> ConvertResult<'a, Expression> {
-    if let Value::Selector(mut def) = macroname {
-        // First of all we need to assert that this is a selector of at least
-        // two sections.
-        let fieldname: String = match &mut def.sel.tail {
-            &mut None => {
-                if ENABLE_TRACE {
-                    eprintln!(
-                        "tuple_to_list_op had error {}",
-                        "Missing a result field for the macro"
-                    );
-                }
-                return Err(Error::new(
-                    format!("Missing a result field for the macro"),
-                    Box::new(input.clone()),
-                ));
-            }
-            &mut Some(ref mut tl) => {
-                if tl.len() < 1 {
-                    if ENABLE_TRACE {
-                        eprintln!(
-                            "tuple_to_list_op had error {}",
-                            "Missing a result field for the macro"
-                        );
-                    }
-                    return Err(Error::new(
-                        format!("Missing a result field for the macro"),
-                        Box::new(input.clone()),
-                    ));
-                }
-                let fname = tl.pop();
-                fname.unwrap().fragment
-            }
-        };
-        return Ok(Expression::ListOp(ListOpDef {
-            typ: kind,
-            mac: def,
-            field: fieldname,
-            target: Box::new(list),
-            pos: input.into(),
-        }));
-    }
-    if ENABLE_TRACE {
-        eprintln!(
-            "tuple_to_list_op had error {}",
-            format!("Expected a selector but got {}", macroname.type_name())
-        );
-    }
-    return Err(Error::new(
-        format!("Expected a selector but got {}", macroname.type_name()),
-        Box::new(input.clone()),
-    ));
+    let macroname = match macroname {
+        Value::Symbol(sym) => sym,
+        _ => {
+            return Err(Error::new(
+                format!("Expected a macro name but got {}", macroname.type_name()),
+                Box::new(input.clone()),
+            ))
+        }
+    };
+    let outfield = match outfield {
+        Value::Symbol(sym) => sym,
+        _ => {
+            return Err(Error::new(
+                format!("Expected a field name but got {}", outfield.type_name()),
+                Box::new(input.clone()),
+            ))
+        }
+    };
+    return Ok(Expression::ListOp(ListOpDef {
+        typ: kind,
+        mac: macroname,
+        field: outfield,
+        target: Box::new(list),
+        pos: input.into(),
+    }));
 }
 
 make_fn!(
@@ -728,9 +597,11 @@ make_fn!(
             do_each!(_ => word!("filter"), (ListOpType::Filter))
         ),
         // TODO This should become just a bareword symbol now
-        macroname => trace_parse!(selector_value),
+        macroname => trace_parse!(symbol),
+        _ => punct!("."),
+        outfield => trace_parse!(symbol),
         list => trace_parse!(non_op_expression),
-        (tuple_to_list_op(&input, optype, macroname, list).unwrap())
+        (tuple_to_list_op(&input, optype, macroname, outfield, list).unwrap())
     )
 );
 
@@ -916,6 +787,3 @@ pub fn parse<'a>(input: OffsetStrIter<'a>) -> std::result::Result<Vec<Statement>
 }
 
 pub mod precedence;
-
-#[cfg(test)]
-mod test;

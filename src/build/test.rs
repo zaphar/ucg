@@ -157,10 +157,10 @@ fn test_expr_copy_no_such_tuple() {
     test_expr_to_val(
         vec![(
             Expression::Copy(CopyDef {
-                selector: make_selector!(
-                    make_expr!("tpl1", Position::new(1, 1, 1)),
-                    Position::new(1, 1, 1)
-                ),
+                selector: Value::Symbol(PositionedItem::new(
+                    "tpl1".to_string(),
+                    Position::new(1, 1, 1),
+                )),
                 fields: Vec::new(),
                 pos: Position::new(1, 0, 0),
             }),
@@ -183,10 +183,10 @@ fn test_expr_copy_not_a_tuple() {
     test_expr_to_val(
         vec![(
             Expression::Copy(CopyDef {
-                selector: make_selector!(
-                    make_expr!("tpl1", Position::new(1, 1, 1)),
-                    Position::new(1, 1, 1)
-                ),
+                selector: Value::Symbol(PositionedItem::new(
+                    "tpl1".to_string(),
+                    Position::new(1, 1, 1),
+                )),
                 fields: Vec::new(),
                 pos: Position::new(1, 0, 0),
             }),
@@ -212,10 +212,10 @@ fn test_expr_copy_field_type_error() {
     test_expr_to_val(
         vec![(
             Expression::Copy(CopyDef {
-                selector: make_selector!(
-                    make_expr!("tpl1", Position::new(1, 1, 1)),
-                    Position::new(1, 1, 1)
-                ),
+                selector: Value::Symbol(PositionedItem::new(
+                    "tpl1".to_string(),
+                    Position::new(1, 1, 1),
+                )),
                 fields: vec![(
                     make_tok!("fld1", Position::new(1, 1, 1)),
                     Expression::Simple(Value::Str(value_node!(
@@ -261,10 +261,10 @@ fn test_macro_hermetic() {
     test_expr_to_val(
         vec![(
             Expression::Call(CallDef {
-                macroref: make_selector!(
-                    make_expr!("tstmac", Position::new(1, 1, 1)),
-                    Position::new(1, 1, 1)
-                ),
+                macroref: Value::Symbol(PositionedItem::new(
+                    "tstmac".to_string(),
+                    Position::new(1, 1, 1),
+                )),
                 arglist: vec![Expression::Simple(Value::Str(value_node!(
                     "bar".to_string(),
                     Position::new(1, 1, 1)

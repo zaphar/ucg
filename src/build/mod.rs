@@ -15,7 +15,7 @@
 //! The build stage of the ucg compiler.
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -239,9 +239,6 @@ impl<'a> FileBuilder<'a> {
             }
             &Value::List(ref def) => self.eval_list(def, scope),
             &Value::Tuple(ref tuple) => self.eval_tuple(&tuple.val, scope),
-            &Value::Selector(ref selector_list_node) => {
-                self.lookup_selector(&selector_list_node.sel, scope)
-            }
         }
     }
 
@@ -476,131 +473,86 @@ impl<'a> FileBuilder<'a> {
 
     fn lookup_in_env(
         &self,
-        search: &Token,
-        stack: &mut VecDeque<Rc<Val>>,
+        pos: &Position,
+        field: &Rc<Val>,
         fs: &Vec<(String, String)>,
-    ) -> Result<(), Box<Error>> {
+    ) -> Result<Rc<Val>, Box<Error>> {
+        let field = if let &Val::Str(ref name) = field.as_ref() {
+            name
+        } else {
+            return Err(Box::new(error::BuildError::new(
+                format!("Invalid type {} for field lookup in env", field),
+                error::ErrorType::TypeFail,
+                pos.clone(),
+            )));
+        };
         for &(ref name, ref val) in fs.iter() {
-            if &search.fragment == name {
-                stack.push_back(Rc::new(Val::Str(val.clone())));
-                return Ok(());
+            if field == name {
+                return Ok(Rc::new(Val::Str(val.clone())));
             } else if !self.strict {
-                stack.push_back(Rc::new(Val::Empty));
-                return Ok(());
+                return Ok(Rc::new(Val::Empty));
             }
         }
         return Err(Box::new(error::BuildError::new(
-            format!("Environment Variable {} not set", search.fragment),
+            format!("Environment Variable {} not set", field),
             error::ErrorType::NoSuchSymbol,
-            search.pos.clone(),
+            pos.clone(),
         )));
     }
 
+    // TODO: Do as part of a binary operator selector lookup.
     fn lookup_in_tuple(
         &self,
-        stack: &mut VecDeque<Rc<Val>>,
-        sl: &SelectorList,
-        next: (&Position, &str),
+        pos: &Position,
+        field: &Val,
         fs: &Vec<(PositionedItem<String>, Rc<Val>)>,
-    ) -> Result<(), Box<Error>> {
-        if let Some(vv) = Self::find_in_fieldlist(next.1, fs) {
-            stack.push_back(vv.clone());
+    ) -> Result<Rc<Val>, Box<Error>> {
+        let field = if let &Val::Str(ref name) = field {
+            name
         } else {
             return Err(Box::new(error::BuildError::new(
-                format!(
-                    "Unable to \
-                     match element {} in selector \
-                     path [{}]",
-                    next.1, sl,
-                ),
-                error::ErrorType::NoSuchSymbol,
-                next.0.clone(),
+                format!("Invalid type {} for field lookup in tuple", field),
+                error::ErrorType::TypeFail,
+                pos.clone(),
             )));
+        };
+        if let Some(vv) = Self::find_in_fieldlist(&field, fs) {
+            Ok(vv)
+        } else {
+            Err(Box::new(error::BuildError::new(
+                format!("Unable to {} match element in tuple.", field,),
+                error::ErrorType::NoSuchSymbol,
+                pos.clone(),
+            )))
         }
-        Ok(())
     }
 
+    // TODO: Do as part of a binary operator selector lookup.
     fn lookup_in_list(
         &self,
-        stack: &mut VecDeque<Rc<Val>>,
-        sl: &SelectorList,
-        next: (&Position, &str),
+        pos: &Position,
+        field: &Rc<Val>,
         elems: &Vec<Rc<Val>>,
-    ) -> Result<(), Box<Error>> {
-        let idx = next.1.parse::<usize>()?;
-        if idx < elems.len() {
-            stack.push_back(elems[idx].clone());
-        } else {
-            return Err(Box::new(error::BuildError::new(
-                format!(
-                    "Unable to \
-                     match element {} in selector \
-                     path [{}]",
-                    next.1, sl,
-                ),
-                error::ErrorType::NoSuchSymbol,
-                next.0.clone(),
-            )));
-        }
-        Ok(())
-    }
-
-    fn lookup_selector(&mut self, sl: &SelectorList, scope: &Scope) -> Result<Rc<Val>, Box<Error>> {
-        let first = self.eval_expr(&sl.head, scope)?;
-        // First we ensure that the result is a tuple or a list.
-        let mut stack = VecDeque::new();
-        match first.as_ref() {
-            &Val::Tuple(_) => {
-                stack.push_back(first.clone());
-            }
-            &Val::List(_) => {
-                stack.push_back(first.clone());
-            }
-            &Val::Env(_) => {
-                stack.push_back(first.clone());
-            }
+    ) -> Result<Rc<Val>, Box<Error>> {
+        let idx = match field.as_ref() {
+            &Val::Int(i) => i as usize,
+            &Val::Str(ref s) => s.parse::<usize>()?,
             _ => {
-                // noop
+                return Err(Box::new(error::BuildError::new(
+                    format!("Invalid idx type {} for list lookup", field),
+                    error::ErrorType::TypeFail,
+                    pos.clone(),
+                )))
             }
-        }
-
-        if let &Some(ref tail) = &sl.tail {
-            if tail.len() == 0 {
-                return Ok(first);
-            }
-            let mut it = tail.iter().peekable();
-            loop {
-                let vref = stack.pop_front().unwrap();
-                if it.peek().is_none() {
-                    return Ok(vref.clone());
-                }
-                // This unwrap is safe because we already checked for
-                // None above.
-                let next = it.next().unwrap();
-                match vref.as_ref() {
-                    &Val::Tuple(ref fs) => {
-                        self.lookup_in_tuple(&mut stack, sl, (&next.pos, &next.fragment), fs)?;
-                        continue;
-                    }
-                    &Val::Env(ref fs) => {
-                        self.lookup_in_env(&next, &mut stack, fs)?;
-                        continue;
-                    }
-                    &Val::List(ref elems) => {
-                        self.lookup_in_list(&mut stack, sl, (&next.pos, &next.fragment), elems)?;
-                        continue;
-                    }
-                    _ => {
-                        return Err(Box::new(error::BuildError::new(
-                            format!("{} is not a Tuple or List", vref),
-                            error::ErrorType::TypeFail,
-                            next.pos.clone(),
-                        )));
-                    }
-                }
-            }
+        };
+        if idx < elems.len() {
+            Ok(elems[idx].clone())
         } else {
-            return Ok(first);
+            Err(Box::new(error::BuildError::new(
+                format!("idx {} out of bounds in list", idx),
+                error::ErrorType::NoSuchSymbol,
+                pos.clone(),
+            )))
         }
     }
 
@@ -857,21 +809,44 @@ impl<'a> FileBuilder<'a> {
         )))
     }
 
+    fn do_dot_lookup(
+        &mut self,
+        pos: &Position,
+        left: Rc<Val>,
+        right: Rc<Val>,
+        scope: &Scope,
+    ) -> Result<Rc<Val>, Box<Error>> {
+        match left.as_ref() {
+            &Val::Tuple(ref fs) => self.lookup_in_tuple(pos, &right, fs),
+            &Val::List(ref fs) => self.lookup_in_list(pos, &right, fs),
+            &Val::Env(ref fs) => self.lookup_in_env(pos, &right, fs),
+            _ => Err(Box::new(error::BuildError::new(
+                "Invalid type left operand for dot lookup",
+                error::ErrorType::TypeFail,
+                pos.clone(),
+            ))),
+        }
+    }
+
     fn eval_binary(&mut self, def: &BinaryOpDef, scope: &Scope) -> Result<Rc<Val>, Box<Error>> {
         let kind = &def.kind;
         let left = self.eval_expr(&def.left, scope)?;
         let right = self.eval_expr(&def.right, scope)?;
         match kind {
+            // Handle math and concatenation operators here
             &BinaryExprType::Add => self.add_vals(&def.pos, left, right),
             &BinaryExprType::Sub => self.subtract_vals(&def.pos, left, right),
             &BinaryExprType::Mul => self.multiply_vals(&def.pos, left, right),
             &BinaryExprType::Div => self.divide_vals(&def.pos, left, right),
+            // Handle Comparison operators here
             &BinaryExprType::Equal => self.do_deep_equal(&def.pos, left, right),
             &BinaryExprType::GT => self.do_gt(&def.pos, left, right),
             &BinaryExprType::LT => self.do_lt(&def.pos, left, right),
             &BinaryExprType::GTEqual => self.do_gtequal(&def.pos, left, right),
             &BinaryExprType::LTEqual => self.do_ltequal(&def.pos, left, right),
             &BinaryExprType::NotEqual => self.do_not_deep_equal(&def.pos, left, right),
+            // TODO Handle the whole selector lookup logic here.
+            &BinaryExprType::DOT => self.do_dot_lookup(&def.pos, left, right, scope),
         }
     }
 
@@ -960,7 +935,7 @@ impl<'a> FileBuilder<'a> {
     }
 
     fn eval_copy(&mut self, def: &CopyDef, scope: &Scope) -> Result<Rc<Val>, Box<Error>> {
-        let v = self.lookup_selector(&def.selector.sel, scope)?;
+        let v = self.eval_value(&def.selector, scope)?;
         if let &Val::Tuple(ref src_fields) = v.as_ref() {
             let mut child_scope = scope.spawn_child();
             child_scope.set_curr_val(v.clone());
@@ -1011,14 +986,14 @@ impl<'a> FileBuilder<'a> {
                         mod_def.arg_tuple
                     ),
                     error::ErrorType::TypeFail,
-                    def.selector.pos.clone(),
+                    def.selector.pos().clone(),
                 )));
             }
         }
         Err(Box::new(error::BuildError::new(
             format!("Expected Tuple or Module got {}", v),
             error::ErrorType::TypeFail,
-            def.selector.pos.clone(),
+            def.selector.pos().clone(),
         )))
     }
 
@@ -1035,9 +1010,8 @@ impl<'a> FileBuilder<'a> {
     }
 
     fn eval_call(&mut self, def: &CallDef, scope: &Scope) -> Result<Rc<Val>, Box<Error>> {
-        let sel = &def.macroref;
         let args = &def.arglist;
-        let v = self.lookup_selector(&sel.sel, scope)?;
+        let v = self.eval_value(&def.macroref, scope)?;
         if let &Val::Macro(ref m) = v.deref() {
             // Congratulations this is actually a macro.
             let mut argvals: Vec<Rc<Val>> = Vec::new();
@@ -1145,13 +1119,13 @@ impl<'a> FileBuilder<'a> {
                 )));
             }
         };
-        let mac = &def.mac;
-        if let &Val::Macro(ref macdef) = self.lookup_selector(&mac.sel, scope)?.as_ref() {
+        let mac_sym = Value::Symbol(def.mac.clone());
+        if let &Val::Macro(ref macdef) = self.eval_value(&mac_sym, &self.scope)?.as_ref() {
             let mut out = Vec::new();
             for item in l.iter() {
                 let argvals = vec![item.clone()];
                 let fields = macdef.eval(self.file.clone(), self, argvals)?;
-                if let Some(v) = Self::find_in_fieldlist(&def.field, &fields) {
+                if let Some(v) = Self::find_in_fieldlist(&def.field.val, &fields) {
                     match def.typ {
                         ListOpType::Map => {
                             out.push(v.clone());
@@ -1172,7 +1146,7 @@ impl<'a> FileBuilder<'a> {
             return Ok(Rc::new(Val::List(out)));
         }
         return Err(Box::new(error::BuildError::new(
-            format!("Expected macro but got {:?}", mac),
+            format!("Expected macro but got {:?}", def.mac),
             error::ErrorType::TypeFail,
             def.pos.clone(),
         )));

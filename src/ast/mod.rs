@@ -185,157 +185,10 @@ macro_rules! make_expr {
     };
 }
 
-/// Helper macro for making selectors.
-///
-/// ```
-/// make_selector!(Token::new("tpl", 1, 1), Token::new("fld", 1, 4));
-///
-/// make_selector!(Token::new("tpl", 1, 1), vec![Token::new("fld", 1, 4)], => 1, 1);
-///
-/// make_selector!(foo", ["bar"]);
-///
-/// make_selector!(foo", ["bar"] => 1, 0);
-/// ```
-#[allow(unused_macros)]
-macro_rules! make_selector {
-    ( $h:expr, $i:expr) => {
-        SelectorDef::new(
-            SelectorList{head: Box::new($h), tail: None},
-            $i)
-    };
-
-    ( $h: expr, $list:expr, $i:expr) => {
-        SelectorDef::new(
-            SelectorList{head: Box::new($h), tail: Some($list)},
-            $i)
-    };
-
-    // Tokens
-    ( $h:expr => [ $( $item:expr ),* ], $i:expr ) => {
-        {
-            make_selector!($h => [ $( $item, )* ] => $i)
-        }
-    };
-
-    ( $h:expr => [ $( $item:expr ),* ] => $i:expr ) => {
-        {
-            let mut list: Vec<Token> = Vec::new();
-
-            $(
-                list.push($item);
-            )*
-
-            make_selector!($h, list, $i)
-        }
-    };
-
-    // Strings not tokens
-    ( $h:expr => $( $item:expr ),* ) => {
-        {
-
-            let mut col = 1;
-            let mut list: Vec<Token> = Vec::new();
-
-            $(
-                list.push(make_tok!($item, Position::new(1, col, col)));
-                col += $item.len() + 1;
-            )*
-
-            // Shut up the lint about unused code;
-            assert!(col != 0);
-
-            make_selector!($h, list, Position::new(1, 1, 1))
-        }
-
-    };
-
-    ( $h:expr => $( $item:expr ),* => $l:expr, $c:expr ) => {
-        {
-            let mut col = $c;
-            let mut list: Vec<Token> = Vec::new();
-
-            $(
-                list.push(make_tok!($item, Position::new($l, col, col)));
-                col += $item.len() + 1;
-            )*
-
-            // Shut up the linter about unused code;
-            assert!(col != 0);
-
-            make_selector!($h, list, Position::new($l, $c, $c))
-        }
-    };
-}
-
-/// An Expression with a series of symbols specifying the key
-/// with which to descend into the result of the expression.
-///
-/// The expression must evaluate to either a tuple or an array. The token must
-/// evaluate to either a bareword Symbol or an Int.
-///
-/// ```ucg
-/// let foo = { bar = "a thing" };
-/// let thing = foo.bar;
-///
-/// let arr = ["one", "two"];
-/// let first = arr.0;
-///
-/// let berry = {best = "strawberry", unique = "acai"}.best;
-/// let third = ["uno", "dos", "tres"].1;
-/// '''
-#[derive(PartialEq, Clone)]
-pub struct SelectorList {
-    pub head: Box<Expression>,
-    // TODO This should now work more like a binary operator. Perhaps move into the precendence parser code?
-    pub tail: Option<Vec<Token>>,
-}
-
-impl SelectorList {
-    /// Returns a stringified version of a SelectorList.
-    pub fn to_string(&self) -> String {
-        "TODO".to_string()
-    }
-}
-
-impl fmt::Debug for SelectorList {
-    fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
-        write!(w, "Selector({})", self)
-    }
-}
-
-impl fmt::Display for SelectorList {
-    fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
-        write!(w, "{}", self.head)?;
-        if let Some(ref tok_vec) = self.tail {
-            for t in tok_vec.iter() {
-                write!(w, ".{}", t.fragment)?;
-            }
-        }
-        return Ok(());
-    }
-}
-
 /// An ordered list of Name = Value pairs.
 ///
 /// This is usually used as the body of a tuple in the UCG AST.
 pub type FieldList = Vec<(Token, Expression)>; // Token is expected to be a symbol
-
-/// Encodes a selector expression in the UCG AST.
-#[derive(Debug, PartialEq, Clone)]
-pub struct SelectorDef {
-    pub pos: Position,
-    pub sel: SelectorList,
-}
-
-impl SelectorDef {
-    /// Constructs a new SelectorDef.
-    pub fn new<P: Into<Position>>(sel: SelectorList, p: P) -> Self {
-        SelectorDef {
-            pos: p.into(),
-            sel: sel,
-        }
-    }
-}
 
 /// Represents a Value in the UCG parsed AST.
 #[derive(Debug, PartialEq, Clone)]
@@ -350,7 +203,6 @@ pub enum Value {
     // Complex Values
     Tuple(PositionedItem<FieldList>),
     List(ListDef),
-    Selector(SelectorDef),
 }
 
 impl Value {
@@ -365,7 +217,6 @@ impl Value {
             &Value::Symbol(_) => "Symbol".to_string(),
             &Value::Tuple(_) => "Tuple".to_string(),
             &Value::List(_) => "List".to_string(),
-            &Value::Selector(_) => "Selector".to_string(),
         }
     }
 
@@ -396,7 +247,6 @@ impl Value {
             &Value::Symbol(ref s) => format!("{}", s.val),
             &Value::Tuple(ref fs) => format!("{}", Self::fields_to_string(&fs.val)),
             &Value::List(ref def) => format!("[{}]", Self::elems_to_string(&def.elems)),
-            &Value::Selector(ref v) => v.sel.to_string(),
         }
     }
 
@@ -411,7 +261,6 @@ impl Value {
             &Value::Symbol(ref s) => &s.pos,
             &Value::Tuple(ref fs) => &fs.pos,
             &Value::List(ref def) => &def.pos,
-            &Value::Selector(ref v) => &v.pos,
         }
     }
 
@@ -427,8 +276,7 @@ impl Value {
             &Value::Str(_),
             &Value::Symbol(_),
             &Value::Tuple(_),
-            &Value::List(_),
-            &Value::Selector(_)
+            &Value::List(_)
         )
     }
 }
@@ -437,7 +285,7 @@ impl Value {
 /// defined.
 #[derive(PartialEq, Debug, Clone)]
 pub struct CallDef {
-    pub macroref: SelectorDef,
+    pub macroref: Value,
     pub arglist: Vec<Expression>,
     pub pos: Position,
 }
@@ -552,8 +400,6 @@ impl MacroDef {
             if !self.symbol_is_in_args(&name.val) {
                 bad_symbols.insert(name.val.clone());
             }
-        } else if let &Value::Selector(ref sel_node) = val {
-            stack.push(&sel_node.sel.head);
         } else if let &Value::Tuple(ref tuple_node) = val {
             let fields = &tuple_node.val;
             for &(_, ref expr) in fields.iter() {
@@ -637,6 +483,7 @@ impl MacroDef {
 /// UCG expression.
 #[derive(Debug, PartialEq, Clone)]
 pub enum BinaryExprType {
+    // Math
     Add,
     Sub,
     Mul,
@@ -648,7 +495,8 @@ pub enum BinaryExprType {
     NotEqual,
     GTEqual,
     LTEqual,
-    // TODO DOT Selector operator
+    // Selector operator
+    DOT,
 }
 
 /// Represents an expression with a left and a right side.
@@ -663,7 +511,7 @@ pub struct BinaryOpDef {
 /// Encodes a tuple Copy expression in the UCG AST.
 #[derive(Debug, PartialEq, Clone)]
 pub struct CopyDef {
-    pub selector: SelectorDef,
+    pub selector: Value,
     pub fields: FieldList,
     pub pos: Position,
 }
@@ -694,8 +542,8 @@ pub enum ListOpType {
 #[derive(Debug, PartialEq, Clone)]
 pub struct ListOpDef {
     pub typ: ListOpType,
-    pub mac: SelectorDef,
-    pub field: String,
+    pub mac: PositionedItem<String>,
+    pub field: PositionedItem<String>,
     pub target: Box<Expression>,
     pub pos: Position,
 }

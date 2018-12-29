@@ -28,6 +28,13 @@ pub enum Element {
 }
 
 make_fn!(
+    dot_op_type<SliceIter<Token>, Element>,
+    do_each!(
+        _ => punct!("."),
+        (Element::Op(BinaryExprType::DOT)))
+);
+
+make_fn!(
     math_op_type<SliceIter<Token>, Element>,
     either!(
         do_each!(
@@ -60,6 +67,34 @@ fn parse_expression(i: SliceIter<Element>) -> Result<SliceIter<Element>, Express
     return Result::Fail(Error::new(
         format!(
             "Error while parsing Binary Expression Expected Expression got {:?}",
+            el
+        ),
+        Box::new(i_),
+    ));
+}
+
+fn parse_dot_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, BinaryExprType> {
+    let mut i_ = i.clone();
+    if eoi(i_.clone()).is_complete() {
+        return Result::Fail(Error::new(
+            format!("Expected Expression found End Of Input"),
+            Box::new(i_),
+        ));
+    }
+    let el = i_.next();
+    if let Some(&Element::Op(ref op)) = el {
+        match op {
+            &BinaryExprType::DOT => {
+                return Result::Complete(i_.clone(), op.clone());
+            }
+            _other => {
+                // noop
+            }
+        };
+    }
+    return Result::Fail(Error::new(
+        format!(
+            "Error while parsing Binary Expression Unexpected Operator {:?}",
             el
         ),
         Box::new(i_),
@@ -182,6 +217,7 @@ make_fn!(
         parse_sum_operator,
         either!(
             trace_parse!(product_expression),
+            trace_parse!(dot_expression),
             trace_parse!(parse_expression)
         )
     )
@@ -189,7 +225,10 @@ make_fn!(
 
 make_fn!(
     product_expression<SliceIter<Element>, Expression>,
-    do_binary_expr!(parse_product_operator, trace_parse!(parse_expression))
+    do_binary_expr!(
+        parse_product_operator,
+        either!(trace_parse!(dot_expression), trace_parse!(parse_expression))
+    )
 );
 
 make_fn!(
@@ -247,7 +286,17 @@ fn parse_compare_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, B
 
 make_fn!(
     binary_expression<SliceIter<Element>, Expression>,
-    either!(compare_expression, math_expression, parse_expression)
+    either!(
+        compare_expression,
+        math_expression,
+        dot_expression,
+        parse_expression
+    )
+);
+
+make_fn!(
+    dot_expression<SliceIter<Element>, Expression>,
+    do_binary_expr!(parse_dot_operator, trace_parse!(parse_expression))
 );
 
 make_fn!(
@@ -256,6 +305,7 @@ make_fn!(
         parse_compare_operator,
         either!(
             trace_parse!(math_expression),
+            trace_parse!(dot_expression),
             trace_parse!(parse_expression)
         )
     )
@@ -290,7 +340,8 @@ fn parse_operand_list<'a>(i: SliceIter<'a, Token>) -> ParseResult<'a, Vec<Elemen
             }
         }
         // 3. Parse an operator.
-        match either!(_i.clone(), math_op_type, compare_op_type) {
+        // TODO(jwall): Parse the dot operator.
+        match either!(_i.clone(), dot_op_type, math_op_type, compare_op_type) {
             Result::Fail(e) => {
                 if firstrun {
                     // If we don't find an operator in our first
