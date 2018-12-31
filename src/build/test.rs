@@ -21,7 +21,10 @@ use std::rc::Rc;
 
 fn test_expr_to_val(mut cases: Vec<(Expression, Val)>, mut b: FileBuilder) {
     for tpl in cases.drain(0..) {
-        assert_eq!(b.eval_expr(&tpl.0).unwrap(), Rc::new(tpl.1));
+        assert_eq!(
+            b.eval_expr(&tpl.0, &b.scope.spawn_child()).unwrap(),
+            Rc::new(tpl.1)
+        );
     }
 }
 
@@ -133,14 +136,15 @@ fn test_eval_simple_lookup_error() {
     let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
     let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
-    b.build_output
+    b.scope
+        .build_output
         .entry(value_node!("var1".to_string(), Position::new(1, 0, 0)))
         .or_insert(Rc::new(Val::Int(1)));
     let expr = Expression::Simple(Value::Symbol(value_node!(
         "var".to_string(),
         Position::new(1, 1, 1)
     )));
-    assert!(b.eval_expr(&expr).is_err());
+    assert!(b.eval_expr(&expr, &b.scope.spawn_child()).is_err());
 }
 
 // Include nested for each.
@@ -172,7 +176,8 @@ fn test_expr_copy_not_a_tuple() {
     let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
     let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
-    b.build_output
+    b.scope
+        .build_output
         .entry(value_node!("tpl1".to_string(), Position::new(1, 0, 0)))
         .or_insert(Rc::new(Val::Int(1)));
     test_expr_to_val(
@@ -197,7 +202,8 @@ fn test_expr_copy_field_type_error() {
     let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
     let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
-    b.build_output
+    b.scope
+        .build_output
         .entry(value_node!("tpl1".to_string(), Position::new(1, 0, 0)))
         .or_insert(Rc::new(Val::Tuple(vec![(
             value_node!("fld1".to_string(), Position::new(1, 0, 0)),
@@ -234,10 +240,12 @@ fn test_macro_hermetic() {
     let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
     let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
-    b.build_output
+    b.scope
+        .build_output
         .entry(value_node!("arg1".to_string(), Position::new(1, 0, 0)))
         .or_insert(Rc::new(Val::Str("bar".to_string())));
-    b.build_output
+    b.scope
+        .build_output
         .entry(value_node!("tstmac".to_string(), Position::new(1, 0, 0)))
         .or_insert(Rc::new(Val::Macro(MacroDef {
             argdefs: vec![value_node!("arg2".to_string(), Position::new(1, 0, 0))],
@@ -278,7 +286,8 @@ fn test_select_expr_not_a_string() {
     let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
     let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
-    b.build_output
+    b.scope
+        .build_output
         .entry(value_node!("foo".to_string(), Position::new(1, 0, 0)))
         .or_insert(Rc::new(Val::Int(4)));
     test_expr_to_val(

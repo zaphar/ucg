@@ -28,6 +28,7 @@ use std::string::ToString;
 use simple_error;
 
 use crate::ast::*;
+use crate::build::scope::{Scope, ValueMap};
 use crate::error;
 use crate::format;
 use crate::iter::OffsetStrIter;
@@ -35,6 +36,7 @@ use crate::parse::parse;
 
 pub mod assets;
 pub mod ir;
+pub mod scope;
 
 pub use self::ir::Val;
 
@@ -67,12 +69,13 @@ impl MacroDef {
             scope.entry(self.argdefs[i].clone()).or_insert(arg.clone());
         }
         let mut b = parent_builder.clone_builder(root);
-        b.set_scope(scope);
+        b.set_build_output(scope);
         let mut result: Vec<(PositionedItem<String>, Rc<Val>)> = Vec::new();
         for &(ref key, ref expr) in self.fields.iter() {
             // We clone the expressions here because this macro may be consumed
             // multiple times in the future.
-            let val = b.eval_expr(expr)?;
+            let scope = b.scope.spawn_child();
+            let val = b.eval_expr(expr, &scope)?;
             result.push((key.into(), val.clone()));
         }
         Ok(result)
@@ -81,9 +84,6 @@ impl MacroDef {
 
 /// The result of a build.
 type BuildResult = Result<(), Box<Error>>;
-
-/// Defines a set of values in a parsed file.
-type ValueMap = HashMap<PositionedItem<String>, Rc<Val>>;
 
 /// AssertCollector collects the results of assertions in the UCG AST.
 pub struct AssertCollector {
@@ -99,7 +99,7 @@ pub struct FileBuilder<'a> {
     validate_mode: bool,
     pub assert_collector: AssertCollector,
     strict: bool,
-    env: Rc<Val>,
+    scope: Scope,
     // NOTE(jwall): We use interior mutability here because we need
     // our asset cache to be shared by multiple different sub-builders.
     // We use Rc to handle the reference counting for us and we use
@@ -112,11 +112,6 @@ pub struct FileBuilder<'a> {
     // so multiple imports of the same file don't have to be parsed
     // multiple times.
     assets: Rc<RefCell<assets::Cache>>,
-    /// build_output is our built output.
-    build_output: ValueMap,
-    /// last is the result of the last statement.
-    import_stack: Vec<String>,
-    pub stack: Option<Vec<Rc<Val>>>,
     pub is_module: bool,
     pub last: Option<Rc<Val>>,
     pub out_lock: Option<(String, Rc<Val>)>,
@@ -146,37 +141,21 @@ impl<'a> FileBuilder<'a> {
         import_paths: &'a Vec<PathBuf>,
         cache: Rc<RefCell<assets::Cache>>,
     ) -> Self {
-        Self::new_with_scope(file, import_paths, cache, HashMap::new())
+        let env_vars: Vec<(String, String)> = env::vars().collect();
+        let scope = scope::Scope::new(Rc::new(Val::Env(env_vars)));
+        Self::new_with_scope(file, import_paths, cache, scope)
     }
 
     /// Constructs a new Builder with a provided scope.
     pub fn new_with_scope<P: Into<PathBuf>>(
-        root: P,
-        import_paths: &'a Vec<PathBuf>,
-        cache: Rc<RefCell<assets::Cache>>,
-        scope: ValueMap,
-    ) -> Self {
-        let env_vars: Vec<(String, String)> = env::vars().collect();
-        Self::new_with_env_and_scope(
-            root,
-            import_paths,
-            cache,
-            scope,
-            Rc::new(Val::Env(env_vars)),
-        )
-    }
-
-    pub fn new_with_env_and_scope<P: Into<PathBuf>>(
         file: P,
         import_paths: &'a Vec<PathBuf>,
         cache: Rc<RefCell<assets::Cache>>,
-        scope: ValueMap,
-        env: Rc<Val>,
+        scope: Scope,
     ) -> Self {
         let file = file.into();
         FileBuilder {
             // Our import stack is initialized with ourself.
-            import_stack: vec![file.to_string_lossy().to_string()],
             file: file,
             import_path: import_paths,
             validate_mode: false,
@@ -185,12 +164,10 @@ impl<'a> FileBuilder<'a> {
                 summary: String::new(),
                 failures: String::new(),
             },
-            env: env,
+            scope: scope,
             strict: true,
             assets: cache,
-            build_output: scope,
             out_lock: None,
-            stack: None,
             is_module: false,
             last: None,
         }
@@ -198,8 +175,6 @@ impl<'a> FileBuilder<'a> {
 
     pub fn clone_builder<P: Into<PathBuf>>(&self, file: P) -> Self {
         FileBuilder {
-            // Our import stack is initialized with ourself.
-            import_stack: self.import_stack.clone(),
             file: file.into(),
             import_path: self.import_path,
             validate_mode: false,
@@ -208,49 +183,45 @@ impl<'a> FileBuilder<'a> {
                 summary: String::new(),
                 failures: String::new(),
             },
-            env: self.env.clone(),
             strict: true,
             assets: self.assets.clone(),
-            build_output: HashMap::new(),
+            scope: self.scope.spawn_clean(),
             out_lock: None,
-            stack: None,
             is_module: false,
             last: None,
         }
     }
 
-    pub fn set_scope(&mut self, scope: ValueMap) {
-        self.build_output = scope;
+    pub fn set_build_output(&mut self, scope: ValueMap) {
+        self.scope.build_output = scope;
     }
 
     pub fn set_strict(&mut self, to: bool) {
         self.strict = to;
     }
 
-    pub fn prepend_import_stack(&mut self, imports: &Vec<String>) {
-        let mut new_stack = self.import_stack.clone();
-        new_stack.append(imports.clone().as_mut());
-        self.import_stack = new_stack;
-    }
-
-    fn eval_tuple(&mut self, fields: &Vec<(Token, Expression)>) -> Result<Rc<Val>, Box<Error>> {
+    fn eval_tuple(
+        &mut self,
+        fields: &Vec<(Token, Expression)>,
+        scope: &Scope,
+    ) -> Result<Rc<Val>, Box<Error>> {
         let mut new_fields = Vec::<(PositionedItem<String>, Rc<Val>)>::new();
         for &(ref name, ref expr) in fields.iter() {
-            let val = self.eval_expr(expr)?;
+            let val = self.eval_expr(expr, scope)?;
             new_fields.push((name.into(), val));
         }
         Ok(Rc::new(Val::Tuple(new_fields)))
     }
 
-    fn eval_list(&mut self, def: &ListDef) -> Result<Rc<Val>, Box<Error>> {
+    fn eval_list(&mut self, def: &ListDef, scope: &Scope) -> Result<Rc<Val>, Box<Error>> {
         let mut vals = Vec::new();
         for expr in def.elems.iter() {
-            vals.push(self.eval_expr(expr)?);
+            vals.push(self.eval_expr(expr, scope)?);
         }
         Ok(Rc::new(Val::List(vals)))
     }
 
-    fn eval_value(&mut self, v: &Value) -> Result<Rc<Val>, Box<Error>> {
+    fn eval_value(&mut self, v: &Value, scope: &Scope) -> Result<Rc<Val>, Box<Error>> {
         match v {
             &Value::Empty(_) => Ok(Rc::new(Val::Empty)),
             &Value::Boolean(ref b) => Ok(Rc::new(Val::Boolean(b.val))),
@@ -258,17 +229,18 @@ impl<'a> FileBuilder<'a> {
             &Value::Float(ref f) => Ok(Rc::new(Val::Float(f.val))),
             &Value::Str(ref s) => Ok(Rc::new(Val::Str(s.val.to_string()))),
             &Value::Symbol(ref s) => {
-                self.lookup_sym(&(s.into()))
+                scope
+                    .lookup_sym(&(s.into()))
                     .ok_or(Box::new(error::BuildError::new(
                         format!("Unable to find binding {}", s.val,),
                         error::ErrorType::NoSuchSymbol,
                         v.pos().clone(),
                     )))
             }
-            &Value::List(ref def) => self.eval_list(def),
-            &Value::Tuple(ref tuple) => self.eval_tuple(&tuple.val),
+            &Value::List(ref def) => self.eval_list(def, scope),
+            &Value::Tuple(ref tuple) => self.eval_tuple(&tuple.val, scope),
             &Value::Selector(ref selector_list_node) => {
-                self.lookup_selector(&selector_list_node.sel)
+                self.lookup_selector(&selector_list_node.sel, scope)
             }
         }
     }
@@ -279,7 +251,7 @@ impl<'a> FileBuilder<'a> {
             pos: Position::new(0, 0, 0),
             val: name.to_string(),
         };
-        self.lookup_sym(&key)
+        self.scope.lookup_sym(&key)
     }
 
     /// Puts the builder in validation mode.
@@ -358,7 +330,11 @@ impl<'a> FileBuilder<'a> {
     }
 
     fn detect_import_cycle(&self, path: &str) -> bool {
-        self.import_stack.iter().find(|p| *p == path).is_some()
+        self.scope
+            .import_stack
+            .iter()
+            .find(|p| *p == path)
+            .is_some()
     }
 
     fn eval_import(&mut self, def: &ImportDef) -> Result<Rc<Val>, Box<Error>> {
@@ -398,7 +374,7 @@ impl<'a> FileBuilder<'a> {
                 format!(
                     "Import Cycle Detected!!!! {} is already in import stack: {:?}",
                     normalized.to_string_lossy(),
-                    self.import_stack,
+                    self.scope.import_stack,
                 ),
                 error::ErrorType::Unsupported,
                 sym.pos.clone(),
@@ -417,21 +393,22 @@ impl<'a> FileBuilder<'a> {
             }
         };
         let key = sym.into();
-        if self.build_output.contains_key(&key) {
+        if self.scope.build_output.contains_key(&key) {
             return Err(Box::new(error::BuildError::new(
                 format!("Binding for import name {} already exists", sym.fragment),
                 error::ErrorType::DuplicateBinding,
                 def.path.pos.clone(),
             )));
         }
-        self.build_output.insert(key, result.clone());
+        self.scope.build_output.insert(key, result.clone());
         let mut mut_assets_cache = self.assets.borrow_mut();
         mut_assets_cache.stash(normalized.clone(), result.clone())?;
         return Ok(result);
     }
 
     fn eval_let(&mut self, def: &LetDef) -> Result<Rc<Val>, Box<Error>> {
-        let val = self.eval_expr(&def.value)?;
+        let child_scope = self.scope.clone();
+        let val = self.eval_expr(&def.value, &child_scope)?;
         let name = &def.name;
         if Self::check_reserved_word(&name.fragment) {
             return Err(Box::new(error::BuildError::new(
@@ -440,7 +417,7 @@ impl<'a> FileBuilder<'a> {
                 name.pos.clone(),
             )));
         }
-        match self.build_output.entry(name.into()) {
+        match self.scope.build_output.entry(name.into()) {
             Entry::Occupied(e) => {
                 return Err(Box::new(error::BuildError::new(
                     format!(
@@ -461,16 +438,17 @@ impl<'a> FileBuilder<'a> {
     }
 
     fn eval_stmt(&mut self, stmt: &Statement) -> Result<Rc<Val>, Box<Error>> {
+        let child_scope = self.scope.clone();
         match stmt {
             &Statement::Assert(ref expr) => self.build_assert(&expr),
             &Statement::Let(ref def) => self.eval_let(def),
             &Statement::Import(ref def) => self.eval_import(def),
-            &Statement::Expression(ref expr) => self.eval_expr(expr),
+            &Statement::Expression(ref expr) => self.eval_expr(expr, &child_scope),
             // Only one output can be used per file. Right now we enforce this by
             // having a single builder per file.
             &Statement::Output(ref typ, ref expr) => {
                 if let None = self.out_lock {
-                    let val = self.eval_expr(expr)?;
+                    let val = self.eval_expr(expr, &child_scope)?;
                     self.out_lock = Some((typ.fragment.to_string(), val.clone()));
                     Ok(val)
                 } else {
@@ -482,19 +460,6 @@ impl<'a> FileBuilder<'a> {
                 }
             }
         }
-    }
-
-    fn lookup_sym(&self, sym: &PositionedItem<String>) -> Option<Rc<Val>> {
-        if &sym.val == "env" {
-            return Some(self.env.clone());
-        }
-        if &sym.val == "self" {
-            return self.peek_val();
-        }
-        if self.build_output.contains_key(sym) {
-            return Some(self.build_output[sym].clone());
-        }
-        None
     }
 
     fn find_in_fieldlist(
@@ -580,8 +545,8 @@ impl<'a> FileBuilder<'a> {
         Ok(())
     }
 
-    fn lookup_selector(&mut self, sl: &SelectorList) -> Result<Rc<Val>, Box<Error>> {
-        let first = self.eval_expr(&sl.head)?;
+    fn lookup_selector(&mut self, sl: &SelectorList, scope: &Scope) -> Result<Rc<Val>, Box<Error>> {
+        let first = self.eval_expr(&sl.head, scope)?;
         // First we ensure that the result is a tuple or a list.
         let mut stack = VecDeque::new();
         match first.as_ref() {
@@ -892,10 +857,10 @@ impl<'a> FileBuilder<'a> {
         )))
     }
 
-    fn eval_binary(&mut self, def: &BinaryOpDef) -> Result<Rc<Val>, Box<Error>> {
+    fn eval_binary(&mut self, def: &BinaryOpDef, scope: &Scope) -> Result<Rc<Val>, Box<Error>> {
         let kind = &def.kind;
-        let left = self.eval_expr(&def.left)?;
-        let right = self.eval_expr(&def.right)?;
+        let left = self.eval_expr(&def.left, scope)?;
+        let right = self.eval_expr(&def.right, scope)?;
         match kind {
             &BinaryExprType::Add => self.add_vals(&def.pos, left, right),
             &BinaryExprType::Sub => self.subtract_vals(&def.pos, left, right),
@@ -904,10 +869,10 @@ impl<'a> FileBuilder<'a> {
         }
     }
 
-    fn eval_compare(&mut self, def: &ComparisonDef) -> Result<Rc<Val>, Box<Error>> {
+    fn eval_compare(&mut self, def: &ComparisonDef, scope: &Scope) -> Result<Rc<Val>, Box<Error>> {
         let kind = &def.kind;
-        let left = self.eval_expr(&def.left)?;
-        let right = self.eval_expr(&def.right)?;
+        let left = self.eval_expr(&def.left, scope)?;
+        let right = self.eval_expr(&def.right, scope)?;
         match kind {
             &CompareType::Equal => self.do_deep_equal(&def.pos, left, right),
             &CompareType::GT => self.do_gt(&def.pos, left, right),
@@ -918,34 +883,9 @@ impl<'a> FileBuilder<'a> {
         }
     }
 
-    fn push_val(&mut self, tuple: Rc<Val>) {
-        if let Some(ref mut v) = self.stack {
-            v.push(tuple);
-        } else {
-            let mut v = Vec::new();
-            v.push(tuple);
-            self.stack = Some(v);
-        }
-    }
-
-    fn pop_val(&mut self) -> Option<Rc<Val>> {
-        if let Some(ref mut v) = self.stack {
-            v.pop()
-        } else {
-            None
-        }
-    }
-
-    fn peek_val(&self) -> Option<Rc<Val>> {
-        if let Some(ref v) = self.stack {
-            v.first().map(|v| v.clone())
-        } else {
-            None
-        }
-    }
-
     fn get_outputs_as_val(&mut self) -> Rc<Val> {
-        let fields: Vec<(PositionedItem<String>, Rc<Val>)> = self.build_output.drain().collect();
+        let fields: Vec<(PositionedItem<String>, Rc<Val>)> =
+            self.scope.build_output.drain().collect();
         Rc::new(Val::Tuple(fields))
     }
 
@@ -953,6 +893,7 @@ impl<'a> FileBuilder<'a> {
         &mut self,
         src_fields: &Vec<(PositionedItem<String>, Rc<Val>)>,
         overrides: &Vec<(Token, Expression)>,
+        scope: &Scope,
     ) -> Result<Rc<Val>, Box<Error>> {
         let mut m = HashMap::<PositionedItem<String>, (i32, Rc<Val>)>::new();
         // loop through fields and build  up a hashmap
@@ -962,7 +903,6 @@ impl<'a> FileBuilder<'a> {
                 v.insert((count, val.clone()));
                 count += 1;
             } else {
-                self.pop_val();
                 return Err(Box::new(error::BuildError::new(
                     format!(
                         "Duplicate \
@@ -976,7 +916,7 @@ impl<'a> FileBuilder<'a> {
             }
         }
         for &(ref key, ref val) in overrides.iter() {
-            let expr_result = self.eval_expr(val)?;
+            let expr_result = self.eval_expr(val, scope)?;
             match m.entry(key.into()) {
                 // brand new field here.
                 Entry::Vacant(v) => {
@@ -993,7 +933,6 @@ impl<'a> FileBuilder<'a> {
                     {
                         v.insert((src_val.0, expr_result));
                     } else {
-                        self.pop_val();
                         return Err(Box::new(error::BuildError::new(
                             format!(
                                 "Expected type {} for field {} but got {}",
@@ -1008,7 +947,6 @@ impl<'a> FileBuilder<'a> {
                 }
             };
         }
-        self.pop_val();
         let mut new_fields: Vec<(PositionedItem<String>, (i32, Rc<Val>))> = m.drain().collect();
         // We want to maintain our order for the fields to make comparing tuples
         // easier in later code. So we sort by the field order before constructing a new tuple.
@@ -1029,11 +967,12 @@ impl<'a> FileBuilder<'a> {
         )));
     }
 
-    fn eval_copy(&mut self, def: &CopyDef) -> Result<Rc<Val>, Box<Error>> {
-        let v = self.lookup_selector(&def.selector.sel)?;
+    fn eval_copy(&mut self, def: &CopyDef, scope: &Scope) -> Result<Rc<Val>, Box<Error>> {
+        let v = self.lookup_selector(&def.selector.sel, scope)?;
         if let &Val::Tuple(ref src_fields) = v.as_ref() {
-            self.push_val(v.clone());
-            return self.copy_from_base(&src_fields, &def.fields);
+            let mut child_scope = scope.spawn_child();
+            child_scope.set_curr_val(v.clone());
+            return self.copy_from_base(&src_fields, &def.fields, &child_scope);
         }
         if let &Val::Module(ref mod_def) = v.as_ref() {
             let maybe_tpl = mod_def.clone().arg_tuple.unwrap().clone();
@@ -1045,12 +984,13 @@ impl<'a> FileBuilder<'a> {
                 //    argset.
                 // Push our base tuple on the stack so the copy can use
                 // self to reference it.
-                b.push_val(maybe_tpl.clone());
-                let mod_args = self.copy_from_base(src_fields, &def.fields)?;
+                let mut child_scope = scope.spawn_child();
+                child_scope.set_curr_val(maybe_tpl.clone());
+                let mod_args = self.copy_from_base(src_fields, &def.fields, &child_scope)?;
                 // put our copied parameters tuple in our builder under the mod key.
                 let mod_key =
                     PositionedItem::new_with_pos(String::from("mod"), Position::new(0, 0, 0));
-                match b.build_output.entry(mod_key) {
+                match b.scope.build_output.entry(mod_key) {
                     Entry::Occupied(e) => {
                         return Err(Box::new(error::BuildError::new(
                             format!(
@@ -1090,27 +1030,27 @@ impl<'a> FileBuilder<'a> {
         )))
     }
 
-    fn eval_format(&mut self, def: &FormatDef) -> Result<Rc<Val>, Box<Error>> {
+    fn eval_format(&mut self, def: &FormatDef, scope: &Scope) -> Result<Rc<Val>, Box<Error>> {
         let tmpl = &def.template;
         let args = &def.args;
         let mut vals = Vec::new();
         for v in args.iter() {
-            let rcv = self.eval_expr(v)?;
+            let rcv = self.eval_expr(v, scope)?;
             vals.push(rcv.deref().clone());
         }
         let formatter = format::Formatter::new(tmpl.clone(), vals);
         Ok(Rc::new(Val::Str(formatter.render(&def.pos)?)))
     }
 
-    fn eval_call(&mut self, def: &CallDef) -> Result<Rc<Val>, Box<Error>> {
+    fn eval_call(&mut self, def: &CallDef, scope: &Scope) -> Result<Rc<Val>, Box<Error>> {
         let sel = &def.macroref;
         let args = &def.arglist;
-        let v = self.lookup_selector(&sel.sel)?;
+        let v = self.lookup_selector(&sel.sel, scope)?;
         if let &Val::Macro(ref m) = v.deref() {
             // Congratulations this is actually a macro.
             let mut argvals: Vec<Rc<Val>> = Vec::new();
             for arg in args.iter() {
-                argvals.push(self.eval_expr(arg)?);
+                argvals.push(self.eval_expr(arg, scope)?);
             }
             let fields = m.eval(self.file.clone(), self, argvals)?;
             return Ok(Rc::new(Val::Tuple(fields)));
@@ -1148,46 +1088,46 @@ impl<'a> FileBuilder<'a> {
         };
     }
 
-    fn eval_module_def(&mut self, def: &ModuleDef) -> Result<Rc<Val>, Box<Error>> {
+    fn eval_module_def(&mut self, def: &ModuleDef, scope: &Scope) -> Result<Rc<Val>, Box<Error>> {
         let root = self.file_dir();
         // Always work on a copy. The original should not be modified.
         let mut def = def.clone();
         // First we rewrite the imports to be absolute paths.
         def.imports_to_absolute(root);
         // Then we create our tuple default.
-        def.arg_tuple = Some(self.eval_tuple(&def.arg_set)?);
+        def.arg_tuple = Some(self.eval_tuple(&def.arg_set, scope)?);
         // Then we construct a new Val::Module
         Ok(Rc::new(Val::Module(def)))
     }
 
-    fn eval_select(&mut self, def: &SelectDef) -> Result<Rc<Val>, Box<Error>> {
+    fn eval_select(&mut self, def: &SelectDef, scope: &Scope) -> Result<Rc<Val>, Box<Error>> {
         let target = &def.val;
         let def_expr = &def.default;
         let fields = &def.tuple;
         // First resolve the target expression.
-        let v = self.eval_expr(target)?;
+        let v = self.eval_expr(target, scope)?;
         // Second ensure that the expression resolves to a string.
         if let &Val::Str(ref name) = v.deref() {
             // Third find the field with that name in the tuple.
             for &(ref fname, ref val_expr) in fields.iter() {
                 if &fname.fragment == name {
                     // Fourth return the result of evaluating that field.
-                    return self.eval_expr(val_expr);
+                    return self.eval_expr(val_expr, scope);
                 }
             }
             // Otherwise return the default.
-            return self.eval_expr(def_expr);
+            return self.eval_expr(def_expr, scope);
         } else if let &Val::Boolean(b) = v.deref() {
             for &(ref fname, ref val_expr) in fields.iter() {
                 if &fname.fragment == "true" && b {
                     // Fourth return the result of evaluating that field.
-                    return self.eval_expr(val_expr);
+                    return self.eval_expr(val_expr, scope);
                 } else if &fname.fragment == "false" && !b {
-                    return self.eval_expr(val_expr);
+                    return self.eval_expr(val_expr, scope);
                 }
             }
             // Otherwise return the default.
-            return self.eval_expr(def_expr);
+            return self.eval_expr(def_expr, scope);
         } else {
             return Err(Box::new(error::BuildError::new(
                 format!(
@@ -1201,8 +1141,8 @@ impl<'a> FileBuilder<'a> {
         }
     }
 
-    fn eval_list_op(&mut self, def: &ListOpDef) -> Result<Rc<Val>, Box<Error>> {
-        let maybe_list = self.eval_expr(&def.target)?;
+    fn eval_list_op(&mut self, def: &ListOpDef, scope: &Scope) -> Result<Rc<Val>, Box<Error>> {
+        let maybe_list = self.eval_expr(&def.target, scope)?;
         let l = match maybe_list.as_ref() {
             &Val::List(ref elems) => elems,
             other => {
@@ -1214,7 +1154,7 @@ impl<'a> FileBuilder<'a> {
             }
         };
         let mac = &def.mac;
-        if let &Val::Macro(ref macdef) = self.lookup_selector(&mac.sel)?.as_ref() {
+        if let &Val::Macro(ref macdef) = self.lookup_selector(&mac.sel, scope)?.as_ref() {
             let mut out = Vec::new();
             for item in l.iter() {
                 let argvals = vec![item.clone()];
@@ -1303,19 +1243,19 @@ impl<'a> FileBuilder<'a> {
 
     // Evals a single Expression in the context of a running Builder.
     // It does not mutate the builders collected state at all.
-    pub fn eval_expr(&mut self, expr: &Expression) -> Result<Rc<Val>, Box<Error>> {
+    pub fn eval_expr(&mut self, expr: &Expression, scope: &Scope) -> Result<Rc<Val>, Box<Error>> {
         match expr {
-            &Expression::Simple(ref val) => self.eval_value(val),
-            &Expression::Binary(ref def) => self.eval_binary(def),
-            &Expression::Compare(ref def) => self.eval_compare(def),
-            &Expression::Copy(ref def) => self.eval_copy(def),
-            &Expression::Grouped(ref expr) => self.eval_expr(expr),
-            &Expression::Format(ref def) => self.eval_format(def),
-            &Expression::Call(ref def) => self.eval_call(def),
+            &Expression::Simple(ref val) => self.eval_value(val, scope),
+            &Expression::Binary(ref def) => self.eval_binary(def, scope),
+            &Expression::Compare(ref def) => self.eval_compare(def, scope),
+            &Expression::Copy(ref def) => self.eval_copy(def, scope),
+            &Expression::Grouped(ref expr) => self.eval_expr(expr, scope),
+            &Expression::Format(ref def) => self.eval_format(def, scope),
+            &Expression::Call(ref def) => self.eval_call(def, scope),
             &Expression::Macro(ref def) => self.eval_macro_def(def),
-            &Expression::Module(ref def) => self.eval_module_def(def),
-            &Expression::Select(ref def) => self.eval_select(def),
-            &Expression::ListOp(ref def) => self.eval_list_op(def),
+            &Expression::Module(ref def) => self.eval_module_def(def, scope),
+            &Expression::Select(ref def) => self.eval_select(def, scope),
+            &Expression::ListOp(ref def) => self.eval_list_op(def, scope),
         }
     }
 }
