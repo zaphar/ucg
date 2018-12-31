@@ -196,7 +196,7 @@ impl Converter for ExecConverter {
 mod exec_test {
     use super::*;
     use crate::build::assets::MemoryCache;
-    use crate::build::Builder;
+    use crate::build::FileBuilder;
     use crate::convert::traits::Converter;
 
     use std;
@@ -207,7 +207,7 @@ mod exec_test {
     fn convert_just_command_test() {
         let i_paths = Vec::new();
         let cache = Rc::new(RefCell::new(MemoryCache::new()));
-        let mut b = Builder::new(std::env::current_dir().unwrap(), &i_paths, cache);
+        let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
         let conv = ExecConverter::new();
         b.eval_string(
             "let script = {
@@ -229,7 +229,7 @@ mod exec_test {
     fn convert_command_with_env_test() {
         let i_paths = Vec::new();
         let cache = Rc::new(RefCell::new(MemoryCache::new()));
-        let mut b = Builder::new(std::env::current_dir().unwrap(), &i_paths, cache);
+        let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
         let conv = ExecConverter::new();
         b.eval_string(
             "let script = {
@@ -258,7 +258,7 @@ mod exec_test {
     fn convert_command_with_arg_test() {
         let i_paths = Vec::new();
         let cache = Rc::new(RefCell::new(MemoryCache::new()));
-        let mut b = Builder::new(std::env::current_dir().unwrap(), &i_paths, cache);
+        let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
         let conv = ExecConverter::new();
         b.eval_string(
             "let script = {

@@ -44,6 +44,6 @@ pub use crate::ast::Expression;
 pub use crate::ast::Statement;
 pub use crate::ast::Value;
 
-pub use crate::build::Builder;
+pub use crate::build::FileBuilder;
 pub use crate::build::Val;
 pub use crate::parse::parse;

@@ -43,7 +43,7 @@ impl MacroDef {
     pub fn eval(
         &self,
         root: PathBuf,
-        parent_builder: &Builder,
+        parent_builder: &FileBuilder,
         mut args: Vec<Rc<Val>>,
     ) -> Result<Vec<(PositionedItem<String>, Rc<Val>)>, Box<Error>> {
         // Error conditions. If the args don't match the length and types of the argdefs then this is
@@ -93,7 +93,7 @@ pub struct AssertCollector {
 }
 
 /// Builder handles building ucg code for a single file.
-pub struct Builder<'a> {
+pub struct FileBuilder<'a> {
     file: PathBuf,
     import_path: &'a Vec<PathBuf>,
     validate_mode: bool,
@@ -139,7 +139,7 @@ macro_rules! eval_binary_expr {
     };
 }
 
-impl<'a> Builder<'a> {
+impl<'a> FileBuilder<'a> {
     /// Constructs a new Builder.
     pub fn new<P: Into<PathBuf>>(
         file: P,
@@ -174,7 +174,7 @@ impl<'a> Builder<'a> {
         env: Rc<Val>,
     ) -> Self {
         let file = file.into();
-        Builder {
+        FileBuilder {
             // Our import stack is initialized with ourself.
             import_stack: vec![file.to_string_lossy().to_string()],
             file: file,
@@ -197,7 +197,7 @@ impl<'a> Builder<'a> {
     }
 
     pub fn clone_builder<P: Into<PathBuf>>(&self, file: P) -> Self {
-        Builder {
+        FileBuilder {
             // Our import stack is initialized with ourself.
             import_stack: self.import_stack.clone(),
             file: file.into(),

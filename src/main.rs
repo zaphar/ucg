@@ -80,12 +80,12 @@ fn build_file<'a>(
     strict: bool,
     import_paths: &'a Vec<PathBuf>,
     cache: Rc<RefCell<Cache>>,
-) -> Result<build::Builder<'a>, Box<Error>> {
+) -> Result<build::FileBuilder<'a>, Box<Error>> {
     let mut file_path_buf = PathBuf::from(file);
     if file_path_buf.is_relative() {
         file_path_buf = std::env::current_dir().unwrap().join(file_path_buf);
     }
-    let mut builder = build::Builder::new(file_path_buf, import_paths, cache);
+    let mut builder = build::FileBuilder::new(file_path_buf, import_paths, cache);
     builder.set_strict(strict);
     if validate {
         builder.enable_validate_mode();
@@ -243,7 +243,7 @@ fn inspect_command(
     let file = matches.value_of("INPUT").unwrap();
     let sym = matches.value_of("sym");
     let target = matches.value_of("target").unwrap();
-    let mut builder = build::Builder::new(file, import_paths, cache);
+    let mut builder = build::FileBuilder::new(file, import_paths, cache);
     builder.set_strict(strict);
     match registry.get_converter(target) {
         Some(converter) => {

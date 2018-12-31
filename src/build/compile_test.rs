@@ -16,12 +16,12 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use super::assets::MemoryCache;
-use super::Builder;
+use super::FileBuilder;
 
 fn assert_build(input: &str) {
     let i_paths = Vec::new();
     let cache = MemoryCache::new();
-    let mut b = Builder::new("<Eval>", &i_paths, Rc::new(RefCell::new(cache)));
+    let mut b = FileBuilder::new("<Eval>", &i_paths, Rc::new(RefCell::new(cache)));
     b.enable_validate_mode();
     b.eval_string(input).unwrap();
     if !b.assert_collector.success {

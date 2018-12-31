@@ -12,14 +12,14 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 use super::assets::MemoryCache;
-use super::{Builder, CallDef, MacroDef, SelectDef, Val};
+use super::{CallDef, FileBuilder, MacroDef, SelectDef, Val};
 use crate::ast::*;
 
 use std;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-fn test_expr_to_val(mut cases: Vec<(Expression, Val)>, mut b: Builder) {
+fn test_expr_to_val(mut cases: Vec<(Expression, Val)>, mut b: FileBuilder) {
     for tpl in cases.drain(0..) {
         assert_eq!(b.eval_expr(&tpl.0).unwrap(), Rc::new(tpl.1));
     }
@@ -30,7 +30,7 @@ fn test_expr_to_val(mut cases: Vec<(Expression, Val)>, mut b: Builder) {
 fn test_eval_div_expr_fail() {
     let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let b = Builder::new(std::env::current_dir().unwrap(), &i_paths, cache);
+    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
     test_expr_to_val(
         vec![(
             Expression::Binary(BinaryOpDef {
@@ -56,7 +56,7 @@ fn test_eval_div_expr_fail() {
 fn test_eval_mul_expr_fail() {
     let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let b = Builder::new(std::env::current_dir().unwrap(), &i_paths, cache);
+    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
     test_expr_to_val(
         vec![(
             Expression::Binary(BinaryOpDef {
@@ -82,7 +82,7 @@ fn test_eval_mul_expr_fail() {
 fn test_eval_subtract_expr_fail() {
     let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let b = Builder::new(std::env::current_dir().unwrap(), &i_paths, cache);
+    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
     test_expr_to_val(
         vec![(
             Expression::Binary(BinaryOpDef {
@@ -107,7 +107,7 @@ fn test_eval_subtract_expr_fail() {
 fn test_eval_add_expr_fail() {
     let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let b = Builder::new(std::env::current_dir().unwrap(), &i_paths, cache);
+    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
     test_expr_to_val(
         vec![(
             Expression::Binary(BinaryOpDef {
@@ -132,7 +132,7 @@ fn test_eval_add_expr_fail() {
 fn test_eval_simple_lookup_error() {
     let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let mut b = Builder::new(std::env::current_dir().unwrap(), &i_paths, cache);
+    let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
     b.build_output
         .entry(value_node!("var1".to_string(), Position::new(1, 0, 0)))
         .or_insert(Rc::new(Val::Int(1)));
@@ -149,7 +149,7 @@ fn test_eval_simple_lookup_error() {
 fn test_expr_copy_no_such_tuple() {
     let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let b = Builder::new(std::env::current_dir().unwrap(), &i_paths, cache);
+    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
     test_expr_to_val(
         vec![(
             Expression::Copy(CopyDef {
@@ -171,7 +171,7 @@ fn test_expr_copy_no_such_tuple() {
 fn test_expr_copy_not_a_tuple() {
     let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let mut b = Builder::new(std::env::current_dir().unwrap(), &i_paths, cache);
+    let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
     b.build_output
         .entry(value_node!("tpl1".to_string(), Position::new(1, 0, 0)))
         .or_insert(Rc::new(Val::Int(1)));
@@ -196,7 +196,7 @@ fn test_expr_copy_not_a_tuple() {
 fn test_expr_copy_field_type_error() {
     let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let mut b = Builder::new(std::env::current_dir().unwrap(), &i_paths, cache);
+    let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
     b.build_output
         .entry(value_node!("tpl1".to_string(), Position::new(1, 0, 0)))
         .or_insert(Rc::new(Val::Tuple(vec![(
@@ -233,7 +233,7 @@ fn test_expr_copy_field_type_error() {
 fn test_macro_hermetic() {
     let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let mut b = Builder::new(std::env::current_dir().unwrap(), &i_paths, cache);
+    let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
     b.build_output
         .entry(value_node!("arg1".to_string(), Position::new(1, 0, 0)))
         .or_insert(Rc::new(Val::Str("bar".to_string())));
@@ -277,7 +277,7 @@ fn test_macro_hermetic() {
 fn test_select_expr_not_a_string() {
     let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let mut b = Builder::new(std::env::current_dir().unwrap(), &i_paths, cache);
+    let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
     b.build_output
         .entry(value_node!("foo".to_string(), Position::new(1, 0, 0)))
         .or_insert(Rc::new(Val::Int(4)));
