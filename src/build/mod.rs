@@ -233,7 +233,7 @@ impl<'a> FileBuilder<'a> {
         self.import_stack = new_stack;
     }
 
-    fn tuple_to_val(&mut self, fields: &Vec<(Token, Expression)>) -> Result<Rc<Val>, Box<Error>> {
+    fn eval_tuple(&mut self, fields: &Vec<(Token, Expression)>) -> Result<Rc<Val>, Box<Error>> {
         let mut new_fields = Vec::<(PositionedItem<String>, Rc<Val>)>::new();
         for &(ref name, ref expr) in fields.iter() {
             let val = self.eval_expr(expr)?;
@@ -242,7 +242,7 @@ impl<'a> FileBuilder<'a> {
         Ok(Rc::new(Val::Tuple(new_fields)))
     }
 
-    fn list_to_val(&mut self, def: &ListDef) -> Result<Rc<Val>, Box<Error>> {
+    fn eval_list(&mut self, def: &ListDef) -> Result<Rc<Val>, Box<Error>> {
         let mut vals = Vec::new();
         for expr in def.elems.iter() {
             vals.push(self.eval_expr(expr)?);
@@ -250,7 +250,7 @@ impl<'a> FileBuilder<'a> {
         Ok(Rc::new(Val::List(vals)))
     }
 
-    fn value_to_val(&mut self, v: &Value) -> Result<Rc<Val>, Box<Error>> {
+    fn eval_value(&mut self, v: &Value) -> Result<Rc<Val>, Box<Error>> {
         match v {
             &Value::Empty(_) => Ok(Rc::new(Val::Empty)),
             &Value::Boolean(ref b) => Ok(Rc::new(Val::Boolean(b.val))),
@@ -265,8 +265,8 @@ impl<'a> FileBuilder<'a> {
                         v.pos().clone(),
                     )))
             }
-            &Value::List(ref def) => self.list_to_val(def),
-            &Value::Tuple(ref tuple) => self.tuple_to_val(&tuple.val),
+            &Value::List(ref def) => self.eval_list(def),
+            &Value::Tuple(ref tuple) => self.eval_tuple(&tuple.val),
             &Value::Selector(ref selector_list_node) => {
                 self.lookup_selector(&selector_list_node.sel)
             }
@@ -1155,7 +1155,7 @@ impl<'a> FileBuilder<'a> {
         // First we rewrite the imports to be absolute paths.
         def.imports_to_absolute(root);
         // Then we create our tuple default.
-        def.arg_tuple = Some(self.tuple_to_val(&def.arg_set)?);
+        def.arg_tuple = Some(self.eval_tuple(&def.arg_set)?);
         // Then we construct a new Val::Module
         Ok(Rc::new(Val::Module(def)))
     }
@@ -1305,7 +1305,7 @@ impl<'a> FileBuilder<'a> {
     // It does not mutate the builders collected state at all.
     pub fn eval_expr(&mut self, expr: &Expression) -> Result<Rc<Val>, Box<Error>> {
         match expr {
-            &Expression::Simple(ref val) => self.value_to_val(val),
+            &Expression::Simple(ref val) => self.eval_value(val),
             &Expression::Binary(ref def) => self.eval_binary(def),
             &Expression::Compare(ref def) => self.eval_compare(def),
             &Expression::Copy(ref def) => self.eval_copy(def),
