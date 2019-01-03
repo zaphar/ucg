@@ -1,3 +1,4 @@
+//! Input stream wrappers for use in abortable_parser.
 use std::convert::From;
 use std::iter::Iterator;
 
