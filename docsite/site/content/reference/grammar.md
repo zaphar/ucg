@@ -52,6 +52,7 @@ mod_keyword: "mod" ;
 out_keyword: "out" ;
 assert_keyword: "assert" ;
 null_keyword: "NULL" ;
+in_keyword: "in" ;
 escaped: "\", VISIBLE_CHAR ;
 str: quot, { escaped | UTF8_CHAR }, quot ;
 ```
@@ -142,8 +143,8 @@ non_operator_expr: literal
 ```
 sum_op: plus | minus ;
 product_op: start | slash ;
-compare_op: equalequal | gtequal | ltequal | gt | lt ;
-binary_op: sum_op | product_op | dot | compare_op;
+compare_op: equalequal | gtequal | ltequal | gt | lt | in_keyword ;
+binary_op: sum_op | product_op | dot | compare_op ;
 binary_expr: non_operator_expr, binary_op, expr ;
 ```
 

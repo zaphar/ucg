@@ -88,3 +88,27 @@ let want = "foo";
 assert |
     select want, 1, { foo=2, } == 2;
 |;
+
+// Contains comparison operators.
+assert |
+    "foo" in {
+        foo = "bar",
+    };
+|;
+assert |
+    foo in {
+        foo = "bar",
+    };
+|;
+assert |
+    "foo" in ["foo", "bar"];
+|;
+assert |
+    "foo" in ["bar", "foo", "bar"];
+|;
+assert |
+    { foo = 1 } in ["foo", { foo = 1 }];
+|;
+assert |
+    true in [ "foo" in {foo = 1}, false ];
+|;

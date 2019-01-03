@@ -729,8 +729,58 @@ impl<'a> FileBuilder<'a> {
         }
     }
 
+    fn do_element_check(
+        &mut self,
+        left: &Expression,
+        right: &Expression,
+        scope: &Scope,
+    ) -> Result<Rc<Val>, Box<Error>> {
+        // First we evaluate our right hand side so we have a something to search
+        // inside for our left hand expression.
+        let right_pos = right.pos().clone();
+        let right = self.eval_expr(right, scope)?;
+        // presence checks are only valid for tuples and lists.
+        if !(right.is_tuple() || right.is_list()) {
+            return Err(Box::new(error::BuildError::new(
+                format!(
+                    "Invalid righthand type for in operator {}",
+                    right.type_name()
+                ),
+                error::ErrorType::TypeFail,
+                right_pos,
+            )));
+        }
+        if let &Val::List(ref els) = right.as_ref() {
+            let left_pos = left.pos().clone();
+            let left = self.eval_expr(left, scope)?;
+            for val in els.iter() {
+                if let Ok(b) = self.do_deep_equal(&left_pos, left.clone(), val.clone()) {
+                    if let &Val::Boolean(b) = b.as_ref() {
+                        if b {
+                            // We found a match
+                            return Ok(Rc::new(Val::Boolean(true)));
+                        }
+                    }
+                }
+            }
+            // We didn't find a match anywhere so return false.
+            return Ok(Rc::new(Val::Boolean(false)));
+        } else {
+            // Handle our tuple case since this isn't a list.
+            let mut child_scope = scope.spawn_child();
+            child_scope.set_curr_val(right.clone());
+            // Search for the field in our tuple or list.
+            let maybe_val = self.do_dot_lookup(left, &child_scope);
+            // Return the result of the search.
+            return Ok(Rc::new(Val::Boolean(maybe_val.is_ok())));
+        }
+    }
+
     fn eval_binary(&mut self, def: &BinaryOpDef, scope: &Scope) -> Result<Rc<Val>, Box<Error>> {
         let kind = &def.kind;
+        if let &BinaryExprType::IN = kind {
+            return self.do_element_check(&def.left, &def.right, scope);
+        };
         let left = self.eval_expr(&def.left, scope)?;
         let mut child_scope = scope.spawn_child();
         child_scope.set_curr_val(left.clone());
@@ -756,8 +806,7 @@ impl<'a> FileBuilder<'a> {
             &BinaryExprType::GTEqual => self.do_gtequal(&def.pos, left, right),
             &BinaryExprType::LTEqual => self.do_ltequal(&def.pos, left, right),
             &BinaryExprType::NotEqual => self.do_not_deep_equal(&def.pos, left, right),
-            // TODO Handle the whole selector lookup logic here.
-            &BinaryExprType::DOT => panic!("Unraeachable"),
+            &BinaryExprType::IN | &BinaryExprType::DOT => panic!("Unreachable"),
         }
     }
 

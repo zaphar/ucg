@@ -495,6 +495,7 @@ pub enum BinaryExprType {
     NotEqual,
     GTEqual,
     LTEqual,
+    IN,
     // Selector operator
     DOT,
 }
@@ -512,6 +513,7 @@ impl BinaryExprType {
             BinaryExprType::LTEqual => 1,
             BinaryExprType::GT => 1,
             BinaryExprType::LT => 1,
+            BinaryExprType::IN => 1,
             // Sum operators are next least tightly bound
             BinaryExprType::Add => 2,
             BinaryExprType::Sub => 2,

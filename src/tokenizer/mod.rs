@@ -264,6 +264,10 @@ make_fn!(selecttok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "select", WS)
 );
 
+make_fn!(intok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::BAREWORD, "in", WS)
+);
+
 make_fn!(macrotok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "macro", WS)
 );
@@ -385,6 +389,7 @@ fn token<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Token> {
         leftsquarebracket,
         rightsquarebracket,
         booleantok,
+        intok,
         lettok,
         outtok,
         selecttok,

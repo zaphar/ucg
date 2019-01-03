@@ -171,7 +171,8 @@ make_fn!(
         do_each!(_ => punct!("<="), (Element::Op(BinaryExprType::LTEqual))),
         do_each!(_ => punct!(">="), (Element::Op(BinaryExprType::GTEqual))),
         do_each!(_ => punct!("<"),  (Element::Op(BinaryExprType::LT))),
-        do_each!(_ => punct!(">"),  (Element::Op(BinaryExprType::GT)))
+        do_each!(_ => punct!(">"),  (Element::Op(BinaryExprType::GT))),
+        do_each!(_ => word!("in"),  (Element::Op(BinaryExprType::IN)))
     )
 );
 
@@ -191,7 +192,8 @@ fn parse_compare_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, B
             | &BinaryExprType::LT
             | &BinaryExprType::LTEqual
             | &BinaryExprType::NotEqual
-            | &BinaryExprType::Equal => {
+            | &BinaryExprType::Equal
+            | &BinaryExprType::IN => {
                 return Result::Complete(i_.clone(), op.clone());
             }
             _other => {
