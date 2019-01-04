@@ -91,7 +91,7 @@ version both sides must be the same type, either string or list.
 
 ### Comparison Operators
 
-UCG supports the comparison operators `==`, `!=`, `>=`, `<=`, `<`, and `>`.
+UCG supports the comparison operators `==`, `!=`, `>=`, `<=`, `<`, `>`, and `in`.
 They all expect both sides to be of the same type.
 
 The `>`, `<`, `>=`, and `>=` operators are only supported on numeric types
@@ -127,6 +127,25 @@ tpl1 == tpl3; // returns false
 
 Because tuples are an ordered set both tuples in a comparison must have their
 fields in the same order to compare as equal.
+
+The `in` operator tests for the existence of a field in a tuple or an element in a
+list.
+
+```
+let tpl = { foo = "bar" };
+foo in tpl; // evaluates to true
+"foo" in tpl; // also evaluates to true.
+```
+
+Lists do a deep equal comparison when testing for the existence of an element.
+
+```
+let lst = [1, "two", {three = 3}];
+1 in lst; // evaluates to true;
+{three = 3} in lst; // evaluates to true
+{three = "3"} in lst; // evaluates to false
+{three = 3, two = 2} in lst // evaluates to false
+```
 
 #### Operator Precedence
 
@@ -205,6 +224,17 @@ should be placed. Any primitive value can be used as an argument.
 
 ```
 "https://@:@/" % (host, port)
+```
+
+Include expressions
+-------------------
+
+UCG can include the contents of other files as an expression. Currently we only
+support strings but we plan to support yaml, and json and possibly base64 encoding
+in the future. include expressions start with the `include` keyword a type (currently only `str`), and a path. Relative paths are calculated relative to the including file.
+
+```
+let script = include str "./script.sh";
 ```
 
 Conditionals
