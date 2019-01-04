@@ -457,15 +457,10 @@ impl MacroDef {
                         let mut syms_set = self.validate_value_symbols(&mut stack, val);
                         bad_symbols.extend(syms_set.drain());
                     }
-                    &Expression::Macro(_) => {
-                        // noop
-                        continue;
-                    }
-                    &Expression::Module(_) => {
-                        // noop
-                        continue;
-                    }
-                    &Expression::ListOp(_) => {
+                    &Expression::Macro(_)
+                    | &Expression::Module(_)
+                    | &Expression::ListOp(_)
+                    | &Expression::Include(_) => {
                         // noop
                         continue;
                     }
@@ -551,6 +546,14 @@ pub struct FormatDef {
     pub pos: Position,
 }
 
+/// Encodes an import statement in the UCG AST.
+#[derive(Debug, PartialEq, Clone)]
+pub struct IncludeDef {
+    pub pos: Position,
+    pub path: Token,
+    pub typ: Token,
+}
+
 /// Encodes a list expression in the UCG AST.
 #[derive(Debug, PartialEq, Clone)]
 pub struct ListDef {
@@ -625,6 +628,7 @@ pub enum Expression {
     // TODO(jwall): This should really store it's position :-(
     Grouped(Box<Expression>),
     Format(FormatDef),
+    Include(IncludeDef),
     Call(CallDef),
     Macro(MacroDef),
     Select(SelectDef),
@@ -646,6 +650,7 @@ impl Expression {
             &Expression::Module(ref def) => &def.pos,
             &Expression::Select(ref def) => &def.pos,
             &Expression::ListOp(ref def) => &def.pos,
+            &Expression::Include(ref def) => &def.pos,
         }
     }
 }
@@ -682,6 +687,9 @@ impl fmt::Display for Expression {
             }
             &Expression::Select(_) => {
                 write!(w, "<Select>")?;
+            }
+            &Expression::Include(_) => {
+                write!(w, "<Include>")?;
             }
         }
         Ok(())

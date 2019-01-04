@@ -509,6 +509,21 @@ make_fn!(
     )
 );
 
+make_fn!(
+    include_expression<SliceIter<Token>, Expression>,
+    do_each!(
+        pos => pos,
+        _ => word!("include"),
+        typ => match_type!(BAREWORD),
+        path => match_type!(STR),
+        (Expression::Include(IncludeDef{
+            pos: pos,
+            typ: typ,
+            path: path,
+        }))
+    )
+);
+
 fn tuple_to_call<'a>(
     input: SliceIter<'a, Token>,
     val: Value,
@@ -622,6 +637,7 @@ make_fn!(
         trace_parse!(module_expression),
         trace_parse!(select_expression),
         trace_parse!(grouped_expression),
+        trace_parse!(include_expression),
         trace_parse!(unprefixed_expression)
     )
 );

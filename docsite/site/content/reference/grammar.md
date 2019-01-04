@@ -44,9 +44,10 @@ rbracket: "]" ;
 lparen: "(" ;
 rparen: ")" ;
 bareword: ASCII_CHAR, { DIGIT | VISIBLE_CHAR | "_" }  ;
-let_keyword: "let" [WS] ;
-import_keyword: "import" [WS];
-as_keyword: "as" [WS];
+let_keyword: "let" ;
+import_keyword: "import" ;
+include_keyword: "include" ; 
+as_keyword: "as" ;
 macro_keyword: "macro" ;
 module_keyword: "module" ;
 mod_keyword: "mod" ;
@@ -134,6 +135,12 @@ call_expression: bareword, lparen, [arglist], rparen ;
 format_expr: str, percent, lparen, [arglist], rparen ;
 ```
 
+#### Include Expression
+
+```
+include_expr: include_keyword, bareword, str ; 
+```
+
 #### Non Operator Expression
 
 ```
@@ -142,6 +149,7 @@ non_operator_expr: literal
                    | macrodef
                    | module_def
                    | format_expression
+                   | include_expression
                    | copy_expression
                    | call_expression ;
 ```

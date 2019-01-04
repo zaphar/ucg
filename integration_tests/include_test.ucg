@@ -1,0 +1,5 @@
+let script = include str "./include_example.sh";
+assert |
+    script == "#!/usr/bin/env bash
+echo \"included\"";
+|;

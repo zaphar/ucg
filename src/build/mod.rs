@@ -334,6 +334,33 @@ impl<'a> FileBuilder<'a> {
             .is_some()
     }
 
+    fn find_file<P: Into<PathBuf>>(
+        &mut self,
+        path: P,
+        use_import_path: bool,
+    ) -> Result<PathBuf, Box<Error>> {
+        // Try a relative path first.
+        let path = path.into();
+        let mut normalized = self.file.parent().unwrap().to_path_buf();
+        if path.is_relative() {
+            normalized.push(&path);
+            // First see if the normalized file exists or not.
+            if !normalized.exists() && use_import_path {
+                // If it does not then look for it in the list of import_paths
+                for mut p in self.import_path.iter().cloned() {
+                    p.push(&path);
+                    if p.exists() {
+                        normalized = p;
+                        break;
+                    }
+                }
+            }
+        } else {
+            normalized = path;
+        }
+        Ok(normalized.canonicalize()?)
+    }
+
     fn eval_import(&mut self, def: &ImportDef) -> Result<Rc<Val>, Box<Error>> {
         let sym = &def.name;
         if Self::check_reserved_word(&sym.fragment) {
@@ -347,25 +374,7 @@ impl<'a> FileBuilder<'a> {
             )));
         }
         // Try a relative path first.
-        let mut normalized = self.file.parent().unwrap().to_path_buf();
-        let import_path = PathBuf::from(&def.path.fragment);
-        if import_path.is_relative() {
-            normalized.push(&import_path);
-            // First see if the normalized file exists or not.
-            if !normalized.exists() {
-                // If it does not then look for it in the list of import_paths
-                for mut p in self.import_path.iter().cloned() {
-                    p.push(&import_path);
-                    if p.exists() {
-                        normalized = p;
-                        break;
-                    }
-                }
-            }
-        } else {
-            normalized = import_path;
-        }
-        normalized = normalized.canonicalize()?;
+        let normalized = self.find_file(&def.path.fragment, true)?;
         if self.detect_import_cycle(normalized.to_string_lossy().as_ref()) {
             return Err(Box::new(error::BuildError::new(
                 format!(
@@ -1167,6 +1176,42 @@ impl<'a> FileBuilder<'a> {
         Ok(ok)
     }
 
+    pub fn eval_include(&mut self, def: &IncludeDef) -> Result<Rc<Val>, Box<Error>> {
+        return if def.typ.fragment == "str" {
+            let normalized = match self.find_file(&def.path.fragment, false) {
+                Ok(p) => p,
+                Err(e) => {
+                    return Err(Box::new(error::BuildError::new(
+                        format!("Error finding file {} {}", def.path.fragment, e),
+                        error::ErrorType::TypeFail,
+                        def.typ.pos.clone(),
+                    )))
+                }
+            };
+            let mut f = match File::open(&normalized) {
+                Ok(f) => f,
+                Err(e) => {
+                    return Err(Box::new(error::BuildError::new(
+                        format!("Error opening file {} {}", normalized.to_string_lossy(), e),
+                        error::ErrorType::TypeFail,
+                        def.typ.pos.clone(),
+                    )))
+                }
+            };
+            let mut contents = String::new();
+            f.read_to_string(&mut contents)?;
+            Ok(Rc::new(Val::Str(contents)))
+        } else {
+            // TODO(jwall): Run the conversion on the contents of the file and return it as
+            //               an Rc<Val>.
+            Err(Box::new(error::BuildError::new(
+                format!("Unknown include conversion type {}", def.typ.fragment),
+                error::ErrorType::Unsupported,
+                def.typ.pos.clone(),
+            )))
+        };
+    }
+
     // Evals a single Expression in the context of a running Builder.
     // It does not mutate the builders collected state at all.
     pub fn eval_expr(&mut self, expr: &Expression, scope: &Scope) -> Result<Rc<Val>, Box<Error>> {
@@ -1181,6 +1226,7 @@ impl<'a> FileBuilder<'a> {
             &Expression::Module(ref def) => self.eval_module_def(def, scope),
             &Expression::Select(ref def) => self.eval_select(def, scope),
             &Expression::ListOp(ref def) => self.eval_list_op(def, scope),
+            &Expression::Include(ref def) => self.eval_include(def),
         }
     }
 }
