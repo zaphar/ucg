@@ -23,6 +23,7 @@ ws: WS ;
 dot: ".";
 quot: '"' ;
 pipe: '|' ;
+percent: "%" ;
 star: "*" ;
 plus: "+" ;
 minus: "-" ;
@@ -127,6 +128,12 @@ copy_expression: bareword, tuple ;
 call_expression: bareword, lparen, [arglist], rparen ;
 ```
 
+#### Format Expression
+
+```
+format_expr: str, percent, lparen, [arglist], rparen ;
+```
+
 #### Non Operator Expression
 
 ```
@@ -134,6 +141,7 @@ non_operator_expr: literal
                    | grouped
                    | macrodef
                    | module_def
+                   | format_expression
                    | copy_expression
                    | call_expression ;
 ```
