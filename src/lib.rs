@@ -15,7 +15,7 @@
 
 //! # ucg, A universal configuration grammar.
 //!
-//! Language reference is at https://ucg.marzhillstudios.com/reference
+//! Language reference is at [https://ucg.marzhillstudios.com/reference](https://ucg.marzhillstudios.com/reference)
 
 // The following is necessary to allow the macros in tokenizer and parse modules
 // to succeed.

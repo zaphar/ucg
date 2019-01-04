@@ -80,4 +80,4 @@ ARGS:
 
 ## Language Reference
 
-https://ucg.marzhillstudios.com/reference/
+[https://ucg.marzhillstudios.com/reference](https://ucg.marzhillstudios.com/reference)
