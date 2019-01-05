@@ -14,17 +14,34 @@ Many ucg expressions or statements use a symbol. A symbol might be used as
 either a name for a binding or a name for a field. Symbols must start with an
 ascii letter and can contain any ascii letter, number, `_`, or `-` characters.
 
-Selectors
-------
+### The environment symbol
 
-A UCG selector references a bound value by name. They can descend into tuples
-or lists or refer to symbols in imported files. They start with a symbol followed
-optionally by a list of other symbols or numbers separated by `.` characters to
-reference subfields or indexes in a list.
+There is a special symbol in ucg for obtaining a value from the environment.
+The `env` symbol references the environment variables in environment at the
+time of the build. You reference an environment variable just like it was in a
+tuple. By default, attempting to reference a variable that doesn't exist will
+be a compile error. You can turn this behavior off with the `--nostrict`
+argument to the compiler. When in nostrict mode nonexistent variables will
+result in a warning and be set to the NULL empty value.
+
+```
+let env_name = env.DEPLOY_ENV;
+```
+
+Binary Operators
+----------
+
+UCG has a number of binary infix operators. Some work only on numeric values and others
+work on more than one type.
+
+### Selector operators
+
+The UCG selector operator `.` selects a field or index from tuples or lists.
+They can descend descend arbitrarily deep into the selector. 
 
 You can reference a field in a tuple by putting the field name after a dot.
 Lists are always 0 indexed. You can index into a list by referencing the index
-after a `.`.
+after the `.`.
 
 ```
 let tuple = {
@@ -47,26 +64,6 @@ Selectors can quote fields in the selector if there are quoted fields with space
 ```
 tuple."quoted field";
 ```
-
-### The environment Selector
-
-There is a special selector in ucg for obtaining a value from the environment.
-The `env` selector references the environment variables in environment at the
-time of the build. You reference an environment variable just like it was in a
-tuple. By default, attempting to reference a variable that doesn't exist will
-be a compile error. You can turn this behavior off with the `--nostrict`
-argument to the compiler. When in nostrict mode nonexistent variables will
-result in a warning and be set to the NULL empty value.
-
-```
-let env_name = env.DEPLOY_ENV;
-```
-
-Binary Operators
-----------
-
-UCG has a number of binary infix operators. Some work only on numeric values and others
-work on more than one type.
 
 ### Numeric Operators
 
