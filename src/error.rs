@@ -101,14 +101,11 @@ impl error::Error for BuildError {
 }
 
 #[derive(Debug)]
-pub struct StackPrinter<C: abortable_parser::Positioned> {
+pub struct StackPrinter<C: Positioned> {
     pub err: abortable_parser::Error<C>,
 }
 
-impl<C> StackPrinter<C>
-where
-    C: abortable_parser::Positioned,
-{
+impl<C: Positioned> StackPrinter<C> {
     pub fn render(&self, w: &mut fmt::Formatter) -> fmt::Result {
         let mut curr_err = Some(&self.err);
         let mut tabstop = "";
@@ -138,10 +135,7 @@ where
     }
 }
 
-impl<C> fmt::Display for StackPrinter<C>
-where
-    C: Positioned,
-{
+impl<C: Positioned> fmt::Display for StackPrinter<C> {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
         self.render(w)
     }
