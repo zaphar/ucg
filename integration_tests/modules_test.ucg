@@ -54,3 +54,6 @@ let embedded_with_params = embedded_mod{deep_value = "Some"};
 assert |
     embedded_with_params.embedded.value == "Some";
 |;
+assert |
+    embedded_mod{dep_value="Some"}.embedded_def{}.value == "None";
+|;
