@@ -31,7 +31,7 @@ pub struct ConverterRegistry {
 }
 
 impl ConverterRegistry {
-    /// new creates a new ConverterRunner with a converter for the provided output target.
+    /// Creates a new ConverterRegistry.
     ///
     /// * flags
     /// * json
@@ -75,12 +75,10 @@ pub struct ImporterRegistry {
 }
 
 impl ImporterRegistry {
-    /// new creates a new ConverterRunner with a converter for the provided output target.
+    /// Creates a new ImporterRegistry.
     ///
-    /// * flags
-    /// * json
-    /// * env
-    /// * exec
+    /// * b64
+    /// * b64urlsafe
     fn new() -> Self {
         ImporterRegistry {
             importers: HashMap::new(),
