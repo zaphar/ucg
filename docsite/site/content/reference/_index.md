@@ -14,7 +14,7 @@ a name. A valid UCG file is composed of a series of statements. Statements can b
 an expression, introduce named bindings, or create different outputs. All statements
 must be terminiated by a semicolon.
 
-Some words are reserved in ucg and can not be used as a named binding.
+Some words are reserved in UCG and can not be used as a named binding.
 
  
 * self

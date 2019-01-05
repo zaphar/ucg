@@ -10,7 +10,7 @@ Installing
 
 ### Cargo
 
-You can install ucg using Rust's Cargo package manager.
+You can install UCG using Rust's Cargo package manager.
 
 ```sh
 cargo install ucg
@@ -36,7 +36,7 @@ cargo install --path .
 A simple configuration
 ----------------------
 
-To create a configuration and build it in ucg you must first create a ucg file. Copy the below contents into a file called `sample.ucg`. All ucg files must end in the ucg
+To create a configuration and build it in UCG you must first create a UCG file. Copy the below contents into a file called `sample.ucg`. All UCG files must end in the UCG
 extension.
 
 ```
@@ -59,21 +59,21 @@ out yaml config;
 ```
 
 The above binds 3 values to names and then creates a config tuple using those values.
-We'll look in more detail at ucg's syntax later.
+We'll look in more detail at UCG's syntax later.
 
-To generate a yaml file from the above run the ucg build command.
+To generate a yaml file from the above run the UCG build command.
 
 ```sh
 ucg build sample.ucg
 cat sample.yaml
 ```
 
-Ucg will generate the yaml file with the same name as the file containing the out statement.
+UCG will generate the yaml file with the same name as the file containing the out statement.
 
-The ucg command line
+The UCG command line
 -----------
 
-Ucg has builtin help on the command line. 
+UCG has builtin help on the command line. 
 
 ```
 $> ucg help

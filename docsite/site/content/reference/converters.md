@@ -64,7 +64,7 @@ Generates the following flags in a file with the `.txt` extension.
 Environment Variables
 --------
 
-ucg is also able to generate environment variables from ucg values following a few
+UCG is also able to generate environment variables from UCG values following a few
 translation rules.
 
 * Booleans, Integers, Floats, and Strings are output as is.
@@ -94,7 +94,7 @@ VERBOSE=true
 Exec Script
 -----
 
-ucg has an exec converter that will generate a launch script in bash for applications
+UCG has an exec converter that will generate a launch script in bash for applications
 that are configured via command line flags or environment variables. The exec converter
 uses a tuple with some required and optional fields to generate the script with.
 

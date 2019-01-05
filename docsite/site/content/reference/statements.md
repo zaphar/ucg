@@ -25,7 +25,7 @@ Named Value Statements
 
 ### Let statements
 
-There are two statements that can introduce a named value for a given ucg file. Let 
+There are two statements that can introduce a named value for a given UCG file. Let 
 statements and import statements. Any collisions in binding names inside a file are 
 treated as compile errors. Bindings are immutable and once bound they can't be 
 modified.
@@ -36,9 +36,9 @@ let name = "foo";
 
 ### Import Statement
 
-The import statement imports the contents of another ucg file into the current file 
+The import statement imports the contents of another UCG file into the current file 
 with a name. The imported file's named values are exposed as a tuple in the referencing 
-file. It starts with the `import` keyword and is followed by a quoted path to the ucg 
+file. It starts with the `import` keyword and is followed by a quoted path to the UCG 
 file, the keyword `as`, and a name for the imported values.
 
 ```
@@ -49,7 +49,7 @@ let mysqlconf = dbconfigs.mysql;
 Output Statements
 -----------
 
-Some statements in ucg exist to generate an output. Either a compiled
+Some statements in UCG exist to generate an output. Either a compiled
 configuration or the results of test assertions.
 
 ### Assert Statements
@@ -58,7 +58,7 @@ The assert statement defines an expression that must evaluate to either true or 
 Assert statements are noops except during a validation compile. They give you a way to 
 assert certains properties about your data and can be used as a form of unit testing 
 for your configurations. It starts with the `assert` keyword followed by a valid block 
-of ucg statements delimited by `|` characters. The final statement in the block 
+of UCG statements delimited by `|` characters. The final statement in the block 
 must evaluate to a boolean expression.
 
 ```
@@ -86,7 +86,7 @@ The Out statement defines the output for a UCG file. It identifies the output
 converter type and an expression that will be output. The output converter type
 is expected to be one of the registered converters unquoted (e.g. json, exec)
 and the value to convert. The generated artificact will take the same name as
-the ucg file with the extension replaced by the defined extension for that
+the UCG file with the extension replaced by the defined extension for that
 converter.
 
 For a file named api_config.ucg with the following contents:
@@ -99,7 +99,7 @@ let myconf = {
 out json myconf;
 ```
 
-ucg will output the myconf tuple as json to a file called api_config.json
+UCG will output the myconf tuple as json to a file called api_config.json
 
 You can get a list of the available converters as well as the extensions
 defined for each one by running the `ucg converters` command.

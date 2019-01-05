@@ -10,13 +10,13 @@ strings, copy and modify a struct, or format a string.
 Symbols
 -------
 
-Many ucg expressions or statements use a symbol. A symbol might be used as
+Many UCG expressions or statements use a symbol. A symbol might be used as
 either a name for a binding or a name for a field. Symbols must start with an
 ascii letter and can contain any ascii letter, number, `_`, or `-` characters.
 
 ### The environment symbol
 
-There is a special symbol in ucg for obtaining a value from the environment.
+There is a special symbol in UCG for obtaining a value from the environment.
 The `env` symbol references the environment variables in environment at the
 time of the build. You reference an environment variable just like it was in a
 tuple. By default, attempting to reference a variable that doesn't exist will
@@ -37,11 +37,11 @@ work on more than one type.
 ### Selector operators
 
 The UCG selector operator `.` selects a field or index from tuples or lists.
-They can descend descend arbitrarily deep into the selector. 
+They can descend arbitrarily deep into data structures. 
 
-You can reference a field in a tuple by putting the field name after a dot.
-Lists are always 0 indexed. You can index into a list by referencing the index
-after the `.`.
+You can reference a field in a tuple by putting the field name after a dot. You
+can index into a list by referencing the index after the `.`. Lists are always
+0 indexed.
 
 ```
 let tuple = {
@@ -59,7 +59,7 @@ tuple.inner.field;
 tuple.list.0;
 ```
 
-Selectors can quote fields in the selector if there are quoted fields with spaces in them.
+Selectors can quote fields if there are quoted fields with spaces in the tuple.
 
 ```
 tuple."quoted field";
@@ -67,7 +67,7 @@ tuple."quoted field";
 
 ### Numeric Operators
 
-ucg supports the following numeric operators, `+`, `-`, `*`, `/` Each one is type safe 
+UCG supports the following numeric operators, `+`, `-`, `*`, `/` Each one is type safe 
 and infers the types from the values they operate on. The operators expect both the 
 left and right operands to be of the same type.
 
@@ -294,20 +294,20 @@ Modules
 UCG has another form of reusable execution that is a little more composable than macros
 are. Modules allow you to parameterize a set of statements and build the statements
 later. Modules are an expression. They can be bound to a value and then reused later.
-Modules do not close over their environment by they can import other ucg files into
+Modules do not close over their environment by they can import other UCG files into
 the module using import statements.
 
 Module expressions start with the module keyword followed by a tuple representing their
 parameters with any associated default values. The body of the module is separated from
 the parameter tuple by the `=>` symbol and is delimited by `{` and `}` respectively.
 
-The body of the module can contain any valid ucg statement.
+The body of the module can contain any valid UCG statement.
 
 ```
 let top_mod = module {
     deep_value = "None",
 } => {
-    import "shared.ucg" as shared_macros;
+    import "shared.UCG" as shared_macros;
 
     let embedded_def = module {
         deep_value = "None",

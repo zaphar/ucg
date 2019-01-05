@@ -4,8 +4,8 @@ weight = 1
 sort_by = "weight"
 in_search_index = true
 +++
-Let's say we wanted to use ucg generate a launch script for a local jupyter datascience
-notebook container. This HowTo walks you through creating a ucg file that can generate
+Let's say we wanted to use UCG generate a launch script for a local jupyter datascience
+notebook container. This HowTo walks you through creating a UCG file that can generate
 a script to launch the container.
 
 First lets define some docker configuration values that we'll use later.
