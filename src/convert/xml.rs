@@ -31,7 +31,7 @@ use xml::EmitterConfig;
 pub struct XmlConverter {}
 
 impl XmlConverter {
-    fn get_str_val(v: &Val) -> std::result::Result<&str, Box<Error>> {
+    fn get_str_val(v: &Val) -> std::result::Result<&str, Box<dyn Error>> {
         if let Val::Str(ref s) = v {
             Ok(s)
         } else {
@@ -45,7 +45,7 @@ impl XmlConverter {
 
     fn get_tuple_val(
         v: &Val,
-    ) -> std::result::Result<&Vec<(PositionedItem<String>, Rc<Val>)>, Box<Error>> {
+    ) -> std::result::Result<&Vec<(PositionedItem<String>, Rc<Val>)>, Box<dyn Error>> {
         if let Val::Tuple(ref fs) = v {
             Ok(fs)
         } else {
@@ -57,7 +57,7 @@ impl XmlConverter {
         }
     }
 
-    fn get_list_val(v: &Val) -> std::result::Result<&Vec<Rc<Val>>, Box<Error>> {
+    fn get_list_val(v: &Val) -> std::result::Result<&Vec<Rc<Val>>, Box<dyn Error>> {
         if let Val::List(ref fs) = v {
             Ok(fs)
         } else {

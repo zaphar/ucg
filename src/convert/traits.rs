@@ -20,7 +20,7 @@ use std::result;
 
 use crate::build::Val;
 
-pub type Result = result::Result<(), Box<Error>>;
+pub type Result = result::Result<(), Box<dyn Error>>;
 
 /// The trait that Converters from Val to different output formats for the
 /// final conversion stage of the ucg compiler.

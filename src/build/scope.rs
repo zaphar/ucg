@@ -97,7 +97,7 @@ impl Scope {
     }
 
     /// Lookup up a list index in the current value
-    pub fn lookup_idx(&self, pos: &Position, idx: &Val) -> Result<Rc<Val>, Box<Error>> {
+    pub fn lookup_idx(&self, pos: &Position, idx: &Val) -> Result<Rc<Val>, Box<dyn Error>> {
         if self.search_curr_val && self.curr_val.is_some() {
             if let &Val::List(ref fs) = self.curr_val.as_ref().unwrap().as_ref() {
                 return Self::lookup_in_list(pos, idx, fs);
@@ -151,7 +151,7 @@ impl Scope {
         pos: &Position,
         field: &str,
         fs: &Vec<(PositionedItem<String>, Rc<Val>)>,
-    ) -> Result<Rc<Val>, Box<Error>> {
+    ) -> Result<Rc<Val>, Box<dyn Error>> {
         if let Some(vv) = find_in_fieldlist(&field, fs) {
             Ok(vv)
         } else {
@@ -167,7 +167,7 @@ impl Scope {
         pos: &Position,
         field: &Val,
         elems: &Vec<Rc<Val>>,
-    ) -> Result<Rc<Val>, Box<Error>> {
+    ) -> Result<Rc<Val>, Box<dyn Error>> {
         let idx = match field {
             &Val::Int(i) => i as usize,
             &Val::Str(ref s) => s.parse::<usize>()?,

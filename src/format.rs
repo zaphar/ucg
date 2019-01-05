@@ -38,7 +38,7 @@ impl<V: Into<String> + Clone> Formatter<V> {
     ///
     /// If the formatter has the wrong number of arguments for the number of replacements
     /// it will return an error. Otherwise it will return the formatted string.
-    pub fn render(&self, pos: &Position) -> Result<String, Box<Error>> {
+    pub fn render(&self, pos: &Position) -> Result<String, Box<dyn Error>> {
         let mut buf = String::new();
         let mut should_escape = false;
         let mut count = 0;

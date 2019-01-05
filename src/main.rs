@@ -80,7 +80,7 @@ fn build_file<'a>(
     strict: bool,
     import_paths: &'a Vec<PathBuf>,
     cache: Rc<RefCell<Cache>>,
-) -> Result<build::FileBuilder<'a>, Box<Error>> {
+) -> Result<build::FileBuilder<'a>, Box<dyn Error>> {
     let mut file_path_buf = PathBuf::from(file);
     if file_path_buf.is_relative() {
         file_path_buf = std::env::current_dir().unwrap().join(file_path_buf);
@@ -164,7 +164,7 @@ fn visit_ucg_files(
     import_paths: &Vec<PathBuf>,
     cache: Rc<RefCell<Cache>>,
     registry: &ConverterRegistry,
-) -> Result<bool, Box<Error>> {
+) -> Result<bool, Box<dyn Error>> {
     let our_path = String::from(path.to_string_lossy());
     let mut result = true;
     let mut summary = String::new();
