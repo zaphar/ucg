@@ -29,6 +29,7 @@ use simple_error;
 
 use crate::ast::*;
 use crate::build::scope::{find_in_fieldlist, Scope, ValueMap};
+use crate::convert::ImporterRegistry;
 use crate::error;
 use crate::format;
 use crate::iter::OffsetStrIter;
@@ -100,6 +101,7 @@ pub struct FileBuilder<'a> {
     pub assert_collector: AssertCollector,
     strict: bool,
     scope: Scope,
+    import_registry: ImporterRegistry,
     // NOTE(jwall): We use interior mutability here because we need
     // our asset cache to be shared by multiple different sub-builders.
     // We use Rc to handle the reference counting for us and we use
@@ -166,6 +168,7 @@ impl<'a> FileBuilder<'a> {
             },
             scope: scope,
             strict: true,
+            import_registry: ImporterRegistry::make_registry(),
             assets: cache,
             out_lock: None,
             is_module: false,
@@ -185,6 +188,8 @@ impl<'a> FileBuilder<'a> {
             },
             strict: true,
             assets: self.assets.clone(),
+            // This is admittedly a little wasteful but we can live with it for now.
+            import_registry: ImporterRegistry::make_registry(),
             scope: self.scope.spawn_clean(),
             out_lock: None,
             is_module: false,
@@ -335,7 +340,7 @@ impl<'a> FileBuilder<'a> {
     }
 
     fn find_file<P: Into<PathBuf>>(
-        &mut self,
+        &self,
         path: P,
         use_import_path: bool,
     ) -> Result<PathBuf, Box<dyn Error>> {
@@ -1194,39 +1199,52 @@ impl<'a> FileBuilder<'a> {
         Ok(ok)
     }
 
+    fn get_file_as_string(&self, pos: &Position, path: &str) -> Result<String, Box<dyn Error>> {
+        let normalized = match self.find_file(path, false) {
+            Ok(p) => p,
+            Err(e) => {
+                return Err(Box::new(error::BuildError::new(
+                    format!("Error finding file {} {}", path, e),
+                    error::ErrorType::TypeFail,
+                    pos.clone(),
+                )))
+            }
+        };
+        let mut f = match File::open(&normalized) {
+            Ok(f) => f,
+            Err(e) => {
+                return Err(Box::new(error::BuildError::new(
+                    format!("Error opening file {} {}", normalized.to_string_lossy(), e),
+                    error::ErrorType::TypeFail,
+                    pos.clone(),
+                )))
+            }
+        };
+        let mut contents = String::new();
+        f.read_to_string(&mut contents)?;
+        Ok(contents)
+    }
+
     pub fn eval_include(&mut self, def: &IncludeDef) -> Result<Rc<Val>, Box<dyn Error>> {
         return if def.typ.fragment == "str" {
-            let normalized = match self.find_file(&def.path.fragment, false) {
-                Ok(p) => p,
-                Err(e) => {
-                    return Err(Box::new(error::BuildError::new(
-                        format!("Error finding file {} {}", def.path.fragment, e),
-                        error::ErrorType::TypeFail,
-                        def.typ.pos.clone(),
-                    )))
-                }
-            };
-            let mut f = match File::open(&normalized) {
-                Ok(f) => f,
-                Err(e) => {
-                    return Err(Box::new(error::BuildError::new(
-                        format!("Error opening file {} {}", normalized.to_string_lossy(), e),
-                        error::ErrorType::TypeFail,
-                        def.typ.pos.clone(),
-                    )))
-                }
-            };
-            let mut contents = String::new();
-            f.read_to_string(&mut contents)?;
-            Ok(Rc::new(Val::Str(contents)))
-        } else {
-            // TODO(jwall): Run the conversion on the contents of the file and return it as
-            //               an Rc<Val>.
-            Err(Box::new(error::BuildError::new(
-                format!("Unknown include conversion type {}", def.typ.fragment),
-                error::ErrorType::Unsupported,
-                def.typ.pos.clone(),
+            Ok(Rc::new(Val::Str(
+                self.get_file_as_string(&def.path.pos, &def.path.fragment)?,
             )))
+        } else {
+            let maybe_importer = self.import_registry.get_importer(&def.typ.fragment);
+            match maybe_importer {
+                Some(importer) => {
+                    let file_contents =
+                        self.get_file_as_string(&def.path.pos, &def.path.fragment)?;
+                    let val = importer.import(file_contents.as_bytes())?;
+                    Ok(val)
+                }
+                None => Err(Box::new(error::BuildError::new(
+                    format!("Unknown include conversion type {}", def.typ.fragment),
+                    error::ErrorType::Unsupported,
+                    def.typ.pos.clone(),
+                ))),
+            }
         };
     }
 

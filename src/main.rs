@@ -27,7 +27,7 @@ use ucglib::build;
 use ucglib::build::assets::{Cache, MemoryCache};
 use ucglib::build::Val;
 use ucglib::convert::traits;
-use ucglib::convert::ConverterRegistry;
+use ucglib::convert::{ConverterRegistry, ImporterRegistry};
 
 fn do_flags<'a, 'b>() -> clap::App<'a, 'b> {
     clap_app!(
@@ -54,6 +54,9 @@ fn do_flags<'a, 'b>() -> clap::App<'a, 'b> {
             )
             (@subcommand converters =>
              (about: "list the available converters")
+            )
+            (@subcommand importers =>
+             (about: "list the available importers for includes")
             )
             (@subcommand env =>
              (about: "Describe the environment variables ucg uses.")
@@ -380,6 +383,14 @@ fn converters_command(registry: &ConverterRegistry) {
     }
 }
 
+fn importers_command(registry: &ImporterRegistry) {
+    println!("Available importers");
+    println!("");
+    for (name, _importer) in registry.get_importer_list().iter() {
+        println!("- {}", name);
+    }
+}
+
 fn env_help() {
     println!("Universal Configuration Grammar compiler.");
     println!("");
@@ -419,6 +430,9 @@ fn main() {
         test_command(matches, &import_paths, cache, &registry, strict);
     } else if let Some(_) = app_matches.subcommand_matches("converters") {
         converters_command(&registry)
+    } else if let Some(_) = app_matches.subcommand_matches("importers") {
+        let registry = ImporterRegistry::make_registry();
+        importers_command(&registry)
     } else if let Some(_) = app_matches.subcommand_matches("env") {
         env_help()
     } else {

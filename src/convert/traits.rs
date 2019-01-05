@@ -29,3 +29,7 @@ pub trait Converter {
     fn file_ext(&self) -> String;
     fn description(&self) -> String;
 }
+
+pub trait Importer {
+    fn import(&self, bytes: &[u8]) -> result::Result<Rc<Val>, Box<dyn Error>>;
+}

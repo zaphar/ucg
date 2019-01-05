@@ -13,6 +13,7 @@
 //  limitations under the License.
 
 //! The conversion stage of the ucg compiler.
+pub mod b64;
 pub mod env;
 pub mod exec;
 pub mod flags;
@@ -26,7 +27,7 @@ use std::collections::HashMap;
 
 /// ConverterRunner knows how to run a given converter on a Val.
 pub struct ConverterRegistry {
-    converters: HashMap<String, Box<traits::Converter>>,
+    converters: HashMap<String, Box<dyn traits::Converter>>,
 }
 
 impl ConverterRegistry {
@@ -64,6 +65,48 @@ impl ConverterRegistry {
 
     pub fn get_converter_list(&self) -> Vec<(&String, &Box<traits::Converter>)> {
         self.converters.iter().collect()
+    }
+
+    // TODO(jwall): Support converter help descriptions.
+}
+
+pub struct ImporterRegistry {
+    importers: HashMap<String, Box<dyn traits::Importer>>,
+}
+
+impl ImporterRegistry {
+    /// new creates a new ConverterRunner with a converter for the provided output target.
+    ///
+    /// * flags
+    /// * json
+    /// * env
+    /// * exec
+    fn new() -> Self {
+        ImporterRegistry {
+            importers: HashMap::new(),
+        }
+    }
+
+    pub fn make_registry() -> Self {
+        let mut registry = Self::new();
+        registry.register("b64", Box::new(b64::Base64Importer { url_safe: false }));
+        registry.register(
+            "b64urlsafe",
+            Box::new(b64::Base64Importer { url_safe: true }),
+        );
+        registry
+    }
+
+    pub fn register<S: Into<String>>(&mut self, typ: S, importer: Box<dyn traits::Importer>) {
+        self.importers.insert(typ.into(), importer);
+    }
+
+    pub fn get_importer(&self, typ: &str) -> Option<&dyn traits::Importer> {
+        self.importers.get(typ).map(|c| c.as_ref())
+    }
+
+    pub fn get_importer_list(&self) -> Vec<(&String, &Box<dyn traits::Importer>)> {
+        self.importers.iter().collect()
     }
 
     // TODO(jwall): Support converter help descriptions.

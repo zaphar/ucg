@@ -3,3 +3,12 @@ assert |
     script == "#!/usr/bin/env bash
 echo \"included\"";
 |;
+let expected = "IyEvdXNyL2Jpbi9lbnYgYmFzaAplY2hvICJpbmNsdWRlZCI=";
+let base64 = include b64 "./include_example.sh";
+assert |
+    base64 == expected;
+|;
+let base64 = include b64urlsafe "./include_example.sh";
+assert |
+    base64 == expected;
+|;

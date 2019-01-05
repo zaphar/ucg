@@ -22,6 +22,7 @@
 #![recursion_limit = "128"]
 #[macro_use]
 extern crate abortable_parser;
+extern crate base64;
 extern crate serde_json;
 extern crate serde_yaml;
 extern crate simple_error;
