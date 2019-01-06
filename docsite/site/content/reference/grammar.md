@@ -57,17 +57,11 @@ null_keyword: "NULL" ;
 in_keyword: "in" ;
 escaped: "\", VISIBLE_CHAR ;
 str: quot, { escaped | UTF8_CHAR }, quot ;
-```
-
-Whitespace is discarded before parsing the rest of the AST.
-
-## Simple Scalar Values
-
-```
-str:
 float: (DIGIT+, dot, { DIGIT }) | (dot, DIGIT+) ;
 number: ["-" | "+"](float | integer) ;
 ```
+
+Whitespace is discarded before parsing the rest of the AST.
 
 ## Complex Values
 
