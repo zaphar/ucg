@@ -174,7 +174,7 @@ Operator expressions have a defined precedence order for evaluation:
 ### Any Expression
 
 ```
-expr: operator_expression | non_operator_expression ;
+expr: binary_expr | non_operator_expr ;
 ```
 
 ## Statements
