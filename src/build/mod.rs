@@ -235,7 +235,7 @@ impl<'a> FileBuilder<'a> {
             &Value::Str(ref s) => Ok(Rc::new(Val::Str(s.val.to_string()))),
             &Value::Symbol(ref s) => {
                 scope
-                    .lookup_sym(&(s.into()))
+                    .lookup_sym(&(s.into()), true)
                     .ok_or(Box::new(error::BuildError::new(
                         format!("Unable to find binding {}", s.val,),
                         error::ErrorType::NoSuchSymbol,
@@ -253,7 +253,7 @@ impl<'a> FileBuilder<'a> {
             pos: Position::new(0, 0, 0),
             val: name.to_string(),
         };
-        self.scope.lookup_sym(&key)
+        self.scope.lookup_sym(&key, true)
     }
 
     /// Puts the builder in validation mode.
@@ -741,14 +741,27 @@ impl<'a> FileBuilder<'a> {
         right: &Expression,
         scope: &Scope,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
+        let pos = right.pos().clone();
         match right {
             Expression::Copy(_) => return self.eval_expr(right, scope),
             Expression::Call(_) => return self.eval_expr(right, scope),
             Expression::Simple(Value::Symbol(ref s)) => {
-                self.eval_value(&Value::Symbol(s.clone()), scope)
+                scope
+                    .lookup_sym(s, true)
+                    .ok_or(Box::new(error::BuildError::new(
+                        format!("Unable to find binding {}", s.val,),
+                        error::ErrorType::NoSuchSymbol,
+                        pos,
+                    )))
             }
             Expression::Simple(Value::Str(ref s)) => {
-                self.eval_value(&Value::Symbol(s.clone()), scope)
+                scope
+                    .lookup_sym(s, false)
+                    .ok_or(Box::new(error::BuildError::new(
+                        format!("Unable to find binding {}", s.val,),
+                        error::ErrorType::NoSuchSymbol,
+                        pos,
+                    )))
             }
             Expression::Simple(Value::Int(ref i)) => {
                 scope.lookup_idx(right.pos(), &Val::Int(i.val))

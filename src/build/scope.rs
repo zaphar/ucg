@@ -119,11 +119,11 @@ impl Scope {
     ///    valid when the current value is a tuple.
     /// * everything else is looked up in the currently accumulated build output
     ///   for this execution context.
-    pub fn lookup_sym(&self, sym: &PositionedItem<String>) -> Option<Rc<Val>> {
-        if &sym.val == "env" {
+    pub fn lookup_sym(&self, sym: &PositionedItem<String>, is_symbol: bool) -> Option<Rc<Val>> {
+        if &sym.val == "env" && is_symbol {
             return Some(self.env.clone());
         }
-        if &sym.val == "self" {
+        if &sym.val == "self" && is_symbol {
             return self.curr_val.clone();
         }
         if self.build_output.contains_key(sym) {

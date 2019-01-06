@@ -86,3 +86,35 @@ let copy_maybe = base_maybe{
 assert |
     copy_maybe.real == NULL;
 |;
+
+let quotedself_tpl = {
+    "self" = "myself",
+};
+
+assert |
+    quotedself_tpl."self" == "myself";
+|;
+
+let quotedenv_tpl = {
+    "env" = "myenv",
+};
+
+assert |
+    quotedenv_tpl."env" == "myenv";
+|;
+
+let unquotedenv_tpl = {
+    env = "myenv",
+};
+
+assert |
+    unquotedenv_tpl."env" == "myenv";
+|;
+
+let unquotedself_tpl = {
+    self = "myself",
+};
+
+assert |
+    unquotedself_tpl."self" == "myself";
+|;
