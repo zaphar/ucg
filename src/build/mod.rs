@@ -1112,49 +1112,65 @@ impl<'a> FileBuilder<'a> {
         }
     }
 
-    fn eval_list_op(&mut self, def: &ListOpDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
-        let maybe_list = self.eval_expr(&def.target, scope)?;
-        let l = match maybe_list.as_ref() {
-            &Val::List(ref elems) => elems,
-            other => {
-                return Err(Box::new(error::BuildError::new(
-                    format!("Expected List as target but got {:?}", other.type_name()),
-                    error::ErrorType::TypeFail,
-                    def.target.pos().clone(),
-                )));
-            }
-        };
-        let mac_sym = Value::Symbol(def.mac.clone());
-        if let &Val::Macro(ref macdef) = self.eval_value(&mac_sym, &self.scope.clone())?.as_ref() {
-            let mut out = Vec::new();
-            for item in l.iter() {
-                let argvals = vec![item.clone()];
-                let fields = macdef.eval(self.file.clone(), self, argvals)?;
-                if let Some(v) = find_in_fieldlist(&def.field.val, &fields) {
-                    match def.typ {
-                        ListOpType::Map => {
-                            out.push(v.clone());
+    fn eval_functional_list_processing(
+        &mut self,
+        elems: &Vec<Rc<Val>>,
+        def: &MacroDef,
+        outfield: &PositionedItem<String>,
+        typ: &ListOpType,
+    ) -> Result<Rc<Val>, Box<dyn Error>> {
+        let mut out = Vec::new();
+        for item in elems.iter() {
+            let argvals = vec![item.clone()];
+            let fields = def.eval(self.file.clone(), self, argvals)?;
+            if let Some(v) = find_in_fieldlist(&outfield.val, &fields) {
+                match typ {
+                    ListOpType::Map => {
+                        out.push(v.clone());
+                    }
+                    ListOpType::Filter => {
+                        if let &Val::Empty = v.as_ref() {
+                            // noop
+                            continue;
+                        } else if let &Val::Boolean(false) = v.as_ref() {
+                            // noop
+                            continue;
                         }
-                        ListOpType::Filter => {
-                            if let &Val::Empty = v.as_ref() {
-                                // noop
-                                continue;
-                            } else if let &Val::Boolean(false) = v.as_ref() {
-                                // noop
-                                continue;
-                            }
-                            out.push(item.clone());
-                        }
+                        out.push(item.clone());
                     }
                 }
             }
-            return Ok(Rc::new(Val::List(out)));
         }
-        return Err(Box::new(error::BuildError::new(
-            format!("Expected macro but got {:?}", def.mac),
-            error::ErrorType::TypeFail,
-            def.pos.clone(),
-        )));
+        return Ok(Rc::new(Val::List(out)));
+    }
+
+    fn eval_functional_processing(
+        &mut self,
+        def: &ListOpDef,
+        scope: &Scope,
+    ) -> Result<Rc<Val>, Box<dyn Error>> {
+        let maybe_list = self.eval_expr(&def.target, scope)?;
+        let maybe_mac = self.eval_value(&Value::Symbol(def.mac.clone()), &self.scope.clone())?;
+        let macdef = match maybe_mac.as_ref() {
+            &Val::Macro(ref macdef) => macdef,
+            _ => {
+                return Err(Box::new(error::BuildError::new(
+                    format!("Expected macro but got {:?}", def.mac),
+                    error::ErrorType::TypeFail,
+                    def.pos.clone(),
+                )));
+            }
+        };
+        return match maybe_list.as_ref() {
+            &Val::List(ref elems) => {
+                self.eval_functional_list_processing(elems, macdef, &def.field, &def.typ)
+            }
+            other => Err(Box::new(error::BuildError::new(
+                format!("Expected List as target but got {:?}", other.type_name()),
+                error::ErrorType::TypeFail,
+                def.target.pos().clone(),
+            ))),
+        };
     }
 
     fn build_assert(&mut self, tok: &Token) -> Result<Rc<Val>, Box<dyn Error>> {
@@ -1278,7 +1294,7 @@ impl<'a> FileBuilder<'a> {
             &Expression::Macro(ref def) => self.eval_macro_def(def),
             &Expression::Module(ref def) => self.eval_module_def(def, scope),
             &Expression::Select(ref def) => self.eval_select(def, scope),
-            &Expression::ListOp(ref def) => self.eval_list_op(def, scope),
+            &Expression::ListOp(ref def) => self.eval_functional_processing(def, scope),
             &Expression::Include(ref def) => self.eval_include(def),
         }
     }
