@@ -49,6 +49,8 @@ import_keyword: "import" ;
 include_keyword: "include" ; 
 as_keyword: "as" ;
 macro_keyword: "macro" ;
+map_keyword: "map" ;
+filter_keyword: "filter" ;
 module_keyword: "module" ;
 mod_keyword: "mod" ;
 out_keyword: "out" ;
@@ -129,6 +131,13 @@ call_expression: bareword, lparen, [arglist], rparen ;
 format_expr: str, percent, lparen, [arglist], rparen ;
 ```
 
+### Functional processing expressions
+
+```
+func_op_kind: map_keyword | filter_keyword ;
+processing_expr: func_op_kind, bareword, dot, bareword, expr ;
+```
+
 #### Include Expression
 
 ```
@@ -145,6 +154,7 @@ non_operator_expr: literal
                    | format_expression
                    | include_expression
                    | copy_expression
+                   | processing_expr
                    | call_expression ;
 ```
 
