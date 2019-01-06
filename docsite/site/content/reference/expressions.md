@@ -223,6 +223,86 @@ should be placed. Any primitive value can be used as an argument.
 "https://@:@/" % (host, port)
 ```
 
+Functional processing expressions
+---------------------------------
+
+UCG has a few functional processing expressions called `map` and `filter`. Both of
+them can process a list or tuple.
+
+Their syntax starts with either map or filter followed by a symbol that
+references a valid macro and the outfield for the tuple the macro produces. and
+finally an expression that resolves to either a list of tuple.
+
+### Map expressions
+
+Map macros should produce in the result field a value or [field, value] that
+will replace the element or field it is curently processing.
+
+**For Lists**
+
+When mapping a macro across a list the result field can be any valid value. The
+macro is expected to take a single argument.
+
+```
+let list1 = [1, 2, 3, 4];
+
+let mapper = macro(item) => { result = item + 1 };
+map mapper.result list1 == [2, 3, 4, 5];
+```
+
+**For Tuples**
+
+Macros for mapping across a tuple are expected to take two arguments. The first
+argument is the name of the field. The second argument is the value in that
+field. The result field should be a two item list with the first item being the
+new field name and the second item being the new value.
+
+```
+let test_tpl = {
+    foo = "bar",
+    quux = "baz",
+};
+let tpl_mapper = macro(name, val) => {
+    result = select name, [name, val], {
+        "foo" = ["foo", "barbar"],
+        quux = ["cute", "pygmy"],
+    },
+};
+map tpl_mapper.result test_tpl == {foo = "barbar", cute = "pygmy"};
+```
+
+### Filter expressions
+
+Filter expressions should return a result field with false or NULL for items to
+filter out of the list or tuple. Any other value in the return field results in
+the item or field staying in the resulting list or tuple.
+
+**Lists**
+
+```
+let list2 = ["foo", "bar", "foo", "bar"];
+let filtrator = macro(item) => {
+    result = select item, NULL, {
+        foo = item,
+    },
+};
+
+filter filtrator.result list2 == ["foo", "foo"];
+```
+
+**Tuples**
+
+```
+let test_tpl = {
+    foo = "bar",
+    quux = "baz",
+};
+let tpl_filter = macro(name, val) => {
+    result = name != "foo",
+};
+filter tpl_filter.result test_tpl == { quux = "baz" };
+```
+
 Include expressions
 -------------------
 

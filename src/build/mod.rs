@@ -1113,7 +1113,7 @@ impl<'a> FileBuilder<'a> {
     }
 
     fn eval_functional_list_processing(
-        &mut self,
+        &self,
         elems: &Vec<Rc<Val>>,
         def: &MacroDef,
         outfield: &PositionedItem<String>,
@@ -1144,6 +1144,77 @@ impl<'a> FileBuilder<'a> {
         return Ok(Rc::new(Val::List(out)));
     }
 
+    fn eval_functional_tuple_processing(
+        &self,
+        fs: &Vec<(PositionedItem<String>, Rc<Val>)>,
+        def: &MacroDef,
+        outfield: &PositionedItem<String>,
+        typ: &ListOpType,
+    ) -> Result<Rc<Val>, Box<dyn Error>> {
+        let mut out = Vec::new();
+        for &(ref name, ref val) in fs {
+            let argvals = vec![Rc::new(Val::Str(name.val.clone())), val.clone()];
+            let fields = def.eval(self.file.clone(), self, argvals)?;
+            if let Some(v) = find_in_fieldlist(&outfield.val, &fields) {
+                match typ {
+                    ListOpType::Map => {
+                        if let &Val::List(ref fs) = v.as_ref() {
+                            if fs.len() == 2 {
+                                // index 0 should be a string for the new field name.
+                                // index 1 should be the val.
+                                let new_name = if let &Val::Str(ref s) = fs[0].as_ref() {
+                                    s.clone()
+                                } else {
+                                    return Err(Box::new(error::BuildError::new(
+                                        format!(
+                                            "map on tuple expects the first item out list to be a string but got size {}",
+                                            fs[0].type_name()
+                                        ),
+                                        error::ErrorType::TypeFail,
+                                        def.pos.clone(),
+                                    )));
+                                };
+                                out.push((
+                                    PositionedItem::new(new_name, name.pos.clone()),
+                                    fs[1].clone(),
+                                ));
+                            } else {
+                                return Err(Box::new(error::BuildError::new(
+                                    format!(
+                                        "map on a tuple field expects a list of size 2 as output but got size {}",
+                                        fs.len()
+                                    ),
+                                    error::ErrorType::TypeFail,
+                                    def.pos.clone(),
+                                )));
+                            }
+                        } else {
+                            return Err(Box::new(error::BuildError::new(
+                                format!(
+                                    "map on a tuple field expects a list as output but got {:?}",
+                                    v.type_name()
+                                ),
+                                error::ErrorType::TypeFail,
+                                def.pos.clone(),
+                            )));
+                        }
+                    }
+                    ListOpType::Filter => {
+                        if let &Val::Empty = v.as_ref() {
+                            // noop
+                            continue;
+                        } else if let &Val::Boolean(false) = v.as_ref() {
+                            // noop
+                            continue;
+                        }
+                        out.push((name.clone(), val.clone()));
+                    }
+                }
+            }
+        }
+        Ok(Rc::new(Val::Tuple(out)))
+    }
+
     fn eval_functional_processing(
         &mut self,
         def: &ListOpDef,
@@ -1164,6 +1235,9 @@ impl<'a> FileBuilder<'a> {
         return match maybe_list.as_ref() {
             &Val::List(ref elems) => {
                 self.eval_functional_list_processing(elems, macdef, &def.field, &def.typ)
+            }
+            &Val::Tuple(ref fs) => {
+                self.eval_functional_tuple_processing(fs, macdef, &def.field, &def.typ)
             }
             other => Err(Box::new(error::BuildError::new(
                 format!("Expected List as target but got {:?}", other.type_name()),

@@ -13,7 +13,7 @@ let boolfiltrator = macro(item) => {
 };
 
 assert |
-map mapper.result list1 == [2, 3, 4, 5];
+    map mapper.result list1 == [2, 3, 4, 5];
 |;
 assert |
     (map mapper.result [1, 2, 3, 4]) == [2, 3, 4, 5];
@@ -33,4 +33,46 @@ assert |
 |;
 assert |
     filter boolfiltrator.result [1, 2, 3, 4, 5, 6, 7] == [1, 2, 3, 4];
+|;
+
+// Tuple processing
+let test_tpl = {
+    foo = "bar",
+    quux = "baz",
+};
+
+let identity_tpl_mapper = macro(name, val) => {
+    result = [name, val],
+};
+
+assert |
+    map identity_tpl_mapper.result test_tpl == test_tpl;
+|;
+
+let tpl_mapper = macro(name, val) => {
+    result = select name, [name, val], {
+        "foo" = ["foo", "barbar"],
+        quux = ["cute", "pygmy"],
+    },
+};
+
+assert |
+    map tpl_mapper.result test_tpl == {foo = "barbar", cute = "pygmy"};
+|;
+
+let identity_tpl_filter = macro(name, val) => {
+    result = true,
+};
+
+// strip out foo field
+let tpl_filter = macro(name, val) => {
+    result = name != "foo",
+};
+
+assert |
+    filter identity_tpl_filter.result test_tpl == test_tpl;
+|;
+
+assert |
+    filter tpl_filter.result test_tpl == { quux = "baz" };
 |;
