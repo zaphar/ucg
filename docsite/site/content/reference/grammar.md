@@ -50,6 +50,7 @@ include_keyword: "include" ;
 as_keyword: "as" ;
 macro_keyword: "macro" ;
 map_keyword: "map" ;
+reduce_keyword: "map" ;
 filter_keyword: "filter" ;
 module_keyword: "module" ;
 mod_keyword: "mod" ;
@@ -121,8 +122,8 @@ module_def: module_keyword, tuple, fatcomma, lbrace, [ { statement } ], rbrace ;
 #### Copy and Call Expression
 
 ```
-copy_expression: bareword, tuple ;
-call_expression: bareword, lparen, [arglist], rparen ;
+copy_expr: bareword, tuple ;
+call_expr: bareword, lparen, [arglist], rparen ;
 ```
 
 #### Format Expression
@@ -135,7 +136,9 @@ format_expr: str, percent, lparen, [arglist], rparen ;
 
 ```
 func_op_kind: map_keyword | filter_keyword ;
-processing_expr: func_op_kind, bareword, dot, bareword, expr ;
+map_or_filter_expr: func_op_kind, bareword, dot, bareword, expr ;
+reduce_expr: reduce_keyword, bareword, dot, bareword, expr, expr ;
+processing_expr: map_or_filter_expr | reduce_expr
 ```
 
 #### Include Expression
@@ -151,11 +154,11 @@ non_operator_expr: literal
                    | grouped
                    | macrodef
                    | module_def
-                   | format_expression
-                   | include_expression
-                   | copy_expression
+                   | format_expr
+                   | include_expr
+                   | copy_expr
                    | processing_expr
-                   | call_expression ;
+                   | call_expr ;
 ```
 
 #### Operator Expressions

@@ -303,6 +303,38 @@ let tpl_filter = macro(name, val) => {
 filter tpl_filter.result test_tpl == { quux = "baz" };
 ```
 
+### Reduce expressions
+
+Reduce expressions start with the reduce keyword followed by a symbol referencing a macro a dot and the output field, then an expression for the accumulator and finally the tuple or list to process.
+
+**Tuples**
+
+```
+let test_tpl = {
+    foo = "bar",
+    quux = "baz",
+};
+let tpl_reducer = macro(acc, name, val) => {
+    result = acc{
+        keys = self.keys + [name],
+        vals = self.vals + [val],
+    },
+};
+
+reduce tpl_reducer.result {keys = [], vals = []}, test_tpl == {keys = ["foo", "quux"], vals = ["bar", "baz"]};
+```
+
+**Lists**
+
+```
+let list1 = [1, 2, 3, 4];
+let list_reducer = macro(acc, item) => {
+    result = acc + item,
+};
+
+ list_reducer.result 0, list1 == 0 + 1 + 2 + 3 + 4;
+```
+
 Include expressions
 -------------------
 
