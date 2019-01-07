@@ -8,7 +8,7 @@ let base64 = include b64 "./include_example.sh";
 assert |
     base64 == expected;
 |;
-let base64 = include b64urlsafe "./include_example.sh";
+let base64safe = include b64urlsafe "./include_example.sh";
 assert |
-    base64 == expected;
+    base64safe == expected;
 |;
