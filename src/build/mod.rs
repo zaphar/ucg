@@ -41,6 +41,11 @@ pub mod scope;
 
 pub use self::ir::Val;
 
+enum ProcessingOpType {
+    Map,
+    Filter,
+}
+
 impl MacroDef {
     /// Expands a ucg Macro using the given arguments into a new Tuple.
     pub fn eval(
@@ -206,7 +211,7 @@ impl<'a> FileBuilder<'a> {
     }
 
     fn eval_tuple(
-        &mut self,
+        &self,
         fields: &Vec<(Token, Expression)>,
         scope: &Scope,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
@@ -218,7 +223,7 @@ impl<'a> FileBuilder<'a> {
         Ok(Rc::new(Val::Tuple(new_fields)))
     }
 
-    fn eval_list(&mut self, def: &ListDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
+    fn eval_list(&self, def: &ListDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         let mut vals = Vec::new();
         for expr in def.elems.iter() {
             vals.push(self.eval_expr(expr, scope)?);
@@ -226,7 +231,7 @@ impl<'a> FileBuilder<'a> {
         Ok(Rc::new(Val::List(vals)))
     }
 
-    fn eval_value(&mut self, v: &Value, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
+    fn eval_value(&self, v: &Value, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         match v {
             &Value::Empty(_) => Ok(Rc::new(Val::Empty)),
             &Value::Boolean(ref b) => Ok(Rc::new(Val::Boolean(b.val))),
@@ -736,11 +741,7 @@ impl<'a> FileBuilder<'a> {
         )))
     }
 
-    fn do_dot_lookup(
-        &mut self,
-        right: &Expression,
-        scope: &Scope,
-    ) -> Result<Rc<Val>, Box<dyn Error>> {
+    fn do_dot_lookup(&self, right: &Expression, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         let pos = right.pos().clone();
         match right {
             Expression::Copy(_) => return self.eval_expr(right, scope),
@@ -771,7 +772,7 @@ impl<'a> FileBuilder<'a> {
     }
 
     fn do_element_check(
-        &mut self,
+        &self,
         left: &Expression,
         right: &Expression,
         scope: &Scope,
@@ -817,7 +818,7 @@ impl<'a> FileBuilder<'a> {
         }
     }
 
-    fn eval_binary(&mut self, def: &BinaryOpDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
+    fn eval_binary(&self, def: &BinaryOpDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         let kind = &def.kind;
         if let &BinaryExprType::IN = kind {
             return self.do_element_check(&def.left, &def.right, scope);
@@ -858,7 +859,7 @@ impl<'a> FileBuilder<'a> {
     }
 
     fn copy_from_base(
-        &mut self,
+        &self,
         src_fields: &Vec<(PositionedItem<String>, Rc<Val>)>,
         overrides: &Vec<(Token, Expression)>,
         scope: &Scope,
@@ -935,7 +936,7 @@ impl<'a> FileBuilder<'a> {
         )));
     }
 
-    fn eval_copy(&mut self, def: &CopyDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
+    fn eval_copy(&self, def: &CopyDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         let v = self.eval_value(&def.selector, scope)?;
         if let &Val::Tuple(ref src_fields) = v.as_ref() {
             let mut child_scope = scope.spawn_child();
@@ -998,7 +999,7 @@ impl<'a> FileBuilder<'a> {
         )))
     }
 
-    fn eval_format(&mut self, def: &FormatDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
+    fn eval_format(&self, def: &FormatDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         let tmpl = &def.template;
         let args = &def.args;
         let mut vals = Vec::new();
@@ -1010,7 +1011,7 @@ impl<'a> FileBuilder<'a> {
         Ok(Rc::new(Val::Str(formatter.render(&def.pos)?)))
     }
 
-    fn eval_call(&mut self, def: &CallDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
+    fn eval_call(&self, def: &CallDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         let args = &def.arglist;
         let v = self.eval_value(&def.macroref, scope)?;
         if let &Val::Macro(ref m) = v.deref() {
@@ -1055,11 +1056,7 @@ impl<'a> FileBuilder<'a> {
         };
     }
 
-    fn eval_module_def(
-        &mut self,
-        def: &ModuleDef,
-        scope: &Scope,
-    ) -> Result<Rc<Val>, Box<dyn Error>> {
+    fn eval_module_def(&self, def: &ModuleDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         let root = self.file_dir();
         // Always work on a copy. The original should not be modified.
         let mut def = def.clone();
@@ -1071,7 +1068,7 @@ impl<'a> FileBuilder<'a> {
         Ok(Rc::new(Val::Module(def)))
     }
 
-    fn eval_select(&mut self, def: &SelectDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
+    fn eval_select(&self, def: &SelectDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         let target = &def.val;
         let def_expr = &def.default;
         let fields = &def.tuple;
@@ -1117,7 +1114,7 @@ impl<'a> FileBuilder<'a> {
         elems: &Vec<Rc<Val>>,
         def: &MacroDef,
         outfield: &PositionedItem<String>,
-        typ: &ListOpType,
+        typ: ProcessingOpType,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
         let mut out = Vec::new();
         for item in elems.iter() {
@@ -1125,10 +1122,10 @@ impl<'a> FileBuilder<'a> {
             let fields = def.eval(self.file.clone(), self, argvals)?;
             if let Some(v) = find_in_fieldlist(&outfield.val, &fields) {
                 match typ {
-                    ListOpType::Map => {
+                    ProcessingOpType::Map => {
                         out.push(v.clone());
                     }
-                    ListOpType::Filter => {
+                    ProcessingOpType::Filter => {
                         if let &Val::Empty = v.as_ref() {
                             // noop
                             continue;
@@ -1149,7 +1146,7 @@ impl<'a> FileBuilder<'a> {
         fs: &Vec<(PositionedItem<String>, Rc<Val>)>,
         def: &MacroDef,
         outfield: &PositionedItem<String>,
-        typ: &ListOpType,
+        typ: ProcessingOpType,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
         let mut out = Vec::new();
         for &(ref name, ref val) in fs {
@@ -1157,7 +1154,7 @@ impl<'a> FileBuilder<'a> {
             let fields = def.eval(self.file.clone(), self, argvals)?;
             if let Some(v) = find_in_fieldlist(&outfield.val, &fields) {
                 match typ {
-                    ListOpType::Map => {
+                    ProcessingOpType::Map => {
                         if let &Val::List(ref fs) = v.as_ref() {
                             if fs.len() == 2 {
                                 // index 0 should be a string for the new field name.
@@ -1199,7 +1196,7 @@ impl<'a> FileBuilder<'a> {
                             )));
                         }
                     }
-                    ListOpType::Filter => {
+                    ProcessingOpType::Filter => {
                         if let &Val::Empty = v.as_ref() {
                             // noop
                             continue;
@@ -1210,17 +1207,23 @@ impl<'a> FileBuilder<'a> {
                         out.push((name.clone(), val.clone()));
                     }
                 }
+            } else {
+                return Err(Box::new(error::BuildError::new(
+                    format!(
+                        "Result {} field does not exist in macro body!",
+                        outfield.val
+                    ),
+                    error::ErrorType::NoSuchSymbol,
+                    def.pos.clone(),
+                )));
             }
         }
         Ok(Rc::new(Val::Tuple(out)))
     }
 
-    fn eval_functional_processing(
-        &mut self,
-        def: &ListOpDef,
-        scope: &Scope,
-    ) -> Result<Rc<Val>, Box<dyn Error>> {
-        let maybe_list = self.eval_expr(&def.target, scope)?;
+    fn eval_reduce_op(&self, def: &ReduceOpDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
+        let maybe_target = self.eval_expr(&def.target, scope)?;
+        let mut acc = self.eval_expr(&def.acc, scope)?;
         let maybe_mac = self.eval_value(&Value::Symbol(def.mac.clone()), &self.scope.clone())?;
         let macdef = match maybe_mac.as_ref() {
             &Val::Macro(ref macdef) => macdef,
@@ -1232,15 +1235,85 @@ impl<'a> FileBuilder<'a> {
                 )));
             }
         };
-        return match maybe_list.as_ref() {
+        match maybe_target.as_ref() {
             &Val::List(ref elems) => {
-                self.eval_functional_list_processing(elems, macdef, &def.field, &def.typ)
+                for item in elems.iter() {
+                    let argvals = vec![acc.clone(), item.clone()];
+                    let fields = macdef.eval(self.file.clone(), self, argvals)?;
+                    if let Some(v) = find_in_fieldlist(&def.field.val, &fields) {
+                        acc = v.clone();
+                    } else {
+                        return Err(Box::new(error::BuildError::new(
+                            format!("Result {} field does not exist in macro body!", def.field),
+                            error::ErrorType::NoSuchSymbol,
+                            def.pos.clone(),
+                        )));
+                    }
+                }
             }
             &Val::Tuple(ref fs) => {
-                self.eval_functional_tuple_processing(fs, macdef, &def.field, &def.typ)
+                for &(ref name, ref val) in fs.iter() {
+                    let argvals = vec![
+                        acc.clone(),
+                        Rc::new(Val::Str(name.val.clone())),
+                        val.clone(),
+                    ];
+                    let fields = macdef.eval(self.file.clone(), self, argvals)?;
+                    if let Some(v) = find_in_fieldlist(&def.field.val, &fields) {
+                        acc = v.clone();
+                    } else {
+                        return Err(Box::new(error::BuildError::new(
+                            format!("Result field {}does not exist in macro body!", def.field),
+                            error::ErrorType::NoSuchSymbol,
+                            def.pos.clone(),
+                        )));
+                    }
+                }
+            }
+            other => {
+                return Err(Box::new(error::BuildError::new(
+                    format!(
+                        "Expected List or Tuple as target but got {:?}",
+                        other.type_name()
+                    ),
+                    error::ErrorType::TypeFail,
+                    def.target.pos().clone(),
+                )));
+            }
+        }
+        Ok(acc)
+    }
+
+    fn eval_functional_processing(
+        &self,
+        def: &MapFilterOpDef,
+        typ: ProcessingOpType,
+        scope: &Scope,
+    ) -> Result<Rc<Val>, Box<dyn Error>> {
+        let maybe_target = self.eval_expr(&def.target, scope)?;
+        let maybe_mac = self.eval_value(&Value::Symbol(def.mac.clone()), &self.scope.clone())?;
+        let macdef = match maybe_mac.as_ref() {
+            &Val::Macro(ref macdef) => macdef,
+            _ => {
+                return Err(Box::new(error::BuildError::new(
+                    format!("Expected macro but got {:?}", def.mac),
+                    error::ErrorType::TypeFail,
+                    def.pos.clone(),
+                )));
+            }
+        };
+        return match maybe_target.as_ref() {
+            &Val::List(ref elems) => {
+                self.eval_functional_list_processing(elems, macdef, &def.field, typ)
+            }
+            &Val::Tuple(ref fs) => {
+                self.eval_functional_tuple_processing(fs, macdef, &def.field, typ)
             }
             other => Err(Box::new(error::BuildError::new(
-                format!("Expected List as target but got {:?}", other.type_name()),
+                format!(
+                    "Expected List or Tuple as target but got {:?}",
+                    other.type_name()
+                ),
                 error::ErrorType::TypeFail,
                 def.target.pos().clone(),
             ))),
@@ -1328,7 +1401,7 @@ impl<'a> FileBuilder<'a> {
         Ok(contents)
     }
 
-    pub fn eval_include(&mut self, def: &IncludeDef) -> Result<Rc<Val>, Box<dyn Error>> {
+    pub fn eval_include(&self, def: &IncludeDef) -> Result<Rc<Val>, Box<dyn Error>> {
         return if def.typ.fragment == "str" {
             Ok(Rc::new(Val::Str(
                 self.get_file_as_string(&def.path.pos, &def.path.fragment)?,
@@ -1351,13 +1424,21 @@ impl<'a> FileBuilder<'a> {
         };
     }
 
+    fn eval_func_op(&self, def: &FuncOpDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
+        match def {
+            FuncOpDef::Filter(ref def) => {
+                self.eval_functional_processing(def, ProcessingOpType::Filter, scope)
+            }
+            FuncOpDef::Map(ref def) => {
+                self.eval_functional_processing(def, ProcessingOpType::Map, scope)
+            }
+            FuncOpDef::Reduce(ref def) => self.eval_reduce_op(def, scope),
+        }
+    }
+
     // Evals a single Expression in the context of a running Builder.
     // It does not mutate the builders collected state at all.
-    pub fn eval_expr(
-        &mut self,
-        expr: &Expression,
-        scope: &Scope,
-    ) -> Result<Rc<Val>, Box<dyn Error>> {
+    pub fn eval_expr(&self, expr: &Expression, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         match expr {
             &Expression::Simple(ref val) => self.eval_value(val, scope),
             &Expression::Binary(ref def) => self.eval_binary(def, scope),
@@ -1368,7 +1449,7 @@ impl<'a> FileBuilder<'a> {
             &Expression::Macro(ref def) => self.eval_macro_def(def),
             &Expression::Module(ref def) => self.eval_module_def(def, scope),
             &Expression::Select(ref def) => self.eval_select(def, scope),
-            &Expression::ListOp(ref def) => self.eval_functional_processing(def, scope),
+            &Expression::FuncOp(ref def) => self.eval_func_op(def, scope),
             &Expression::Include(ref def) => self.eval_include(def),
         }
     }

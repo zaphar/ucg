@@ -567,55 +567,68 @@ fn call_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expressi
     }
 }
 
-fn tuple_to_list_op<'a>(
-    input: &'a SliceIter<Token>,
-    kind: ListOpType,
-    macroname: Value,
-    outfield: Value,
-    list: Expression,
-) -> ConvertResult<'a, Expression> {
-    let macroname = match macroname {
-        Value::Symbol(sym) => sym,
-        _ => {
-            return Err(Error::new(
-                format!("Expected a macro name but got {}", macroname.type_name()),
-                Box::new(input.clone()),
-            ))
-        }
-    };
-    let outfield = match outfield {
-        Value::Symbol(sym) => sym,
-        _ => {
-            return Err(Error::new(
-                format!("Expected a field name but got {}", outfield.type_name()),
-                Box::new(input.clone()),
-            ))
-        }
-    };
-    return Ok(Expression::ListOp(ListOpDef {
-        typ: kind,
-        mac: macroname,
-        field: outfield,
-        target: Box::new(list),
-        pos: input.into(),
-    }));
-}
+make_fn!(
+    reduce_expression<SliceIter<Token>, Expression>,
+    do_each!(
+        pos => pos,
+        _ => word!("reduce"),
+        macroname => match_type!(BAREWORD),
+        _ => punct!("."),
+        outfield => match_type!(BAREWORD),
+        acc => trace_parse!(non_op_expression),
+        _ => punct!(","),
+        tgt => trace_parse!(non_op_expression),
+        (Expression::FuncOp(FuncOpDef::Reduce(ReduceOpDef{
+            mac: (&macroname).into(),
+            field: (&outfield).into(),
+            acc: Box::new(acc),
+            target: Box::new(tgt),
+            pos: pos,
+        })))
+    )
+);
 
 make_fn!(
-    list_op_expression<SliceIter<Token>, Expression>,
+    map_expression<SliceIter<Token>, Expression>,
     do_each!(
-        input => input!(),
-        optype => either!(
-            do_each!(_ => word!("map"), (ListOpType::Map)),
-            do_each!(_ => word!("filter"), (ListOpType::Filter))
-        ),
+        pos => pos,
+        _ => word!("map"),
         // TODO This should become just a bareword symbol now
-        macroname => trace_parse!(symbol),
+        macroname => match_type!(BAREWORD),
         _ => punct!("."),
-        outfield => trace_parse!(symbol),
+        outfield => match_type!(BAREWORD),
         list => trace_parse!(non_op_expression),
-        (tuple_to_list_op(&input, optype, macroname, outfield, list).unwrap())
+        (Expression::FuncOp(FuncOpDef::Map(MapFilterOpDef{
+            mac: (&macroname).into(),
+            field: (&outfield).into(),
+            target: Box::new(list),
+            pos: pos,
+        })))
     )
+);
+
+make_fn!(
+    filter_expression<SliceIter<Token>, Expression>,
+    do_each!(
+        pos => pos,
+        _ => word!("filter"),
+        // TODO This should become just a bareword symbol now
+        macroname => match_type!(BAREWORD),
+        _ => punct!("."),
+        outfield => match_type!(BAREWORD),
+        list => trace_parse!(non_op_expression),
+        (Expression::FuncOp(FuncOpDef::Filter(MapFilterOpDef{
+            mac: (&macroname).into(),
+            field: (&outfield).into(),
+            target: Box::new(list),
+            pos: pos,
+        })))
+    )
+);
+
+make_fn!(
+    func_op_expression<SliceIter<Token>, Expression>,
+    either!(reduce_expression, map_expression, filter_expression)
 );
 
 fn unprefixed_expression(input: SliceIter<Token>) -> ParseResult<Expression> {
@@ -632,7 +645,7 @@ fn unprefixed_expression(input: SliceIter<Token>) -> ParseResult<Expression> {
 make_fn!(
     non_op_expression<SliceIter<Token>, Expression>,
     either!(
-        trace_parse!(list_op_expression),
+        trace_parse!(func_op_expression),
         trace_parse!(macro_expression),
         trace_parse!(module_expression),
         trace_parse!(select_expression),

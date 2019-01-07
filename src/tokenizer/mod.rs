@@ -308,6 +308,10 @@ make_fn!(filtertok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "filter", WS)
 );
 
+make_fn!(reducetok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::BAREWORD, "reduce", WS)
+);
+
 fn comment(input: OffsetStrIter) -> Result<OffsetStrIter, Token> {
     match text_token!(input, "//") {
         Result::Complete(rest, _) => {
@@ -405,6 +409,7 @@ fn token<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Token> {
         astok,
         maptok,
         filtertok,
+        reducetok,
         barewordtok,
         whitespace,
         end_of_input

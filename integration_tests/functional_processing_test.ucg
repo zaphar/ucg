@@ -1,3 +1,5 @@
+// List processing
+
 let list1 = [1, 2, 3, 4];
 let list2 = ["foo", "bar", "foo", "bar"];
 
@@ -11,6 +13,22 @@ let filtrator = macro(item) => {
 let boolfiltrator = macro(item) => {
     result = item < 5,
 };
+
+let identity_list_reducer = macro(acc, item) => {
+    result = acc + [item],
+};
+
+assert |
+    reduce identity_list_reducer.result [], list1 == list1;
+|;
+
+let list_reducer = macro(acc, item) => {
+    result = acc + item,
+};
+
+assert |
+    reduce list_reducer.result 0, list1 == 0 + 1 + 2 + 3 + 4;
+|;
 
 assert |
     map mapper.result list1 == [2, 3, 4, 5];
@@ -75,4 +93,15 @@ assert |
 
 assert |
     filter tpl_filter.result test_tpl == { quux = "baz" };
+|;
+
+let tpl_reducer = macro(acc, name, val) => {
+    result = acc{
+        keys = self.keys + [name],
+        vals = self.vals + [val],
+    },
+};
+
+assert |
+    reduce tpl_reducer.result {keys = [], vals = []}, test_tpl == {keys = ["foo", "quux"], vals = ["bar", "baz"]};
 |;

@@ -397,7 +397,7 @@ impl MacroDef {
     ) -> HashSet<String> {
         let mut bad_symbols = HashSet::new();
         if let &Value::Symbol(ref name) = val {
-            if !self.symbol_is_in_args(&name.val) {
+            if name.val != "self" && !self.symbol_is_in_args(&name.val) {
                 bad_symbols.insert(name.val.clone());
             }
         } else if let &Value::Tuple(ref tuple_node) = val {
@@ -442,12 +442,6 @@ impl MacroDef {
                             stack.push(expr);
                         }
                     }
-                    &Expression::Copy(ref def) => {
-                        let fields = &def.fields;
-                        for &(_, ref expr) in fields.iter() {
-                            stack.push(expr);
-                        }
-                    }
                     &Expression::Call(ref def) => {
                         for expr in def.arglist.iter() {
                             stack.push(expr);
@@ -458,8 +452,9 @@ impl MacroDef {
                         bad_symbols.extend(syms_set.drain());
                     }
                     &Expression::Macro(_)
+                    | &Expression::Copy(_)
                     | &Expression::Module(_)
-                    | &Expression::ListOp(_)
+                    | &Expression::FuncOp(_)
                     | &Expression::Include(_) => {
                         // noop
                         continue;
@@ -561,21 +556,39 @@ pub struct ListDef {
     pub pos: Position,
 }
 
-/// ListOpType represents the type of list operation for a ListOpDef.
 #[derive(Debug, PartialEq, Clone)]
-pub enum ListOpType {
-    Map,
-    Filter,
+pub enum FuncOpDef {
+    Reduce(ReduceOpDef),
+    Map(MapFilterOpDef),
+    Filter(MapFilterOpDef),
 }
 
-/// ListOpDef implements the list operations in the UCG AST.
 #[derive(Debug, PartialEq, Clone)]
-pub struct ListOpDef {
-    pub typ: ListOpType,
+pub struct ReduceOpDef {
+    pub mac: PositionedItem<String>,
+    pub field: PositionedItem<String>,
+    pub acc: Box<Expression>,
+    pub target: Box<Expression>,
+    pub pos: Position,
+}
+
+/// MapFilterOpDef implements the list operations in the UCG AST.
+#[derive(Debug, PartialEq, Clone)]
+pub struct MapFilterOpDef {
     pub mac: PositionedItem<String>,
     pub field: PositionedItem<String>,
     pub target: Box<Expression>,
     pub pos: Position,
+}
+
+impl FuncOpDef {
+    pub fn pos(&self) -> &Position {
+        match self {
+            FuncOpDef::Map(def) => &def.pos,
+            FuncOpDef::Filter(def) => &def.pos,
+            FuncOpDef::Reduce(def) => &def.pos,
+        }
+    }
 }
 
 // TODO(jwall): this should probably be moved to a Val::Module IR type.
@@ -632,7 +645,7 @@ pub enum Expression {
     Call(CallDef),
     Macro(MacroDef),
     Select(SelectDef),
-    ListOp(ListOpDef),
+    FuncOp(FuncOpDef),
     Module(ModuleDef),
 }
 
@@ -649,7 +662,7 @@ impl Expression {
             &Expression::Macro(ref def) => &def.pos,
             &Expression::Module(ref def) => &def.pos,
             &Expression::Select(ref def) => &def.pos,
-            &Expression::ListOp(ref def) => &def.pos,
+            &Expression::FuncOp(ref def) => def.pos(),
             &Expression::Include(ref def) => &def.pos,
         }
     }
@@ -664,7 +677,7 @@ impl fmt::Display for Expression {
             &Expression::Binary(_) => {
                 write!(w, "<Expr>")?;
             }
-            &Expression::ListOp(_) => {
+            &Expression::FuncOp(_) => {
                 write!(w, "<Expr>")?;
             }
             &Expression::Copy(_) => {
