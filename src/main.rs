@@ -38,7 +38,7 @@ fn do_flags<'a, 'b>() -> clap::App<'a, 'b> {
             (@arg nostrict: --("no-strict") "Turn off strict checking.")
             (@subcommand inspect =>
              (about: "Inspect a specific symbol in a ucg file.")
-             (@arg sym: --sym +takes_value +required "Specify a specific binding in the ucg file to output.")
+             (@arg expr: --expr +takes_value +required "Specify a specific binding in the ucg file to output.")
              (@arg target: --format +required +takes_value "Inspect output type. (flags, json, env, exec)")
              (@arg INPUT: +required "Input ucg file to inspect symbol from.")
             )
@@ -244,7 +244,7 @@ fn inspect_command(
     strict: bool,
 ) {
     let file = matches.value_of("INPUT").unwrap();
-    let sym = matches.value_of("sym");
+    let sym = matches.value_of("expr");
     let target = matches.value_of("target").unwrap();
     let mut builder = build::FileBuilder::new(file, import_paths, cache);
     builder.set_strict(strict);
@@ -257,7 +257,22 @@ fn inspect_command(
                 process::exit(1);
             }
             let val = match sym {
-                Some(sym_name) => builder.get_out_by_name(sym_name),
+                Some(sym_name) => {
+                    let normalized = if !sym_name.ends_with(";") {
+                        let mut temp = sym_name.to_owned();
+                        temp.push_str(";");
+                        temp
+                    } else {
+                        sym_name.to_owned()
+                    };
+                    match builder.eval_string(&normalized) {
+                        Ok(v) => Some(v.clone()),
+                        Err(e) => {
+                            eprintln!("Err: {}", e);
+                            process::exit(1);
+                        }
+                    }
+                }
                 None => builder.last,
             };
             match val {
