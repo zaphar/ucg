@@ -424,7 +424,9 @@ impl MacroDef {
                 match stack.pop().unwrap() {
                     &Expression::Binary(ref bexpr) => {
                         stack.push(&bexpr.left);
-                        stack.push(&bexpr.right);
+                        if bexpr.kind != BinaryExprType::DOT {
+                            stack.push(&bexpr.right);
+                        }
                     }
                     &Expression::Grouped(ref expr) => {
                         stack.push(expr);
