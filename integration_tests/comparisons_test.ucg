@@ -112,3 +112,11 @@ assert |
 assert |
     true in [ "foo" in {foo = 1}, false ];
 |;
+
+assert |
+    "foo" ~ "o+";
+|;
+
+assert |
+    "foo" !~ "bar";
+|;

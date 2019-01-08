@@ -19,6 +19,7 @@ serde_yaml = "~0.8.1"
 toml = "~0.4.8"
 xml-rs = "0.8.0"
 base64 = "0.10.0"
+regex = "1"
 
 [dev-dependencies]
 bencher = "~0.1.5"

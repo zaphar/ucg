@@ -144,27 +144,27 @@ make_fn!(booleantok<OffsetStrIter, Token>,
 macro_rules! do_text_token_tok {
     ($i:expr, $type:expr, $text_token:expr, WS) => {
         do_each!($i,
-                                                                span => input!(),
-                                                                frag => text_token!($text_token),
-                                                                _ => either!(whitespace, comment),
-                                                                (Token {
-                                                                    typ: $type,
-                                                                    pos: Position::from(&span),
-                                                                    fragment: frag.to_string(),
-                                                                })
-                                                                )
+           span => input!(),
+           frag => text_token!($text_token),
+           _ => either!(whitespace, comment),
+           (Token {
+               typ: $type,
+               pos: Position::from(&span),
+               fragment: frag.to_string(),
+           })
+           )
     };
 
     ($i:expr, $type:expr, $text_token:expr) => {
         do_each!($i,
-                                                                span => input!(),
-                                                                frag => text_token!($text_token),
-                                                                (Token {
-                                                                    typ: $type,
-                                                                    pos: Position::from(&span),
-                                                                    fragment: frag.to_string(),
-                                                                })
-                                                                )
+            span => input!(),
+            frag => text_token!($text_token),
+            (Token {
+                typ: $type,
+                pos: Position::from(&span),
+                fragment: frag.to_string(),
+            })
+            )
     };
 }
 
@@ -222,6 +222,14 @@ make_fn!(eqeqtok<OffsetStrIter, Token>,
 
 make_fn!(notequaltok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, "!=")
+);
+
+make_fn!(matchtok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, "~")
+);
+
+make_fn!(notmatchtok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, "!~")
 );
 
 make_fn!(gttok<OffsetStrIter, Token>,
@@ -387,6 +395,8 @@ fn token<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Token> {
         pcttok,
         eqeqtok,
         notequaltok,
+        matchtok,
+        notmatchtok,
         complete!("Not >=".to_string(), gtequaltok),
         complete!("Not <=".to_string(), ltequaltok),
         gttok,

@@ -25,6 +25,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::string::ToString;
 
+use regex;
 use simple_error;
 
 use crate::ast::*;
@@ -818,6 +819,39 @@ impl<'a> FileBuilder<'a> {
         }
     }
 
+    fn eval_re_match(
+        &self,
+        left: Rc<Val>,
+        left_pos: &Position,
+        right: Rc<Val>,
+        right_pos: &Position,
+        negate: bool,
+    ) -> Result<Rc<Val>, Box<dyn Error>> {
+        let re = if let Val::Str(ref s) = right.as_ref() {
+            regex::Regex::new(s.as_ref())?
+        } else {
+            return Err(Box::new(error::BuildError::new(
+                format!("Expected string for regex but got {}", right.type_name()),
+                error::ErrorType::TypeFail,
+                right_pos.clone(),
+            )));
+        };
+        let tgt = if let Val::Str(ref s) = left.as_ref() {
+            s.as_ref()
+        } else {
+            return Err(Box::new(error::BuildError::new(
+                format!("Expected string but got {}", left.type_name()),
+                error::ErrorType::TypeFail,
+                left_pos.clone(),
+            )));
+        };
+        return if negate {
+            Ok(Rc::new(Val::Boolean(!re.is_match(tgt))))
+        } else {
+            Ok(Rc::new(Val::Boolean(re.is_match(tgt))))
+        };
+    }
+
     fn eval_binary(&self, def: &BinaryOpDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         let kind = &def.kind;
         if let &BinaryExprType::IN = kind {
@@ -848,6 +882,12 @@ impl<'a> FileBuilder<'a> {
             &BinaryExprType::GTEqual => self.do_gtequal(&def.pos, left, right),
             &BinaryExprType::LTEqual => self.do_ltequal(&def.pos, left, right),
             &BinaryExprType::NotEqual => self.do_not_deep_equal(&def.pos, left, right),
+            &BinaryExprType::REMatch => {
+                self.eval_re_match(left, def.left.pos(), right, def.right.pos(), false)
+            }
+            &BinaryExprType::NotREMatch => {
+                self.eval_re_match(left, def.left.pos(), right, def.right.pos(), true)
+            }
             &BinaryExprType::IN | &BinaryExprType::DOT => panic!("Unreachable"),
         }
     }

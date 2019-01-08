@@ -168,6 +168,8 @@ make_fn!(
     either!(
         do_each!(_ => punct!("=="), (Element::Op(BinaryExprType::Equal))),
         do_each!(_ => punct!("!="), (Element::Op(BinaryExprType::NotEqual))),
+        do_each!(_ => punct!("~"), (Element::Op(BinaryExprType::REMatch))),
+        do_each!(_ => punct!("!~"), (Element::Op(BinaryExprType::NotREMatch))),
         do_each!(_ => punct!("<="), (Element::Op(BinaryExprType::LTEqual))),
         do_each!(_ => punct!(">="), (Element::Op(BinaryExprType::GTEqual))),
         do_each!(_ => punct!("<"),  (Element::Op(BinaryExprType::LT))),
@@ -192,6 +194,8 @@ fn parse_compare_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, B
             | &BinaryExprType::LT
             | &BinaryExprType::LTEqual
             | &BinaryExprType::NotEqual
+            | &BinaryExprType::REMatch
+            | &BinaryExprType::NotREMatch
             | &BinaryExprType::Equal
             | &BinaryExprType::IN => {
                 return Result::Complete(i_.clone(), op.clone());
