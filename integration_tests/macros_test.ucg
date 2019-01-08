@@ -44,3 +44,15 @@ assert |
 assert |
     cplxresult.boolfield == true;
 |;
+
+let macro_tpl_arg = macro(tpl) => {
+    result = tpl.field,
+};
+
+let arg_tpl = {
+    field = "value",
+};
+
+assert |
+    macro_tpl_arg(arg_tpl).result == arg_tpl.field;
+|;
