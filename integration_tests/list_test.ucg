@@ -1,1 +1,11 @@
 let empty_list = [];
+
+let concatenated = ["foo"] + ["bar"];
+
+assert |
+    concatenated == ["foo", "bar"];
+|;
+
+assert |
+    concatenated + empty_list == ["foo", "bar"];
+|;
