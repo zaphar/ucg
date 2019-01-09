@@ -73,7 +73,9 @@ impl Val {
                     Ok(false)
                 } else {
                     for (i, lv) in ldef.iter().enumerate() {
-                        lv.equal(rdef[i].as_ref(), pos.clone())?;
+                        if !lv.equal(rdef[i].as_ref(), pos.clone())? {
+                            return Ok(false);
+                        }
                     }
                     Ok(true)
                 }

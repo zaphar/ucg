@@ -22,6 +22,14 @@ assert |
     reduce identity_list_reducer.result [], list1 == list1;
 |;
 
+let nested_list = {
+    list = list1,
+};
+
+assert |
+    reduce identity_list_reducer.result [], (nested_list.list) == list1;
+|;
+
 let list_reducer = macro(acc, item) => {
     result = acc + item,
 };
