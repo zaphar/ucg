@@ -742,7 +742,7 @@ pub enum Statement {
     Import(ImportDef),
 
     // Assert statement
-    Assert(Token),
+    Assert(Expression),
 
     // Identify an Expression for output.
     Output(Token, Expression),

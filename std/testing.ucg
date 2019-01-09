@@ -1,0 +1,88 @@
+// A module with helper test assertions for ucg tests.
+// Each contained module will output a struct with 
+// ok and desc fields.
+//
+// ok will be a boolean.
+// desc will be a descriptive message.
+let asserts = module{
+        // allows you to specify a a prefix for messages.
+        ok_prefix = "OK - ",
+        // specify the prefix to add when the condition is not true.
+        not_prefix = "NOT ",
+        // A default description to use for messages.
+        default_description = "TODO description",
+    } => {
+    
+    // Test that a value is true.
+    let ok = module{
+        ok_prefix = mod.ok_prefix,
+        not_prefix = mod.not_prefix,
+        // test value expected to be true for success.
+        test=false,
+        // descriptive message to use in output.
+        desc=mod.default_description,
+    } => {
+        let ok = mod.test;
+
+        let desc = select ok, "NOT OK - ", {
+            true = "@@" % (mod.ok_prefix, mod.desc),
+            false = "@@@" % (mod.not_prefix, mod.ok_prefix, mod.desc),
+        };
+    };
+
+    // Test that a value is not true.
+    let not_ok = module{
+        ok_prefix = mod.ok_prefix,
+        not_prefix = mod.not_prefix,
+        // Test value expected to to be false for success.
+        test=true,
+        // descriptive message to use in output.
+        desc=mod.default_description,
+    } => {
+        let ok = mod.test != true;
+
+        let desc_prefix = select ok, "", {
+            true = "@@" % (mod.ok_prefix, mod.desc),
+            false = "@@@" % (mod.not_prefix, mod.ok_prefix, mod.desc),
+        };
+
+        let desc = select (mod.desc == ""), "", {
+            true = "@ not succcessful" % (desc_prefix),
+            false = "@" % (desc_prefix),
+        };
+    };
+
+    // Asserts that two values are equal. Does deep equal comparisons.
+    let equal = module{
+        ok_prefix = mod.ok_prefix,
+        not_prefix = mod.not_prefix,
+        // Left value for deep equal comparison.
+        left=NULL,
+        // right value for deep equal comparison.
+        right=NULL,
+    } => {
+        let ok = mod.left == mod.right;
+
+        let desc = select ok, "", {
+            true = "@@ == @" % (mod.ok_prefix, mod.left, mod.right),
+            false = "@@@ != @" % (mod.not_prefix, mod.ok_prefix, mod.left, mod.right),
+        };
+    };
+
+    // Asserts that two values are not equal. Does deep equal comparisons.
+    let not_equal = module{
+        ok_prefix = mod.ok_prefix,
+        not_prefix = mod.not_prefix,
+        // Left value for deep equal comparison.
+        left=NULL,
+        // right value for deep equal comparison.
+        right=NULL,
+    } => {
+        let ok = mod.left != mod.right;
+
+        let desc = select ok, "", {
+            true = "@@ != @" % (mod.ok_prefix, mod.left, mod.right),
+            false = "@@@ == @" % (mod.not_prefix, mod.ok_prefix, mod.left, mod.right),
+        };
+    };
+};

@@ -11,14 +11,16 @@ let test_simple_mod = module {
 };
 
 let simple_mod_instance = test_simple_mod{};
-assert |
-    simple_mod_instance.value == "value";
-|;
+assert {
+    ok = simple_mod_instance.value == "value",
+    desc = "simple_mod_instance.value == \"value\"",
+};
 
 let simple_mod_with_args = test_simple_mod{arg = "othervalue"};
-assert |
-    simple_mod_with_args.value == "othervalue";
-|;
+assert {
+    ok = simple_mod_with_args.value == "othervalue",
+    desc = "simple_mod_with_args.value == \"othervalue\"",
+};
 
 let embedded_mod = module {
     deep_value = "None",
@@ -41,19 +43,23 @@ let embedded_mod = module {
 
 let embedded_default_params = embedded_mod{};
 
-assert |
-    embedded_default_params.embedded.value == "None";
-|;
+assert {
+    ok = embedded_default_params.embedded.value == "None",
+    desc = "embedded_default_params.embedded.value == \"None\"",
+};
 
-assert |
-    embedded_default_params.env_name == "qa";
-|;
+assert {
+    ok = embedded_default_params.env_name == "qa",
+    desc = "embedded_default_params.env_name == \"qa\"",
+};
 
 let embedded_with_params = embedded_mod{deep_value = "Some"};
 
-assert |
-    embedded_with_params.embedded.value == "Some";
-|;
-assert |
-    embedded_mod{dep_value="Some"}.embedded_def{}.value == "None";
-|;
+assert {
+    ok = embedded_with_params.embedded.value == "Some",
+    desc = "embedded_with_params.embedded.value == \"Some\"",
+};
+assert {
+    ok = embedded_mod{dep_value="Some"}.embedded_def{}.value == "None",
+    desc = "embedded_mod{dep_value=\"Some\"}.embedded_def{}.value == \"None\"",
+};

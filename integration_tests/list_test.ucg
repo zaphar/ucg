@@ -2,10 +2,12 @@ let empty_list = [];
 
 let concatenated = ["foo"] + ["bar"];
 
-assert |
-    concatenated == ["foo", "bar"];
-|;
+assert {
+    ok = concatenated == ["foo", "bar"],
+    desc = "concatenated == [\"foo\", \"bar\"]",
+};
 
-assert |
-    concatenated + empty_list == ["foo", "bar"];
-|;
+assert {
+    ok = concatenated + empty_list == ["foo", "bar"],
+    desc = "concatenated + empty_list == [\"foo\", \"bar\"]",
+};

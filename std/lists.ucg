@@ -1,0 +1,42 @@
+let str_join = module{
+    sep=" ",
+    list=NULL,
+} => {
+    let joiner = macro(acc, item) => {
+        result = select (acc.out == ""), NULL, {
+            true = acc{
+                out="@@" % (acc.out,item),
+            },
+            false = acc{
+                out="@@@" % (acc.out, acc.sep, item),
+            },
+        },
+    };
+
+    let result = (reduce joiner.result {sep=mod.sep, out=""}, (mod.list)).out;
+};
+
+let len = module{
+    list = NULL,
+} => {
+    let counter = macro(acc, item) => {
+        result = acc + 1,
+    };
+
+    let result = reduce counter.result 0, (mod.list);
+};
+
+let enumerate = module{
+    start = 0,
+    step = 1,
+    list = NULL,
+} => {
+    let reducer = macro(acc, item) => {
+        result = acc{count = acc.count + acc.step, list=acc.list + [[acc.count, item]]},
+    };
+
+    let acc = {count=mod.start, list=[], step=mod.step};
+
+    let enumerated = reduce reducer.result acc, (mod.list);
+    let result = enumerated.list;
+};

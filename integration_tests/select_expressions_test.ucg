@@ -11,12 +11,14 @@ let defaultgot = select badwant, "OOPS", {
     door2 = "you lose",
 };
 
-assert |
-    got == "grand prize";
-|;
-assert |
-    defaultgot == "OOPS";
-|;
+assert {
+    ok = got == "grand prize",
+    desc = "got == \"grand prize\"",
+};
+assert {
+    ok = defaultgot == "OOPS",
+    desc = "defaultgot == \"OOPS\"",
+};
 
 // select inside a macro
 
@@ -29,21 +31,25 @@ let condmacro = macro(arg) => {
 
 let result = condmacro("opt1");
 
-assert |
-    condmacro("opt1") == {output = "yay"};
-|;
-assert |
-    condmacro("opt2") == {output = "boo"};
-|;
-assert |
-    condmacro("invalid") == {output = NULL};
-|;
+assert {
+    ok = condmacro("opt1") == {output = "yay"},
+    desc = "condmacro(\"opt1\") == {output = \"yay\"}",
+};
+assert {
+    ok = condmacro("opt2") == {output = "boo"},
+    desc = "condmacro(\"opt2\") == {output = \"boo\"}",
+};
+assert {
+    ok = condmacro("invalid") == {output = NULL},
+    desc = "condmacro(\"invalid\") == {output = NULL}",
+};
 
 let iflike = select true, "default", {
     true = "I was true",
     false = "I was false",
 };
 
-assert |
-    iflike == "I was true";
-|;
+assert {
+    ok = iflike == "I was true",
+    desc = "iflike == \"I was true\"",
+};

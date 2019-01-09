@@ -1,12 +1,16 @@
-assert |
-    "hello @" % ("world") == "hello world";
-|;
-assert |
-    "1 @ @" % (2, 3) == "1 2 3";
-|;
-assert |
-    "@ or @" % (true, false) == "true or false";
-|;
-assert |
-    "@" % (NULL) == "NULL";
-|;
+assert {
+    ok = "hello @" % ("world") == "hello world",
+    desc = "\"hello @\" % (\"world\") == \"hello world\"",
+};
+assert {
+    ok = "1 @ @" % (2, 3) == "1 2 3",
+    desc = "\"1 @ @\" % (2, 3) == \"1 2 3\"",
+};
+assert {
+    ok = "@ or @" % (true, false) == "true or false",
+    desc = "\"@ or @\" % (true, false) == \"true or false\"",
+};
+assert {
+    ok = "@" % (NULL) == "NULL",
+    desc = "\"@\" % (NULL) == \"NULL\"",
+};

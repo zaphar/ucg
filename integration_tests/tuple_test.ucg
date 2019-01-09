@@ -15,33 +15,42 @@ let nestedtpl = {
     maybe_val = NULL,
 };
 
-assert |
-    simpletpl.foo == "bar";
-|;
-assert |
-    stringfieldtpl."field 1" == 1;
-|;
-assert |
-    nestedtpl.scalar == 1;
-|;
-assert |
-    nestedtpl.maybe_val == NULL;
-|;
-assert |
-    nestedtpl.inner.field == "value";
-|;
-assert |
-    nestedtpl.list.0 == 1;
-|;
-assert |
-    nestedtpl.list.1 == 2;
-|;
-assert |
-    nestedtpl.list.2 == 3;
-|;
-assert |
-    nestedtpl.list.3 == 4;
-|;
+assert {
+    ok = simpletpl.foo == "bar",
+    desc = "simpletpl.foo == \"bar\"",
+};
+assert {
+    ok = stringfieldtpl."field 1" == 1,
+    desc = "stringfieldtpl.\"field 1\" == 1",
+};
+assert {
+    ok = nestedtpl.scalar == 1,
+    desc = "nestedtpl.scalar == 1",
+};
+assert {
+    ok = nestedtpl.maybe_val == NULL,
+    desc = "nestedtpl.maybe_val == NULL",
+};
+assert {
+    ok = nestedtpl.inner.field == "value",
+    desc = "nestedtpl.inner.field == \"value\"",
+};
+assert {
+    ok = nestedtpl.list.0 == 1,
+    desc = "nestedtpl.list.0 == 1",
+};
+assert {
+    ok = nestedtpl.list.1 == 2,
+    desc = "nestedtpl.list.1 == 2",
+};
+assert {
+    ok = nestedtpl.list.2 == 3,
+    desc = "nestedtpl.list.2 == 3",
+};
+assert {
+    ok = nestedtpl.list.3 == 4,
+    desc = "nestedtpl.list.3 == 4",
+};
 
 let nestedcopy = nestedtpl{
     inner = self.inner{
@@ -62,18 +71,22 @@ let deepnestedcopy = nestedcopy{
     },
 };
 
-assert |
-    nestedcopy.inner.field2 == 2;
-|;
-assert |
-    nestedcopy.inner.inner.field3 == "three";
-|;
-assert |
-    deepnestedcopy.inner.inner.field4 == 4;
-|;
-assert |
-    deepnestedcopy.maybe_val == "some val";
-|;
+assert {
+    ok = nestedcopy.inner.field2 == 2,
+    desc = "nestedcopy.inner.field2 == 2",
+};
+assert {
+    ok = nestedcopy.inner.inner.field3 == "three",
+    desc = "nestedcopy.inner.inner.field3 == \"three\"",
+};
+assert {
+    ok = deepnestedcopy.inner.inner.field4 == 4,
+    desc = "deepnestedcopy.inner.inner.field4 == 4",
+};
+assert {
+    ok = deepnestedcopy.maybe_val == "some val",
+    desc = "deepnestedcopy.maybe_val == \"some val\"",
+};
 
 let base_maybe = {
     real = "A real value",
@@ -83,38 +96,43 @@ let copy_maybe = base_maybe{
     real = NULL,
 };
 
-assert |
-    copy_maybe.real == NULL;
-|;
+assert {
+    ok = copy_maybe.real == NULL,
+    desc = "copy_maybe.real == NULL",
+};
 
 let quotedself_tpl = {
     "self" = "myself",
 };
 
-assert |
-    quotedself_tpl."self" == "myself";
-|;
+assert {
+    ok = quotedself_tpl."self" == "myself",
+    desc = "quotedself_tpl.\"self\" == \"myself\"",
+};
 
 let quotedenv_tpl = {
     "env" = "myenv",
 };
 
-assert |
-    quotedenv_tpl."env" == "myenv";
-|;
+assert {
+    ok = quotedenv_tpl."env" == "myenv",
+    desc = "quotedenv_tpl.\"env\" == \"myenv\"",
+};
 
 let unquotedenv_tpl = {
     env = "myenv",
 };
 
-assert |
-    unquotedenv_tpl."env" == "myenv";
-|;
+assert {
+    ok = unquotedenv_tpl."env" == "myenv",
+    desc = "unquotedenv_tpl.\"env\" == \"myenv\"",
+};
 
 let unquotedself_tpl = {
     self = "myself",
 };
 
-assert |
-    unquotedself_tpl."self" == "myself";
-|;
+assert {
+    ok = unquotedself_tpl."self" == "myself",
+    desc = "unquotedself_tpl.\"self\" == \"myself\"",
+};

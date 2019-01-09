@@ -1,14 +1,17 @@
 let script = include str "./include_example.sh";
-assert |
-    script == "#!/usr/bin/env bash
-echo \"included\"";
-|;
+assert {
+    ok = script == "#!/usr/bin/env bash
+echo \"included\"",
+    desc = "script was successfully included",
+};
 let expected = "IyEvdXNyL2Jpbi9lbnYgYmFzaAplY2hvICJpbmNsdWRlZCI=";
 let base64 = include b64 "./include_example.sh";
-assert |
-    base64 == expected;
-|;
+assert {
+    ok = base64 == expected,
+    desc = "base64 == expected",
+};
 let base64safe = include b64urlsafe "./include_example.sh";
-assert |
-    base64safe == expected;
-|;
+assert {
+    ok = base64safe == expected,
+    desc = "base64safe == expected",
+};

@@ -2,6 +2,7 @@ let empty = NULL;
 let tpl = {
     foo = NULL,
 };
-assert |
-    tpl.foo == empty;
-|;
+assert {
+    ok = tpl.foo == empty,
+    desc = "tpl.foo == empty",
+};

@@ -10,44 +10,55 @@ let testmacro = macro(arg) => {
     output = arg,
 };
 
-assert |
-    list.0 == 1;
-|;
-assert |
-    list.1 == 2;
-|;
-assert |
-    list.3 == 4;
-|;
-assert |
-    tuple.field1 == 1;
-|;
-assert |
-    tuple.field2 == 3;
-|;
-assert |
-    tuple.deeplist.0 == "foo";
-|;
-assert |
-    tuple.deeplist.1 == "bar";
-|;
-assert |
-    {foo = "bar"}.foo == "bar";
-|;
-assert |
-    ["one", "two", "three"].0 == "one";
-|;
+assert {
+    ok = list.0 == 1,
+    desc = "list.0 == 1",
+};
+assert {
+    ok = list.1 == 2,
+    desc = "list.1 == 2",
+};
+assert {
+    ok = list.3 == 4,
+    desc = "list.3 == 4",
+};
+assert {
+    ok = tuple.field1 == 1,
+    desc = "tuple.field1 == 1",
+};
+assert {
+    ok = tuple.field2 == 3,
+    desc = "tuple.field2 == 3",
+};
+assert {
+    ok = tuple.deeplist.0 == "foo",
+    desc = "tuple.deeplist.0 == \"foo\"",
+};
+assert {
+    ok = tuple.deeplist.1 == "bar",
+    desc = "tuple.deeplist.1 == \"bar\"",
+};
+assert {
+    ok = {foo = "bar"}.foo == "bar",
+    desc = "{foo = \"bar\"}.foo == \"bar\"",
+};
+assert {
+    ok = ["one", "two", "three"].0 == "one",
+    desc = "[\"one\", \"two\", \"three\"].0 == \"one\"",
+};
 
 let macro_for_test = macro() => {
     foo = "bar",
 };
-assert |
-    macro_for_test().foo == "bar";
-|;
+assert {
+    ok = macro_for_test().foo == "bar",
+    desc = "macro_for_test().foo == \"bar\"",
+};
 
 let mymodule = module { foo = "bar" } => {
     let foo = mod.foo;
 };
-assert |
-    mymodule{}.foo == "bar";
-|;
+assert {
+    ok = mymodule{}.foo == "bar",
+    desc = "mymodule{}.foo == \"bar\"",
+};

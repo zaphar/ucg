@@ -736,9 +736,9 @@ make_fn!(
     assert_statement<SliceIter<Token>, Statement>,
     do_each!(
         _ => word!("assert"),
-            tok => must!(match_type!(PIPEQUOTE)),
-            _ => must!(punct!(";")),
-            (Statement::Assert(tok.clone()))
+        expr => must!(expression),
+        _ => must!(punct!(";")),
+        (Statement::Assert(expr))
     )
 );
 

@@ -75,19 +75,6 @@ fn test_escape_quoted() {
 }
 
 #[test]
-fn test_pipe_quoted() {
-    let result = pipequotetok(OffsetStrIter::new("|foo|"));
-    assert!(
-        result.is_complete(),
-        format!("result {:?} is not ok", result)
-    );
-    if let Result::Complete(_, tok) = result {
-        assert_eq!(tok.fragment, "foo".to_string());
-        assert_eq!(tok.typ, TokenType::PIPEQUOTE);
-    }
-}
-
-#[test]
 fn test_string_with_escaping() {
     let result = strtok(OffsetStrIter::new("\"foo \\\\ \\\"bar\""));
     assert!(

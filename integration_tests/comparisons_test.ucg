@@ -16,33 +16,42 @@ let list = [1, 2, 3];
 let list2 = list;
 let list3 = [1, 2];
 
-assert |
-    one == one;
-|;
-assert |
-    one == one;
-|;
-assert |
-    one >= one;
-|;
-assert |
-    two > one;
-|;
-assert |
-    two >= two;
-|;
-assert |
-    tpl1 == tpl2;
-|;
-assert |
-    tpl1 != tpl3;
-|;
-assert |
-    list == list2;
-|;
-assert |
-    list != list3;
-|;
+assert {
+    ok = one == one,
+    desc = "one == one",
+};
+assert {
+    ok = one == one,
+    desc = "one == one",
+};
+assert {
+    ok = one >= one,
+    desc = "one >= one"
+};
+assert {
+    ok = two > one,
+    desc = "two > one"
+};
+assert {
+    ok = two >= two,
+    desc = "two >= two",
+};
+assert {
+    ok = tpl1 == tpl2,
+    desc = "tpl1 == tpl2"
+};
+assert {
+    ok = tpl1 != tpl3,
+    desc = "tpl1 != tpl3",
+};
+assert {
+    ok = list == list2,
+    desc = "list == list2",
+};
+assert {
+    ok = list != list3,
+    desc = "list != list3",
+};
 
 // Deep Comparisons
 let tpl4 = {
@@ -58,73 +67,105 @@ let less = {
     foo = "bar"
 };
 
-assert |
-    tpl4.inner == copy.inner;
-|;
-assert |
-    tpl4.inner.fld == copy.inner.fld;
-|;
-assert |
-    tpl4.lst == copy.lst;
-|;
-assert |
-    tpl4.foo == copy.foo;
-|;
-assert |
-    tpl4 == copy;
-|;
-assert |
-    tpl4 != extra;
-|;
-assert |
-    tpl4 != less;
-|;
+assert {
+    ok = tpl4.inner == copy.inner,
+    desc = "tpl4.inner == copy.inner",
+};
+assert {
+    ok = tpl4.inner.fld == copy.inner.fld,
+    desc = "tpl4.inner.fld == copy.inner.fld",
+};
+assert {
+    ok = tpl4.lst == copy.lst,
+    desc = "tpl4.lst == copy.lst",
+};
+assert {
+    ok = tpl4.foo == copy.foo,
+    desc = "tpl4.foo == copy.foo",
+};
+assert {
+    ok = tpl4 == copy,
+    desc = "tpl4 == copy",
+};
+assert {
+    ok = tpl4 != extra,
+    desc = "tpl4 != extra",
+};
+assert {
+    ok = tpl4 != less,
+    desc = "tpl4 != less",
+};
 
-assert |
-    [[1, 2, [3]], 4] == [[1, 2, [3]], 4];
-|;
+assert {
+    ok = [[1, 2, [3]], 4] == [[1, 2, [3]], 4],
+    desc = "[[1, 2, [3]], 4] == [[1, 2, [3]], 4]",
+};
 
-assert |
-    [[1, 2, [3]], 4] != [[1, 2, [6]], 4];
-|;
+assert {
+    ok = [[1, 2, [3]], 4] != [[1, 2, [6]], 4],
+    desc = "[[1, 2, [3]], 4] != [[1, 2, [6]], 4]",
+};
 
 // Expression comparisons
-assert |2 == 1+1;|;
-assert |(1+1) == 2;|;
-assert |(1+1) == (1+1);|;
+assert {
+    ok = 2 == 1+1,
+    desc = "2 == 1+1",
+};
+assert {
+    ok = (1+1) == 2,
+    desc = "(1+1) == 2",
+};
+assert {
+    ok = (1+1) == (1+1),
+    desc = "(1+1) == (1+1)",
+};
 let want = "foo";
-assert |
-    select want, 1, { foo=2, } == 2;
-|;
+assert {
+    ok = select want, 1, { foo=2, } == 2,
+    desc = "select want, 1, { foo=2, } == 2",
+};
 
 // Contains comparison operators.
-assert |
-    "foo" in {
+assert {
+    ok = "foo" in {
         foo = "bar",
-    };
-|;
-assert |
-    foo in {
+    },
+    desc = "\"foo\" in {
+        foo = \"bar\",
+    }
+    ",
+};
+assert {
+    ok = foo in {
         foo = "bar",
-    };
-|;
-assert |
-    "foo" in ["foo", "bar"];
-|;
-assert |
-    "foo" in ["bar", "foo", "bar"];
-|;
-assert |
-    { foo = 1 } in ["foo", { foo = 1 }];
-|;
-assert |
-    true in [ "foo" in {foo = 1}, false ];
-|;
+    },
+    desc = "foo in {
+        foo = \"bar\",
+    }",
+};
+assert {
+    ok = "foo" in ["foo", "bar"],
+    desc = "\"foo\" in [\"foo\", \"bar\"]",
+};
+assert {
+    ok = "foo" in ["bar", "foo", "bar"],
+    desc = "\"foo\" in [\"bar\", \"foo\", \"bar\"]",
+};
+assert {
+    ok = { foo = 1 } in ["foo", { foo = 1 }],
+    desc = "{ foo = 1 } in [\"foo\", { foo = 1 }]",
+};
+assert {
+    ok = true in [ "foo" in {foo = 1}, false ],
+    desc = "true in [ \"foo\" in {foo = 1}, false ]",
+};
 
-assert |
-    "foo" ~ "o+";
-|;
+assert {
+    ok = "foo" ~ "o+",
+    desc = "\"foo\" ~ \"o+\""
+};
 
-assert |
-    "foo" !~ "bar";
-|;
+assert {
+    ok = "foo" !~ "bar",
+    desc = "\"foo\" !~ \"bar\"",
+};

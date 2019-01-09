@@ -84,20 +84,6 @@ make_fn!(strtok<OffsetStrIter, Token>,
        )
 );
 
-make_fn!(pipequotetok<OffsetStrIter, Token>,
-       do_each!(
-           p    => input!(),
-           _    => text_token!("|"),
-           frag => until!(text_token!("|")),
-           _    => text_token!("|"),
-           (Token{
-               typ: TokenType::PIPEQUOTE,
-               pos: Position::from(&p),
-               fragment: frag.to_string(),
-           })
-       )
-);
-
 make_fn!(barewordtok<OffsetStrIter, Token>,
        do_each!(
            span => input!(),
@@ -378,7 +364,6 @@ fn token<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Token> {
     either!(
         input,
         strtok,
-        pipequotetok,
         emptytok, // This must come before the barewordtok
         digittok,
         commatok,
@@ -526,14 +511,6 @@ macro_rules! match_type {
 
     ($i:expr,STR) => {
         match_type!($i, STR => token_clone)
-    };
-
-    ($i:expr,PIPEQUOTE => $h:expr) => {
-        match_type!($i, TokenType::PIPEQUOTE, "Not a Pipe Quoted String", $h)
-    };
-
-    ($i:expr,PIPEQUOTE) => {
-        match_type!($i, PIPEQUOTE => token_clone)
     };
 
     ($i:expr,DIGIT => $h:expr) => {

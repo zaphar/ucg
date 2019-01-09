@@ -457,7 +457,7 @@ impl<'a> FileBuilder<'a> {
     fn eval_stmt(&mut self, stmt: &Statement) -> Result<Rc<Val>, Box<dyn Error>> {
         let child_scope = self.scope.clone();
         match stmt {
-            &Statement::Assert(ref expr) => self.build_assert(&expr),
+            &Statement::Assert(ref expr) => self.build_assert(&expr, &child_scope),
             &Statement::Let(ref def) => self.eval_let(def),
             &Statement::Import(ref def) => self.eval_import(def),
             &Statement::Expression(ref expr) => self.eval_expr(expr, &child_scope),
@@ -1360,22 +1360,29 @@ impl<'a> FileBuilder<'a> {
         };
     }
 
-    fn build_assert(&mut self, tok: &Token) -> Result<Rc<Val>, Box<dyn Error>> {
+    fn record_assert_result(&mut self, msg: &str, is_success: bool) {
+        let msg = format!("{}\n", msg);
+        self.assert_collector.summary.push_str(&msg);
+        if !is_success {
+            self.assert_collector.failures.push_str(&msg);
+            self.assert_collector.success = false;
+        }
+    }
+
+    fn build_assert(
+        &mut self,
+        expr: &Expression,
+        scope: &Scope,
+    ) -> Result<Rc<Val>, Box<dyn Error>> {
         if !self.validate_mode {
             // we are not in validate_mode then build_asserts are noops.
             return Ok(Rc::new(Val::Empty));
         }
-        let expr = &tok.fragment;
-        let assert_input =
-            OffsetStrIter::new_with_offsets(expr, tok.pos.line - 1, tok.pos.column - 1);
-        let ok = match self.eval_input(assert_input) {
+        let ok = match self.eval_expr(expr, scope) {
             Ok(v) => v,
             Err(e) => {
                 // failure!
-                let msg = format!(
-                    "NOT OK - '{}' at line: {} column: {}\n\tCompileError: {}\n",
-                    expr, tok.pos.line, tok.pos.column, e
-                );
+                let msg = format!("CompileError: {}\n", e);
                 self.assert_collector.summary.push_str(&msg);
                 self.assert_collector.failures.push_str(&msg);
                 self.assert_collector.success = false;
@@ -1383,34 +1390,69 @@ impl<'a> FileBuilder<'a> {
             }
         };
 
-        if let &Val::Boolean(b) = ok.as_ref() {
-            // record the assertion result.
-            if b {
-                // success!
-                let msg = format!(
-                    "OK - '{}' at line: {} column: {}\n",
-                    expr, tok.pos.line, tok.pos.column
-                );
-                self.assert_collector.summary.push_str(&msg);
-            } else {
-                // failure!
-                let msg = format!(
-                    "NOT OK - '{}' at line: {} column: {}\n",
-                    expr, tok.pos.line, tok.pos.column
-                );
-                self.assert_collector.summary.push_str(&msg);
-                self.assert_collector.failures.push_str(&msg);
-                self.assert_collector.success = false;
+        match ok.as_ref() {
+            &Val::Tuple(ref fs) => {
+                let ok_field = match find_in_fieldlist("ok", fs) {
+                    Some(ref val) => match val.as_ref() {
+                        &Val::Boolean(b) => b,
+                        _ => {
+                            let msg = format!(
+                                    "TYPE FAIL - Expected Boolean field ok in tuple {}, line: {} column: {}",
+                                    ok.as_ref(), expr.pos().line, expr.pos().column
+                                );
+                            self.record_assert_result(&msg, false);
+                            return Ok(Rc::new(Val::Empty));
+                        }
+                    },
+                    None => {
+                        let msg = format!(
+                            "TYPE FAIL - Expected Boolean field ok in tuple {}, line: {} column: {}",
+                            ok.as_ref(), expr.pos().line, expr.pos().column
+                        );
+                        self.record_assert_result(&msg, false);
+                        return Ok(Rc::new(Val::Empty));
+                    }
+                };
+                let desc = match find_in_fieldlist("desc", fs) {
+                    Some(ref val) => match val.as_ref() {
+                        Val::Str(ref s) => s.clone(),
+                        _ => {
+                            let msg = format!(
+                                    "TYPE FAIL - Expected Boolean field desc in tuple {} line: {} column: {}",
+                                    ok, expr.pos().line, expr.pos().column
+                                );
+                            self.record_assert_result(&msg, false);
+                            return Ok(Rc::new(Val::Empty));
+                        }
+                    },
+                    None => {
+                        let msg = format!(
+                            "TYPE FAIL - Expected Boolean field desc in tuple {} line: {} column: {}\n",
+                            ok, expr.pos().line, expr.pos().column
+                        );
+                        self.record_assert_result(&msg, false);
+                        return Ok(Rc::new(Val::Empty));
+                    }
+                };
+                self.record_assert_result(&desc, ok_field);
             }
-        } else {
-            // record an assertion type-failure result.
-            let msg = format!(
-                "TYPE FAIL - '{}' Expected Boolean got {} at line: {} column: {}\n",
-                expr, ok, tok.pos.line, tok.pos.column
-            );
-            self.assert_collector.failures.push_str(&msg);
-            self.assert_collector.success = false;
-            self.assert_collector.summary.push_str(&msg);
+            &Val::Empty
+            | &Val::Boolean(_)
+            | &Val::Env(_)
+            | &Val::Float(_)
+            | &Val::Int(_)
+            | &Val::Str(_)
+            | &Val::List(_)
+            | &Val::Macro(_)
+            | &Val::Module(_) => {
+                // record an assertion type-failure result.
+                let msg = format!(
+                    "TYPE FAIL - Expected tuple with ok and desc fields got {} at line: {} column: {}\n",
+                    ok, expr.pos().line, expr.pos().column
+                );
+                self.record_assert_result(&msg, false);
+                return Ok(Rc::new(Val::Empty));
+            }
         }
         Ok(ok)
     }

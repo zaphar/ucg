@@ -1,0 +1,35 @@
+import "../lists.ucg" as list;
+import "../testing.ucg" as t;
+
+let list_to_join = [1, 2, 3];
+
+let asserts = t.asserts{};
+
+assert asserts.equal{
+    left=list.str_join{sep=",", list=list_to_join}.result,
+    right="1,2,3"
+};
+
+assert asserts.equal{
+    left=list.len{list=[0, 1, 2, 3]}.result,
+    right=4,
+};
+
+assert asserts.equal{
+    left=list.enumerate{list=["foo", "bar"]}.result,
+    right=[[0, "foo"], [1, "bar"]],
+};
+
+assert asserts.equal{
+    left=list.enumerate{start=1, list=["foo", "bar"]}.result,
+    right=[[1, "foo"], [2, "bar"]],
+};
+
+assert asserts.equal{
+    left=list.enumerate{
+        start=1,
+        step=2,
+        list=["foo", "bar"]
+    }.result,
+    right=[[1, "foo"], [3, "bar"]],
+};

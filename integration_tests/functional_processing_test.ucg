@@ -18,48 +18,58 @@ let identity_list_reducer = macro(acc, item) => {
     result = acc + [item],
 };
 
-assert |
-    reduce identity_list_reducer.result [], list1 == list1;
-|;
+assert {
+    ok = reduce identity_list_reducer.result [], list1 == list1,
+    desc = "reduce identity_list_reducer.result [], list1 == list1",
+};
 
 let nested_list = {
     list = list1,
 };
 
-assert |
-    reduce identity_list_reducer.result [], (nested_list.list) == list1;
-|;
+assert {
+    ok = reduce identity_list_reducer.result [], (nested_list.list) == list1,
+    desc = "reduce identity_list_reducer.result [], (nested_list.list) == list1",
+};
 
 let list_reducer = macro(acc, item) => {
     result = acc + item,
 };
 
-assert |
-    reduce list_reducer.result 0, list1 == 0 + 1 + 2 + 3 + 4;
-|;
+assert {
+    ok = reduce list_reducer.result 0, list1 == 0 + 1 + 2 + 3 + 4,
+    desc = "reduce list_reducer.result 0, list1 == 0 + 1 + 2 + 3 + 4",
+};
 
-assert |
-    map mapper.result list1 == [2, 3, 4, 5];
-|;
-assert |
-    (map mapper.result [1, 2, 3, 4]) == [2, 3, 4, 5];
-|;
-assert |
-    map mapper.result [1, 2, 3, 4] == [2, 3, 4, 5];
-|;
+assert {
+    ok = map mapper.result list1 == [2, 3, 4, 5],
+    desc = "map mapper.result list1 == [2, 3, 4, 5]",
+};
+assert {
+    ok = (map mapper.result [1, 2, 3, 4]) == [2, 3, 4, 5],
+    desc = "(map mapper.result [1, 2, 3, 4]) == [2, 3, 4, 5]",
+};
+assert {
+    ok = map mapper.result [1, 2, 3, 4] == [2, 3, 4, 5],
+    desc = "map mapper.result [1, 2, 3, 4] == [2, 3, 4, 5]",
+};
 
-assert |
-    filter filtrator.result list2 == ["foo", "foo"];
-|;
-assert |
-    (filter filtrator.result ["foo", "bar", "foo", "bar"]) == ["foo", "foo"];
-|;
-assert |
-    filter filtrator.result ["foo", "bar", "foo", "bar"] == ["foo", "foo"];
-|;
-assert |
-    filter boolfiltrator.result [1, 2, 3, 4, 5, 6, 7] == [1, 2, 3, 4];
-|;
+assert {
+    ok = filter filtrator.result list2 == ["foo", "foo"],
+    desc = "filter filtrator.result list2 == [\"foo\", \"foo\"]",
+};
+assert {
+    ok = (filter filtrator.result ["foo", "bar", "foo", "bar"]) == ["foo", "foo"],
+    desc = "(filter filtrator.result [\"foo\", \"bar\", \"foo\", \"bar\"]) == [\"foo\", \"foo\"]",
+};
+assert {
+    ok = filter filtrator.result ["foo", "bar", "foo", "bar"] == ["foo", "foo"],
+    desc = "filter filtrator.result [\"foo\", \"bar\", \"foo\", \"bar\"] == [\"foo\", \"foo\"]",
+};
+assert {
+    ok = filter boolfiltrator.result [1, 2, 3, 4, 5, 6, 7] == [1, 2, 3, 4],
+    desc = "filter boolfiltrator.result [1, 2, 3, 4, 5, 6, 7] == [1, 2, 3, 4]",
+};
 
 // Tuple processing
 let test_tpl = {
@@ -71,9 +81,10 @@ let identity_tpl_mapper = macro(name, val) => {
     result = [name, val],
 };
 
-assert |
-    map identity_tpl_mapper.result test_tpl == test_tpl;
-|;
+assert {
+    ok = map identity_tpl_mapper.result test_tpl == test_tpl,
+    desc = "map identity_tpl_mapper.result test_tpl == test_tpl",
+};
 
 let tpl_mapper = macro(name, val) => {
     result = select name, [name, val], {
@@ -82,9 +93,10 @@ let tpl_mapper = macro(name, val) => {
     },
 };
 
-assert |
-    map tpl_mapper.result test_tpl == {foo = "barbar", cute = "pygmy"};
-|;
+assert {
+    ok = map tpl_mapper.result test_tpl == {foo = "barbar", cute = "pygmy"},
+    desc = "map tpl_mapper.result test_tpl == {foo = \"barbar\", cute = \"pygmy\"}",
+};
 
 let identity_tpl_filter = macro(name, val) => {
     result = true,
@@ -95,13 +107,15 @@ let tpl_filter = macro(name, val) => {
     result = name != "foo",
 };
 
-assert |
-    filter identity_tpl_filter.result test_tpl == test_tpl;
-|;
+assert {
+    ok = filter identity_tpl_filter.result test_tpl == test_tpl,
+    desc = "filter identity_tpl_filter.result test_tpl == test_tpl",
+};
 
-assert |
-    filter tpl_filter.result test_tpl == { quux = "baz" };
-|;
+assert {
+    ok = filter tpl_filter.result test_tpl == { quux = "baz" },
+    desc = "filter tpl_filter.result test_tpl == { quux = \"baz\" }",
+};
 
 let tpl_reducer = macro(acc, name, val) => {
     result = acc{
@@ -110,6 +124,7 @@ let tpl_reducer = macro(acc, name, val) => {
     },
 };
 
-assert |
-    reduce tpl_reducer.result {keys = [], vals = []}, test_tpl == {keys = ["foo", "quux"], vals = ["bar", "baz"]};
-|;
+assert {
+    ok = reduce tpl_reducer.result {keys = [], vals = []}, test_tpl == {keys = ["foo", "quux"], vals = ["bar", "baz"]},
+    desc = "reduce tpl_reducer.result {keys = [], vals = []}, test_tpl == {keys = [\"foo\", \"quux\"], vals = [\"bar\", \"baz\"]}",
+};

@@ -3,3 +3,4 @@ script:
   - cargo build --verbose 
   - cargo test --verbose
   - cargo run -- test integration_tests
+  - cargo run -- test -r std/tests

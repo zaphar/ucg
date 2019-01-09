@@ -54,24 +54,26 @@ configuration or the results of test assertions.
 
 ### Assert Statements
 
-The assert statement defines an expression that must evaluate to either true or false. 
-Assert statements are noops except during a validation compile. They give you a way to 
-assert certains properties about your data and can be used as a form of unit testing 
-for your configurations. It starts with the `assert` keyword followed by a valid block 
-of UCG statements delimited by `|` characters. The final statement in the block 
-must evaluate to a boolean expression.
+The assert statement defines an expression that must evaluate to tuple with an
+ok field that is either true or false and a desc field that is a string. Assert
+statements are noops except during a validation compile. They give you a way to
+assert certains properties about your data and can be used as a form of unit
+testing for your configurations. It starts with the `assert` keyword followed
+by a valid ucg expression.
 
 ```
-assert |
-    host == "www.example.com";
-|;
+assert {
+    ok = host == "www.example.com",
+    desc = "Host is www.example.com",
+};
 
-assert |
-    select qa, 443, {
+assert {
+    ok = select qa, 443, {
       qa = 80,
       prod = 443,
-    } == 443;
-|;
+    } == 443,
+    desc = "select default was 443",
+};
 ```
 
 Assert statements are only evaluated when running the `ucg test` command. That

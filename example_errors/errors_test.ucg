@@ -1,17 +1,17 @@
-assert |macro |;
-assert |{ foo = hello world}|;
-assert |{ foo = "hello world"|;
-assert |{ = }|;
-assert |"|;
-assert |=|;
+assert {macro };
+assert {{ foo = hello world}};
+assert {{ foo = "hello world"};
+assert {{ = }};
+assert {"};
+assert {=};
 
-assert |let |;
-assert |let foo |;
-assert |let foo =|;
-assert |import |;
-assert |import foo |;
-assert |out |;
-assert |out "|;
-assert |out json|;
+assert {let };
+assert {let foo };
+assert {let foo =};
+assert {import };
+assert {import foo };
+assert {out };
+assert {out "};
+assert {out json};
 
-assert |let env = 1;|;
+assert {let env = 1;};

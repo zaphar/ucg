@@ -19,31 +19,39 @@ let noargresult = noargmacro();
 let simpleresult = simplemacro(1, 2, 3);
 let cplxresult = cplxmacro(1, "We", 3.0);
 
-assert |
-    noargresult.field1 == "value";
-|;
-assert |
-    simpleresult.field1 == 1;
-|;
-assert |
-    simpleresult.field2 == 2;
-|;
-assert |
-    simpleresult.field3 == 3;
-|;
+assert {
+    ok = noargresult.field1 == "value",
+    desc = "noargresult.field1 == \"value\"",
+};
+assert {
+    ok = simpleresult.field1 == 1,
+    desc = "simpleresult.field1 == 1",
+};
+assert {
+    ok = simpleresult.field2 == 2,
+    desc = "simpleresult.field2 == 2",
+};
+assert {
+    ok = simpleresult.field3 == 3,
+    desc = "simpleresult.field3 == 3",
+};
 
-assert |
-    cplxresult.field1 == 2;
-|;
-assert |
-    cplxresult.field2 == "We are here";
-|;
-assert |
-    cplxresult.field3 == 2.0;
-|;
-assert |
-    cplxresult.boolfield == true;
-|;
+assert {
+    ok = cplxresult.field1 == 2,
+    desc = "cplxresult.field1 == 2",
+};
+assert {
+    ok = cplxresult.field2 == "We are here",
+    desc = "cplxresult.field2 == \"We are here\"",
+};
+assert {
+    ok = cplxresult.field3 == 2.0,
+    desc = "cplxresult.field3 == 2.0",
+};
+assert {
+    ok = cplxresult.boolfield == true,
+    desc = "cplxresult.boolfield == true",
+};
 
 let macro_tpl_arg = macro(tpl) => {
     result = tpl.field,
@@ -53,6 +61,7 @@ let arg_tpl = {
     field = "value",
 };
 
-assert |
-    macro_tpl_arg(arg_tpl).result == arg_tpl.field;
-|;
+assert {
+    ok = macro_tpl_arg(arg_tpl).result == arg_tpl.field,
+    desc = "macro_tpl_arg(arg_tpl).result == arg_tpl.field",
+};
