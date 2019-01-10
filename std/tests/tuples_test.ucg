@@ -1,0 +1,12 @@
+import "../tuples.ucg" as tpl;
+import "../testing.ucg" as t;
+
+assert t.asserts{}.equal{
+    left = tpl.fields{tpl={foo=1, bar=2}}.result,
+    right = ["foo", "bar"],
+};
+
+assert t.asserts{}.equal{
+    left = tpl.values{tpl={foo=1, bar=2}}.result,
+    right = [1, 2],
+};

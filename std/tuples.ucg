@@ -1,0 +1,20 @@
+
+let fields = module{
+    tpl = NULL,
+} => {
+    let reducer = macro(acc, field, value) => {
+        result = acc + [field],
+    };
+
+    let result = reduce reducer.result [], (mod.tpl);
+};
+
+let values = module{
+    tpl = NULL,
+} => {
+    let reducer = macro(acc, field, value) => {
+        result = acc + [value],
+    };
+
+    let result = reduce reducer.result [], (mod.tpl);
+};
