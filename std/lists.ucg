@@ -26,6 +26,16 @@ let len = module{
     let result = reduce counter.result 0, (mod.list);
 };
 
+let reverse = module{
+    list = NULL,
+} => {
+    let reducer = macro(acc, item) => {
+        result = [item] + acc,
+    };
+
+    let result = reduce reducer.result [], (mod.list); 
+};
+
 let enumerate = module{
     start = 0,
     step = 1,

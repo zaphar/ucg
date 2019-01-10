@@ -1,4 +1,5 @@
 
+// return a list of the fields in a tuple.
 let fields = module{
     tpl = NULL,
 } => {
@@ -9,6 +10,7 @@ let fields = module{
     let result = reduce reducer.result [], (mod.tpl);
 };
 
+// return a list of the values in a tuple.
 let values = module{
     tpl = NULL,
 } => {
@@ -16,5 +18,15 @@ let values = module{
         result = acc + [value],
     };
 
+    let result = reduce reducer.result [], (mod.tpl);
+};
+
+let enumerate = module{
+    tpl = NULL,
+} => {
+    let reducer = macro(acc, field, value) => {
+        result = acc + [[field, value]],
+    };
+    
     let result = reduce reducer.result [], (mod.tpl);
 };

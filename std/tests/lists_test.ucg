@@ -16,6 +16,11 @@ assert asserts.equal{
 };
 
 assert asserts.equal{
+    left = list.reverse{list=[0, 1, 2, 3]}.result,
+    right = [3, 2, 1, 0],
+};
+
+assert asserts.equal{
     left=list.enumerate{list=["foo", "bar"]}.result,
     right=[[0, "foo"], [1, "bar"]],
 };
