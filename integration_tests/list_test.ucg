@@ -4,10 +4,25 @@ let concatenated = ["foo"] + ["bar"];
 
 assert {
     ok = concatenated == ["foo", "bar"],
-    desc = "concatenated == [\"foo\", \"bar\"]",
+    desc = "Successfully concatenated",
 };
 
 assert {
     ok = concatenated + empty_list == ["foo", "bar"],
-    desc = "concatenated + empty_list == [\"foo\", \"bar\"]",
+    desc = "successfully concatenated empty list",
+};
+
+assert {
+    ok = 1:5 == [1, 2, 3, 4, 5],
+    desc = "expected list of 5 but got @" % (1:5),
+};
+
+assert {
+    ok = 0:2:6 == [0, 2, 4, 6],
+    desc = "Expected evens up to 6 but got @" % (0:2:6),
+};
+
+assert {
+    ok = 0:(1+3) == [0, 1, 2, 3, 4],
+    desc = "Expected 0 through 4 but got @" % (0:(1+3)),
 };

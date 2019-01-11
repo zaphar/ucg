@@ -62,3 +62,9 @@ assert {
     ok = mymodule{}.foo == "bar",
     desc = "mymodule{}.foo == \"bar\"",
 };
+
+let idx = 1;
+assert {
+    ok = list.(idx) == 2,
+    desc = "expected 2, got @" % (list.(idx)),
+};

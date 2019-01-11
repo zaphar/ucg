@@ -38,3 +38,8 @@ assert asserts.equal{
     }.result,
     right=[[1, "foo"], [3, "bar"]],
 };
+
+assert asserts.equal{
+    left=list.zip{list1=[0, 1], list2=[3, 4]}.result,
+    right=[[0, 3], [1, 4]],
+};

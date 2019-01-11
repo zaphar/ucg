@@ -223,6 +223,16 @@ should be placed. Any primitive value can be used as an argument.
 "https://@:@/" % (host, port)
 ```
 
+Range Expression
+----------------
+
+UCG can generate lists from a range with an optional step.
+
+```
+1:10 == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+0:2:10 == [0, 2, 4, 6, 8, 10];
+```
+
 Functional processing expressions
 ---------------------------------
 

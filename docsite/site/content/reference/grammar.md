@@ -141,6 +141,12 @@ reduce_expr: reduce_keyword, bareword, dot, bareword, expr, expr ;
 processing_expr: map_or_filter_expr | reduce_expr
 ```
 
+### Range Expression
+
+```
+range_expr: expr, ':', [int, ':'], expr ;
+```
+
 #### Include Expression
 
 ```
@@ -155,6 +161,7 @@ non_operator_expr: literal
                    | macrodef
                    | module_def
                    | format_expr
+                   | range_expr
                    | include_expr
                    | copy_expr
                    | processing_expr

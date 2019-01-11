@@ -768,7 +768,24 @@ impl<'a> FileBuilder<'a> {
             Expression::Simple(Value::Int(ref i)) => {
                 scope.lookup_idx(right.pos(), &Val::Int(i.val))
             }
-            _ => self.eval_expr(right, scope),
+            _ => {
+                let val = self.eval_expr(right, scope)?;
+                match val.as_ref() {
+                    Val::Int(i) => scope.lookup_idx(right.pos(), &Val::Int(*i)),
+                    Val::Str(ref s) => scope
+                        .lookup_sym(&PositionedItem::new(s.clone(), pos.clone()), false)
+                        .ok_or(Box::new(error::BuildError::new(
+                            format!("Unable to find binding {}", s,),
+                            error::ErrorType::NoSuchSymbol,
+                            pos,
+                        ))),
+                    _ => Err(Box::new(error::BuildError::new(
+                        format!("Invalid selector lookup {}", val.type_name(),),
+                        error::ErrorType::NoSuchSymbol,
+                        pos,
+                    ))),
+                }
+            }
         }
     }
 
@@ -1518,6 +1535,65 @@ impl<'a> FileBuilder<'a> {
         }
     }
 
+    pub fn eval_range(&self, def: &RangeDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
+        let start = self.eval_expr(&def.start, scope)?;
+        let start = match start.as_ref() {
+            &Val::Int(i) => i,
+            _ => {
+                return Err(Box::new(error::BuildError::new(
+                    format!(
+                        "Expected an integer for range start but got {}",
+                        start.type_name()
+                    ),
+                    error::ErrorType::TypeFail,
+                    def.start.pos().clone(),
+                )));
+            }
+        };
+        // See if there was a step.
+        let step = match &def.step {
+            Some(step) => {
+                let step = self.eval_expr(&step, scope)?;
+                match step.as_ref() {
+                    &Val::Int(i) => i,
+                    _ => {
+                        return Err(Box::new(error::BuildError::new(
+                            format!(
+                                "Expected an integer for range step but got {}",
+                                step.type_name()
+                            ),
+                            error::ErrorType::TypeFail,
+                            def.start.pos().clone(),
+                        )));
+                    }
+                }
+            }
+            None => 1,
+        };
+
+        // Get the end.
+        let end = self.eval_expr(&def.end, scope)?;
+        let end = match end.as_ref() {
+            &Val::Int(i) => i,
+            _ => {
+                return Err(Box::new(error::BuildError::new(
+                    format!(
+                        "Expected an integer for range start but got {}",
+                        end.type_name()
+                    ),
+                    error::ErrorType::TypeFail,
+                    def.start.pos().clone(),
+                )));
+            }
+        };
+
+        let vec = (start..end + 1)
+            .step_by(step as usize)
+            .map(|i| Rc::new(Val::Int(i)))
+            .collect();
+        Ok(Rc::new(Val::List(vec)))
+    }
+
     // Evals a single Expression in the context of a running Builder.
     // It does not mutate the builders collected state at all.
     pub fn eval_expr(&self, expr: &Expression, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
@@ -1525,6 +1601,7 @@ impl<'a> FileBuilder<'a> {
             &Expression::Simple(ref val) => self.eval_value(val, scope),
             &Expression::Binary(ref def) => self.eval_binary(def, scope),
             &Expression::Copy(ref def) => self.eval_copy(def, scope),
+            &Expression::Range(ref def) => self.eval_range(def, scope),
             &Expression::Grouped(ref expr) => self.eval_expr(expr, scope),
             &Expression::Format(ref def) => self.eval_format(def, scope),
             &Expression::Call(ref def) => self.eval_call(def, scope),

@@ -50,3 +50,36 @@ let enumerate = module{
     let enumerated = reduce reducer.result acc, (mod.list);
     let result = enumerated.list;
 };
+
+let zip = module{
+    list1 = NULL,
+    list2 = NULL,
+} => {
+    let counter = macro(acc, item) => {
+        result = acc + 1,
+    };
+
+    let len1 = reduce counter.result 0, (mod.list1);
+    let len2 = reduce counter.result 0, (mod.list2);
+
+    let rng = select (len1 >= len2), NULL, {
+        true = 0:(len1 - 1),
+        false = 0:(len2 - 1),
+    };
+
+    let reducer = macro(acc, item) => {
+        result = acc{
+            result = acc.result + [[acc.list1.(item), acc.list2.(item)]],
+            idxs = acc.idxs + [item]
+        },
+    };
+
+    let acc = {
+        list1 = mod.list1,
+        list2 = mod.list2,
+        result = [],
+        idxs = [],
+    };
+
+    let result = (reduce reducer.result acc, rng).result;
+};

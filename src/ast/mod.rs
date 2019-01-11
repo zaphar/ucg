@@ -456,6 +456,7 @@ impl MacroDef {
                     &Expression::Macro(_)
                     | &Expression::Copy(_)
                     | &Expression::Module(_)
+                    | &Expression::Range(_)
                     | &Expression::FuncOp(_)
                     | &Expression::Include(_) => {
                         // noop
@@ -633,6 +634,15 @@ impl ModuleDef {
     }
 }
 
+/// RangeDef defines a range with optional step.
+#[derive(Debug, PartialEq, Clone)]
+pub struct RangeDef {
+    pub pos: Position,
+    pub start: Box<Expression>,
+    pub step: Option<Box<Expression>>,
+    pub end: Box<Expression>,
+}
+
 /// Encodes a ucg expression. Expressions compute a value from.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
@@ -644,6 +654,7 @@ pub enum Expression {
 
     // Complex Expressions
     Copy(CopyDef),
+    Range(RangeDef),
     // TODO(jwall): This should really store it's position :-(
     Grouped(Box<Expression>),
     Format(FormatDef),
@@ -662,6 +673,7 @@ impl Expression {
             &Expression::Simple(ref v) => v.pos(),
             &Expression::Binary(ref def) => &def.pos,
             &Expression::Copy(ref def) => &def.pos,
+            &Expression::Range(ref def) => &def.pos,
             &Expression::Grouped(ref expr) => expr.pos(),
             &Expression::Format(ref def) => &def.pos,
             &Expression::Call(ref def) => &def.pos,
@@ -688,6 +700,9 @@ impl fmt::Display for Expression {
             }
             &Expression::Copy(_) => {
                 write!(w, "<Copy>")?;
+            }
+            &Expression::Range(_) => {
+                write!(w, "<Range>")?;
             }
             &Expression::Grouped(_) => {
                 write!(w, "(<Expr>)")?;

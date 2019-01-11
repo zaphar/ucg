@@ -631,11 +631,35 @@ make_fn!(
     either!(reduce_expression, map_expression, filter_expression)
 );
 
+make_fn!(
+    range_expression<SliceIter<Token>, Expression>,
+    do_each!(
+        pos => pos,
+        start => either!(simple_expression, grouped_expression),
+        _ => punct!(":"),
+        maybe_step => optional!(
+            do_each!(
+                step => either!(simple_expression, grouped_expression),
+                _ => punct!(":"),
+                (Box::new(step))
+            )
+        ),
+        end => either!(simple_expression, grouped_expression),
+        (Expression::Range(RangeDef{
+            pos: pos,
+            start: Box::new(start),
+            step: maybe_step,
+            end: Box::new(end),
+        }))
+    )
+);
+
 fn unprefixed_expression(input: SliceIter<Token>) -> ParseResult<Expression> {
     let _input = input.clone();
     either!(
         input,
         trace_parse!(format_expression),
+        trace_parse!(range_expression),
         trace_parse!(simple_expression),
         trace_parse!(call_expression),
         trace_parse!(copy_expression)
