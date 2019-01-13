@@ -8,7 +8,7 @@ assert {
     desc = "include path worked from an imported module",
 };
 
-let imported = (import "./libs/test_import.ucg").val;
+let imported = import "./libs/test_import.ucg".val;
 
 assert {
     ok = imported == test_mod.imported,
