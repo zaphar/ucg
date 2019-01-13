@@ -8,7 +8,7 @@ let site_mod = module{
     
     // this binding is not visible outside of the module. should be at the time of definition?
     // or path should be rewritten to be absolue before instantiation.
-    import "../../shared.ucg" as shared;
+    let shared = import "../../shared.ucg";
 
     // processing should be delayed till module instantiation.
     let base_config = shared.mk_site_config(mod.hostname, mod.port); 

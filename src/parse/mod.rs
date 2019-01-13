@@ -654,6 +654,19 @@ make_fn!(
     )
 );
 
+make_fn!(
+    import_expression<SliceIter<Token>, Expression>,
+    do_each!(
+        pos => pos,
+        _ => word!("import"),
+        path => must!(wrap_err!(match_type!(STR), "Expected import path")),
+        (Expression::Import(ImportDef{
+            pos: pos,
+            path: path,
+        }))
+    )
+);
+
 fn unprefixed_expression(input: SliceIter<Token>) -> ParseResult<Expression> {
     let _input = input.clone();
     either!(
@@ -671,6 +684,7 @@ make_fn!(
     either!(
         trace_parse!(func_op_expression),
         trace_parse!(macro_expression),
+        trace_parse!(import_expression),
         trace_parse!(module_expression),
         trace_parse!(select_expression),
         trace_parse!(grouped_expression),
@@ -728,34 +742,6 @@ make_fn!(
     )
 );
 
-fn tuple_to_import(tok: Token, tok2: Token) -> Statement {
-    Statement::Import(ImportDef {
-        path: tok,
-        name: tok2,
-    })
-}
-
-make_fn!(
-    import_stmt_body<SliceIter<Token>, Statement>,
-    do_each!(
-        path => wrap_err!(match_type!(STR), "Expected import path"),
-        _ => word!("as"),
-        name => wrap_err!(match_type!(BAREWORD), "Expected import name"),
-        _ => punct!(";"),
-        (tuple_to_import(path, name))
-    )
-);
-
-make_fn!(
-    import_statement<SliceIter<Token>, Statement>,
-    do_each!(
-        _ => word!("import"),
-        // past this point we know this is supposed to be an import statement.
-        stmt => trace_parse!(must!(import_stmt_body)),
-        (stmt)
-    )
-);
-
 make_fn!(
     assert_statement<SliceIter<Token>, Statement>,
     do_each!(
@@ -782,7 +768,6 @@ fn statement(i: SliceIter<Token>) -> Result<SliceIter<Token>, Statement> {
     return either!(
         i,
         trace_parse!(assert_statement),
-        trace_parse!(import_statement),
         trace_parse!(let_statement),
         trace_parse!(out_statement),
         trace_parse!(expression_statement)

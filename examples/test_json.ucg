@@ -1,4 +1,4 @@
-import "shared.ucg" as shared;
+let shared = import "shared.ucg";
 
 // A few constants.
 let dbhost1 = "db1.prod.net";

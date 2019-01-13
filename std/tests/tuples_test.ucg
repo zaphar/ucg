@@ -1,17 +1,17 @@
-import "../tuples.ucg" as tpl;
-import "../testing.ucg" as t;
+let tpl = import "../tuples.ucg";
+let t = (import "../testing.ucg").asserts{};
 
-assert t.asserts{}.equal{
+assert t.equal{
     left = tpl.fields{tpl={foo=1, bar=2}}.result,
     right = ["foo", "bar"],
 };
 
-assert t.asserts{}.equal{
+assert t.equal{
     left = tpl.values{tpl={foo=1, bar=2}}.result,
     right = [1, 2],
 };
 
-assert t.asserts{}.equal{
+assert t.equal{
     left = tpl.enumerate{tpl={foo=1, bar=2}}.result,
     right = [["foo", 1], ["bar", 2]],
 };

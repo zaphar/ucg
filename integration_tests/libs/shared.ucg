@@ -1,0 +1,4 @@
+let test_mod = module{} => {
+    let imported = (import "./test_import.ucg").val;
+    let script = include str "../include_example.sh";
+};

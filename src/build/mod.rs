@@ -372,18 +372,7 @@ impl<'a> FileBuilder<'a> {
         Ok(normalized.canonicalize()?)
     }
 
-    fn eval_import(&mut self, def: &ImportDef) -> Result<Rc<Val>, Box<dyn Error>> {
-        let sym = &def.name;
-        if Self::check_reserved_word(&sym.fragment) {
-            return Err(Box::new(error::BuildError::new(
-                format!(
-                    "Import {} binding collides with reserved word",
-                    sym.fragment
-                ),
-                error::ErrorType::ReservedWordError,
-                sym.pos.clone(),
-            )));
-        }
+    fn eval_import(&self, def: &ImportDef) -> Result<Rc<Val>, Box<dyn Error>> {
         // Try a relative path first.
         let normalized = self.find_file(&def.path.fragment, true)?;
         if self.detect_import_cycle(normalized.to_string_lossy().as_ref()) {
@@ -394,7 +383,7 @@ impl<'a> FileBuilder<'a> {
                     self.scope.import_stack,
                 ),
                 error::ErrorType::Unsupported,
-                sym.pos.clone(),
+                def.pos.clone(),
             )));
         }
         // Introduce a scope so the above borrow is dropped before we modify
@@ -409,15 +398,6 @@ impl<'a> FileBuilder<'a> {
                 b.get_outputs_as_val()
             }
         };
-        let key = sym.into();
-        if self.scope.build_output.contains_key(&key) {
-            return Err(Box::new(error::BuildError::new(
-                format!("Binding for import name {} already exists", sym.fragment),
-                error::ErrorType::DuplicateBinding,
-                def.path.pos.clone(),
-            )));
-        }
-        self.scope.build_output.insert(key, result.clone());
         let mut mut_assets_cache = self.assets.borrow_mut();
         mut_assets_cache.stash(normalized.clone(), result.clone())?;
         return Ok(result);
@@ -459,7 +439,6 @@ impl<'a> FileBuilder<'a> {
         match stmt {
             &Statement::Assert(ref expr) => self.build_assert(&expr, &child_scope),
             &Statement::Let(ref def) => self.eval_let(def),
-            &Statement::Import(ref def) => self.eval_import(def),
             &Statement::Expression(ref expr) => self.eval_expr(expr, &child_scope),
             // Only one output can be used per file. Right now we enforce this by
             // having a single builder per file.
@@ -1613,6 +1592,7 @@ impl<'a> FileBuilder<'a> {
             &Expression::Select(ref def) => self.eval_select(def, scope),
             &Expression::FuncOp(ref def) => self.eval_func_op(def, scope),
             &Expression::Include(ref def) => self.eval_include(def),
+            &Expression::Import(ref def) => self.eval_import(def),
         }
     }
 }

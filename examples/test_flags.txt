@@ -1,0 +1,1 @@
+--port 8080 --listen '0.0.0.0' --verbose --dir 'some/dir' --dir 'some/other/dir' --log.debug true --log.format 'json' 

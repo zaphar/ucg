@@ -1,5 +1,5 @@
-import "../ucglib/globals.ucg" as globals;
-import "../ucglib/macros.ucg" as mks;
+let globals = import "../ucglib/globals.ucg";
+let mks = import "../ucglib/macros.ucg";
 
 let doc_bucket_name = "ucg.marzhillstudios.com";
 

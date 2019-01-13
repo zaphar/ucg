@@ -31,6 +31,8 @@ use abortable_parser;
 
 use crate::build::Val;
 
+pub mod walk;
+
 macro_rules! enum_type_equality {
     ( $slf:ident, $r:expr, $( $l:pat ),* ) => {
         match $slf {
@@ -458,6 +460,7 @@ impl MacroDef {
                     | &Expression::Module(_)
                     | &Expression::Range(_)
                     | &Expression::FuncOp(_)
+                    | &Expression::Import(_)
                     | &Expression::Include(_) => {
                         // noop
                         continue;
@@ -618,8 +621,8 @@ impl ModuleDef {
     }
 
     pub fn imports_to_absolute(&mut self, base: PathBuf) {
-        for stmt in self.statements.iter_mut() {
-            if let &mut Statement::Import(ref mut def) = stmt {
+        let rewrite_import = |e: &mut Expression| {
+            if let Expression::Include(ref mut def) = e {
                 let path = PathBuf::from(&def.path.fragment);
                 if path.is_relative() {
                     def.path.fragment = base
@@ -630,6 +633,21 @@ impl ModuleDef {
                         .to_string();
                 }
             }
+            if let Expression::Import(ref mut def) = e {
+                let path = PathBuf::from(&def.path.fragment);
+                if path.is_relative() {
+                    def.path.fragment = base
+                        .join(path)
+                        .canonicalize()
+                        .unwrap()
+                        .to_string_lossy()
+                        .to_string();
+                }
+            }
+        };
+        let walker = walk::AstWalker::new().with_expr_handler(&rewrite_import);
+        for stmt in self.statements.iter_mut() {
+            walker.walk_statement(stmt);
         }
     }
 }
@@ -641,6 +659,13 @@ pub struct RangeDef {
     pub start: Box<Expression>,
     pub step: Option<Box<Expression>>,
     pub end: Box<Expression>,
+}
+
+/// Encodes an import expression in the UCG AST.
+#[derive(Debug, PartialEq, Clone)]
+pub struct ImportDef {
+    pub pos: Position,
+    pub path: Token,
 }
 
 /// Encodes a ucg expression. Expressions compute a value from.
@@ -659,6 +684,7 @@ pub enum Expression {
     Grouped(Box<Expression>),
     Format(FormatDef),
     Include(IncludeDef),
+    Import(ImportDef),
     Call(CallDef),
     Macro(MacroDef),
     Select(SelectDef),
@@ -682,6 +708,7 @@ impl Expression {
             &Expression::Select(ref def) => &def.pos,
             &Expression::FuncOp(ref def) => def.pos(),
             &Expression::Include(ref def) => &def.pos,
+            &Expression::Import(ref def) => &def.pos,
         }
     }
 }
@@ -725,6 +752,9 @@ impl fmt::Display for Expression {
             &Expression::Include(_) => {
                 write!(w, "<Include>")?;
             }
+            &Expression::Import(_) => {
+                write!(w, "<Include>")?;
+            }
         }
         Ok(())
     }
@@ -737,13 +767,6 @@ pub struct LetDef {
     pub value: Expression,
 }
 
-/// Encodes an import statement in the UCG AST.
-#[derive(Debug, PartialEq, Clone)]
-pub struct ImportDef {
-    pub path: Token,
-    pub name: Token,
-}
-
 /// Encodes a parsed statement in the UCG AST.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
@@ -752,9 +775,6 @@ pub enum Statement {
 
     // Named bindings
     Let(LetDef),
-
-    // Import a file.
-    Import(ImportDef),
 
     // Assert statement
     Assert(Expression),

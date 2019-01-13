@@ -1,0 +1,16 @@
+let shared = import "./libs/shared.ucg";
+let test_mod = (import "./libs/shared.ucg").test_mod{};
+
+let script = include str "./include_example.sh";
+
+assert {
+    ok = script == test_mod.script,
+    desc = "include path worked from an imported module",
+};
+
+let imported = (import "./libs/test_import.ucg").val;
+
+assert {
+    ok = imported == test_mod.imported,
+    desc = "include path worked from an imported module",
+};

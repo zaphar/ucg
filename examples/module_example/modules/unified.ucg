@@ -1,6 +1,6 @@
 let composed = module{} => {
-    import "host_module.ucg" as host_mod;
-    import "site_module.ucg" as site_mod;
+    let host_mod = import "host_module.ucg";
+    let  site_mod = import "site_module.ucg";
 
     let site_conf = site_mod.site_mod{hostname="example.com", port=80};
     let host_conf = host_mod.host_mod{hostname="example.com"};
