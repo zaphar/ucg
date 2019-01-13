@@ -9,6 +9,8 @@ documentation = "https://docs.rs/crate/ucg"
 readme      = "README.md"
 keywords    = ["compiler", "config"]
 license     = "Apache-2.0"
+include     = ["std/**/*.ucg", "std/*.ucg"]
+build = "bin/build_main.rs"
 
 [dependencies]
 abortable_parser = "~0.2.2"
@@ -20,6 +22,10 @@ toml = "~0.4.8"
 xml-rs = "0.8.0"
 base64 = "0.10.0"
 regex = "1"
+dirs = "1.0.4"
+
+[build-dependencies]
+walkdir = "2.2.7"
 dirs = "1.0.4"
 
 [dev-dependencies]

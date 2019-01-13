@@ -39,6 +39,7 @@ use crate::parse::parse;
 pub mod assets;
 pub mod ir;
 pub mod scope;
+mod stdlib;
 
 pub use self::ir::Val;
 
@@ -143,6 +144,7 @@ macro_rules! eval_binary_expr {
     };
 }
 
+// TODO(jwall): Use the builder patter here. Just like AstWalker.
 impl<'a> FileBuilder<'a> {
     /// Constructs a new Builder.
     pub fn new<P: Into<PathBuf>>(
