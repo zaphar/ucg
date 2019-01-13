@@ -1378,11 +1378,14 @@ impl<'a> FileBuilder<'a> {
     }
 
     fn record_assert_result(&mut self, msg: &str, is_success: bool) {
-        let msg = format!("{}\n", msg);
-        self.assert_collector.summary.push_str(&msg);
         if !is_success {
+            let msg = format!("NOT OK - {}\n", msg);
+            self.assert_collector.summary.push_str(&msg);
             self.assert_collector.failures.push_str(&msg);
             self.assert_collector.success = false;
+        } else {
+            let msg = format!("OK - {}\n", msg);
+            self.assert_collector.summary.push_str(&msg);
         }
     }
 
