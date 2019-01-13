@@ -25,25 +25,12 @@ Named Value Statements
 
 ### Let statements
 
-There are two statements that can introduce a named value for a given UCG file. Let 
-statements and import statements. Any collisions in binding names inside a file are 
-treated as compile errors. Bindings are immutable and once bound they can't be 
-modified.
+There is one statement that can introduce a named value for a given UCG file,
+the let statement. Any collisions in binding names inside a file are treated as
+compile errors. Bindings are immutable and once bound they can't be modified.
 
 ```
 let name = "foo";
-```
-
-### Import Statement
-
-The import statement imports the contents of another UCG file into the current file 
-with a name. The imported file's named values are exposed as a tuple in the referencing 
-file. It starts with the `import` keyword and is followed by a quoted path to the UCG 
-file, the keyword `as`, and a name for the imported values.
-
-```
-import "dbconfigs.ucg" as dbconfigs;
-let mysqlconf = dbconfigs.mysql;
 ```
 
 Output Statements

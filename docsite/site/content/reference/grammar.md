@@ -153,11 +153,17 @@ range_expr: expr, ':', [int, ':'], expr ;
 include_expr: include_keyword, bareword, str ; 
 ```
 
+#### Import expression
+
+```
+import_expr: import_keyword, str ;
+```
 #### Non Operator Expression
 
 ```
 non_operator_expr: literal
                    | grouped
+                   | import_expr
                    | macrodef
                    | module_def
                    | format_expr
@@ -195,13 +201,11 @@ expr: binary_expr | non_operator_expr ;
 
 ```
 let_statement: let_keyword, bareword, equal, expr ;
-import_statement: import_keyword, str, as_keyword, bareword ;
 out_statement: out_keyword, bareword, str ;
 assert_statement: assert_keyword, pipe, { statement }, pipe ;
 simple_statement: expr ;
 
 statement: ( let_statement
-             | import_statement
              | out_statement
              | assert_statement
              | simple_statement ), semicolon ;

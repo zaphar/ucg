@@ -210,6 +210,22 @@ let copiedtpl = nestedtpl{
 };
 ```
 
+Import Expressions
+------------------
+
+Import expressions bring in a ucg file and expose their bound values as a tuple
+in the current file. Import expressions are idempotent and cached so you can
+use them than once in a file safely. Import expressions start with the `import`
+keyword and are followed by a string containing the path of the file to import.
+
+```
+// You can import an entire file into the namespace.
+let imported = import "some_file.ucg";
+
+// Or you can just import a single value from that file.
+let imported_val = (import "some_file.ucg").val;
+```
+
 Format Expressions
 ----------
 
