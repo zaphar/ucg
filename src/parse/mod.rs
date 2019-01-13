@@ -214,8 +214,8 @@ make_fn!(
     do_each!(
             field => wrap_err!(either!(match_type!(BOOLEAN), match_type!(BAREWORD), match_type!(STR)),
                                "Field names must be a bareword or a string."),
-            _ => punct!("="),
-            value => expression,
+            _ => must!(punct!("=")),
+            value => must!(expression),
             (field, value)
     )
 );
@@ -381,14 +381,14 @@ fn module_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expres
     let parsed = do_each!(input,
         pos => pos,
         _ => word!("module"),
-        _ => punct!("{"),
+        _ => must!(punct!("{")),
         arglist => trace_parse!(optional!(field_list)),
         _ => optional!(punct!(",")),
-        _ => punct!("}"),
-        _ => punct!("=>"),
-        _ => punct!("{"),
+        _ => must!(punct!("}")),
+        _ => must!(punct!("=>")),
+        _ => must!(punct!("{")),
         stmt_list =>  trace_parse!(repeat!(statement)),
-        _ => punct!("}"),
+        _ => must!(punct!("}")),
         (pos, arglist, stmt_list)
     );
     match parsed {
@@ -412,10 +412,10 @@ fn macro_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Express
     let parsed = do_each!(input,
         pos => pos,
         _ => word!("macro"),
-        _ => punct!("("),
+        _ => must!(punct!("(")),
         arglist => trace_parse!(optional!(arglist)),
-        _ => punct!(")"),
-        _ => punct!("=>"),
+        _ => must!(punct!(")")),
+        _ => must!(punct!("=>")),
         map =>  trace_parse!(tuple),
         (pos, arglist, map)
     );
@@ -502,9 +502,9 @@ make_fn!(
     do_each!(
         tmpl => match_type!(STR),
         _ => punct!("%"),
-        _ => punct!("("),
+        _ => must!(punct!("(")),
         args => separated!(punct!(","), trace_parse!(expression)),
-        _ => punct!(")"),
+        _ => must!(punct!(")")),
         (tuple_to_format(tmpl, args))
     )
 );
@@ -514,8 +514,8 @@ make_fn!(
     do_each!(
         pos => pos,
         _ => word!("include"),
-        typ => match_type!(BAREWORD),
-        path => match_type!(STR),
+        typ => must!(match_type!(BAREWORD)),
+        path => must!(match_type!(STR)),
         (Expression::Include(IncludeDef{
             pos: pos,
             typ: typ,
