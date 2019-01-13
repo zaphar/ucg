@@ -13,6 +13,7 @@
 //  limitations under the License.
 #[macro_use]
 extern crate clap;
+extern crate dirs;
 extern crate ucglib;
 
 use std::cell::RefCell;
@@ -427,6 +428,14 @@ fn main() {
     let cache: Rc<RefCell<Cache>> = Rc::new(RefCell::new(MemoryCache::new()));
     let registry = ConverterRegistry::make_registry();
     let mut import_paths = Vec::new();
+    if let Some(mut p) = dirs::home_dir() {
+        p.push(".ucg");
+        // Attempt to create directory if it doesn't exist.
+        if !p.exists() {
+            std::fs::create_dir(&p).unwrap();
+        }
+        import_paths.push(p);
+    }
     if let Ok(path_list_str) = std::env::var("UCG_IMPORT_PATH") {
         for p in std::env::split_paths(&path_list_str) {
             import_paths.push(p);
