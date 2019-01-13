@@ -94,6 +94,7 @@ type BuildResult = Result<(), Box<dyn Error>>;
 
 /// AssertCollector collects the results of assertions in the UCG AST.
 pub struct AssertCollector {
+    pub counter: i32,
     pub success: bool,
     pub summary: String,
     pub failures: String,
@@ -168,6 +169,7 @@ impl<'a> FileBuilder<'a> {
             import_path: import_paths,
             validate_mode: false,
             assert_collector: AssertCollector {
+                counter: 0,
                 success: true,
                 summary: String::new(),
                 failures: String::new(),
@@ -188,6 +190,7 @@ impl<'a> FileBuilder<'a> {
             import_path: self.import_path,
             validate_mode: false,
             assert_collector: AssertCollector {
+                counter: 0,
                 success: true,
                 summary: String::new(),
                 failures: String::new(),
@@ -1358,14 +1361,15 @@ impl<'a> FileBuilder<'a> {
 
     fn record_assert_result(&mut self, msg: &str, is_success: bool) {
         if !is_success {
-            let msg = format!("NOT OK - {}\n", msg);
+            let msg = format!("{} - NOT OK: {}\n", self.assert_collector.counter, msg);
             self.assert_collector.summary.push_str(&msg);
             self.assert_collector.failures.push_str(&msg);
             self.assert_collector.success = false;
         } else {
-            let msg = format!("OK - {}\n", msg);
+            let msg = format!("{} - OK: {}\n", self.assert_collector.counter, msg);
             self.assert_collector.summary.push_str(&msg);
         }
+        self.assert_collector.counter += 1;
     }
 
     fn build_assert(
