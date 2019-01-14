@@ -384,7 +384,6 @@ impl<'a> FileBuilder<'a> {
     fn eval_import(&self, def: &ImportDef) -> Result<Rc<Val>, Box<dyn Error>> {
         // Look for a std file first.
         if def.path.fragment.starts_with("std/") {
-            eprintln!("Processing std lib path: {}", def.path.fragment);
             if self.std.contains_key(&def.path.fragment) {
                 // Okay then this is a stdlib and it's special.
                 // Introduce a scope so the above borrow is dropped before we modify
@@ -395,7 +394,7 @@ impl<'a> FileBuilder<'a> {
                 let result = match maybe_asset {
                     Some(v) => v.clone(),
                     None => {
-                        let mut b = self.clone_builder(&def.path.fragment);
+                        let mut b = self.clone_builder(self.file.clone());
                         b.eval_string(self.std.get(&def.path.fragment).unwrap())?;
                         b.get_outputs_as_val()
                     }
