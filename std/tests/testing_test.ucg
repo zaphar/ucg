@@ -51,7 +51,7 @@ assert asserts.equal{
     right="TODO description",
 };
 
-let bad_ok_result = t.asserts.ok{
+let bad_ok_result = asserts.ok{
     test=false,
 };
 assert asserts.equal{

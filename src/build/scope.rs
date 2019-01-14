@@ -126,23 +126,29 @@ impl Scope {
         if &sym.val == "self" && is_symbol {
             return self.curr_val.clone();
         }
-        if self.build_output.contains_key(sym) {
-            return Some(self.build_output[sym].clone());
-        }
         if self.search_curr_val && self.curr_val.is_some() {
-            return match self.curr_val.as_ref().unwrap().as_ref() {
+            match self.curr_val.as_ref().unwrap().as_ref() {
                 &Val::Tuple(ref fs) => match Self::lookup_in_tuple(&sym.pos, &sym.val, fs) {
-                    Ok(v) => Some(v),
-                    Err(_) => None,
+                    Ok(v) => return Some(v),
+                    Err(_) => {
+                        // noop
+                    }
                 },
                 &Val::List(ref fs) => {
                     match Self::lookup_in_list(&sym.pos, &Val::Str(sym.val.clone()), fs) {
-                        Ok(v) => Some(v),
-                        Err(_) => None,
+                        Ok(v) => return Some(v),
+                        Err(_) => {
+                            // noop
+                        }
                     }
                 }
-                _ => None,
+                _ => {
+                    // noop
+                }
             };
+        }
+        if self.build_output.contains_key(sym) {
+            return Some(self.build_output[sym].clone());
         }
         None
     }

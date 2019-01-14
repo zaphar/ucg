@@ -68,3 +68,14 @@ assert {
     ok = list.(idx) == 2,
     desc = "expected 2, got @" % (list.(idx)),
 };
+
+let repeated = {
+    inner = {
+        repeated = "foo",
+    },
+};
+
+assert {
+    ok = repeated.inner.repeated == "foo",
+    desc = "selectors don't jump the line",
+};
