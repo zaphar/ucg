@@ -21,7 +21,7 @@ let values = module{
     let result = reduce reducer.result [], (mod.tpl);
 };
 
-let enumerate = module{
+let iter = module{
     tpl = NULL,
 } => {
     let reducer = macro(acc, field, value) => {
