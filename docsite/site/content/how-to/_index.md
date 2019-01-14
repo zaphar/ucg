@@ -1,6 +1,6 @@
 +++
 title = "HowTo Guides"
-weight = 3
+weight = 4
 sort_by = "weight"
 in_search_index = true
 +++
