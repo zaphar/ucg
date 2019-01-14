@@ -42,10 +42,13 @@ let asserts = module{
         left=NULL,
         // right value for deep equal comparison.
         right=NULL,
+        desc=NULL,
     } => {
         let ok = mod.left == mod.right;
 
-        let desc =  "@ == @" % (mod.left, mod.right);
+        let desc = select (mod.desc == NULL), "@ == @" % (mod.left, mod.right), {
+            false = mod.desc,
+        };
     };
 
     // Asserts that two values are not equal. Does deep equal comparisons.
@@ -54,9 +57,12 @@ let asserts = module{
         left=NULL,
         // right value for deep equal comparison.
         right=NULL,
+        desc=NULL,
     } => {
         let ok = mod.left != mod.right;
 
-        let desc = "@ != @" % (mod.left, mod.right);
+        let desc = select (mod.desc == NULL), "@ != @" % (mod.left, mod.right), {
+            false = mod.desc,
+        };
     };
 };

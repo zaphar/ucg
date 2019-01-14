@@ -55,12 +55,13 @@ assert t.ok{
 
 ### equal assertion
 
-The `equal` assertion module tests that two items are equal. It has two parameters.
+The `equal` assertion module tests that two items are equal. It has three
+parameters.
 
 * `left` which is required and is the left hand side expression to compare
 * `right` which is required is the right hand side expression to compare.
-
-This module will create a description for you from the compared values.
+* `desc` which is an optional description to output for your test. This defaults to
+  a description created from the compared values.
 
 ```
 let t = import "std/testing.ucg".asserts{};
@@ -78,8 +79,8 @@ parameters.
 
 * `left` which is required and is the left hand side expression to compare
 * `right` which is required is the right hand side expression to compare.
-
-This module will create a description for you from the compared values.
+* `desc` which is an optional description to output for your test. This defaults to
+  a description created from the compared values.
 
 ```
 let t = import "std/testing.ucg".asserts{};
