@@ -42,11 +42,11 @@ let asserts = module{
         left=NULL,
         // right value for deep equal comparison.
         right=NULL,
-        desc=NULL,
+        desc="",
     } => {
         let ok = mod.left == mod.right;
 
-        let desc = select (mod.desc == NULL), "@ == @" % (mod.left, mod.right), {
+        let desc = select (mod.desc == ""), "@ == @" % (mod.left, mod.right), {
             false = mod.desc,
         };
     };
@@ -57,11 +57,11 @@ let asserts = module{
         left=NULL,
         // right value for deep equal comparison.
         right=NULL,
-        desc=NULL,
+        desc="",
     } => {
         let ok = mod.left != mod.right;
 
-        let desc = select (mod.desc == NULL), "@ != @" % (mod.left, mod.right), {
+        let desc = select (mod.desc == ""), "@ != @" % (mod.left, mod.right), {
             false = mod.desc,
         };
     };

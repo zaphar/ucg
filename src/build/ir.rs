@@ -186,33 +186,34 @@ impl Val {
 impl Display for Val {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            &Val::Boolean(b) => write!(f, "Boolean({})", b),
-            &Val::Empty => write!(f, "EmptyValue"),
-            &Val::Float(ref ff) => write!(f, "Float({})", ff),
-            &Val::Int(ref i) => write!(f, "Int({})", i),
-            &Val::Str(ref s) => write!(f, "String({})", s),
+            &Val::Boolean(b) => write!(f, "{}", b),
+            &Val::Empty => write!(f, "NULL"),
+            &Val::Float(ref ff) => write!(f, "{}", ff),
+            &Val::Int(ref i) => write!(f, "{}", i),
+            // TODO(jwall): Escape quotes in the string.
+            &Val::Str(ref s) => write!(f, "\"{}\"", s),
             &Val::List(ref def) => {
-                write!(f, "[\n")?;
+                write!(f, "[")?;
                 for v in def.iter() {
-                    write!(f, "\t{},\n", v)?;
+                    write!(f, "{}, ", v)?;
                 }
                 write!(f, "]")
             }
             &Val::Macro(_) => write!(f, "Macro(..)"),
             &Val::Module(_) => write!(f, "Module{{..}}"),
             &Val::Tuple(ref def) => {
-                write!(f, "Tuple(\n")?;
+                write!(f, "{{\n")?;
                 for v in def.iter() {
                     write!(f, "\t{} = {},\n", v.0.val, v.1)?;
                 }
-                write!(f, ")")
+                write!(f, "}}")
             }
             &Val::Env(ref def) => {
-                write!(f, "Env(\n")?;
+                write!(f, "{{\n")?;
                 for v in def.iter() {
                     write!(f, "\t{}=\"{}\"\n", v.0, v.1)?;
                 }
-                write!(f, ")")
+                write!(f, "}}")
             }
         }
     }
@@ -226,7 +227,7 @@ impl From<Val> for String {
             Val::Str(ref s) => s.to_string(),
             Val::Boolean(ref b) => format!("{}", b),
             Val::Empty => "NULL".to_string(),
-            val => format!("<{}>", val),
+            val => format!("{}", val),
         }
     }
 }

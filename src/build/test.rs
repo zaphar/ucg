@@ -171,7 +171,7 @@ fn test_expr_copy_no_such_tuple() {
 }
 
 #[test]
-#[should_panic(expected = "Expected Tuple or Module got Int(1)")]
+#[should_panic(expected = "Expected Tuple or Module got 1")]
 fn test_expr_copy_not_a_tuple() {
     let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
