@@ -104,6 +104,7 @@ pub struct AssertCollector {
 /// Builder handles building ucg code for a single file.
 pub struct FileBuilder<'a> {
     file: PathBuf,
+    std: Rc<HashMap<String, &'static str>>,
     import_path: &'a Vec<PathBuf>,
     validate_mode: bool,
     pub assert_collector: AssertCollector,
@@ -165,9 +166,11 @@ impl<'a> FileBuilder<'a> {
         scope: Scope,
     ) -> Self {
         let file = file.into();
+        let std = Rc::new(stdlib::get_libs());
         FileBuilder {
             // Our import stack is initialized with ourself.
             file: file,
+            std: std,
             import_path: import_paths,
             validate_mode: false,
             assert_collector: AssertCollector {
@@ -189,6 +192,7 @@ impl<'a> FileBuilder<'a> {
     pub fn clone_builder<P: Into<PathBuf>>(&self, file: P) -> Self {
         FileBuilder {
             file: file.into(),
+            std: self.std.clone(),
             import_path: self.import_path,
             validate_mode: false,
             assert_collector: AssertCollector {
@@ -378,6 +382,35 @@ impl<'a> FileBuilder<'a> {
     }
 
     fn eval_import(&self, def: &ImportDef) -> Result<Rc<Val>, Box<dyn Error>> {
+        // Look for a std file first.
+        if def.path.fragment.starts_with("std/") {
+            eprintln!("Processing std lib path: {}", def.path.fragment);
+            if self.std.contains_key(&def.path.fragment) {
+                // Okay then this is a stdlib and it's special.
+                // Introduce a scope so the above borrow is dropped before we modify
+                // the cache below.
+                // Only parse the file once on import.
+                let path = PathBuf::from(&def.path.fragment);
+                let maybe_asset = self.assets.borrow().get(&path)?;
+                let result = match maybe_asset {
+                    Some(v) => v.clone(),
+                    None => {
+                        let mut b = self.clone_builder(&def.path.fragment);
+                        b.eval_string(self.std.get(&def.path.fragment).unwrap())?;
+                        b.get_outputs_as_val()
+                    }
+                };
+                let mut mut_assets_cache = self.assets.borrow_mut();
+                mut_assets_cache.stash(path, result.clone())?;
+                return Ok(result);
+            } else {
+                return Err(Box::new(error::BuildError::new(
+                    format!("No such import {} in the std library.", def.path.fragment),
+                    error::ErrorType::Unsupported,
+                    def.pos.clone(),
+                )));
+            }
+        }
         // Try a relative path first.
         let normalized = self.find_file(&def.path.fragment, true)?;
         if self.detect_import_cycle(normalized.to_string_lossy().as_ref()) {

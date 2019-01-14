@@ -1,5 +1,5 @@
-let tpl = import "../tuples.ucg";
-let t = (import "../testing.ucg").asserts{};
+let tpl = import "std/tuples.ucg";
+let t = (import "std/testing.ucg").asserts{};
 
 assert t.equal{
     left = tpl.fields{tpl={foo=1, bar=2}}.result,

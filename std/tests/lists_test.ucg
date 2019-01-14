@@ -1,5 +1,5 @@
-let list = import "../lists.ucg";
-let t = import "../testing.ucg";
+let list = import "std/lists.ucg";
+let t = import "std/testing.ucg";
 
 let list_to_join = [1, 2, 3];
 

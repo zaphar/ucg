@@ -1,4 +1,4 @@
-let t = import "../testing.ucg";
+let t = import "std/testing.ucg";
 
 let asserts = t.asserts{};
 

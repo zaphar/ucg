@@ -14,8 +14,11 @@ fn generate_rust_module() -> String {
         // We only include files that are not test files.
         if path.is_file() && !path.ends_with("_test.ucg") {
             let path_str = path.to_string_lossy();
-            let include = format!("\tstdlib.insert(\n\t\t\"{}\".to_string(),\n\t\tinclude_str!(\"../../{}\"));\n", path_str, path_str);
-            rust_lib.push_str(&include); 
+            let include = format!(
+                "\tstdlib.insert(\n\t\t\"{}\".to_string(),\n\t\tinclude_str!(\"../../{}\"));\n",
+                path_str, path_str
+            );
+            rust_lib.push_str(&include);
         }
     }
     rust_lib.push_str("\tstdlib\n");
