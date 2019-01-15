@@ -407,24 +407,26 @@ Macros
 -----
 
 Macros look like functions but they are resolved at compile time and
-configurations don't execute so they never appear in output. Macros do not
-close over their environment so they can only reference values defined in their
-arguments. They can't refer to bindings or other macros defined elsewhere. They
-are useful for constructing tuples of a certain shape or otherwise promoting
-data reuse. You define a macro with the `macro` keyword followed by the
-arguments in parentheses, a `=>`, and then a tuple literal.
+configurations don't execute so they never appear in output. Macros close over
+their environment in the file they are declared in. They are useful for
+constructing tuples of a certain shape or otherwise promoting data reuse. You
+define a macro with the `macro` keyword followed by the arguments in
+parentheses, a `=>`, and then a tuple literal.
 
 ```
 let mymacro = macro (arg1, arg2) => {
     host = arg1,
     port = arg2,
     connstr = "couchdb://@:@" % (arg1, arg2),
-}
+};
 
 let my_dbconf = mymacro("couchdb.example.org", "9090");
 
 let my_dbhost = dbconf.host;
 ```
+
+Note that while macros can close over their environment they can not reference
+other fields in the macro body itself.
 
 Modules
 -------

@@ -9,7 +9,7 @@ An Overview
 -----------
 
 UCG is a language specialized for generating configurations. It does not have classes,
-inheritance,  closures, or a full type system. All values are immutable once bound to
+inheritance, or a full type system. All values are immutable once bound to
 a name. A valid UCG file is composed of a series of statements. Statements can be
 an expression, introduce named bindings, or create different outputs. All statements
 must be terminiated by a semicolon.

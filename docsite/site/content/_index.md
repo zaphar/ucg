@@ -2,10 +2,12 @@
 title = "Introduction to UCG"
 in_seach_index = true
 +++
-[UCG](https://crates.io/crates/ucg) is a universal grammar for configuration. It's goal is not to define a configuration format
-like JSON, YAML, or TOML. It is not intended to replace the other configuration formats. Instead
-it is intended to provide a common grammar for generating those formats. Currently UCG is able to
-generate conversions for the following formats.
+
+[UCG](https://crates.io/crates/ucg) is a universal grammar for configuration.
+It's goal is not to define a configuration format like JSON, YAML, or TOML. It
+is not intended to replace the other configuration formats. Instead it is
+intended to provide a common grammar for generating those formats. Currently
+UCG is able to generate conversions for the following formats.
 
 * Environment Variables
 * Command Line Flags
