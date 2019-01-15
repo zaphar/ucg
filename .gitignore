@@ -5,4 +5,3 @@ target
 docsite/site/generated
 docsite/site/public
 rerast_rules/
-src/build/stdlib.rs
