@@ -361,6 +361,7 @@ fn tuple_to_macro<'a>(
         .collect();
     match val {
         Value::Tuple(v) => Ok(Expression::Macro(MacroDef {
+            scope: None,
             argdefs: arglist,
             fields: v.val,
             pos: pos,

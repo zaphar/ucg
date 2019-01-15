@@ -65,3 +65,14 @@ assert {
     ok = macro_tpl_arg(arg_tpl).result == arg_tpl.field,
     desc = "macro_tpl_arg(arg_tpl).result == arg_tpl.field",
 };
+
+let closed_over = "foo";
+
+let closure = macro(arg1) => {
+    result = closed_over + arg1,
+};
+
+assert {
+    ok = closure("bar").result == "foobar",
+    desc = "we closed over closed_over and got @" % (closure("bar").result),
+};

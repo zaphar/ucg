@@ -72,12 +72,18 @@ impl MacroDef {
         // If the expressions reference Symbols not defined in the MacroDef that is also an error.
         // TODO(jwall): We should probably enforce that the Expression Symbols must be in argdefs rules
         // at Macro definition time not evaluation time.
-        let mut scope = HashMap::<PositionedItem<String>, Rc<Val>>::new();
+        let mut build_output = HashMap::<PositionedItem<String>, Rc<Val>>::new();
         for (i, arg) in args.drain(0..).enumerate() {
-            scope.entry(self.argdefs[i].clone()).or_insert(arg.clone());
+            build_output
+                .entry(self.argdefs[i].clone())
+                .or_insert(arg.clone());
         }
         let mut b = parent_builder.clone_builder(root);
-        b.set_build_output(scope);
+        if let Some(ref scope) = self.scope {
+            b.scope = scope.spawn_child();
+        }
+        // We clobber anything that used to be in the scope with the arguments.
+        b.merge_build_output(build_output, true);
         let mut result: Vec<(PositionedItem<String>, Rc<Val>)> = Vec::new();
         for &(ref key, ref expr) in self.fields.iter() {
             // We clone the expressions here because this macro may be consumed
@@ -214,6 +220,16 @@ impl<'a> FileBuilder<'a> {
 
     pub fn set_build_output(&mut self, scope: ValueMap) {
         self.scope.build_output = scope;
+    }
+
+    pub fn merge_build_output(&mut self, scope: ValueMap, clobber: bool) {
+        for (name, value) in scope.iter() {
+            if !clobber && !self.scope.build_output.contains_key(name) {
+                self.scope.build_output.insert(name.clone(), value.clone());
+            } else {
+                self.scope.build_output.insert(name.clone(), value.clone());
+            }
+        }
     }
 
     pub fn set_strict(&mut self, to: bool) {
@@ -1104,19 +1120,9 @@ impl<'a> FileBuilder<'a> {
         )))
     }
 
-    fn eval_macro_def(&self, def: &MacroDef) -> Result<Rc<Val>, Box<dyn Error>> {
-        match def.validate_symbols() {
-            Ok(()) => Ok(Rc::new(Val::Macro(def.clone()))),
-            Err(set) => Err(Box::new(error::BuildError::new(
-                format!(
-                    "Macro has the following \
-                     undefined symbols: {:?}",
-                    set
-                ),
-                error::ErrorType::NoSuchSymbol,
-                def.pos.clone(),
-            ))),
-        }
+    fn eval_macro_def(&self, def: &mut MacroDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
+        def.scope = Some(scope.spawn_child());
+        Ok(Rc::new(Val::Macro(def.clone())))
     }
 
     fn file_dir(&self) -> PathBuf {
@@ -1625,8 +1631,14 @@ impl<'a> FileBuilder<'a> {
             &Expression::Grouped(ref expr) => self.eval_expr(expr, scope),
             &Expression::Format(ref def) => self.eval_format(def, scope),
             &Expression::Call(ref def) => self.eval_call(def, scope),
-            &Expression::Macro(ref def) => self.eval_macro_def(def),
-            &Expression::Module(ref def) => self.eval_module_def(def, scope),
+            &Expression::Macro(ref def) => {
+                let mut def_clone = def.clone();
+                self.eval_macro_def(&mut def_clone, scope)
+            }
+            &Expression::Module(ref def) => {
+                let mut def_clone = def.clone();
+                self.eval_module_def(&mut def_clone, scope)
+            }
             &Expression::Select(ref def) => self.eval_select(def, scope),
             &Expression::FuncOp(ref def) => self.eval_func_op(def, scope),
             &Expression::Include(ref def) => self.eval_include(def),

@@ -19,7 +19,6 @@ use std::cmp::Eq;
 use std::cmp::Ordering;
 use std::cmp::PartialEq;
 use std::cmp::PartialOrd;
-use std::collections::HashSet;
 use std::convert::Into;
 use std::fmt;
 use std::hash::Hash;
@@ -29,6 +28,7 @@ use std::rc::Rc;
 
 use abortable_parser;
 
+use crate::build::scope::Scope;
 use crate::build::Val;
 
 pub mod walk;
@@ -377,102 +377,10 @@ impl<'a> From<&'a PositionedItem<String>> for PositionedItem<String> {
 /// any values except what is defined in their arguments.
 #[derive(PartialEq, Debug, Clone)]
 pub struct MacroDef {
+    pub scope: Option<Scope>,
     pub argdefs: Vec<PositionedItem<String>>,
     pub fields: FieldList,
     pub pos: Position,
-}
-
-impl MacroDef {
-    fn symbol_is_in_args(&self, sym: &String) -> bool {
-        for arg in self.argdefs.iter() {
-            if &arg.val == sym {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    fn validate_value_symbols<'a>(
-        &self,
-        stack: &mut Vec<&'a Expression>,
-        val: &'a Value,
-    ) -> HashSet<String> {
-        let mut bad_symbols = HashSet::new();
-        if let &Value::Symbol(ref name) = val {
-            if name.val != "self" && !self.symbol_is_in_args(&name.val) {
-                bad_symbols.insert(name.val.clone());
-            }
-        } else if let &Value::Tuple(ref tuple_node) = val {
-            let fields = &tuple_node.val;
-            for &(_, ref expr) in fields.iter() {
-                stack.push(expr);
-            }
-        } else if let &Value::List(ref def) = val {
-            for elem in def.elems.iter() {
-                stack.push(elem);
-            }
-        }
-        return bad_symbols;
-    }
-
-    /// Performs typechecking of a ucg macro's arguments to ensure
-    /// that they are valid for the expressions in the macro.
-    pub fn validate_symbols(&self) -> Result<(), HashSet<String>> {
-        let mut bad_symbols = HashSet::new();
-        for &(_, ref expr) in self.fields.iter() {
-            let mut stack = Vec::new();
-            stack.push(expr);
-            while stack.len() > 0 {
-                match stack.pop().unwrap() {
-                    &Expression::Binary(ref bexpr) => {
-                        stack.push(&bexpr.left);
-                        if bexpr.kind != BinaryExprType::DOT {
-                            stack.push(&bexpr.right);
-                        }
-                    }
-                    &Expression::Grouped(ref expr) => {
-                        stack.push(expr);
-                    }
-                    &Expression::Format(ref def) => {
-                        let exprs = &def.args;
-                        for arg_expr in exprs.iter() {
-                            stack.push(arg_expr);
-                        }
-                    }
-                    &Expression::Select(ref def) => {
-                        stack.push(def.default.borrow());
-                        stack.push(def.val.borrow());
-                        for &(_, ref expr) in def.tuple.iter() {
-                            stack.push(expr);
-                        }
-                    }
-                    &Expression::Call(ref def) => {
-                        for expr in def.arglist.iter() {
-                            stack.push(expr);
-                        }
-                    }
-                    &Expression::Simple(ref val) => {
-                        let mut syms_set = self.validate_value_symbols(&mut stack, val);
-                        bad_symbols.extend(syms_set.drain());
-                    }
-                    &Expression::Macro(_)
-                    | &Expression::Copy(_)
-                    | &Expression::Module(_)
-                    | &Expression::Range(_)
-                    | &Expression::FuncOp(_)
-                    | &Expression::Import(_)
-                    | &Expression::Include(_) => {
-                        // noop
-                        continue;
-                    }
-                }
-            }
-        }
-        if bad_symbols.len() > 0 {
-            return Err(bad_symbols);
-        }
-        return Ok(());
-    }
 }
 
 /// Specifies the types of binary operations supported in
@@ -604,6 +512,7 @@ impl FuncOpDef {
 // TODO(jwall): this should probably be moved to a Val::Module IR type.
 #[derive(Debug, PartialEq, Clone)]
 pub struct ModuleDef {
+    pub scope: Option<Scope>,
     pub pos: Position,
     pub arg_set: FieldList,
     pub arg_tuple: Option<Rc<Val>>,
@@ -613,6 +522,7 @@ pub struct ModuleDef {
 impl ModuleDef {
     pub fn new<P: Into<Position>>(arg_set: FieldList, stmts: Vec<Statement>, pos: P) -> Self {
         ModuleDef {
+            scope: None,
             pos: pos.into(),
             arg_set: arg_set,
             arg_tuple: None,
@@ -782,6 +692,3 @@ pub enum Statement {
     // Identify an Expression for output.
     Output(Token, Expression),
 }
-
-#[cfg(test)]
-pub mod test;

@@ -248,6 +248,7 @@ fn test_macro_hermetic() {
         .build_output
         .entry(value_node!("tstmac".to_string(), Position::new(1, 0, 0)))
         .or_insert(Rc::new(Val::Macro(MacroDef {
+            scope: None,
             argdefs: vec![value_node!("arg2".to_string(), Position::new(1, 0, 0))],
             fields: vec![(
                 make_tok!("foo", Position::new(1, 1, 1)),

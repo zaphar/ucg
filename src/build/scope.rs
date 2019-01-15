@@ -33,7 +33,7 @@ pub type ValueMap = HashMap<PositionedItem<String>, Rc<Val>>;
 ///
 /// UCG Scopes do not descend up into their parent scopes so we do not maintain a stack
 /// for those.
-#[derive(Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Scope {
     pub import_stack: Vec<String>,
     pub env: Rc<Val>,
