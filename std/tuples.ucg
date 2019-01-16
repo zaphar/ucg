@@ -30,3 +30,13 @@ let iter = module{
     
     let result = reduce reducer.result [], (mod.tpl);
 };
+
+let strip_nulls = module{
+    tpl = NULL,
+} => {
+    let filterer = macro(name, value) => {
+        result = value != NULL,
+    };
+
+    let result = filter filterer.result (mod.tpl);
+};

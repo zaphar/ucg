@@ -15,3 +15,8 @@ assert t.equal{
     left = tpl.iter{tpl={foo=1, bar=2}}.result,
     right = [["foo", 1], ["bar", 2]],
 };
+
+assert t.equal{
+    left = tpl.strip_nulls{tpl={foo="bar", bar=NULL}}.result,
+    right = {foo="bar"},
+};
