@@ -169,3 +169,13 @@ assert {
     ok = "foo" !~ "bar",
     desc = "\"foo\" !~ \"bar\"",
 };
+
+assert {
+    ok = NULL != 1,
+    desc = "Integers are comparable to null",
+};
+
+assert {
+    ok = NULL != "string",
+    desc = "Strings are comparable to null",
+};

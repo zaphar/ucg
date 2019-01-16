@@ -109,6 +109,9 @@ impl Val {
                 error::ErrorType::TypeFail,
                 pos,
             )),
+            // EMPTY is always comparable for equality.
+            (&Val::Empty, _) => Ok(false),
+            (_, &Val::Empty) => Ok(false),
             (me, tgt) => Err(error::BuildError::new(
                 format!("Types differ for {}, {}", me, tgt),
                 error::ErrorType::TypeFail,
