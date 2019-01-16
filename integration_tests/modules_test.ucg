@@ -2,6 +2,11 @@ let test_empty_mod = module {
 } => {
 };
 
+let std_lib_import = module {
+} => {
+    let tpl = import "std/tuples.ucg";
+};
+
 let empty_mod_instance = test_empty_mod{};
 
 let test_simple_mod = module {

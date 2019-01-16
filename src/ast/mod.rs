@@ -545,6 +545,10 @@ impl ModuleDef {
             }
             if let Expression::Import(ref mut def) = e {
                 let path = PathBuf::from(&def.path.fragment);
+                // std/ paths are special and do not get made into absolute paths.
+                if path.starts_with("std/") {
+                    return;
+                }
                 if path.is_relative() {
                     def.path.fragment = base
                         .join(path)
