@@ -179,3 +179,8 @@ assert {
     ok = NULL != "string",
     desc = "Strings are comparable to null",
 };
+
+assert {
+    ok = (foo in {foo = NULL}),
+    desc = "Null valued fields are still present in tuple",
+};

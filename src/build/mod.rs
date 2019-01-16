@@ -780,6 +780,7 @@ impl<'a> FileBuilder<'a> {
             Expression::Copy(_) => return self.eval_expr(right, scope),
             Expression::Call(_) => return self.eval_expr(right, scope),
             Expression::Simple(Value::Symbol(ref s)) => {
+                let scope = scope.clone().use_curr_val();
                 scope
                     .lookup_sym(s, true)
                     .ok_or(Box::new(error::BuildError::new(
@@ -789,6 +790,7 @@ impl<'a> FileBuilder<'a> {
                     )))
             }
             Expression::Simple(Value::Str(ref s)) => {
+                let scope = scope.clone().use_curr_val();
                 scope
                     .lookup_sym(s, false)
                     .ok_or(Box::new(error::BuildError::new(
@@ -904,6 +906,7 @@ impl<'a> FileBuilder<'a> {
     fn eval_binary(&self, def: &BinaryOpDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         let kind = &def.kind;
         if let &BinaryExprType::IN = kind {
+            // TODO Should we support this operation on strings too?
             return self.do_element_check(&def.left, &def.right, scope);
         };
         let left = self.eval_expr(&def.left, scope)?;

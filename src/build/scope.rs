@@ -56,6 +56,11 @@ impl Scope {
         }
     }
 
+    pub fn use_curr_val(mut self) -> Self {
+        self.search_curr_val = true;
+        self
+    }
+
     /// Spawn a child scope based on the current scope but without the current
     /// val set.
     pub fn spawn_child(&self) -> Self {
