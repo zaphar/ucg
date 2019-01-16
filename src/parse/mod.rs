@@ -462,12 +462,12 @@ fn select_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expres
         _ => word!("select"),
         val => do_each!(
             expr => trace_parse!(expression),
-            _ => punct!(","),
+            _ => must!(punct!(",")),
             (expr)
         ),
         default => do_each!(
             expr => trace_parse!(expression),
-            _ => punct!(","),
+            _ => must!(punct!(",")),
             (expr)
         ),
         map => trace_parse!(tuple),
