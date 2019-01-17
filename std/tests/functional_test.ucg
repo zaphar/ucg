@@ -1,0 +1,31 @@
+let t = (import "std/testing.ucg").asserts{};
+let f = (import "std/functional.ucg");
+
+let op = macro(arg) => {
+    result = arg{foo="bar"},
+};
+
+assert t.equal{
+    left = f.maybe{val=NULL}.do(op).result,
+    right = NULL,
+};
+
+assert t.equal{
+    left = f.maybe{val={}}.do(op).result,
+    right = {foo="bar"},
+};
+
+assert t.equal{
+    left = f.if{test=true}.do(op, {}).result,
+    right = {foo="bar"},
+};
+
+assert t.equal{
+    left = f.if{test=false}.do(op, {}).result,
+    right = {},
+};
+
+assert t.equal{
+    left = f.identity("foo").result,
+    right = "foo",
+};
