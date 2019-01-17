@@ -41,5 +41,9 @@ fn generate_rust_module() -> String {
 fn main() {
     let contents = generate_rust_module();
     let out_dir = std::env::var("OUT_DIR").unwrap();
-    std::fs::write(format!("{}/stdlib_generated.rs", out_dir), contents.as_bytes()).unwrap();
+    std::fs::write(
+        format!("{}/stdlib_generated.rs", out_dir),
+        contents.as_bytes(),
+    )
+    .unwrap();
 }
