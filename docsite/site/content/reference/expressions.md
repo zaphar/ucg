@@ -249,19 +249,46 @@ UCG can generate lists from a range with an optional step.
 0:2:10 == [0, 2, 4, 6, 8, 10];
 ```
 
+Macros
+-----
+
+Macros look like functions but they are resolved at compile time and
+configurations don't execute so they never appear in output. Macros close over
+the environment up to the point where they are declared in the file. One
+consequence of this is that they can not call themselves so recursive macros
+are not possible. This is probably a feature. They are useful for constructing
+tuples of a certain shape or otherwise promoting data reuse. You define a macro
+with the `macro` keyword followed by the arguments in parentheses, a `=>`, and
+then a valid expression.
+
+```
+let mymacro = macro (arg1, arg2) => {
+    host = arg1,
+    port = arg2,
+    connstr = "couchdb://@:@" % (arg1, arg2),
+};
+
+let my_dbconf = mymacro("couchdb.example.org", "9090");
+
+let my_dbhost = dbconf.host;
+
+let add = macro(arg1, arg2) => arg1 + arg2;
+add(1, 1) == 2;
+```
+
 Functional processing expressions
 ---------------------------------
 
-UCG has a few functional processing expressions called `map` and `filter`. Both of
-them can process a list or tuple.
+UCG has a few functional processing expressions called `map`, `filter`, and
+`reduce`. All of them can process a list or tuple.
 
-Their syntax starts with either map or filter followed by a symbol that
-references a valid macro and the outfield for the tuple the macro produces. and
-finally an expression that resolves to either a list of tuple.
+Their syntax starts with either `map` `filter`, or `reduce followed by a symbol
+that references a valid macro and finally an expression that resolves to either
+a list or a tuple.
 
 ### Map expressions
 
-Map macros should produce in the result field a value or [field, value] that
+Map macros should produce either a valid value or a list of [field, value] that
 will replace the element or field it is curently processing.
 
 **For Lists**
@@ -272,34 +299,32 @@ macro is expected to take a single argument.
 ```
 let list1 = [1, 2, 3, 4];
 
-let mapper = macro(item) => { result = item + 1 };
-map mapper.result list1 == [2, 3, 4, 5];
+let mapper = macro(item) =>  item + 1;
+map mapper list1 == [2, 3, 4, 5];
 ```
 
 **For Tuples**
 
 Macros for mapping across a tuple are expected to take two arguments. The first
 argument is the name of the field. The second argument is the value in that
-field. The result field should be a two item list with the first item being the
-new field name and the second item being the new value.
+field. The result should be a two item list with the first item being the new
+field name and the second item being the new value.
 
 ```
 let test_tpl = {
     foo = "bar",
     quux = "baz",
 };
-let tpl_mapper = macro(name, val) => {
-    result = select name, [name, val], {
-        "foo" = ["foo", "barbar"],
-        quux = ["cute", "pygmy"],
-    },
+let tpl_mapper = macro(name, val) =>  select name, [name, val], {
+    "foo" = ["foo", "barbar"],
+    quux = ["cute", "pygmy"],
 };
-map tpl_mapper.result test_tpl == {foo = "barbar", cute = "pygmy"};
+map tpl_mapper test_tpl == {foo = "barbar", cute = "pygmy"};
 ```
 
 ### Filter expressions
 
-Filter expressions should return a result field with false or NULL for items to
+Filter expressions should return a field with false or NULL for items to
 filter out of the list or tuple. Any other value in the return field results in
 the item or field staying in the resulting list or tuple.
 
@@ -307,10 +332,8 @@ the item or field staying in the resulting list or tuple.
 
 ```
 let list2 = ["foo", "bar", "foo", "bar"];
-let filtrator = macro(item) => {
-    result = select item, NULL, {
-        foo = item,
-    },
+let filtrator = macro(item) => select item, NULL, {
+    foo = item,
 };
 
 filter filtrator.result list2 == ["foo", "foo"];
@@ -323,15 +346,13 @@ let test_tpl = {
     foo = "bar",
     quux = "baz",
 };
-let tpl_filter = macro(name, val) => {
-    result = name != "foo",
-};
-filter tpl_filter.result test_tpl == { quux = "baz" };
+let tpl_filter = macro(name, val) =>  name != "foo";
+filter tpl_filter test_tpl == { quux = "baz" };
 ```
 
 ### Reduce expressions
 
-Reduce expressions start with the reduce keyword followed by a symbol referencing a macro a dot and the output field, then an expression for the accumulator and finally the tuple or list to process.
+Reduce expressions start with the reduce keyword followed by a symbol referencing a macro an expression for the accumulator and finally the tuple or list to process.
 
 **Tuples**
 
@@ -340,25 +361,21 @@ let test_tpl = {
     foo = "bar",
     quux = "baz",
 };
-let tpl_reducer = macro(acc, name, val) => {
-    result = acc{
-        keys = self.keys + [name],
-        vals = self.vals + [val],
-    },
+let tpl_reducer = macro(acc, name, val) =>  acc{
+    keys = self.keys + [name],
+    vals = self.vals + [val],
 };
 
-reduce tpl_reducer.result {keys = [], vals = []}, test_tpl == {keys = ["foo", "quux"], vals = ["bar", "baz"]};
+reduce tpl_reducer {keys = [], vals = []}, test_tpl == {keys = ["foo", "quux"], vals = ["bar", "baz"]};
 ```
 
 **Lists**
 
 ```
 let list1 = [1, 2, 3, 4];
-let list_reducer = macro(acc, item) => {
-    result = acc + item,
-};
+let list_reducer = macro(acc, item) =>  acc + item;
 
- list_reducer.result 0, list1 == 0 + 1 + 2 + 3 + 4;
+ list_reducer 0, list1 == 0 + 1 + 2 + 3 + 4;
 ```
 
 Include expressions
@@ -402,31 +419,6 @@ let ifresult = select true, NULL, {
     false = "false result",
 }; // result will be "true result"
 ```
-
-Macros
------
-
-Macros look like functions but they are resolved at compile time and
-configurations don't execute so they never appear in output. Macros close over
-their environment in the file they are declared in. They are useful for
-constructing tuples of a certain shape or otherwise promoting data reuse. You
-define a macro with the `macro` keyword followed by the arguments in
-parentheses, a `=>`, and then a tuple literal.
-
-```
-let mymacro = macro (arg1, arg2) => {
-    host = arg1,
-    port = arg2,
-    connstr = "couchdb://@:@" % (arg1, arg2),
-};
-
-let my_dbconf = mymacro("couchdb.example.org", "9090");
-
-let my_dbhost = dbconf.host;
-```
-
-Note that while macros can close over their environment they can not reference
-other fields in the macro body itself.
 
 Modules
 -------

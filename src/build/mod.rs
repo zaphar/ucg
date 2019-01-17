@@ -55,7 +55,7 @@ impl MacroDef {
         root: PathBuf,
         parent_builder: &FileBuilder,
         mut args: Vec<Rc<Val>>,
-    ) -> Result<Vec<(PositionedItem<String>, Rc<Val>)>, Box<dyn Error>> {
+    ) -> Result<Rc<Val>, Box<dyn Error>> {
         // Error conditions. If the args don't match the length and types of the argdefs then this is
         // macro call error.
         if args.len() > self.argdefs.len() {
@@ -84,15 +84,7 @@ impl MacroDef {
         }
         // We clobber anything that used to be in the scope with the arguments.
         b.merge_build_output(build_output, true);
-        let mut result: Vec<(PositionedItem<String>, Rc<Val>)> = Vec::new();
-        for &(ref key, ref expr) in self.fields.iter() {
-            // We clone the expressions here because this macro may be consumed
-            // multiple times in the future.
-            let scope = b.scope.spawn_child();
-            let val = b.eval_expr(expr, &scope)?;
-            result.push((key.into(), val.clone()));
-        }
-        Ok(result)
+        Ok(b.eval_expr(self.fields.as_ref(), &b.scope.spawn_child())?)
     }
 }
 
@@ -1112,8 +1104,7 @@ impl<'a> FileBuilder<'a> {
             for arg in args.iter() {
                 argvals.push(self.eval_expr(arg, scope)?);
             }
-            let fields = m.eval(self.file.clone(), self, argvals)?;
-            return Ok(Rc::new(Val::Tuple(fields)));
+            return Ok(m.eval(self.file.clone(), self, argvals)?);
         }
         Err(Box::new(error::BuildError::new(
             // We should pretty print the selectors here.
@@ -1195,28 +1186,25 @@ impl<'a> FileBuilder<'a> {
         &self,
         elems: &Vec<Rc<Val>>,
         def: &MacroDef,
-        outfield: &PositionedItem<String>,
         typ: ProcessingOpType,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
         let mut out = Vec::new();
         for item in elems.iter() {
             let argvals = vec![item.clone()];
-            let fields = def.eval(self.file.clone(), self, argvals)?;
-            if let Some(v) = find_in_fieldlist(&outfield.val, &fields) {
-                match typ {
-                    ProcessingOpType::Map => {
-                        out.push(v.clone());
+            let val = def.eval(self.file.clone(), self, argvals)?;
+            match typ {
+                ProcessingOpType::Map => {
+                    out.push(val.clone());
+                }
+                ProcessingOpType::Filter => {
+                    if let &Val::Empty = val.as_ref() {
+                        // noop
+                        continue;
+                    } else if let &Val::Boolean(false) = val.as_ref() {
+                        // noop
+                        continue;
                     }
-                    ProcessingOpType::Filter => {
-                        if let &Val::Empty = v.as_ref() {
-                            // noop
-                            continue;
-                        } else if let &Val::Boolean(false) = v.as_ref() {
-                            // noop
-                            continue;
-                        }
-                        out.push(item.clone());
-                    }
+                    out.push(item.clone());
                 }
             }
         }
@@ -1227,77 +1215,65 @@ impl<'a> FileBuilder<'a> {
         &self,
         fs: &Vec<(PositionedItem<String>, Rc<Val>)>,
         def: &MacroDef,
-        outfield: &PositionedItem<String>,
         typ: ProcessingOpType,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
         let mut out = Vec::new();
         for &(ref name, ref val) in fs {
             let argvals = vec![Rc::new(Val::Str(name.val.clone())), val.clone()];
-            let fields = def.eval(self.file.clone(), self, argvals)?;
-            if let Some(v) = find_in_fieldlist(&outfield.val, &fields) {
-                match typ {
-                    ProcessingOpType::Map => {
-                        if let &Val::List(ref fs) = v.as_ref() {
-                            if fs.len() == 2 {
-                                // index 0 should be a string for the new field name.
-                                // index 1 should be the val.
-                                let new_name = if let &Val::Str(ref s) = fs[0].as_ref() {
-                                    s.clone()
-                                } else {
-                                    return Err(Box::new(error::BuildError::new(
-                                        format!(
-                                            "map on tuple expects the first item out list to be a string but got size {}",
-                                            fs[0].type_name()
-                                        ),
-                                        error::ErrorType::TypeFail,
-                                        def.pos.clone(),
-                                    )));
-                                };
-                                out.push((
-                                    PositionedItem::new(new_name, name.pos.clone()),
-                                    fs[1].clone(),
-                                ));
+            let result = def.eval(self.file.clone(), self, argvals)?;
+            match typ {
+                ProcessingOpType::Map => {
+                    if let &Val::List(ref fs) = result.as_ref() {
+                        if fs.len() == 2 {
+                            // index 0 should be a string for the new field name.
+                            // index 1 should be the val.
+                            let new_name = if let &Val::Str(ref s) = fs[0].as_ref() {
+                                s.clone()
                             } else {
                                 return Err(Box::new(error::BuildError::new(
                                     format!(
-                                        "map on a tuple field expects a list of size 2 as output but got size {}",
-                                        fs.len()
+                                        "map on tuple expects the first item out list to be a string but got size {}",
+                                        fs[0].type_name()
                                     ),
                                     error::ErrorType::TypeFail,
                                     def.pos.clone(),
                                 )));
-                            }
+                            };
+                            out.push((
+                                PositionedItem::new(new_name, name.pos.clone()),
+                                fs[1].clone(),
+                            ));
                         } else {
                             return Err(Box::new(error::BuildError::new(
                                 format!(
-                                    "map on a tuple field expects a list as output but got {:?}",
-                                    v.type_name()
+                                    "map on a tuple field expects a list of size 2 as output but got size {}",
+                                    fs.len()
                                 ),
                                 error::ErrorType::TypeFail,
                                 def.pos.clone(),
                             )));
                         }
-                    }
-                    ProcessingOpType::Filter => {
-                        if let &Val::Empty = v.as_ref() {
-                            // noop
-                            continue;
-                        } else if let &Val::Boolean(false) = v.as_ref() {
-                            // noop
-                            continue;
-                        }
-                        out.push((name.clone(), val.clone()));
+                    } else {
+                        return Err(Box::new(error::BuildError::new(
+                            format!(
+                                "map on a tuple field expects a list as output but got {:?}",
+                                result.type_name()
+                            ),
+                            error::ErrorType::TypeFail,
+                            def.pos.clone(),
+                        )));
                     }
                 }
-            } else {
-                return Err(Box::new(error::BuildError::new(
-                    format!(
-                        "Result {} field does not exist in macro body!",
-                        outfield.val
-                    ),
-                    error::ErrorType::NoSuchSymbol,
-                    def.pos.clone(),
-                )));
+                ProcessingOpType::Filter => {
+                    if let &Val::Empty = result.as_ref() {
+                        // noop
+                        continue;
+                    } else if let &Val::Boolean(false) = result.as_ref() {
+                        // noop
+                        continue;
+                    }
+                    out.push((name.clone(), val.clone()));
+                }
             }
         }
         Ok(Rc::new(Val::Tuple(out)))
@@ -1321,16 +1297,8 @@ impl<'a> FileBuilder<'a> {
             &Val::List(ref elems) => {
                 for item in elems.iter() {
                     let argvals = vec![acc.clone(), item.clone()];
-                    let fields = macdef.eval(self.file.clone(), self, argvals)?;
-                    if let Some(v) = find_in_fieldlist(&def.field.val, &fields) {
-                        acc = v.clone();
-                    } else {
-                        return Err(Box::new(error::BuildError::new(
-                            format!("Result {} field does not exist in macro body!", def.field),
-                            error::ErrorType::NoSuchSymbol,
-                            def.pos.clone(),
-                        )));
-                    }
+                    let result = macdef.eval(self.file.clone(), self, argvals)?;
+                    acc = result;
                 }
             }
             &Val::Tuple(ref fs) => {
@@ -1340,16 +1308,8 @@ impl<'a> FileBuilder<'a> {
                         Rc::new(Val::Str(name.val.clone())),
                         val.clone(),
                     ];
-                    let fields = macdef.eval(self.file.clone(), self, argvals)?;
-                    if let Some(v) = find_in_fieldlist(&def.field.val, &fields) {
-                        acc = v.clone();
-                    } else {
-                        return Err(Box::new(error::BuildError::new(
-                            format!("Result field {}does not exist in macro body!", def.field),
-                            error::ErrorType::NoSuchSymbol,
-                            def.pos.clone(),
-                        )));
-                    }
+                    let result = macdef.eval(self.file.clone(), self, argvals)?;
+                    acc = result;
                 }
             }
             other => {
@@ -1385,12 +1345,8 @@ impl<'a> FileBuilder<'a> {
             }
         };
         return match maybe_target.as_ref() {
-            &Val::List(ref elems) => {
-                self.eval_functional_list_processing(elems, macdef, &def.field, typ)
-            }
-            &Val::Tuple(ref fs) => {
-                self.eval_functional_tuple_processing(fs, macdef, &def.field, typ)
-            }
+            &Val::List(ref elems) => self.eval_functional_list_processing(elems, macdef, typ),
+            &Val::Tuple(ref fs) => self.eval_functional_tuple_processing(fs, macdef, typ),
             other => Err(Box::new(error::BuildError::new(
                 format!(
                     "Expected List or Tuple as target but got {:?}",

@@ -343,10 +343,9 @@ make_fn!(
 );
 
 fn tuple_to_macro<'a>(
-    input: SliceIter<'a, Token>,
     pos: Position,
     vals: Option<Vec<Value>>,
-    val: Value,
+    val: Expression,
 ) -> ConvertResult<'a, Expression> {
     let mut default_args = match vals {
         None => Vec::new(),
@@ -359,18 +358,12 @@ fn tuple_to_macro<'a>(
             val: s.to_string(),
         })
         .collect();
-    match val {
-        Value::Tuple(v) => Ok(Expression::Macro(MacroDef {
-            scope: None,
-            argdefs: arglist,
-            fields: v.val,
-            pos: pos,
-        })),
-        val => Err(Error::new(
-            format!("Expected Tuple Got {:?}", val),
-            Box::new(input.clone()),
-        )),
-    }
+    Ok(Expression::Macro(MacroDef {
+        scope: None,
+        argdefs: arglist,
+        fields: Box::new(val),
+        pos: pos,
+    }))
 }
 
 make_fn!(
@@ -417,23 +410,21 @@ fn macro_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Express
         arglist => trace_parse!(optional!(arglist)),
         _ => must!(punct!(")")),
         _ => must!(punct!("=>")),
-        map =>  trace_parse!(tuple),
+        map =>  trace_parse!(expression),
         (pos, arglist, map)
     );
     match parsed {
         Result::Abort(e) => Result::Abort(e),
         Result::Fail(e) => Result::Fail(e),
         Result::Incomplete(offset) => Result::Incomplete(offset),
-        Result::Complete(rest, (pos, arglist, map)) => {
-            match tuple_to_macro(rest.clone(), pos, arglist, map) {
-                Ok(expr) => Result::Complete(rest, expr),
-                Err(e) => Result::Fail(Error::caused_by(
-                    "Invalid Macro syntax",
-                    Box::new(e),
-                    Box::new(rest.clone()),
-                )),
-            }
-        }
+        Result::Complete(rest, (pos, arglist, map)) => match tuple_to_macro(pos, arglist, map) {
+            Ok(expr) => Result::Complete(rest, expr),
+            Err(e) => Result::Fail(Error::caused_by(
+                "Invalid Macro syntax",
+                Box::new(e),
+                Box::new(rest.clone()),
+            )),
+        },
     }
 }
 
@@ -574,14 +565,11 @@ make_fn!(
         pos => pos,
         _ => word!("reduce"),
         macroname => match_type!(BAREWORD),
-        _ => punct!("."),
-        outfield => match_type!(BAREWORD),
         acc => trace_parse!(non_op_expression),
         _ => punct!(","),
         tgt => trace_parse!(non_op_expression),
         (Expression::FuncOp(FuncOpDef::Reduce(ReduceOpDef{
             mac: (&macroname).into(),
-            field: (&outfield).into(),
             acc: Box::new(acc),
             target: Box::new(tgt),
             pos: pos,
@@ -596,12 +584,9 @@ make_fn!(
         _ => word!("map"),
         // TODO This should become just a bareword symbol now
         macroname => match_type!(BAREWORD),
-        _ => punct!("."),
-        outfield => match_type!(BAREWORD),
         list => trace_parse!(non_op_expression),
         (Expression::FuncOp(FuncOpDef::Map(MapFilterOpDef{
             mac: (&macroname).into(),
-            field: (&outfield).into(),
             target: Box::new(list),
             pos: pos,
         })))
@@ -615,12 +600,9 @@ make_fn!(
         _ => word!("filter"),
         // TODO This should become just a bareword symbol now
         macroname => match_type!(BAREWORD),
-        _ => punct!("."),
-        outfield => match_type!(BAREWORD),
         list => trace_parse!(non_op_expression),
         (Expression::FuncOp(FuncOpDef::Filter(MapFilterOpDef{
             mac: (&macroname).into(),
-            field: (&outfield).into(),
             target: Box::new(list),
             pos: pos,
         })))

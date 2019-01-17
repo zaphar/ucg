@@ -89,7 +89,7 @@ impl<'a> AstWalker<'a> {
             Expression::Grouped(ref mut expr) => {
                 self.walk_expression(expr);
             }
-            Expression::Macro(ref mut def) => self.walk_fieldset(&mut def.fields),
+            Expression::Macro(ref mut def) => self.walk_expression(def.fields.as_mut()),
             Expression::Module(ref mut def) => {
                 self.walk_fieldset(&mut def.arg_set);
                 for stmt in def.statements.iter_mut() {

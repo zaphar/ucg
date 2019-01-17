@@ -3,40 +3,32 @@
 let fields = module{
     tpl = NULL,
 } => {
-    let reducer = macro(acc, field, value) => {
-        result = acc + [field],
-    };
+    let reducer = macro(acc, field, value) =>  acc + [field];
 
-    let result = reduce reducer.result [], (mod.tpl);
+    let result = reduce reducer [], (mod.tpl);
 };
 
 // return a list of the values in a tuple.
 let values = module{
     tpl = NULL,
 } => {
-    let reducer = macro(acc, field, value) => {
-        result = acc + [value],
-    };
+    let reducer = macro(acc, field, value) =>  acc + [value];
 
-    let result = reduce reducer.result [], (mod.tpl);
+    let result = reduce reducer [], (mod.tpl);
 };
 
 let iter = module{
     tpl = NULL,
 } => {
-    let reducer = macro(acc, field, value) => {
-        result = acc + [[field, value]],
-    };
+    let reducer = macro(acc, field, value) =>  acc + [[field, value]];
     
-    let result = reduce reducer.result [], (mod.tpl);
+    let result = reduce reducer [], (mod.tpl);
 };
 
 let strip_nulls = module{
     tpl = NULL,
 } => {
-    let filterer = macro(name, value) => {
-        result = value != NULL,
-    };
+    let filterer = macro(name, value) =>  value != NULL;
 
-    let result = filter filterer.result (mod.tpl);
+    let result = filter filterer (mod.tpl);
 };

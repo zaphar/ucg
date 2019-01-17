@@ -379,7 +379,7 @@ impl<'a> From<&'a PositionedItem<String>> for PositionedItem<String> {
 pub struct MacroDef {
     pub scope: Option<Scope>,
     pub argdefs: Vec<PositionedItem<String>>,
-    pub fields: FieldList,
+    pub fields: Box<Expression>,
     pub pos: Position,
 }
 
@@ -484,7 +484,6 @@ pub enum FuncOpDef {
 #[derive(Debug, PartialEq, Clone)]
 pub struct ReduceOpDef {
     pub mac: PositionedItem<String>,
-    pub field: PositionedItem<String>,
     pub acc: Box<Expression>,
     pub target: Box<Expression>,
     pub pos: Position,
@@ -494,7 +493,6 @@ pub struct ReduceOpDef {
 #[derive(Debug, PartialEq, Clone)]
 pub struct MapFilterOpDef {
     pub mac: PositionedItem<String>,
-    pub field: PositionedItem<String>,
     pub target: Box<Expression>,
     pub pos: Position,
 }

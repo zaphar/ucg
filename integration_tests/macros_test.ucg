@@ -76,3 +76,10 @@ assert {
     ok = closure("bar").result == "foobar",
     desc = "we closed over closed_over and got @" % (closure("bar").result),
 };
+
+let concat = macro(arg1, arg2) => arg1 + arg2;
+
+assert {
+    ok = concat("foo", "bar") == "foobar",
+    desc = "macros that aren't tuples work",
+};

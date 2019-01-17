@@ -250,13 +250,10 @@ fn test_macro_hermetic() {
         .or_insert(Rc::new(Val::Macro(MacroDef {
             scope: None,
             argdefs: vec![value_node!("arg2".to_string(), Position::new(1, 0, 0))],
-            fields: vec![(
-                make_tok!("foo", Position::new(1, 1, 1)),
-                Expression::Simple(Value::Symbol(value_node!(
-                    "arg1".to_string(),
-                    Position::new(1, 1, 1)
-                ))),
-            )],
+            fields: Box::new(Expression::Simple(Value::Symbol(value_node!(
+                "arg1".to_string(),
+                Position::new(1, 1, 1)
+            )))),
             pos: Position::new(1, 0, 0),
         })));
     test_expr_to_val(

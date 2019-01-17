@@ -2,38 +2,32 @@ let str_join = module{
     sep=" ",
     list=NULL,
 } => {
-    let joiner = macro(acc, item) => {
-        result = select (acc.out == ""), NULL, {
-            true = acc{
-                out="@@" % (acc.out,item),
-            },
-            false = acc{
-                out="@@@" % (acc.out, acc.sep, item),
-            },
+    let joiner = macro(acc, item) =>  select (acc.out == ""), NULL, {
+        true = acc{
+            out="@@" % (acc.out,item),
+        },
+        false = acc{
+            out="@@@" % (acc.out, acc.sep, item),
         },
     };
 
-    let result = (reduce joiner.result {sep=mod.sep, out=""}, (mod.list)).out;
+    let result = (reduce joiner {sep=mod.sep, out=""}, (mod.list)).out;
 };
 
 let len = module{
     list = NULL,
 } => {
-    let counter = macro(acc, item) => {
-        result = acc + 1,
-    };
+    let counter = macro(acc, item) =>  acc + 1;
 
-    let result = reduce counter.result 0, (mod.list);
+    let result = reduce counter 0, (mod.list);
 };
 
 let reverse = module{
     list = NULL,
 } => {
-    let reducer = macro(acc, item) => {
-        result = [item] + acc,
-    };
+    let reducer = macro(acc, item) =>  [item] + acc;
 
-    let result = reduce reducer.result [], (mod.list); 
+    let result = reduce reducer [], (mod.list); 
 };
 
 let enumerate = module{
@@ -41,13 +35,14 @@ let enumerate = module{
     step = 1,
     list = NULL,
 } => {
-    let reducer = macro(acc, item) => {
-        result = acc{count = acc.count + acc.step, list=acc.list + [[acc.count, item]]},
+    let reducer = macro(acc, item) =>  acc{
+        count = acc.count + acc.step,
+        list=acc.list + [[acc.count, item]],
     };
 
     let acc = {count=mod.start, list=[], step=mod.step};
 
-    let enumerated = reduce reducer.result acc, (mod.list);
+    let enumerated = reduce reducer acc, (mod.list);
     let result = enumerated.list;
 };
 
@@ -55,23 +50,19 @@ let zip = module{
     list1 = NULL,
     list2 = NULL,
 } => {
-    let counter = macro(acc, item) => {
-        result = acc + 1,
-    };
+    let counter = macro(acc, item) =>  acc + 1;
 
-    let len1 = reduce counter.result 0, (mod.list1);
-    let len2 = reduce counter.result 0, (mod.list2);
+    let len1 = reduce counter 0, (mod.list1);
+    let len2 = reduce counter 0, (mod.list2);
 
     let rng = select (len1 >= len2), NULL, {
         true = 0:(len1 - 1),
         false = 0:(len2 - 1),
     };
 
-    let reducer = macro(acc, item) => {
-        result = acc{
-            result = acc.result + [[acc.list1.(item), acc.list2.(item)]],
-            idxs = acc.idxs + [item]
-        },
+    let reducer = macro(acc, item) =>  acc{
+        result = acc.result + [[acc.list1.(item), acc.list2.(item)]],
+        idxs = acc.idxs + [item]
     };
 
     let acc = {
@@ -81,5 +72,5 @@ let zip = module{
         idxs = [],
     };
 
-    let result = (reduce reducer.result acc, rng).result;
+    let result = (reduce reducer acc, rng).result;
 };
