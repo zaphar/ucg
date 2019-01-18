@@ -184,3 +184,33 @@ assert {
     ok = (foo in {foo = NULL}),
     desc = "Null valued fields are still present in tuple",
 };
+
+assert {
+    ok = true && true == true,
+    desc = "&&: truth",
+};
+
+assert {
+    ok = true && false == false,
+    desc = "&&: propagates false",
+};
+
+assert {
+    ok = false && true == false,
+    desc = "&&:  propagates false part 2",
+};
+
+assert {
+    ok = true || false == true,
+    desc = "||: propagates true",
+};
+
+assert {
+    ok = false || true == true,
+    desc = "||: propagates true part 2",
+};
+
+assert {
+    ok = true || true == true,
+    desc = "||: likes truth",
+};

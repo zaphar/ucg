@@ -178,6 +178,13 @@ impl Val {
         return false;
     }
 
+    pub fn is_bool(&self) -> bool {
+        if let &Val::Boolean(_) = self {
+            return true;
+        }
+        return false;
+    }
+
     pub fn is_macro(&self) -> bool {
         if let &Val::Macro(_) = self {
             return true;

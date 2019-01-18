@@ -52,6 +52,18 @@ make_fn!(
     )
 );
 
+make_fn!(
+    bool_op_type<SliceIter<Token>, Element>,
+    either!(
+        do_each!(
+            _ => punct!("&&"),
+            (Element::Op(BinaryExprType::AND))),
+        do_each!(
+            _ => punct!("||"),
+            (Element::Op(BinaryExprType::OR)))
+    )
+);
+
 fn parse_expression(i: SliceIter<Element>) -> Result<SliceIter<Element>, Expression> {
     let mut i_ = i.clone();
     if eoi(i_.clone()).is_complete() {
@@ -67,6 +79,34 @@ fn parse_expression(i: SliceIter<Element>) -> Result<SliceIter<Element>, Express
     return Result::Fail(Error::new(
         format!(
             "Error while parsing Binary Expression Expected Expression got {:?}",
+            el
+        ),
+        Box::new(i_),
+    ));
+}
+
+fn parse_bool_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, BinaryExprType> {
+    let mut i_ = i.clone();
+    if eoi(i_.clone()).is_complete() {
+        return Result::Fail(Error::new(
+            format!("Expected Expression found End Of Input"),
+            Box::new(i_),
+        ));
+    }
+    let el = i_.next();
+    if let Some(&Element::Op(ref op)) = el {
+        match op {
+            BinaryExprType::AND | BinaryExprType::OR => {
+                return Result::Complete(i_.clone(), op.clone());
+            }
+            _other => {
+                // noop
+            }
+        };
+    }
+    return Result::Fail(Error::new(
+        format!(
+            "Error while parsing Binary Expression Unexpected Operator {:?}",
             el
         ),
         Box::new(i_),
@@ -243,7 +283,13 @@ fn parse_operand_list<'a>(i: SliceIter<'a, Token>) -> ParseResult<'a, Vec<Elemen
             }
         }
         // 3. Parse an operator.
-        match either!(_i.clone(), dot_op_type, math_op_type, compare_op_type) {
+        match either!(
+            _i.clone(),
+            dot_op_type,
+            math_op_type,
+            compare_op_type,
+            bool_op_type
+        ) {
             Result::Fail(e) => {
                 if firstrun {
                     // If we don't find an operator in our first
@@ -278,7 +324,8 @@ make_fn!(
         parse_dot_operator,
         parse_sum_operator,
         parse_product_operator,
-        parse_compare_operator
+        parse_compare_operator,
+        parse_bool_operator
     )
 );
 

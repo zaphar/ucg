@@ -392,6 +392,9 @@ pub enum BinaryExprType {
     Sub,
     Mul,
     Div,
+    // Boolean
+    AND,
+    OR,
     // Comparison
     Equal,
     GT,
@@ -428,8 +431,11 @@ impl BinaryExprType {
             // Product operators are next tightly bound
             BinaryExprType::Mul => 3,
             BinaryExprType::Div => 3,
+            // Boolean operators bind tighter than math
+            BinaryExprType::AND => 4,
+            BinaryExprType::OR => 4,
             // Dot operators are most tightly bound.
-            BinaryExprType::DOT => 4,
+            BinaryExprType::DOT => 5,
         }
     }
 }

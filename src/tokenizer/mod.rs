@@ -258,6 +258,14 @@ make_fn!(fatcommatok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, "=>")
 );
 
+make_fn!(andtok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, "&&")
+);
+
+make_fn!(ortok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, "||")
+);
+
 make_fn!(selecttok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "select", WS)
 );
@@ -376,6 +384,8 @@ fn token<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Token> {
         lparentok,
         rparentok,
         dottok,
+        andtok,
+        ortok,
         plustok,
         dashtok,
         startok,

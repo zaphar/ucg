@@ -52,3 +52,13 @@ assert {
     ok = 1 + tpl.one.two * 2 + 3 == 28,
     desc = "1 + tpl.one.two * 2 + 3 == 28",
 };
+
+assert {
+    ok = (1 == 1) && (1 != 1) == false,
+    desc = "(1 == 1) && (1 != 1) == true",
+};
+
+assert {
+    ok = (1 == 1) || (1 != 1) == true,
+    desc = "(1 == 1) && (1 != 1) == true",
+};

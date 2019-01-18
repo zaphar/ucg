@@ -815,6 +815,57 @@ impl<'a> FileBuilder<'a> {
         }
     }
 
+    fn do_bool_operator(
+        &self,
+        kind: &BinaryExprType,
+        left: &Expression,
+        right: &Expression,
+        scope: &Scope,
+    ) -> Result<Rc<Val>, Box<dyn Error>> {
+        let left_pos = left.pos();
+        let left = self.eval_expr(left, scope)?;
+        if let Val::Boolean(b) = left.as_ref() {
+            let right_pos = right.pos();
+            let b = *b;
+            if kind == &BinaryExprType::AND {
+                if !b {
+                    // short circuit
+                    return Ok(Rc::new(Val::Boolean(b)));
+                }
+                let right = self.eval_expr(right, scope)?;
+                if right.is_bool() {
+                    return Ok(right);
+                }
+            } else {
+                if b {
+                    // short circuit
+                    return Ok(Rc::new(Val::Boolean(b)));
+                }
+                let right = self.eval_expr(right, scope)?;
+                if right.is_bool() {
+                    return Ok(right);
+                }
+            }
+            return Err(Box::new(error::BuildError::new(
+                format!(
+                    "Expected boolean value for operator but got {}",
+                    left.type_name()
+                ),
+                error::ErrorType::TypeFail,
+                right_pos.clone(),
+            )));
+        } else {
+            return Err(Box::new(error::BuildError::new(
+                format!(
+                    "Expected boolean value for operator but got {}",
+                    left.type_name()
+                ),
+                error::ErrorType::TypeFail,
+                left_pos.clone(),
+            )));
+        }
+    }
+
     fn do_element_check(
         &self,
         left: &Expression,
@@ -901,6 +952,15 @@ impl<'a> FileBuilder<'a> {
             // TODO Should we support this operation on strings too?
             return self.do_element_check(&def.left, &def.right, scope);
         };
+        match kind {
+            // We special case the boolean operators because we want them to short circuit.
+            &BinaryExprType::AND | &BinaryExprType::OR => {
+                return self.do_bool_operator(kind, &def.left, &def.right, scope);
+            }
+            _ => {
+                // noop
+            }
+        }
         let left = self.eval_expr(&def.left, scope)?;
         let mut child_scope = scope.spawn_child();
         child_scope.set_curr_val(left.clone());
@@ -932,7 +992,10 @@ impl<'a> FileBuilder<'a> {
             &BinaryExprType::NotREMatch => {
                 self.eval_re_match(left, def.left.pos(), right, def.right.pos(), true)
             }
-            &BinaryExprType::IN | &BinaryExprType::DOT => panic!("Unreachable"),
+            &BinaryExprType::IN
+            | &BinaryExprType::DOT
+            | &BinaryExprType::AND
+            | &BinaryExprType::OR => panic!("Unreachable"),
         }
     }
 
