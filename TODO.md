@@ -1,8 +1,18 @@
 # Major Planned Features
 
-## Boolean operations and type
+## Compile Errors as expression
 
-* contains (for lists or strings)
+## String handling
+
+Mostly handled by ranges and indexing for strings?
+
+Type comparisons?
+
+```
+let foo = "foo";
+foo is str; // evaluates to true
+foo is int; // evaluates to false
+```
 
 ## Query Language (Experimental)
 

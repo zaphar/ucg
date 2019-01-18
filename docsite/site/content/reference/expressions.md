@@ -144,6 +144,16 @@ let lst = [1, "two", {three = 3}];
 {three = 3, two = 2} in lst // evaluates to false
 ```
 
+### Boolean Operators
+
+UCG has the standard boolean operators: `&&` and `||`. Both of them short circuit and they require the expressions on each
+side to be boolean.
+
+```
+true && false == false;
+false || true == true;
+```
+
 #### Operator Precedence
 
 UCG binary operators follow the typical operator precedence for math. `*` and
