@@ -1,6 +1,14 @@
+# Documentation TODO
+
+* Recursive Modules
+* Schema Checking With Modules
+
 # Major Planned Features
 
-## Compile Errors as expression
+## Standard Library
+
+* String processing
+* Schema checking.
 
 ## Query Language (Experimental)
 
@@ -8,8 +16,6 @@ You should be able to ask the compiler to tell you any value or set of values in
 compiled configuration.
 
 Inspect is probably the correct location for this.
-
-## Shape equality as a form of type assertion?
 
 # Minor Fixes and Polish
 
@@ -19,11 +25,6 @@ Inspect is probably the correct location for this.
 * Better error messages.
 * Flags should allow different seperators for prefixed flags.
 * HCL export
-
-# Documentation TODO
-
-* Recursive Modules
-* Schema Checking With Modules
 
 # Release Checklist
 
