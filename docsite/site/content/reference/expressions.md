@@ -164,9 +164,19 @@ Type test expressions
 ---------------------
 
 ucg has the `is` operator for testing that something is of a given base type.
+The type must be a string literal matching one of:
+
+* `"null"`
+* `"str"`
+* `"int"`
+* `"float"`
+* `"tuple"`
+* `"list"`
+* `"macro"`
+* `"module"`
 
 ```
-("foo" is str) == true;
+("foo" is "str") == true;
 ```
 
 Copy Expressions

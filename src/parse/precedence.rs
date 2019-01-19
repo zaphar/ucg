@@ -20,6 +20,17 @@ use abortable_parser::{Error, Peekable, Result, SliceIter};
 use super::{non_op_expression, ParseResult};
 use crate::ast::*;
 
+macro_rules! abort_on_end {
+    ($i:expr) => {{
+        if eoi($i.clone()).is_complete() {
+            return Result::Fail(Error::new(
+                format!("Expected Expression found End Of Input"),
+                Box::new($i.clone()),
+            ));
+        }
+    }};
+}
+
 /// Defines the intermediate stages of our bottom up parser for precedence parsing.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Element {
@@ -66,12 +77,7 @@ make_fn!(
 
 fn parse_expression(i: SliceIter<Element>) -> Result<SliceIter<Element>, Expression> {
     let mut i_ = i.clone();
-    if eoi(i_.clone()).is_complete() {
-        return Result::Abort(Error::new(
-            "Expected Expression found End Of Input",
-            Box::new(i_),
-        ));
-    }
+    abort_on_end!(i_);
     let el = i_.next();
     if let Some(&Element::Expr(ref expr)) = el {
         return Result::Complete(i_.clone(), expr.clone());
@@ -87,12 +93,7 @@ fn parse_expression(i: SliceIter<Element>) -> Result<SliceIter<Element>, Express
 
 fn parse_bool_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, BinaryExprType> {
     let mut i_ = i.clone();
-    if eoi(i_.clone()).is_complete() {
-        return Result::Fail(Error::new(
-            format!("Expected Expression found End Of Input"),
-            Box::new(i_),
-        ));
-    }
+    abort_on_end!(i_);
     let el = i_.next();
     if let Some(&Element::Op(ref op)) = el {
         match op {
@@ -115,12 +116,7 @@ fn parse_bool_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, Bina
 
 fn parse_dot_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, BinaryExprType> {
     let mut i_ = i.clone();
-    if eoi(i_.clone()).is_complete() {
-        return Result::Fail(Error::new(
-            format!("Expected Expression found End Of Input"),
-            Box::new(i_),
-        ));
-    }
+    abort_on_end!(i_);
     let el = i_.next();
     if let Some(&Element::Op(ref op)) = el {
         match op {
@@ -143,12 +139,7 @@ fn parse_dot_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, Binar
 
 fn parse_sum_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, BinaryExprType> {
     let mut i_ = i.clone();
-    if eoi(i_.clone()).is_complete() {
-        return Result::Fail(Error::new(
-            format!("Expected Expression found End Of Input"),
-            Box::new(i_),
-        ));
-    }
+    abort_on_end!(i_);
     let el = i_.next();
     if let Some(&Element::Op(ref op)) = el {
         match op {
@@ -174,12 +165,7 @@ fn parse_sum_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, Binar
 
 fn parse_product_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, BinaryExprType> {
     let mut i_ = i.clone();
-    if eoi(i_.clone()).is_complete() {
-        return Result::Fail(Error::new(
-            format!("Expected Expression found End Of Input"),
-            Box::new(i_),
-        ));
-    }
+    abort_on_end!(i_);
     let el = i_.next();
     if let Some(&Element::Op(ref op)) = el {
         match op {
@@ -214,18 +200,14 @@ make_fn!(
         do_each!(_ => punct!(">="), (Element::Op(BinaryExprType::GTEqual))),
         do_each!(_ => punct!("<"),  (Element::Op(BinaryExprType::LT))),
         do_each!(_ => punct!(">"),  (Element::Op(BinaryExprType::GT))),
-        do_each!(_ => word!("in"),  (Element::Op(BinaryExprType::IN)))
+        do_each!(_ => word!("in"),  (Element::Op(BinaryExprType::IN))),
+        do_each!(_ => word!("is"),  (Element::Op(BinaryExprType::IS)))
     )
 );
 
 fn parse_compare_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, BinaryExprType> {
     let mut i_ = i.clone();
-    if eoi(i_.clone()).is_complete() {
-        return Result::Fail(Error::new(
-            format!("Expected Expression found End Of Input"),
-            Box::new(i_),
-        ));
-    }
+    abort_on_end!(i_);
     let el = i_.next();
     if let Some(&Element::Op(ref op)) = el {
         match op {
@@ -237,6 +219,7 @@ fn parse_compare_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, B
             | &BinaryExprType::REMatch
             | &BinaryExprType::NotREMatch
             | &BinaryExprType::Equal
+            | &BinaryExprType::IS
             | &BinaryExprType::IN => {
                 return Result::Complete(i_.clone(), op.clone());
             }

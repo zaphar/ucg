@@ -650,21 +650,6 @@ make_fn!(
     )
 );
 
-make_fn!(
-    is_type_expression<SliceIter<Token>, Expression>,
-    do_each!(
-        pos  => pos,
-        expr => non_op_expression,
-        _    => word!("is"),
-        typ => must!(match_type!(BAREWORD)),
-        (Expression::IS(IsDef{
-            pos: pos,
-            target: Box::new(expr),
-            typ: typ,
-        }))
-    )
-);
-
 fn unprefixed_expression(input: SliceIter<Token>) -> ParseResult<Expression> {
     let _input = input.clone();
     either!(
@@ -693,7 +678,7 @@ make_fn!(
 
 fn expression(input: SliceIter<Token>) -> ParseResult<Expression> {
     let _input = input.clone();
-    match trace_parse!(_input, either!(is_type_expression, op_expression)) {
+    match trace_parse!(_input, op_expression) {
         Result::Incomplete(i) => Result::Incomplete(i),
         Result::Fail(_) => trace_parse!(input, non_op_expression),
         Result::Abort(e) => Result::Abort(e),

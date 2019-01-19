@@ -350,7 +350,7 @@ impl<'a> FileBuilder<'a> {
     fn check_reserved_word(name: &str) -> bool {
         match name {
             "self" | "assert" | "true" | "false" | "let" | "import" | "as" | "select" | "macro"
-            | "module" | "env" | "map" | "filter" | "NULL" | "out" => true,
+            | "module" | "env" | "map" | "filter" | "NULL" | "out" | "in" | "is" => true,
             _ => false,
         }
     }
@@ -952,7 +952,10 @@ impl<'a> FileBuilder<'a> {
         if let &BinaryExprType::IN = kind {
             // TODO Should we support this operation on strings too?
             return self.do_element_check(&def.left, &def.right, scope);
-        };
+        }
+        if let &BinaryExprType::IS = kind {
+            return self.eval_is_check(def, scope);
+        }
         match kind {
             // We special case the boolean operators because we want them to short circuit.
             &BinaryExprType::AND | &BinaryExprType::OR => {
@@ -994,6 +997,7 @@ impl<'a> FileBuilder<'a> {
                 self.eval_re_match(left, def.left.pos(), right, def.right.pos(), true)
             }
             &BinaryExprType::IN
+            | &BinaryExprType::IS
             | &BinaryExprType::DOT
             | &BinaryExprType::AND
             | &BinaryExprType::OR => panic!("Unreachable"),
@@ -1702,9 +1706,23 @@ impl<'a> FileBuilder<'a> {
         Ok(Rc::new(Val::List(vec)))
     }
 
-    pub fn eval_is_check(&self, def: &IsDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
-        let val = self.eval_expr(def.target.as_ref(), scope)?;
-        let result = match def.typ.fragment.as_str() {
+    pub fn eval_is_check(
+        &self,
+        def: &BinaryOpDef,
+        scope: &Scope,
+    ) -> Result<Rc<Val>, Box<dyn Error>> {
+        let typ = match def.right.as_ref() {
+            Expression::Simple(Value::Str(ref s)) => s.val.clone(),
+            _ => {
+                return Err(Box::new(error::BuildError::new(
+                    format!("Expected string expression but got {}", def.right),
+                    error::ErrorType::TypeFail,
+                    def.right.pos().clone(),
+                )));
+            }
+        };
+        let val = self.eval_expr(def.left.as_ref(), scope)?;
+        let result = match typ.as_str() {
             "str" => val.is_str(),
             "bool" => val.is_bool(),
             "null" => val.is_empty(),
@@ -1718,7 +1736,7 @@ impl<'a> FileBuilder<'a> {
                 return Err(Box::new(error::BuildError::new(
                     format!("Expected valid type name but got {}", other),
                     error::ErrorType::TypeFail,
-                    def.pos.clone(),
+                    def.right.pos().clone(),
                 )));
             }
         };
@@ -1748,7 +1766,6 @@ impl<'a> FileBuilder<'a> {
             &Expression::FuncOp(ref def) => self.eval_func_op(def, scope),
             &Expression::Include(ref def) => self.eval_include(def),
             &Expression::Import(ref def) => self.eval_import(def),
-            &Expression::IS(ref def) => self.eval_is_check(def, scope),
         }
     }
 }

@@ -1,51 +1,63 @@
 let t = import "std/testing.ucg".asserts{};
 
 assert t.ok{
-    test = "foo" is str,
+    test = "foo" is "str",
     desc = "foo is a str",
 };
 
 assert t.not_ok{
-    test = "foo" is int,
+    test = "foo" is "int",
     desc = "foo is not an int",
 };
 
 assert t.ok{
-    test = {foo="bar"} is tuple,
+    test = {foo="bar"} is "tuple",
     desc = "found a tuple",
 };
 
 assert t.not_ok{
-    test = {foo="bar"} is str,
+    test = {foo="bar"} is "str",
     desc = "a tuple is not a str",
 };
 
 assert t.ok{
-    test = [1, 2] is list,
+    test = [1, 2] is "list",
     desc = "found a list",
 };
 
 assert t.not_ok{
-    test = [1, 2] is tuple,
+    test = [1, 2] is "tuple",
     desc = "list is not a tuple",
 };
 
 assert t.ok{
-    test = (macro(arg) => arg) is macro,
+    test = (macro(arg) => arg) is "macro",
     desc = "found a macro",
 };
 
 assert t.not_ok{
-    test = (macro(arg) => arg) is list,
+    test = (macro(arg) => arg) is "list",
     desc = "a macro is not a list",
 };
 
 assert t.ok{
-    test = (module{} => {}) is module,
+    test = (module{} => {}) is "module",
     desc = "found a module",
 };
 
 assert t.not_ok{
-    test = module{} => {} is macro,
+    test = module{} => {} is "macro",
     desc = "a module is not a macro",
+};
+
+let foo_check = macro(val) => (foo in val) && (val.foo is "str");
+
+assert t.ok{
+    test = foo_check({foo="bar"}),
+    desc = "we can check for foo string fields",
+};
+
+assert t.not_ok{
+    test = foo_check({bar="foo"}),
+    desc = "we can check for absent foo string fields",
 };

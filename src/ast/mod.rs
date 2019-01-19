@@ -405,6 +405,7 @@ pub enum BinaryExprType {
     REMatch,
     NotREMatch,
     IN,
+    IS,
     // Selector operator
     DOT,
 }
@@ -424,18 +425,19 @@ impl BinaryExprType {
             BinaryExprType::LT => 1,
             BinaryExprType::REMatch => 1,
             BinaryExprType::NotREMatch => 1,
-            BinaryExprType::IN => 1,
+            BinaryExprType::IN => 2,
+            BinaryExprType::IS => 2,
             // Sum operators are next least tightly bound
-            BinaryExprType::Add => 2,
-            BinaryExprType::Sub => 2,
+            BinaryExprType::Add => 3,
+            BinaryExprType::Sub => 3,
             // Product operators are next tightly bound
-            BinaryExprType::Mul => 3,
-            BinaryExprType::Div => 3,
+            BinaryExprType::Mul => 4,
+            BinaryExprType::Div => 4,
             // Boolean operators bind tighter than math
-            BinaryExprType::AND => 4,
-            BinaryExprType::OR => 4,
+            BinaryExprType::AND => 5,
+            BinaryExprType::OR => 5,
             // Dot operators are most tightly bound.
-            BinaryExprType::DOT => 5,
+            BinaryExprType::DOT => 6,
         }
     }
 }
@@ -602,9 +604,6 @@ pub enum Expression {
     // Binary expressions
     Binary(BinaryOpDef),
 
-    // Type tests
-    IS(IsDef),
-
     // Complex Expressions
     Copy(CopyDef),
     Range(RangeDef),
@@ -637,7 +636,6 @@ impl Expression {
             &Expression::FuncOp(ref def) => def.pos(),
             &Expression::Include(ref def) => &def.pos,
             &Expression::Import(ref def) => &def.pos,
-            &Expression::IS(ref def) => &def.pos,
         }
     }
 }
@@ -680,9 +678,6 @@ impl fmt::Display for Expression {
             }
             &Expression::Include(_) => {
                 write!(w, "<Include>")?;
-            }
-            &Expression::IS(_) => {
-                write!(w, "<IS>")?;
             }
             &Expression::Import(_) => {
                 write!(w, "<Include>")?;
