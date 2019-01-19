@@ -187,7 +187,7 @@ impl Scope {
                     format!("Invalid idx type {} for list lookup", field),
                     error::ErrorType::TypeFail,
                     pos.clone(),
-                )))
+                )));
             }
         };
         if idx < elems.len() {

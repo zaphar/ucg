@@ -299,7 +299,7 @@ Functional processing expressions
 ---------------------------------
 
 UCG has a few functional processing expressions called `map`, `filter`, and
-`reduce`. All of them can process a list or tuple.
+`reduce`. All of them can process a string, list, or tuple.
 
 Their syntax starts with either `map` `filter`, or `reduce followed by a symbol
 that references a valid macro and finally an expression that resolves to either

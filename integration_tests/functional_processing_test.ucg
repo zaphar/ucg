@@ -46,6 +46,13 @@ assert {
     desc = "map mapper [1, 2, 3, 4] == [2, 3, 4, 5]",
 };
 
+let s_mapper = macro(arg) => arg + ",";
+
+assert {
+    ok = map s_mapper "foo" == "f,o,o,",
+    desc = "we can map over each character",
+};
+
 assert {
     ok = filter filtrator list2 == ["foo", "foo"],
     desc = "filter filtrator list2 == [\"foo\", \"foo\"]",
@@ -102,6 +109,13 @@ assert {
     desc = "filter tpl_filter test_tpl == { quux = \"baz\" }",
 };
 
+let o_str_filter = macro(s) => s != "o";
+
+assert {
+    ok = filter o_str_filter "foobar" == "fbar",
+    desc = "We can strip out characters",
+};
+
 let tpl_reducer = macro(acc, name, val) => acc{
         keys = self.keys + [name],
         vals = self.vals + [val],
@@ -110,4 +124,18 @@ let tpl_reducer = macro(acc, name, val) => acc{
 assert {
     ok = reduce tpl_reducer {keys = [], vals = []}, test_tpl == {keys = ["foo", "quux"], vals = ["bar", "baz"]},
     desc = "reduce tpl_reducer {keys = [], vals = []}, test_tpl == {keys = [\"foo\", \"quux\"], vals = [\"bar\", \"baz\"]}",
+};
+
+let str_identity_reducer = macro(acc, s) => acc + s;
+
+assert {
+    ok = reduce str_identity_reducer "", "foo" == "foo",
+    desc = "identity reducer copies string",
+};
+
+let char_iter = macro(acc, s) => acc + [s];
+
+assert {
+    ok = reduce char_iter [], "foo" == ["f", "o", "o"],
+    desc = "we can split a string into grapheme clusters",
 };

@@ -158,7 +158,7 @@ impl ExecConverter {
                                 "Exec args must be a list of strings or tuples of strings.",
                                 ErrorType::TypeFail,
                                 Position::new(0, 0, 0),
-                            )))
+                            )));
                         }
                     }
                 }

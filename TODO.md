@@ -2,18 +2,6 @@
 
 ## Compile Errors as expression
 
-## String handling
-
-Mostly handled by ranges and indexing for strings?
-
-Type comparisons?
-
-```
-let foo = "foo";
-foo is str; // evaluates to true
-foo is int; // evaluates to false
-```
-
 ## Query Language (Experimental)
 
 You should be able to ask the compiler to tell you any value or set of values in the

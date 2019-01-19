@@ -31,7 +31,7 @@ fn is_symbol_char<'a>(i: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, u8> {
             return Result::Fail(Error::new(
                 "Unexpected End of Input".to_string(),
                 Box::new(_i.clone()),
-            ))
+            ));
         }
     };
     if (c as char).is_ascii_alphanumeric() || c == b'-' || c == b'_' {

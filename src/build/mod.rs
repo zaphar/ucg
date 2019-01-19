@@ -27,6 +27,7 @@ use std::string::ToString;
 
 use regex;
 use simple_error;
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::ast::*;
 use crate::build::scope::{find_in_fieldlist, Scope, ValueMap};
@@ -1375,10 +1376,17 @@ impl<'a> FileBuilder<'a> {
                     acc = result;
                 }
             }
+            &Val::Str(ref s) => {
+                for gc in s.graphemes(true) {
+                    let argvals = vec![acc.clone(), Rc::new(Val::Str(gc.to_string()))];
+                    let result = macdef.eval(self.file.clone(), self, argvals)?;
+                    acc = result;
+                }
+            }
             other => {
                 return Err(Box::new(error::BuildError::new(
                     format!(
-                        "Expected List or Tuple as target but got {:?}",
+                        "Expected List Str, or Tuple as target but got {:?}",
                         other.type_name()
                     ),
                     error::ErrorType::TypeFail,
@@ -1387,6 +1395,56 @@ impl<'a> FileBuilder<'a> {
             }
         }
         Ok(acc)
+    }
+
+    fn eval_functional_string_processing(
+        &self,
+        s: &str,
+        def: &MacroDef,
+        typ: ProcessingOpType,
+    ) -> Result<Rc<Val>, Box<dyn Error>> {
+        let mut result = String::new();
+        for gc in s.graphemes(true) {
+            let arg = Rc::new(Val::Str(gc.to_string()));
+            let out = def.eval(self.file.clone(), self, vec![arg])?;
+            match typ {
+                ProcessingOpType::Filter => {
+                    match out.as_ref() {
+                        Val::Boolean(b) => {
+                            if *b {
+                                result.push_str(gc);
+                            }
+                        }
+                        Val::Empty => {
+                            // noop
+                        }
+                        _ => {
+                            return Err(Box::new(error::BuildError::new(
+                                format!(
+                                    "Expected boolean or NULL for filter return but got {}",
+                                    out.type_name()
+                                ),
+                                error::ErrorType::TypeFail,
+                                def.pos.clone(),
+                            )));
+                        }
+                    }
+                }
+                ProcessingOpType::Map => match out.as_ref() {
+                    Val::Str(s) => {
+                        result.push_str(&s);
+                    }
+                    _ => {
+                        return Err(Box::new(error::BuildError::new(
+                            format!("Expected string map return but got {}", out.type_name()),
+                            error::ErrorType::TypeFail,
+                            def.pos.clone(),
+                        )));
+                    }
+                },
+            }
+        }
+        Ok(Rc::new(Val::Str(result)))
     }
 
     fn eval_functional_processing(
@@ -1410,6 +1468,8 @@ impl<'a> FileBuilder<'a> {
         return match maybe_target.as_ref() {
             &Val::List(ref elems) => self.eval_functional_list_processing(elems, macdef, typ),
             &Val::Tuple(ref fs) => self.eval_functional_tuple_processing(fs, macdef, typ),
+            // TODO(jwall): Strings?
+            &Val::Str(ref s) => self.eval_functional_string_processing(s, macdef, typ),
             other => Err(Box::new(error::BuildError::new(
                 format!(
                     "Expected List or Tuple as target but got {:?}",
