@@ -16,3 +16,6 @@ stdlibtest: integration
 
 install: test
 	cargo install --path . --force
+
+publish: build test
+	cargo publish
