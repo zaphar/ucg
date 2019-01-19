@@ -492,4 +492,17 @@ let embedded_with_params = embedded_mod{deep_value = "Some"};
 embedded_with_params.embedded.value == "Some";
 ```
 
+Fail Expression
+---------------
+
+UCG has a way to declaratively trigger a build failure using the `fail` expression.
+
+Fail expression start with the `fail` keyword and are followed with either a string or a format expression with the build failure message.
+
+```
+fail "Oh No This was not what we wanted!";
+
+fail "Expected foo but got @" % ("bar");
+```
+
 Next: <a href="/reference/statements">Statements</a>

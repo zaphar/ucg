@@ -56,8 +56,10 @@ module_keyword: "module" ;
 mod_keyword: "mod" ;
 out_keyword: "out" ;
 assert_keyword: "assert" ;
+fail_keyword: "fail" ;
 null_keyword: "NULL" ;
 in_keyword: "in" ;
+is_keyword: "in" ;
 escaped: "\", VISIBLE_CHAR ;
 str: quot, { escaped | UTF8_CHAR }, quot ;
 float: (DIGIT+, dot, { DIGIT }) | (dot, DIGIT+) ;
@@ -158,6 +160,13 @@ include_expr: include_keyword, bareword, str ;
 ```
 import_expr: import_keyword, str ;
 ```
+
+#### Fail expressions
+
+```
+fail_expr: fail_keyword, (str | format_expr) ;
+```
+
 #### Non Operator Expression
 
 ```
@@ -166,6 +175,7 @@ non_operator_expr: literal
                    | import_expr
                    | macrodef
                    | module_def
+                   | fail_expr
                    | format_expr
                    | range_expr
                    | include_expr
@@ -179,7 +189,7 @@ non_operator_expr: literal
 ```
 sum_op: plus | minus ;
 product_op: start | slash ;
-compare_op: equalequal | gtequal | ltequal | gt | lt | in_keyword ;
+compare_op: equalequal | gtequal | ltequal | gt | lt | in_keyword | is_keyword ;
 binary_op: sum_op | product_op | dot | compare_op ;
 binary_expr: non_operator_expr, binary_op, expr ;
 ```
