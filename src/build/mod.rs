@@ -1711,11 +1711,12 @@ impl<'a> FileBuilder<'a> {
         def: &BinaryOpDef,
         scope: &Scope,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
-        let typ = match def.right.as_ref() {
-            Expression::Simple(Value::Str(ref s)) => s.val.clone(),
+        let tval = self.eval_expr(def.right.as_ref(), scope)?;
+        let typ = match tval.as_ref() {
+            Val::Str(ref s) => s.clone(),
             _ => {
                 return Err(Box::new(error::BuildError::new(
-                    format!("Expected string expression but got {}", def.right),
+                    format!("Expected string expression but got {}", tval),
                     error::ErrorType::TypeFail,
                     def.right.pos().clone(),
                 )));

@@ -20,3 +20,22 @@ assert t.equal{
     left = tpl.strip_nulls{tpl={foo="bar", bar=NULL}}.result,
     right = {foo="bar"},
 };
+
+assert t.ok{
+    test = tpl.has_fields{tpl={foo=1, bar=2}, fields=["foo", "bar"]}.result,
+    desc = "tuple has fields has foo and bar fields",
+};
+
+assert t.not_ok{
+    test = tpl.has_fields{tpl={blah=1, bar=2}, fields=["foo", "bar"]}.result,
+    desc = "tuple does not have fields foo and bar",
+};
+
+assert t.ok{
+    test = tpl.field_type{
+        tpl={foo=1},
+        field="foo",
+        type="int",
+    }.result,
+    desc = "tuple has field of type int",
+};

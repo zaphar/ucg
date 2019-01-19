@@ -1,8 +1,15 @@
+let assert_tuple = macro(tpl) => select tpl is "tuple", NULL, {
+    false = fail "@ is not a tuple" % (tpl),
+};
 
 // return a list of the fields in a tuple.
 let fields = module{
     tpl = NULL,
 } => {
+    let assert_tuple = import "std/tuples.ucg".assert_tuple;
+    // First we check that mod.tpl is a tuple.
+    assert_tuple(mod.tpl);
+    
     let reducer = macro(acc, field, value) =>  acc + [field];
 
     let result = reduce reducer [], (mod.tpl);
@@ -12,6 +19,10 @@ let fields = module{
 let values = module{
     tpl = NULL,
 } => {
+    let assert_tuple = import "std/tuples.ucg".assert_tuple;
+    // First we check that mod.tpl is a tuple.
+    assert_tuple(mod.tpl);
+    
     let reducer = macro(acc, field, value) =>  acc + [value];
 
     let result = reduce reducer [], (mod.tpl);
@@ -20,6 +31,10 @@ let values = module{
 let iter = module{
     tpl = NULL,
 } => {
+    let assert_tuple = import "std/tuples.ucg".assert_tuple;
+    // First we check that mod.tpl is a tuple.
+    assert_tuple(mod.tpl);
+    
     let reducer = macro(acc, field, value) =>  acc + [[field, value]];
     
     let result = reduce reducer [], (mod.tpl);
@@ -28,7 +43,59 @@ let iter = module{
 let strip_nulls = module{
     tpl = NULL,
 } => {
+    let assert_tuple = import "std/tuples.ucg".assert_tuple;
+    // First we check that mod.tpl is a tuple.
+    assert_tuple(mod.tpl);
+    
     let filterer = macro(name, value) =>  value != NULL;
 
     let result = filter filterer (mod.tpl);
+};
+
+let has_fields = module{
+    tpl = NULL,
+    fields = [],
+} => {
+    let lib = import "std/tuples.ucg";
+    // First we check that mod.tpl is a tuple.
+    lib.assert_tuple(mod.tpl);
+
+    let fs = lib.fields{tpl=mod.tpl}.result;
+
+    let reducer = macro(acc, f) => acc && (f in fs);
+
+    let result = reduce reducer true, (mod.fields);
+};
+
+let field_type = module{
+    tpl = NULL,
+    field = NULL,
+    type = NULL,
+} => {
+    let lib = import "std/tuples.ucg";
+    // First we check that mod.tpl is a tuple.
+    lib.assert_tuple(mod.tpl);
+
+    // Next we assert that mod.field is a string.
+    select mod.field is "str", NULL, {
+        false = fail "@ is not a string" % (mod.field),
+    };
+
+    // and finally that mod.type is a string
+    select mod.type is "str", NULL, {
+        false = fail "@ is not a string" % (mod.type),
+    };
+
+    let has_field = lib.has_fields{tpl=mod.tpl, fields=[mod.field]}.result; 
+    
+    let it = lib.iter{tpl=mod.tpl}.result;
+    
+    let reducer = macro(acc, l) => acc && (select l.0 == mod.field, NULL, {
+        true = l.1 is mod.type, // if this is the field then we propagate if it's the right type.
+        false = true, // if this isn't the field then we propagate true
+    });
+
+    let is_type = reduce reducer true, it;
+
+    let result = has_field && is_type;
 };

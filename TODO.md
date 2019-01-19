@@ -20,6 +20,11 @@ Inspect is probably the correct location for this.
 * Flags should allow different seperators for prefixed flags.
 * HCL export
 
+# Documentation TODO
+
+* Recursive Modules
+* Schema Checking With Modules
+
 # Release Checklist
 
 * Cargo test
