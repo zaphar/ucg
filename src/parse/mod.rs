@@ -650,6 +650,27 @@ make_fn!(
     )
 );
 
+make_fn!(
+    string_expression<SliceIter<Token>, Expression>,
+    do_each!(
+        val => trace_parse!(quoted_value),
+        (value_to_expression(val))
+    )
+);
+
+make_fn!(
+    fail_expression<SliceIter<Token>, Expression>,
+    do_each!(
+        pos => pos,
+        _ => word!("fail"),
+        msg => must!(wrap_err!(either!(format_expression, string_expression), "Expected failure message")),
+        (Expression::Fail(FailDef{
+            pos: pos,
+            message: Box::new(msg),
+        }))
+    )
+);
+
 fn unprefixed_expression(input: SliceIter<Token>) -> ParseResult<Expression> {
     let _input = input.clone();
     either!(
@@ -668,6 +689,7 @@ make_fn!(
         trace_parse!(func_op_expression),
         trace_parse!(macro_expression),
         trace_parse!(import_expression),
+        trace_parse!(fail_expression),
         trace_parse!(module_expression),
         trace_parse!(select_expression),
         trace_parse!(grouped_expression),

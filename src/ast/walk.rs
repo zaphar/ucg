@@ -111,7 +111,7 @@ impl<'a> AstWalker<'a> {
             Expression::Simple(ref mut val) => {
                 self.visit_value(val);
             }
-            Expression::Import(_) | Expression::Include(_) => {
+            Expression::Import(_) | Expression::Include(_) | Expression::Fail(_) => {
                 //noop
             }
         }

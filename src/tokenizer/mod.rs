@@ -278,6 +278,10 @@ make_fn!(istok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "is", WS)
 );
 
+make_fn!(failtok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::BAREWORD, "fail", WS)
+);
+
 make_fn!(macrotok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "macro", WS)
 );
@@ -417,6 +421,7 @@ fn token<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Token> {
         outtok,
         selecttok,
         asserttok,
+        failtok,
         macrotok,
         moduletok,
         importtok,

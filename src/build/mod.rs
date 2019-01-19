@@ -1766,6 +1766,25 @@ impl<'a> FileBuilder<'a> {
             &Expression::FuncOp(ref def) => self.eval_func_op(def, scope),
             &Expression::Include(ref def) => self.eval_include(def),
             &Expression::Import(ref def) => self.eval_import(def),
+            &Expression::Fail(ref def) => {
+                let err = self.eval_expr(&def.message, scope)?;
+                return if let Val::Str(ref s) = err.as_ref() {
+                    Err(Box::new(error::BuildError::new(
+                        s.clone(),
+                        error::ErrorType::UserDefined,
+                        def.pos.clone(),
+                    )))
+                } else {
+                    Err(Box::new(error::BuildError::new(
+                        format!(
+                            "Expected string form message but got {}",
+                            def.message.as_ref()
+                        ),
+                        error::ErrorType::TypeFail,
+                        def.message.pos().clone(),
+                    )))
+                };
+            }
         }
     }
 }

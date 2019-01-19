@@ -595,6 +595,12 @@ pub struct IsDef {
     pub typ: Token,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct FailDef {
+    pub pos: Position,
+    pub message: Box<Expression>,
+}
+
 /// Encodes a ucg expression. Expressions compute a value from.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
@@ -617,6 +623,9 @@ pub enum Expression {
     Select(SelectDef),
     FuncOp(FuncOpDef),
     Module(ModuleDef),
+
+    // Declarative failure expressions
+    Fail(FailDef),
 }
 
 impl Expression {
@@ -636,6 +645,7 @@ impl Expression {
             &Expression::FuncOp(ref def) => def.pos(),
             &Expression::Include(ref def) => &def.pos,
             &Expression::Import(ref def) => &def.pos,
+            &Expression::Fail(ref def) => &def.pos,
         }
     }
 }
@@ -681,6 +691,9 @@ impl fmt::Display for Expression {
             }
             &Expression::Import(_) => {
                 write!(w, "<Include>")?;
+            }
+            &Expression::Fail(_) => {
+                write!(w, "<Fail>")?;
             }
         }
         Ok(())

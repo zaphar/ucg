@@ -101,3 +101,21 @@ fn test_format() {
 fn test_type_checks() {
     assert_build(include_str!("../../integration_tests/types_test.ucg"));
 }
+
+#[test]
+#[should_panic(expected = "UserDefined")]
+fn test_declarative_failures_are_user_defined() {
+    assert_build("fail \"I am a failure!\";");
+}
+
+#[test]
+#[should_panic(expected = "Caused By:\n\tI am a failure!")]
+fn test_declarative_failures_are_caused_by_msg() {
+    assert_build("fail \"I am a failure!\";");
+}
+
+#[test]
+#[should_panic(expected = "1 is a failure!")]
+fn test_declarative_failures_can_with_format_expr() {
+    assert_build("fail \"@ is a failure!\" % (1);");
+}
