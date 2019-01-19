@@ -518,7 +518,7 @@ impl<'a> FileBuilder<'a> {
             }
             Val::Str(ref s) => match right.as_ref() {
                 &Val::Str(ref ss) => {
-                    return Ok(Rc::new(Val::Str([s.to_string(), ss.clone()].concat())))
+                    return Ok(Rc::new(Val::Str([s.to_string(), ss.clone()].concat())));
                 }
                 val => {
                     return Err(Box::new(error::BuildError::new(
@@ -531,7 +531,7 @@ impl<'a> FileBuilder<'a> {
                         ),
                         error::ErrorType::TypeFail,
                         pos.clone(),
-                    )))
+                    )));
                 }
             },
             Val::List(ref l) => match right.as_ref() {
@@ -552,7 +552,7 @@ impl<'a> FileBuilder<'a> {
                         ),
                         error::ErrorType::TypeFail,
                         pos.clone(),
-                    )))
+                    )));
                 }
             },
             ref expr => {
@@ -560,7 +560,7 @@ impl<'a> FileBuilder<'a> {
                     format!("{} does not support the '+' operation", expr.type_name()),
                     error::ErrorType::Unsupported,
                     pos.clone(),
-                )))
+                )));
             }
         }
     }
@@ -583,7 +583,7 @@ impl<'a> FileBuilder<'a> {
                     format!("{} does not support the '-' operation", expr.type_name()),
                     error::ErrorType::Unsupported,
                     pos.clone(),
-                )))
+                )));
             }
         }
     }
@@ -606,7 +606,7 @@ impl<'a> FileBuilder<'a> {
                     format!("{} does not support the '*' operation", expr.type_name()),
                     error::ErrorType::Unsupported,
                     pos.clone(),
-                )))
+                )));
             }
         }
     }
@@ -629,7 +629,7 @@ impl<'a> FileBuilder<'a> {
                     format!("{} does not support the '*' operation", expr.type_name()),
                     error::ErrorType::Unsupported,
                     pos.clone(),
-                )))
+                )));
             }
         }
     }
@@ -1530,7 +1530,7 @@ impl<'a> FileBuilder<'a> {
                     format!("Error finding file {} {}", path, e),
                     error::ErrorType::TypeFail,
                     pos.clone(),
-                )))
+                )));
             }
         };
         let mut f = match File::open(&normalized) {
@@ -1540,7 +1540,7 @@ impl<'a> FileBuilder<'a> {
                     format!("Error opening file {} {}", normalized.to_string_lossy(), e),
                     error::ErrorType::TypeFail,
                     pos.clone(),
-                )))
+                )));
             }
         };
         let mut contents = String::new();
@@ -1642,6 +1642,29 @@ impl<'a> FileBuilder<'a> {
         Ok(Rc::new(Val::List(vec)))
     }
 
+    pub fn eval_is_check(&self, def: &IsDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
+        let val = self.eval_expr(def.target.as_ref(), scope)?;
+        let result = match def.typ.fragment.as_str() {
+            "str" => val.is_str(),
+            "bool" => val.is_bool(),
+            "null" => val.is_empty(),
+            "int" => val.is_int(),
+            "float" => val.is_float(),
+            "tuple" => val.is_tuple(),
+            "list" => val.is_list(),
+            "macro" => val.is_macro(),
+            "module" => val.is_module(),
+            other => {
+                return Err(Box::new(error::BuildError::new(
+                    format!("Expected valid type name but got {}", other),
+                    error::ErrorType::TypeFail,
+                    def.pos.clone(),
+                )));
+            }
+        };
+        Ok(Rc::new(Val::Boolean(result)))
+    }
+
     // Evals a single Expression in the context of a running Builder.
     // It does not mutate the builders collected state at all.
     pub fn eval_expr(&self, expr: &Expression, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
@@ -1665,6 +1688,7 @@ impl<'a> FileBuilder<'a> {
             &Expression::FuncOp(ref def) => self.eval_func_op(def, scope),
             &Expression::Include(ref def) => self.eval_include(def),
             &Expression::Import(ref def) => self.eval_import(def),
+            &Expression::IS(ref def) => self.eval_is_check(def, scope),
         }
     }
 }

@@ -96,3 +96,8 @@ fn test_concatenation() {
 fn test_format() {
     assert_build(include_str!("../../integration_tests/format_test.ucg"));
 }
+
+#[test]
+fn test_type_checks() {
+    assert_build(include_str!("../../integration_tests/types_test.ucg"));
+}

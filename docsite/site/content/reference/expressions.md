@@ -160,6 +160,15 @@ UCG binary operators follow the typical operator precedence for math. `*` and
 `/` are higher precendence than `+` and `-` which are higher precedence than
 any of the comparison operators.
 
+Type test expressions
+---------------------
+
+ucg has the `is` operator for testing that something is of a given base type.
+
+```
+("foo" is str) == true;
+```
+
 Copy Expressions
 ----------------
 

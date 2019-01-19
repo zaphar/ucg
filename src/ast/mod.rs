@@ -586,6 +586,13 @@ pub struct ImportDef {
     pub path: Token,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct IsDef {
+    pub pos: Position,
+    pub target: Box<Expression>,
+    pub typ: Token,
+}
+
 /// Encodes a ucg expression. Expressions compute a value from.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
@@ -594,6 +601,9 @@ pub enum Expression {
 
     // Binary expressions
     Binary(BinaryOpDef),
+
+    // Type tests
+    IS(IsDef),
 
     // Complex Expressions
     Copy(CopyDef),
@@ -627,6 +637,7 @@ impl Expression {
             &Expression::FuncOp(ref def) => def.pos(),
             &Expression::Include(ref def) => &def.pos,
             &Expression::Import(ref def) => &def.pos,
+            &Expression::IS(ref def) => &def.pos,
         }
     }
 }
@@ -669,6 +680,9 @@ impl fmt::Display for Expression {
             }
             &Expression::Include(_) => {
                 write!(w, "<Include>")?;
+            }
+            &Expression::IS(_) => {
+                write!(w, "<IS>")?;
             }
             &Expression::Import(_) => {
                 write!(w, "<Include>")?;

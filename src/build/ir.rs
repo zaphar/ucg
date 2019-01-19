@@ -191,6 +191,19 @@ impl Val {
         }
         return false;
     }
+
+    pub fn is_str(&self) -> bool {
+        if let &Val::Str(_) = self {
+            return true;
+        }
+        return false;
+    }
+    pub fn is_module(&self) -> bool {
+        if let &Val::Module(_) = self {
+            return true;
+        }
+        return false;
+    }
 }
 
 impl Display for Val {

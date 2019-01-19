@@ -103,6 +103,9 @@ impl<'a> AstWalker<'a> {
                     self.walk_expression(expr.as_mut());
                 }
             }
+            Expression::IS(ref mut def) => {
+                self.walk_expression(def.target.as_mut());
+            }
             Expression::Select(ref mut def) => {
                 self.walk_expression(def.default.as_mut());
                 self.walk_expression(def.val.as_mut());
