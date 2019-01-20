@@ -1,0 +1,12 @@
+let t = import "std/testing.ucg".asserts{};
+let schema = import "std/schema.ucg";
+
+assert t.ok{
+    test = schema.must(schema.one_of{val=1, types=["float", "int"]}, "Must be a float or an int"),
+    desc = "1 is an int",
+};
+
+assert t.not_ok{
+    test = schema.one_of{val=1, types=["float", "str"]}.result,
+    desc = "1 is not a float or string",
+};

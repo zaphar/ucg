@@ -1,0 +1,15 @@
+let one_of = module {
+    val=NULL,
+    types=[],
+} => {
+    let reducer = macro(acc, t) => acc{
+        ok = acc.ok || (acc.val is t),
+    };
+    let any = macro(val, types) => reduce reducer {ok=false, val=val}, types;
+
+    let result = any(mod.val, mod.types).ok;
+};
+
+let must = macro(m, msg) => select m.result, fail msg, {
+    true = m.result,
+};

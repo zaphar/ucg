@@ -663,7 +663,7 @@ make_fn!(
     do_each!(
         pos => pos,
         _ => word!("fail"),
-        msg => must!(wrap_err!(either!(format_expression, string_expression), "Expected failure message")),
+        msg => must!(wrap_err!(expression, "Expected failure message")),
         (Expression::Fail(FailDef{
             pos: pos,
             message: Box::new(msg),
