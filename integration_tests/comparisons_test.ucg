@@ -214,3 +214,9 @@ assert {
     ok = true || true == true,
     desc = "||: likes truth",
 };
+
+let name = "foo";
+assert {
+    ok = (name) in {foo="bar"},
+    desc = "(name) in {foo=\"bar\"} works",
+};

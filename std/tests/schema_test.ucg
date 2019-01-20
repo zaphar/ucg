@@ -2,11 +2,106 @@ let t = import "std/testing.ucg".asserts{};
 let schema = import "std/schema.ucg";
 
 assert t.ok{
-    test = schema.must(schema.one_of{val=1, types=["float", "int"]}, "Must be a float or an int"),
+    test = schema.must(schema.any{val=1, types=[1.0, 1]}, "Must be a float or an int"),
     desc = "1 is an int",
 };
 
 assert t.not_ok{
-    test = schema.one_of{val=1, types=["float", "str"]}.result,
+    test = schema.any{val=1, types=[1.0, ""]}.result,
     desc = "1 is not a float or string",
+};
+
+assert t.equal{
+    left = schema.base_type_of("foo"),
+    right = "str",
+};
+
+assert t.equal{
+    left = schema.base_type_of(1),
+    right = "int",
+};
+
+assert t.equal{
+    left = schema.base_type_of(1.0),
+    right = "float",
+};
+
+assert t.equal{
+    left = schema.base_type_of(1.0),
+    right = "float",
+};
+
+assert t.equal{
+    left = schema.base_type_of(true),
+    right = "bool",
+};
+
+assert t.equal{
+    left = schema.base_type_of(NULL),
+    right = "null",
+};
+
+assert t.equal{
+    left = schema.base_type_of({}),
+    right = "tuple",
+};
+
+assert t.equal{
+    left = schema.base_type_of([]),
+    right = "list",
+};
+
+assert t.equal{
+    left = schema.base_type_of(macro(arg) => arg),
+    right = "macro",
+};
+
+assert t.equal{
+    left = schema.base_type_of(schema.any),
+    right = "module",
+};
+
+assert t.equal{
+    left = schema.shaped{val="foo", shape=""}.result,
+    right = true,
+}; 
+
+assert t.ok{
+    test = schema.shaped{val="foo", shape=""}.result,
+    desc = "\"foo\" is same shape as \"\"",
+}; 
+
+assert t.not_ok{
+    test = schema.shaped{val="foo", shape=0}.result,
+    desc = "\"foo\" is not the same shape as 0",
+};
+ 
+assert t.ok{
+    test = schema.shaped{val={foo="bar"}, shape={foo=""}}.result,
+    desc = "shaped for simple tuples works",
+};
+
+assert t.ok{
+    test = schema.shaped{val={foo="bar", count=1}, shape={foo=""}}.result,
+    desc = "shaped for partial tuples works",
+};
+
+assert t.not_ok{
+    test = schema.shaped{partial=false, val={foo="bar", count=1}, shape={foo=""}}.result,
+    desc = "shaped for non partial tuples also works",
+};
+
+assert t.ok{
+    test = schema.shaped{val={foo="bar", inner={one=1}}, shape={foo="", inner={one=0}}}.result,
+    desc = "shaped for nested tuples works",
+};
+
+assert t.ok{
+    test = schema.shaped{val={foo="bar", inner=[1, 2]}, shape={foo="", inner=[]}}.result,
+    desc = "shaped for nested list in tuple works",
+};
+
+assert t.not_ok{
+    test = schema.shaped{val={inner={foo="bar"}}, shape={inner={foo=1}}}.result,
+    desc = "shaped fails when the shape doesn't match",
 };

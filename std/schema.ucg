@@ -1,15 +1,90 @@
-let one_of = module {
+// The list of base types for a UCG value.
+let base_types = [
+    "int",
+    "float",
+    "str",
+    "bool",
+    "null",
+    "tuple",
+    "list",
+    "macro",
+    "module",
+];
+
+let base_type_reducer = macro(acc, f) => select (acc.val is f), f, {
+    true = acc{typ = f},
+    false = acc,
+};
+
+// Computes the base type of a value.
+let base_type_of = macro(val) => (reduce base_type_reducer {val=val, typ="null"}, base_types).typ;
+
+// Turns any schema check module into a compile failure.
+// The module must export the computed value as the result field.
+let must = macro(m, msg) => select m.result, fail msg, {
+    true = m.result,
+};
+
+// Any does a boolean match against a set of allowed shapes for a type.
+// This module uses the shape module below so the same rules for checking
+// the types against the source value apply for each example in the list.
+let any = module {
+    // The source value to check.
     val=NULL,
+    // The set of allowed type shapes it can be.
     types=[],
 } => {
+    let schema = import "std/schema.ucg";
+
     let reducer = macro(acc, t) => acc{
-        ok = acc.ok || (acc.val is t),
+        ok = acc.ok || (schema.shaped{val=acc.val, shape=t}.result),
     };
     let any = macro(val, types) => reduce reducer {ok=false, val=val}, types;
 
     let result = any(mod.val, mod.types).ok;
 };
 
-let must = macro(m, msg) => select m.result, fail msg, {
-    true = m.result,
+// Compares a value against an example schema value. compares the "shape" of the
+// value to see if it matches. The base type must be the same as the base type
+// of the shape. For tuples any field in the shape tuple must be present in the 
+// source value and must be of the same base type and shape. This module will
+// recurse into nested tuples.
+// 
+// Lists are assumed to be able to contain any type and can be any length.
+// We do not check that macros or modules have the same argument lengths or types
+// nor we check that they output the same types.
+let shaped = module {
+    // The source value to validate
+    val = NULL,
+    
+    // The shape to validate it against.
+    shape = NULL,
+    
+    // Whether partial matches are accepted.
+    // When set to true then the source value can have
+    // fields in tuples that are not present in the
+    // shape it is compared with.
+    partial = true,
+} => {
+    let schema = import "std/schema.ucg";
+
+    let simple_handler = macro(val, shape) => val is (schema.base_type_of(shape));
+
+    let tuple_handler = macro(acc, name, value) => acc{
+        ok = select (name) in acc.shape, mod.partial, {
+            true = schema.shaped{val=value, shape=acc.shape.(name)}.result,
+        },
+    };
+    
+    let result =select schema.base_type_of(mod.val), false, {
+        str = simple_handler(mod.val, mod.shape),
+        int = simple_handler(mod.val, mod.shape),
+        float = simple_handler(mod.val, mod.shape),
+        bool = simple_handler(mod.val, mod.shape),
+        null = simple_handler(mod.val, mod.shape), 
+        tuple = (reduce tuple_handler {shape=mod.shape, ok=false}, (mod.val)).ok, 
+        list = simple_handler(mod.val, mod.shape),
+        macro = simple_handler(mod.val, mod.shape),
+        module = simple_handler(mod.val, mod.shape),
+    };
 };

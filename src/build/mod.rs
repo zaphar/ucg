@@ -769,11 +769,11 @@ impl<'a> FileBuilder<'a> {
 
     fn do_dot_lookup(&self, right: &Expression, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         let pos = right.pos().clone();
+        let scope = scope.clone().use_curr_val();
         match right {
-            Expression::Copy(_) => return self.eval_expr(right, scope),
-            Expression::Call(_) => return self.eval_expr(right, scope),
+            Expression::Copy(_) => return self.eval_expr(right, &scope),
+            Expression::Call(_) => return self.eval_expr(right, &scope),
             Expression::Simple(Value::Symbol(ref s)) => {
-                let scope = scope.clone().use_curr_val();
                 scope
                     .lookup_sym(s, true)
                     .ok_or(Box::new(error::BuildError::new(
@@ -783,7 +783,6 @@ impl<'a> FileBuilder<'a> {
                     )))
             }
             Expression::Simple(Value::Str(ref s)) => {
-                let scope = scope.clone().use_curr_val();
                 scope
                     .lookup_sym(s, false)
                     .ok_or(Box::new(error::BuildError::new(
@@ -796,7 +795,7 @@ impl<'a> FileBuilder<'a> {
                 scope.lookup_idx(right.pos(), &Val::Int(i.val))
             }
             _ => {
-                let val = self.eval_expr(right, scope)?;
+                let val = self.eval_expr(right, &scope)?;
                 match val.as_ref() {
                     Val::Int(i) => scope.lookup_idx(right.pos(), &Val::Int(*i)),
                     Val::Str(ref s) => scope
@@ -968,7 +967,6 @@ impl<'a> FileBuilder<'a> {
         let left = self.eval_expr(&def.left, scope)?;
         let mut child_scope = scope.spawn_child();
         child_scope.set_curr_val(left.clone());
-        child_scope.search_curr_val = true;
         if let &BinaryExprType::DOT = kind {
             return self.do_dot_lookup(&def.right, &child_scope);
         };
