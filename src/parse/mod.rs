@@ -237,7 +237,7 @@ make_fn!(
         _ => punct!("{"),
         v => optional!(field_list),
         _ => optional!(punct!(",")),
-        _ => punct!("}"),
+        _ => must!(punct!("}")),
         (vec_to_tuple(pos, v))
     )
 );
@@ -255,7 +255,7 @@ make_fn!(
         start => punct!("["),
         elements => optional!(separated!(punct!(","), expression)),
         _ => optional!(punct!(",")),
-        _ => punct!("]"),
+        _ => must!(punct!("]")),
         (tuple_to_list(start.pos, elements))
     )
 );
@@ -309,7 +309,7 @@ make_fn!(
         _ => punct!("("),
         expr => do_each!(
             expr => trace_parse!(expression),
-            _ => punct!(")"),
+            _ => must!(punct!(")")),
             (expr)
         ),
         (expression_to_grouped_expression(expr))
@@ -332,12 +332,11 @@ fn tuple_to_copy(sym: Value, fields: Option<FieldList>) -> Expression {
 make_fn!(
     copy_expression<SliceIter<Token>, Expression>,
     do_each!(
-        // TODO This should become just a bareword symbol now
         sym => trace_parse!(symbol),
         _ => punct!("{"),
         fields => optional!(trace_parse!(field_list)),
-        _ => optional!(punct!(",")), // noms opt! macro does not preserve error types properly but this one does.
-        _ => punct!("}"),
+        _ => optional!(punct!(",")),
+        _ => must!(punct!("}")),
         (tuple_to_copy(sym, fields))
     )
 );
@@ -452,16 +451,16 @@ fn select_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expres
     let parsed = do_each!(input,
         _ => word!("select"),
         val => do_each!(
-            expr => trace_parse!(expression),
+            expr => trace_parse!(must!(expression)),
             _ => must!(punct!(",")),
             (expr)
         ),
         default => do_each!(
-            expr => trace_parse!(expression),
+            expr => trace_parse!(must!(expression)),
             _ => must!(punct!(",")),
             (expr)
         ),
-        map => trace_parse!(tuple),
+        map => trace_parse!(must!(tuple)),
         (val, default, map)
     );
     match parsed {
@@ -537,11 +536,10 @@ fn tuple_to_call<'a>(
 
 fn call_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expression> {
     let parsed = do_each!(input.clone(),
-        // TODO This should become just a bareword symbol now
         callee_name => trace_parse!(symbol),
         _ => punct!("("),
         args => optional!(separated!(punct!(","), trace_parse!(expression))),
-        _ => punct!(")"),
+        _ => must!(punct!(")")),
         (callee_name, args)
     );
     match parsed {
@@ -564,10 +562,10 @@ make_fn!(
     do_each!(
         pos => pos,
         _ => word!("reduce"),
-        macroname => match_type!(BAREWORD),
-        acc => trace_parse!(non_op_expression),
-        _ => punct!(","),
-        tgt => trace_parse!(non_op_expression),
+        macroname => must!(match_type!(BAREWORD)),
+        acc => must!(trace_parse!(non_op_expression)),
+        _ => must!(punct!(",")),
+        tgt => must!(trace_parse!(non_op_expression)),
         (Expression::FuncOp(FuncOpDef::Reduce(ReduceOpDef{
             mac: (&macroname).into(),
             acc: Box::new(acc),
@@ -582,9 +580,8 @@ make_fn!(
     do_each!(
         pos => pos,
         _ => word!("map"),
-        // TODO This should become just a bareword symbol now
-        macroname => match_type!(BAREWORD),
-        list => trace_parse!(non_op_expression),
+        macroname => must!(match_type!(BAREWORD)),
+        list => must!(trace_parse!(non_op_expression)),
         (Expression::FuncOp(FuncOpDef::Map(MapFilterOpDef{
             mac: (&macroname).into(),
             target: Box::new(list),
@@ -598,9 +595,8 @@ make_fn!(
     do_each!(
         pos => pos,
         _ => word!("filter"),
-        // TODO This should become just a bareword symbol now
-        macroname => match_type!(BAREWORD),
-        list => trace_parse!(non_op_expression),
+        macroname => must!(match_type!(BAREWORD)),
+        list => must!(trace_parse!(non_op_expression)),
         (Expression::FuncOp(FuncOpDef::Filter(MapFilterOpDef{
             mac: (&macroname).into(),
             target: Box::new(list),
@@ -627,7 +623,7 @@ make_fn!(
                 (Box::new(step))
             )
         ),
-        end => either!(simple_expression, grouped_expression),
+        end => must!(wrap_err!(either!(simple_expression, grouped_expression), "Expected simple or grouped expression")),
         (Expression::Range(RangeDef{
             pos: pos,
             start: Box::new(start),
@@ -713,7 +709,7 @@ make_fn!(
     do_each!(
         e => do_each!(
             expr => trace_parse!(expression),
-            _ => punct!(";"),
+            _ => must!(punct!(";")),
             (expr)
         ),
         (Statement::Expression(e))

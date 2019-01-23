@@ -250,6 +250,12 @@ fn parse_operand_list<'a>(i: SliceIter<'a, Token>) -> ParseResult<'a, Vec<Elemen
             Result::Fail(e) => {
                 // A failure to parse an expression
                 // is always an error.
+                if !firstrun {
+                    // if we have successfully parsed an element and an operator then
+                    // failing to parse a second expression is an abort since we know
+                    // for sure now that the next expression is supposed to be there.
+                    return Result::Abort(e);
+                }
                 return Result::Fail(e);
             }
             Result::Abort(e) => {
@@ -284,7 +290,7 @@ fn parse_operand_list<'a>(i: SliceIter<'a, Token>) -> ParseResult<'a, Vec<Elemen
                 break;
             }
             Result::Abort(e) => {
-                // A failure to parse an expression
+                // A failure to parse an operator
                 // is always an error.
                 return Result::Abort(e);
             }
