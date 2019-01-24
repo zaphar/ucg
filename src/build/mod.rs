@@ -322,12 +322,14 @@ impl<'a> FileBuilder<'a> {
         self.eval_input(OffsetStrIter::new(input))
     }
 
+    // FileBuilder specific
     /// Builds a ucg file at the named path.
     pub fn build(&mut self) -> BuildResult {
         let mut f = File::open(&self.file)?;
         let mut s = String::new();
         f.read_to_string(&mut s)?;
-        let eval_result = self.eval_string(&s);
+        let input = OffsetStrIter::new(&s).with_src_file(self.file.clone());
+        let eval_result = self.eval_input(input);
         match eval_result {
             Ok(v) => {
                 self.last = Some(v);
