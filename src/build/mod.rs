@@ -53,6 +53,7 @@ impl MacroDef {
     /// Expands a ucg Macro using the given arguments into a new Tuple.
     pub fn eval(
         &self,
+        // TODO(jwall): This should come from the macrodef instead.
         root: PathBuf,
         parent_builder: &FileBuilder,
         mut args: Vec<Rc<Val>>,
@@ -71,15 +72,13 @@ impl MacroDef {
         }
         // If the args don't match the types required by the expressions then that is a TypeFail.
         // If the expressions reference Symbols not defined in the MacroDef that is also an error.
-        // TODO(jwall): We should probably enforce that the Expression Symbols must be in argdefs rules
-        // at Macro definition time not evaluation time.
         let mut build_output = HashMap::<PositionedItem<String>, Rc<Val>>::new();
         for (i, arg) in args.drain(0..).enumerate() {
             build_output
                 .entry(self.argdefs[i].clone())
                 .or_insert(arg.clone());
         }
-        let mut b = parent_builder.clone_builder(root);
+        let mut b = parent_builder.clone_builder();
         if let Some(ref scope) = self.scope {
             b.scope = scope.spawn_child();
         }
@@ -102,7 +101,10 @@ pub struct AssertCollector {
 
 /// Builder handles building ucg code for a single file.
 pub struct FileBuilder<'a> {
-    file: PathBuf,
+    // FIXME(jwall): This should probably become a working directory instead.
+    working_dir: PathBuf,
+    // FIXME(jwall): All of the below is build context shared amongst
+    // various builders.
     std: Rc<HashMap<String, &'static str>>,
     import_path: &'a Vec<PathBuf>,
     validate_mode: bool,
@@ -148,28 +150,26 @@ macro_rules! eval_binary_expr {
 impl<'a> FileBuilder<'a> {
     /// Constructs a new Builder.
     pub fn new<P: Into<PathBuf>>(
-        file: P,
+        working_dir: P,
         import_paths: &'a Vec<PathBuf>,
         cache: Rc<RefCell<assets::Cache>>,
     ) -> Self {
         let env_vars: Vec<(String, String)> = env::vars().collect();
         let scope = scope::Scope::new(Rc::new(Val::Env(env_vars)));
-        Self::new_with_scope(file, import_paths, cache, scope)
+        Self::new_with_scope(working_dir, import_paths, cache, scope)
     }
 
     /// Constructs a new Builder with a provided scope.
     pub fn new_with_scope<P: Into<PathBuf>>(
-        file: P,
+        working_dir: P,
         import_paths: &'a Vec<PathBuf>,
         cache: Rc<RefCell<assets::Cache>>,
         scope: Scope,
     ) -> Self {
-        let file = file.into();
-        let std = Rc::new(stdlib::get_libs());
         FileBuilder {
             // Our import stack is initialized with ourself.
-            file: file,
-            std: std,
+            working_dir: working_dir.into(),
+            std: Rc::new(stdlib::get_libs()),
             import_path: import_paths,
             validate_mode: false,
             assert_collector: AssertCollector {
@@ -188,9 +188,9 @@ impl<'a> FileBuilder<'a> {
         }
     }
 
-    pub fn clone_builder<P: Into<PathBuf>>(&self, file: P) -> Self {
+    pub fn clone_builder(&self) -> Self {
         FileBuilder {
-            file: file.into(),
+            working_dir: self.working_dir.clone(),
             std: self.std.clone(),
             import_path: self.import_path,
             validate_mode: false,
@@ -211,8 +211,37 @@ impl<'a> FileBuilder<'a> {
         }
     }
 
+    // TODO(jwall): With builder pattern
     pub fn set_build_output(&mut self, scope: ValueMap) {
         self.scope.build_output = scope;
+    }
+
+    /// Builds a ucg file at the named path.
+    pub fn build<P: Into<PathBuf>>(&mut self, file: P) -> BuildResult {
+        let file = file.into();
+        self.working_dir = file.parent().unwrap().to_path_buf();
+        let mut f = File::open(&file)?;
+        let mut s = String::new();
+        f.read_to_string(&mut s)?;
+        let input = OffsetStrIter::new(&s).with_src_file(file.clone());
+        let eval_result = self.eval_input(input);
+        match eval_result {
+            Ok(v) => {
+                self.last = Some(v);
+                Ok(())
+            }
+            Err(e) => {
+                let err = simple_error::SimpleError::new(
+                    format!(
+                        "Error building file: {}\n{}",
+                        file.to_string_lossy(),
+                        e.as_ref()
+                    )
+                    .as_ref(),
+                );
+                Err(Box::new(err))
+            }
+        }
     }
 
     pub fn merge_build_output(&mut self, scope: ValueMap, clobber: bool) {
@@ -317,36 +346,10 @@ impl<'a> FileBuilder<'a> {
         }
     }
 
+    // TODO Non file builder specific.
     /// Evaluate an input string as UCG.
     pub fn eval_string(&mut self, input: &str) -> Result<Rc<Val>, Box<dyn Error>> {
         self.eval_input(OffsetStrIter::new(input))
-    }
-
-    // FileBuilder specific
-    /// Builds a ucg file at the named path.
-    pub fn build(&mut self) -> BuildResult {
-        let mut f = File::open(&self.file)?;
-        let mut s = String::new();
-        f.read_to_string(&mut s)?;
-        let input = OffsetStrIter::new(&s).with_src_file(self.file.clone());
-        let eval_result = self.eval_input(input);
-        match eval_result {
-            Ok(v) => {
-                self.last = Some(v);
-                Ok(())
-            }
-            Err(e) => {
-                let err = simple_error::SimpleError::new(
-                    format!(
-                        "Error building file: {}\n{}",
-                        self.file.to_string_lossy(),
-                        e.as_ref()
-                    )
-                    .as_ref(),
-                );
-                Err(Box::new(err))
-            }
-        }
     }
 
     fn check_reserved_word(name: &str) -> bool {
@@ -372,7 +375,8 @@ impl<'a> FileBuilder<'a> {
     ) -> Result<PathBuf, Box<dyn Error>> {
         // Try a relative path first.
         let path = path.into();
-        let mut normalized = self.file.parent().unwrap().to_path_buf();
+        // TODO(jwall): Change this to take a root directory.
+        let mut normalized = self.working_dir.clone();
         if path.is_relative() {
             normalized.push(&path);
             // First see if the normalized file exists or not.
@@ -405,7 +409,8 @@ impl<'a> FileBuilder<'a> {
                 let result = match maybe_asset {
                     Some(v) => v.clone(),
                     None => {
-                        let mut b = self.clone_builder(self.file.clone());
+                        // TODO(jwall): This does not need to be a FileBuilder specifically
+                        let mut b = self.clone_builder();
                         b.eval_string(self.std.get(&def.path.fragment).unwrap())?;
                         b.get_outputs_as_val()
                     }
@@ -441,8 +446,8 @@ impl<'a> FileBuilder<'a> {
         let result = match maybe_asset {
             Some(v) => v.clone(),
             None => {
-                let mut b = self.clone_builder(normalized.clone());
-                b.build()?;
+                let mut b = self.clone_builder();
+                b.build(&normalized)?;
                 b.get_outputs_as_val()
             }
         };
@@ -1099,7 +1104,8 @@ impl<'a> FileBuilder<'a> {
             let maybe_tpl = mod_def.clone().arg_tuple.unwrap().clone();
             if let &Val::Tuple(ref src_fields) = maybe_tpl.as_ref() {
                 // 1. First we create a builder.
-                let mut b = self.clone_builder(self.file.clone());
+                // TODO(jwall): This file should optionally come from the module def itself.
+                let mut b = self.clone_builder();
                 b.is_module = true;
                 // 2. We construct an argument tuple by copying from the defs
                 //    argset.
@@ -1172,7 +1178,7 @@ impl<'a> FileBuilder<'a> {
             for arg in args.iter() {
                 argvals.push(self.eval_expr(arg, scope)?);
             }
-            return Ok(m.eval(self.file.clone(), self, argvals)?);
+            return Ok(m.eval(self.working_dir.clone(), self, argvals)?);
         }
         Err(Box::new(error::BuildError::new(
             // We should pretty print the selectors here.
@@ -1187,17 +1193,19 @@ impl<'a> FileBuilder<'a> {
         Ok(Rc::new(Val::Macro(def.clone())))
     }
 
+    // TODO(jwall): This stays with the FileBuilder specifically.
     fn file_dir(&self) -> PathBuf {
-        return if self.file.is_file() {
+        return if self.working_dir.is_file() {
             // Only use the dirname portion if the root is a file.
-            self.file.parent().unwrap().to_path_buf()
+            self.working_dir.parent().unwrap().to_path_buf()
         } else {
-            // otherwise use clone of the root..
-            self.file.clone()
+            // otherwise use clone of the root.
+            self.working_dir.clone()
         };
     }
 
     fn eval_module_def(&self, def: &ModuleDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
+        // TODO(jwall): This should actually be passed in to here.
         let root = self.file_dir();
         // Always work on a copy. The original should not be modified.
         let mut def = def.clone();
@@ -1259,7 +1267,7 @@ impl<'a> FileBuilder<'a> {
         let mut out = Vec::new();
         for item in elems.iter() {
             let argvals = vec![item.clone()];
-            let val = def.eval(self.file.clone(), self, argvals)?;
+            let val = def.eval(self.working_dir.clone(), self, argvals)?;
             match typ {
                 ProcessingOpType::Map => {
                     out.push(val.clone());
@@ -1288,7 +1296,7 @@ impl<'a> FileBuilder<'a> {
         let mut out = Vec::new();
         for &(ref name, ref val) in fs {
             let argvals = vec![Rc::new(Val::Str(name.val.clone())), val.clone()];
-            let result = def.eval(self.file.clone(), self, argvals)?;
+            let result = def.eval(self.working_dir.clone(), self, argvals)?;
             match typ {
                 ProcessingOpType::Map => {
                     if let &Val::List(ref fs) = result.as_ref() {
@@ -1365,7 +1373,7 @@ impl<'a> FileBuilder<'a> {
             &Val::List(ref elems) => {
                 for item in elems.iter() {
                     let argvals = vec![acc.clone(), item.clone()];
-                    let result = macdef.eval(self.file.clone(), self, argvals)?;
+                    let result = macdef.eval(self.working_dir.clone(), self, argvals)?;
                     acc = result;
                 }
             }
@@ -1376,14 +1384,14 @@ impl<'a> FileBuilder<'a> {
                         Rc::new(Val::Str(name.val.clone())),
                         val.clone(),
                     ];
-                    let result = macdef.eval(self.file.clone(), self, argvals)?;
+                    let result = macdef.eval(self.working_dir.clone(), self, argvals)?;
                     acc = result;
                 }
             }
             &Val::Str(ref s) => {
                 for gc in s.graphemes(true) {
                     let argvals = vec![acc.clone(), Rc::new(Val::Str(gc.to_string()))];
-                    let result = macdef.eval(self.file.clone(), self, argvals)?;
+                    let result = macdef.eval(self.working_dir.clone(), self, argvals)?;
                     acc = result;
                 }
             }
@@ -1410,7 +1418,7 @@ impl<'a> FileBuilder<'a> {
         let mut result = String::new();
         for gc in s.graphemes(true) {
             let arg = Rc::new(Val::Str(gc.to_string()));
-            let out = def.eval(self.file.clone(), self, vec![arg])?;
+            let out = def.eval(self.working_dir.clone(), self, vec![arg])?;
             match typ {
                 ProcessingOpType::Filter => {
                     match out.as_ref() {

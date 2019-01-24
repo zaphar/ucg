@@ -87,14 +87,14 @@ fn build_file<'a>(
 ) -> Result<build::FileBuilder<'a>, Box<dyn Error>> {
     let mut file_path_buf = PathBuf::from(file);
     if file_path_buf.is_relative() {
-        file_path_buf = std::env::current_dir().unwrap().join(file_path_buf);
+        file_path_buf = std::env::current_dir()?.join(file_path_buf);
     }
-    let mut builder = build::FileBuilder::new(file_path_buf, import_paths, cache);
+    let mut builder = build::FileBuilder::new(std::env::current_dir()?, import_paths, cache);
     builder.set_strict(strict);
     if validate {
         builder.enable_validate_mode();
     }
-    builder.build()?;
+    builder.build(file_path_buf)?;
     if validate {
         println!("{}", builder.assert_collector.summary);
     }
@@ -247,12 +247,13 @@ fn inspect_command(
     let file = matches.value_of("INPUT").unwrap();
     let sym = matches.value_of("expr");
     let target = matches.value_of("target").unwrap();
-    let mut builder = build::FileBuilder::new(file, import_paths, cache);
+    let mut builder =
+        build::FileBuilder::new(std::env::current_dir().unwrap(), import_paths, cache);
     builder.set_strict(strict);
     match registry.get_converter(target) {
         Some(converter) => {
             // TODO(jwall): We should warn if this is a test file.
-            let result = builder.build();
+            let result = builder.build(file);
             if !result.is_ok() {
                 eprintln!("{:?}", result.err().unwrap());
                 process::exit(1);
@@ -266,7 +267,7 @@ fn inspect_command(
                     } else {
                         sym_name.to_owned()
                     };
-                    let mut builder = builder.clone_builder("/eval");
+                    let mut builder = builder.clone_builder();
                     match builder.eval_string(&normalized) {
                         Ok(v) => Some(v.clone()),
                         Err(e) => {
