@@ -1512,7 +1512,7 @@ impl<'a> FileBuilder<'a> {
         scope: &Scope,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
         if !self.validate_mode {
-            // we are not in validate_mode then build_asserts are noops.
+            // we are not in validate_mode so build_asserts are noops.
             return Ok(Rc::new(Val::Empty));
         }
         let ok = match self.eval_expr(expr, scope) {
@@ -1520,9 +1520,7 @@ impl<'a> FileBuilder<'a> {
             Err(e) => {
                 // failure!
                 let msg = format!("CompileError: {}\n", e);
-                self.assert_collector.summary.push_str(&msg);
-                self.assert_collector.failures.push_str(&msg);
-                self.assert_collector.success = false;
+                self.record_assert_result(&msg, false);
                 return Ok(Rc::new(Val::Empty));
             }
         };
