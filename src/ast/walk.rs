@@ -114,6 +114,9 @@ impl<'a> AstWalker<'a> {
             Expression::Import(_) | Expression::Include(_) | Expression::Fail(_) => {
                 //noop
             }
+            Expression::Not(ref mut def) => {
+                self.walk_expression(def.expr.as_mut());
+            }
         }
     }
 

@@ -667,6 +667,19 @@ make_fn!(
     )
 );
 
+make_fn!(
+    not_expression<SliceIter<Token>, Expression>,
+    do_each!(
+        pos => pos,
+        _ => word!("not"),
+        expr => must!(wrap_err!(expression, "Expected failure message")),
+        (Expression::Not(NotDef{
+            pos: pos,
+            expr: Box::new(expr),
+        }))
+    )
+);
+
 fn unprefixed_expression(input: SliceIter<Token>) -> ParseResult<Expression> {
     let _input = input.clone();
     either!(
@@ -685,6 +698,7 @@ make_fn!(
         trace_parse!(func_op_expression),
         trace_parse!(macro_expression),
         trace_parse!(import_expression),
+        trace_parse!(not_expression),
         trace_parse!(fail_expression),
         trace_parse!(module_expression),
         trace_parse!(select_expression),

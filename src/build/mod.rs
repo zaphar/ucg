@@ -1786,11 +1786,26 @@ impl<'a> FileBuilder<'a> {
                 } else {
                     Err(Box::new(error::BuildError::new(
                         format!(
-                            "Expected string form message but got {}",
+                            "Expected string for message but got {}",
                             def.message.as_ref()
                         ),
                         error::ErrorType::TypeFail,
                         def.message.pos().clone(),
+                    )))
+                };
+            }
+            &Expression::Not(ref def) => {
+                let val = self.eval_expr(&def.expr, scope)?;
+                return if let Val::Boolean(b) = val.as_ref() {
+                    Ok(Rc::new(Val::Boolean(!b)))
+                } else {
+                    Err(Box::new(error::BuildError::new(
+                        format!(
+                            "Expected boolean for expression but got {}",
+                            def.expr.as_ref()
+                        ),
+                        error::ErrorType::TypeFail,
+                        def.expr.pos().clone(),
                     )))
                 };
             }

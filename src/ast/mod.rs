@@ -601,11 +601,18 @@ pub struct FailDef {
     pub message: Box<Expression>,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct NotDef {
+    pub pos: Position,
+    pub expr: Box<Expression>,
+}
+
 /// Encodes a ucg expression. Expressions compute a value from.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
     // Base Expression
     Simple(Value),
+    Not(NotDef),
 
     // Binary expressions
     Binary(BinaryOpDef),
@@ -646,6 +653,7 @@ impl Expression {
             &Expression::Include(ref def) => &def.pos,
             &Expression::Import(ref def) => &def.pos,
             &Expression::Fail(ref def) => &def.pos,
+            &Expression::Not(ref def) => &def.pos,
         }
     }
 }
@@ -694,6 +702,9 @@ impl fmt::Display for Expression {
             }
             &Expression::Fail(_) => {
                 write!(w, "<Fail>")?;
+            }
+            &Expression::Not(ref def) => {
+                write!(w, "!{}", def.expr)?;
             }
         }
         Ok(())

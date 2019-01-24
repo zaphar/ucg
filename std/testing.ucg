@@ -30,7 +30,7 @@ let asserts = module{
         // descriptive message to use in output.
         desc=mod.default_description,
     } => {
-        let ok = mod.test != true;
+        let ok = not mod.test;
 
         let desc = "@" % (mod.desc);
 

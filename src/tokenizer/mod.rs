@@ -278,6 +278,10 @@ make_fn!(istok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "is", WS)
 );
 
+make_fn!(nottok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::BAREWORD, "not", WS)
+);
+
 make_fn!(failtok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "fail", WS)
 );
@@ -417,6 +421,7 @@ fn token<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Token> {
         booleantok,
         intok,
         istok,
+        nottok,
         lettok,
         outtok,
         selecttok,

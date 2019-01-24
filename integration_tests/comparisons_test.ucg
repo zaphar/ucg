@@ -220,3 +220,18 @@ assert {
     ok = (name) in {foo="bar"},
     desc = "(name) in {foo=\"bar\"} works",
 };
+
+assert {
+    ok = not false,
+    desc = "not false is true",
+};
+
+assert {
+    ok = not true == false,
+    desc = "not true is false",
+};
+
+assert {
+    ok = not not true,
+    desc = "double negatives are positive",
+};
