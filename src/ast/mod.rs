@@ -55,6 +55,7 @@ macro_rules! enum_type_equality {
 /// parts of the UCG AST have a positioned associated with them.
 #[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord, Hash)]
 pub struct Position {
+    pub file: Option<PathBuf>,
     pub line: usize,
     pub column: usize,
     pub offset: usize,
@@ -64,6 +65,7 @@ impl Position {
     /// Construct a new Position.
     pub fn new(line: usize, column: usize, offset: usize) -> Self {
         Position {
+            file: None,
             line: line,
             column: column,
             offset: offset,
@@ -373,8 +375,6 @@ impl<'a> From<&'a PositionedItem<String>> for PositionedItem<String> {
 /// Encodes a macro expression in the UCG AST..
 ///
 /// A macro is a pure function over a tuple.
-/// MacroDefs are not closures. They can not reference
-/// any values except what is defined in their arguments.
 #[derive(PartialEq, Debug, Clone)]
 pub struct MacroDef {
     pub scope: Option<Scope>,

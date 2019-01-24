@@ -1,6 +1,7 @@
 //! Input stream wrappers for use in abortable_parser.
 use std::convert::From;
 use std::iter::Iterator;
+use std::path::PathBuf;
 
 use abortable_parser::iter::{SliceIter, StrIter};
 use abortable_parser::{InputIter, Offsetable, Peekable, Positioned, Seekable, Span, SpanRange};
@@ -9,6 +10,7 @@ use crate::ast::{Position, Token};
 
 #[derive(Debug)]
 pub struct OffsetStrIter<'a> {
+    source_file: Option<PathBuf>,
     contained: StrIter<'a>,
     line_offset: usize,
     col_offset: usize,
@@ -21,10 +23,16 @@ impl<'a> OffsetStrIter<'a> {
 
     pub fn new_with_offsets(input: &'a str, line_offset: usize, col_offset: usize) -> Self {
         OffsetStrIter {
+            source_file: None,
             contained: StrIter::new(input),
             line_offset: line_offset,
             col_offset: col_offset,
         }
+    }
+
+    pub fn with_src_file(mut self, file: PathBuf) -> Self {
+        self.source_file = Some(file);
+        self
     }
 }
 
@@ -45,6 +53,7 @@ impl<'a> Offsetable for OffsetStrIter<'a> {
 impl<'a> Clone for OffsetStrIter<'a> {
     fn clone(&self) -> Self {
         OffsetStrIter {
+            source_file: self.source_file.clone(),
             contained: self.contained.clone(),
             line_offset: self.line_offset,
             col_offset: self.col_offset,
@@ -55,6 +64,7 @@ impl<'a> Clone for OffsetStrIter<'a> {
 impl<'a> From<&'a str> for OffsetStrIter<'a> {
     fn from(source: &'a str) -> Self {
         OffsetStrIter {
+            source_file: None,
             contained: StrIter::new(source),
             line_offset: 0,
             col_offset: 0,
@@ -103,6 +113,11 @@ impl<'a> From<&'a SliceIter<'a, Token>> for Position {
 
 impl<'a> From<&'a OffsetStrIter<'a>> for Position {
     fn from(s: &'a OffsetStrIter<'a>) -> Position {
-        Position::new(s.line(), s.column(), s.get_offset())
+        Position {
+            file: s.source_file.clone(),
+            line: s.line(),
+            column: s.column(),
+            offset: s.get_offset(),
+        }
     }
 }

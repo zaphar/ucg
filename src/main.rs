@@ -266,6 +266,7 @@ fn inspect_command(
                     } else {
                         sym_name.to_owned()
                     };
+                    let mut builder = builder.clone_builder("/eval");
                     match builder.eval_string(&normalized) {
                         Ok(v) => Some(v.clone()),
                         Err(e) => {

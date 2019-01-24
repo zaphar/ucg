@@ -203,6 +203,7 @@ fn test_parse_comment() {
                 typ: TokenType::COMMENT,
                 fragment: " comment".to_string(),
                 pos: Position {
+                    file: None,
                     line: 1,
                     column: 1,
                     offset: 0
@@ -219,6 +220,7 @@ fn test_parse_comment() {
                 typ: TokenType::COMMENT,
                 fragment: " comment".to_string(),
                 pos: Position {
+                    file: None,
                     column: 1,
                     line: 1,
                     offset: 0
@@ -235,6 +237,7 @@ fn test_parse_comment() {
                 typ: TokenType::COMMENT,
                 fragment: " comment".to_string(),
                 pos: Position {
+                    file: None,
                     column: 1,
                     line: 1,
                     offset: 0
@@ -251,6 +254,7 @@ fn test_match_word() {
         fragment: "foo".to_string(),
         typ: TokenType::BAREWORD,
         pos: Position {
+            file: None,
             line: 1,
             column: 1,
             offset: 0,
@@ -269,6 +273,7 @@ fn test_match_word_empty_input() {
         fragment: "".to_string(),
         typ: TokenType::END,
         pos: Position {
+            file: None,
             line: 1,
             column: 1,
             offset: 0,
@@ -291,6 +296,7 @@ fn test_match_punct() {
         fragment: "!".to_string(),
         typ: TokenType::PUNCT,
         pos: Position {
+            file: None,
             line: 1,
             column: 1,
             offset: 0,
@@ -309,6 +315,7 @@ fn test_match_type() {
         fragment: "foo".to_string(),
         typ: TokenType::BAREWORD,
         pos: Position {
+            file: None,
             line: 1,
             column: 1,
             offset: 0,
