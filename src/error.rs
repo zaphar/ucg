@@ -17,9 +17,8 @@ use std::error;
 use std::fmt;
 use std::fmt::Debug;
 
-use abortable_parser::Positioned;
-
 use crate::ast::*;
+use crate::iter::FilePositioned;
 
 /// ErrorType defines the various types of errors that can result from compiling UCG into an
 /// output format.
@@ -76,10 +75,14 @@ impl BuildError {
     }
 
     fn render(&self, w: &mut fmt::Formatter) -> fmt::Result {
+        let file = match self.pos.file {
+            Some(ref pb) => pb.to_string_lossy().to_string(),
+            None => "<eval>".to_string(),
+        };
         write!(
             w,
-            "{} at line: {} column: {}\nCaused By:\n\t{} ",
-            self.err_type, self.pos.line, self.pos.column, self.msg
+            "{} at {} line: {} column: {}\nCaused By:\n\t{} ",
+            self.err_type, file, self.pos.line, self.pos.column, self.msg
         )?;
         Ok(())
     }
@@ -104,11 +107,11 @@ impl error::Error for BuildError {
 }
 
 #[derive(Debug)]
-pub struct StackPrinter<C: Positioned> {
+pub struct StackPrinter<C: FilePositioned> {
     pub err: abortable_parser::Error<C>,
 }
 
-impl<C: Positioned> StackPrinter<C> {
+impl<C: FilePositioned> StackPrinter<C> {
     pub fn render(&self, w: &mut fmt::Formatter) -> fmt::Result {
         let mut curr_err = Some(&self.err);
         let mut tabstop = "";
@@ -118,11 +121,16 @@ impl<C: Positioned> StackPrinter<C> {
                 None => break,
                 Some(err) => {
                     let context = err.get_context();
+                    let file = match context.file() {
+                        Some(ref pb) => pb.to_string_lossy().to_string(),
+                        None => "<eval>".to_string(),
+                    };
                     write!(
                         w,
-                        "{}{}: line: {}, column: {}\n",
+                        "{}{}: at {} line: {}, column: {}\n",
                         tabstop,
                         err.get_msg(),
+                        file,
                         context.line(),
                         context.column(),
                     )?;
@@ -138,7 +146,7 @@ impl<C: Positioned> StackPrinter<C> {
     }
 }
 
-impl<C: Positioned> fmt::Display for StackPrinter<C> {
+impl<C: FilePositioned> fmt::Display for StackPrinter<C> {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
         self.render(w)
     }

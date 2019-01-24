@@ -121,3 +121,22 @@ impl<'a> From<&'a OffsetStrIter<'a>> for Position {
         }
     }
 }
+
+pub trait FilePositioned: Positioned {
+    fn file(&self) -> Option<&PathBuf>;
+}
+
+impl<'a> FilePositioned for OffsetStrIter<'a> {
+    fn file(&self) -> Option<&PathBuf> {
+        self.source_file.as_ref()
+    }
+}
+
+impl<'a> FilePositioned for SliceIter<'a, Token> {
+    fn file(&self) -> Option<&PathBuf> {
+        match self.peek_next() {
+            Some(t) => t.pos.file.as_ref(),
+            None => None,
+        }
+    }
+}
