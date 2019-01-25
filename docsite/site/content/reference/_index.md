@@ -24,8 +24,12 @@ Some words are reserved in UCG and can not be used as a named binding.
 * let
 * import
 * as
+* in
+* is
+* not
+* fail
 * select
-* macro
+* func
 * module
 * env
 * map

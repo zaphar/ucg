@@ -18,11 +18,11 @@ let container_conf = {
 };
 ```
 
-Then we can define a helper macro for creating our host and port mappings
+Then we can define a helper function for creating our host and port mappings
 
 ```
-// A little helper macro for creating our host and port mappings.
-let map_to_container = macro (host, container) => {
+// A little helper func for creating our host and port mappings.
+let map_to_container = func (host, container) => {
     result = "@:@" % (host, container)
 };
 

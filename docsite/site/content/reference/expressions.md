@@ -172,7 +172,7 @@ The type must be a string literal matching one of:
 * `"float"`
 * `"tuple"`
 * `"list"`
-* `"macro"`
+* `"func"`
 * `"module"`
 
 ```
@@ -278,30 +278,28 @@ UCG can generate lists from a range with an optional step.
 0:2:10 == [0, 2, 4, 6, 8, 10];
 ```
 
-Macros
+Functions
 -----
 
-Macros look like functions but they are resolved at compile time and
-configurations don't execute so they never appear in output. Macros close over
-the environment up to the point where they are declared in the file. One
-consequence of this is that they can not call themselves so recursive macros
-are not possible. This is probably a feature. They are useful for constructing
-tuples of a certain shape or otherwise promoting data reuse. You define a macro
-with the `macro` keyword followed by the arguments in parentheses, a `=>`, and
-then a valid expression.
+Functions close over the environment up to the point where they are declared in
+the file. One consequence of this is that they can not call themselves so
+recursive functions are not possible. This is probably a feature. They are
+useful for constructing tuples of a certain shape or otherwise promoting data
+reuse. You define a function with the `function` keyword followed by the
+arguments in parentheses, a `=>`, and then a valid expression.
 
 ```
-let mymacro = macro (arg1, arg2) => {
+let myfunc = func (arg1, arg2) => {
     host = arg1,
     port = arg2,
     connstr = "couchdb://@:@" % (arg1, arg2),
 };
 
-let my_dbconf = mymacro("couchdb.example.org", "9090");
+let my_dbconf = myfunc("couchdb.example.org", "9090");
 
 let my_dbhost = dbconf.host;
 
-let add = macro(arg1, arg2) => arg1 + arg2;
+let add = func (arg1, arg2) => arg1 + arg2;
 add(1, 1) == 2;
 ```
 
@@ -312,29 +310,29 @@ UCG has a few functional processing expressions called `map`, `filter`, and
 `reduce`. All of them can process a string, list, or tuple.
 
 Their syntax starts with either `map` `filter`, or `reduce followed by a symbol
-that references a valid macro and finally an expression that resolves to either
+that references a valid func and finally an expression that resolves to either
 a list or a tuple.
 
 ### Map expressions
 
-Map macros should produce either a valid value or a list of [field, value] that
+Map functions should produce either a valid value or a list of [field, value] that
 will replace the element or field it is curently processing.
 
 **For Lists**
 
-When mapping a macro across a list the result field can be any valid value. The
-macro is expected to take a single argument.
+When mapping a function across a list the result field can be any valid value. The
+function is expected to take a single argument.
 
 ```
 let list1 = [1, 2, 3, 4];
 
-let mapper = macro(item) =>  item + 1;
+let mapper = func (item) =>  item + 1;
 map mapper list1 == [2, 3, 4, 5];
 ```
 
 **For Tuples**
 
-Macros for mapping across a tuple are expected to take two arguments. The first
+Functions for mapping across a tuple are expected to take two arguments. The first
 argument is the name of the field. The second argument is the value in that
 field. The result should be a two item list with the first item being the new
 field name and the second item being the new value.
@@ -344,7 +342,7 @@ let test_tpl = {
     foo = "bar",
     quux = "baz",
 };
-let tpl_mapper = macro(name, val) =>  select name, [name, val], {
+let tpl_mapper = func (name, val) =>  select name, [name, val], {
     "foo" = ["foo", "barbar"],
     quux = ["cute", "pygmy"],
 };
@@ -361,7 +359,7 @@ the item or field staying in the resulting list or tuple.
 
 ```
 let list2 = ["foo", "bar", "foo", "bar"];
-let filtrator = macro(item) => select item, NULL, {
+let filtrator = func (item) => select item, NULL, {
     foo = item,
 };
 
@@ -375,13 +373,15 @@ let test_tpl = {
     foo = "bar",
     quux = "baz",
 };
-let tpl_filter = macro(name, val) =>  name != "foo";
+let tpl_filter = func (name, val) =>  name != "foo";
 filter tpl_filter test_tpl == { quux = "baz" };
 ```
 
 ### Reduce expressions
 
-Reduce expressions start with the reduce keyword followed by a symbol referencing a macro an expression for the accumulator and finally the tuple or list to process.
+Reduce expressions start with the reduce keyword followed by a symbol
+referencing a func, an expression for the accumulator, and finally the tuple or
+list to process.
 
 **Tuples**
 
@@ -390,7 +390,7 @@ let test_tpl = {
     foo = "bar",
     quux = "baz",
 };
-let tpl_reducer = macro(acc, name, val) =>  acc{
+let tpl_reducer = func (acc, name, val) =>  acc{
     keys = self.keys + [name],
     vals = self.vals + [val],
 };
@@ -402,7 +402,7 @@ reduce tpl_reducer {keys = [], vals = []}, test_tpl == {keys = ["foo", "quux"], 
 
 ```
 let list1 = [1, 2, 3, 4];
-let list_reducer = macro(acc, item) =>  acc + item;
+let list_reducer = func (acc, item) =>  acc + item;
 
  list_reducer 0, list1 == 0 + 1 + 2 + 3 + 4;
 ```
@@ -452,7 +452,7 @@ let ifresult = select true, NULL, {
 Modules
 -------
 
-UCG has another form of reusable execution that is a little more composable than macros
+UCG has another form of reusable execution that is a little more robust than functions
 are. Modules allow you to parameterize a set of statements and build the statements
 later. Modules are an expression. They can be bound to a value and then reused later.
 Modules do not close over their environment by they can import other UCG files into
@@ -468,7 +468,7 @@ The body of the module can contain any valid UCG statement.
 let top_mod = module {
     deep_value = "None",
 } => {
-    import "shared.UCG" as shared_macros;
+    let shared_funcs = import "shared.UCG";
 
     let embedded_def = module {
         deep_value = "None",

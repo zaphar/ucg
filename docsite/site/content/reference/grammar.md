@@ -48,7 +48,7 @@ let_keyword: "let" ;
 import_keyword: "import" ;
 include_keyword: "include" ; 
 as_keyword: "as" ;
-macro_keyword: "macro" ;
+func_keyword: "func" ;
 map_keyword: "map" ;
 reduce_keyword: "map" ;
 filter_keyword: "filter" ;
@@ -60,6 +60,7 @@ fail_keyword: "fail" ;
 null_keyword: "NULL" ;
 in_keyword: "in" ;
 is_keyword: "in" ;
+not_keyword: "module" ;
 escaped: "\", VISIBLE_CHAR ;
 str: quot, { escaped | UTF8_CHAR }, quot ;
 float: (DIGIT+, dot, { DIGIT }) | (dot, DIGIT+) ;
@@ -108,11 +109,11 @@ literal: str | integer | float | list | tuple | null_keyword;
 grouped: lparen, expr, rparen ;
 ```
 
-#### Macro Definition
+#### Function Definition
 
 ```
 arglist: expr, { comma, expr }, [comma] ;
-macro_def: macro_keyword, lparen, [ arglist ], rparen, fatcomma, tuple ;
+func_def: func_keyword, lparen, [ arglist ], rparen, fatcomma, tuple ;
 ```
 
 #### Module Definition
@@ -167,13 +168,19 @@ import_expr: import_keyword, str ;
 fail_expr: fail_keyword, (str | format_expr) ;
 ```
 
+#### Not Expression
+
+```
+not_expr: not_keyword, expr ;
+```
+
 #### Non Operator Expression
 
 ```
 non_operator_expr: literal
                    | grouped
                    | import_expr
-                   | macrodef
+                   | funcdef
                    | module_def
                    | fail_expr
                    | format_expr
