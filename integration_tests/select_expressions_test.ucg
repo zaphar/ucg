@@ -20,28 +20,28 @@ assert {
     desc = "defaultgot == \"OOPS\"",
 };
 
-// select inside a macro
+// select inside a function
 
-let condmacro = macro(arg) => {
+let condfunc = func (arg) => {
     output = select arg, NULL, {
         opt1 = "yay",
         opt2 = "boo",
     },
 };
 
-let result = condmacro("opt1");
+let result = condfunc("opt1");
 
 assert {
-    ok = condmacro("opt1") == {output = "yay"},
-    desc = "condmacro(\"opt1\") == {output = \"yay\"}",
+    ok = condfunc("opt1") == {output = "yay"},
+    desc = "condfunc(\"opt1\") == {output = \"yay\"}",
 };
 assert {
-    ok = condmacro("opt2") == {output = "boo"},
-    desc = "condmacro(\"opt2\") == {output = \"boo\"}",
+    ok = condfunc("opt2") == {output = "boo"},
+    desc = "condfunc(\"opt2\") == {output = \"boo\"}",
 };
 assert {
-    ok = condmacro("invalid") == {output = NULL},
-    desc = "condmacro(\"invalid\") == {output = NULL}",
+    ok = condfunc("invalid") == {output = NULL},
+    desc = "condfunc(\"invalid\") == {output = NULL}",
 };
 
 let iflike = select true, "default", {

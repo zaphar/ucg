@@ -3,14 +3,14 @@
 let list1 = [1, 2, 3, 4];
 let list2 = ["foo", "bar", "foo", "bar"];
 
-let mapper = macro(item) => item + 1;
-let filtrator = macro(item) =>  select item, NULL, {
+let mapper = func (item) => item + 1;
+let filtrator = func (item) =>  select item, NULL, {
         foo = item,
 };
 
-let boolfiltrator = macro(item) => item < 5;
+let boolfiltrator = func (item) => item < 5;
 
-let identity_list_reducer = macro(acc, item) =>  acc + [item];
+let identity_list_reducer = func (acc, item) =>  acc + [item];
 
 assert {
     ok = reduce identity_list_reducer [], list1 == list1,
@@ -26,7 +26,7 @@ assert {
     desc = "reduce identity_list_reducer [], (nested_list.list) == list1",
 };
 
-let list_reducer = macro(acc, item) =>  acc + item;
+let list_reducer = func (acc, item) =>  acc + item;
 
 assert {
     ok = reduce list_reducer 0, list1 == 0 + 1 + 2 + 3 + 4,
@@ -46,7 +46,7 @@ assert {
     desc = "map mapper [1, 2, 3, 4] == [2, 3, 4, 5]",
 };
 
-let s_mapper = macro(arg) => arg + ",";
+let s_mapper = func (arg) => arg + ",";
 
 assert {
     ok = map s_mapper "foo" == "f,o,o,",
@@ -77,14 +77,14 @@ let test_tpl = {
     quux = "baz",
 };
 
-let identity_tpl_mapper = macro(name, val) => [name, val];
+let identity_tpl_mapper = func (name, val) => [name, val];
 
 assert {
     ok = map identity_tpl_mapper test_tpl == test_tpl,
     desc = "map identity_tpl_mapper test_tpl == test_tpl",
 };
 
-let tpl_mapper = macro(name, val) => select name, [name, val], {
+let tpl_mapper = func (name, val) => select name, [name, val], {
     "foo" = ["foo", "barbar"],
     quux = ["cute", "pygmy"],
 };
@@ -94,10 +94,10 @@ assert {
     desc = "map tpl_mapper test_tpl == {foo = \"barbar\", cute = \"pygmy\"}",
 };
 
-let identity_tpl_filter = macro(name, val) =>  true;
+let identity_tpl_filter = func (name, val) =>  true;
 
 // strip out foo field
-let tpl_filter = macro(name, val) => name != "foo";
+let tpl_filter = func (name, val) => name != "foo";
 
 assert {
     ok = filter identity_tpl_filter test_tpl == test_tpl,
@@ -109,14 +109,14 @@ assert {
     desc = "filter tpl_filter test_tpl == { quux = \"baz\" }",
 };
 
-let o_str_filter = macro(s) => s != "o";
+let o_str_filter = func (s) => s != "o";
 
 assert {
     ok = filter o_str_filter "foobar" == "fbar",
     desc = "We can strip out characters",
 };
 
-let tpl_reducer = macro(acc, name, val) => acc{
+let tpl_reducer = func (acc, name, val) => acc{
         keys = self.keys + [name],
         vals = self.vals + [val],
 };
@@ -126,14 +126,14 @@ assert {
     desc = "reduce tpl_reducer {keys = [], vals = []}, test_tpl == {keys = [\"foo\", \"quux\"], vals = [\"bar\", \"baz\"]}",
 };
 
-let str_identity_reducer = macro(acc, s) => acc + s;
+let str_identity_reducer = func (acc, s) => acc + s;
 
 assert {
     ok = reduce str_identity_reducer "", "foo" == "foo",
     desc = "identity reducer copies string",
 };
 
-let char_iter = macro(acc, s) => acc + [s];
+let char_iter = func (acc, s) => acc + [s];
 
 assert {
     ok = reduce char_iter [], "foo" == ["f", "o", "o"],

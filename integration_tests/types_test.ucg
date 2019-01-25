@@ -31,13 +31,13 @@ assert t.not_ok{
 };
 
 assert t.ok{
-    test = (macro(arg) => arg) is "macro",
-    desc = "found a macro",
+    test = (func(arg) => arg) is "func",
+    desc = "found a func",
 };
 
 assert t.not_ok{
-    test = (macro(arg) => arg) is "list",
-    desc = "a macro is not a list",
+    test = (func(arg) => arg) is "list",
+    desc = "a func is not a list",
 };
 
 assert t.ok{
@@ -46,11 +46,11 @@ assert t.ok{
 };
 
 assert t.not_ok{
-    test = module{} => {} is "macro",
-    desc = "a module is not a macro",
+    test = module{} => {} is "func",
+    desc = "a module is not a func",
 };
 
-let foo_check = macro(val) => (foo in val) && (val.foo is "str");
+let foo_check = func (val) => (foo in val) && (val.foo is "str");
 
 assert t.ok{
     test = foo_check({foo="bar"}),

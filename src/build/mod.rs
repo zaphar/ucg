@@ -49,21 +49,21 @@ enum ProcessingOpType {
     Filter,
 }
 
-impl MacroDef {
-    /// Expands a ucg Macro using the given arguments into a new Tuple.
+impl FuncDef {
+    /// Expands a ucg function using the given arguments into a new Tuple.
     pub fn eval(
         &self,
-        // TODO(jwall): This should come from the macrodef instead.
+        // TODO(jwall): This should come from the FuncDef instead.
         root: PathBuf,
         parent_builder: &FileBuilder,
         mut args: Vec<Rc<Val>>,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
         // Error conditions. If the args don't match the length and types of the argdefs then this is
-        // macro call error.
+        // func call error.
         if args.len() > self.argdefs.len() {
             return Err(Box::new(error::BuildError::new(
                 format!(
-                    "Macro called with too many args in file: {}",
+                    "Func called with too many args in file: {}",
                     root.to_string_lossy()
                 ),
                 error::ErrorType::BadArgLen,
@@ -71,7 +71,7 @@ impl MacroDef {
             )));
         }
         // If the args don't match the types required by the expressions then that is a TypeFail.
-        // If the expressions reference Symbols not defined in the MacroDef that is also an error.
+        // If the expressions reference Symbols not defined in the FuncDef that is also an error.
         let mut build_output = HashMap::<PositionedItem<String>, Rc<Val>>::new();
         for (i, arg) in args.drain(0..).enumerate() {
             build_output
@@ -101,10 +101,7 @@ pub struct AssertCollector {
 
 /// Builder handles building ucg code for a single file.
 pub struct FileBuilder<'a> {
-    // FIXME(jwall): This should probably become a working directory instead.
     working_dir: PathBuf,
-    // FIXME(jwall): All of the below is build context shared amongst
-    // various builders.
     std: Rc<HashMap<String, &'static str>>,
     import_path: &'a Vec<PathBuf>,
     validate_mode: bool,
@@ -354,8 +351,8 @@ impl<'a> FileBuilder<'a> {
 
     fn check_reserved_word(name: &str) -> bool {
         match name {
-            "self" | "assert" | "true" | "false" | "let" | "import" | "as" | "select" | "macro"
-            | "module" | "env" | "map" | "filter" | "NULL" | "out" | "in" | "is" => true,
+            "self" | "assert" | "true" | "false" | "let" | "import" | "as" | "select" | "func"
+            | "module" | "env" | "map" | "filter" | "NULL" | "out" | "in" | "is" | "not" => true,
             _ => false,
         }
     }
@@ -1171,26 +1168,26 @@ impl<'a> FileBuilder<'a> {
 
     fn eval_call(&self, def: &CallDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         let args = &def.arglist;
-        let v = self.eval_value(&def.macroref, scope)?;
-        if let &Val::Macro(ref m) = v.deref() {
-            // Congratulations this is actually a macro.
+        let v = self.eval_value(&def.funcref, scope)?;
+        if let &Val::Func(ref def) = v.deref() {
+            // Congratulations this is actually a function.
             let mut argvals: Vec<Rc<Val>> = Vec::new();
             for arg in args.iter() {
                 argvals.push(self.eval_expr(arg, scope)?);
             }
-            return Ok(m.eval(self.working_dir.clone(), self, argvals)?);
+            return Ok(def.eval(self.working_dir.clone(), self, argvals)?);
         }
         Err(Box::new(error::BuildError::new(
             // We should pretty print the selectors here.
-            format!("{} is not a Macro", v),
+            format!("{} is not a Function", v),
             error::ErrorType::TypeFail,
             def.pos.clone(),
         )))
     }
 
-    fn eval_macro_def(&self, def: &mut MacroDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
+    fn eval_func_def(&self, def: &mut FuncDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         def.scope = Some(scope.spawn_child());
-        Ok(Rc::new(Val::Macro(def.clone())))
+        Ok(Rc::new(Val::Func(def.clone())))
     }
 
     // TODO(jwall): This stays with the FileBuilder specifically.
@@ -1261,7 +1258,7 @@ impl<'a> FileBuilder<'a> {
     fn eval_functional_list_processing(
         &self,
         elems: &Vec<Rc<Val>>,
-        def: &MacroDef,
+        def: &FuncDef,
         typ: ProcessingOpType,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
         let mut out = Vec::new();
@@ -1290,7 +1287,7 @@ impl<'a> FileBuilder<'a> {
     fn eval_functional_tuple_processing(
         &self,
         fs: &Vec<(PositionedItem<String>, Rc<Val>)>,
-        def: &MacroDef,
+        def: &FuncDef,
         typ: ProcessingOpType,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
         let mut out = Vec::new();
@@ -1358,12 +1355,12 @@ impl<'a> FileBuilder<'a> {
     fn eval_reduce_op(&self, def: &ReduceOpDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         let maybe_target = self.eval_expr(&def.target, scope)?;
         let mut acc = self.eval_expr(&def.acc, scope)?;
-        let maybe_mac = self.eval_value(&Value::Symbol(def.mac.clone()), &self.scope.clone())?;
-        let macdef = match maybe_mac.as_ref() {
-            &Val::Macro(ref macdef) => macdef,
+        let maybe_mac = self.eval_value(&Value::Symbol(def.func.clone()), &self.scope.clone())?;
+        let funcdef = match maybe_mac.as_ref() {
+            &Val::Func(ref funcdef) => funcdef,
             _ => {
                 return Err(Box::new(error::BuildError::new(
-                    format!("Expected macro but got {:?}", def.mac),
+                    format!("Expected func but got {:?}", def.func),
                     error::ErrorType::TypeFail,
                     def.pos.clone(),
                 )));
@@ -1373,7 +1370,7 @@ impl<'a> FileBuilder<'a> {
             &Val::List(ref elems) => {
                 for item in elems.iter() {
                     let argvals = vec![acc.clone(), item.clone()];
-                    let result = macdef.eval(self.working_dir.clone(), self, argvals)?;
+                    let result = funcdef.eval(self.working_dir.clone(), self, argvals)?;
                     acc = result;
                 }
             }
@@ -1384,14 +1381,14 @@ impl<'a> FileBuilder<'a> {
                         Rc::new(Val::Str(name.val.clone())),
                         val.clone(),
                     ];
-                    let result = macdef.eval(self.working_dir.clone(), self, argvals)?;
+                    let result = funcdef.eval(self.working_dir.clone(), self, argvals)?;
                     acc = result;
                 }
             }
             &Val::Str(ref s) => {
                 for gc in s.graphemes(true) {
                     let argvals = vec![acc.clone(), Rc::new(Val::Str(gc.to_string()))];
-                    let result = macdef.eval(self.working_dir.clone(), self, argvals)?;
+                    let result = funcdef.eval(self.working_dir.clone(), self, argvals)?;
                     acc = result;
                 }
             }
@@ -1412,7 +1409,7 @@ impl<'a> FileBuilder<'a> {
     fn eval_functional_string_processing(
         &self,
         s: &str,
-        def: &MacroDef,
+        def: &FuncDef,
         typ: ProcessingOpType,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
         let mut result = String::new();
@@ -1466,12 +1463,12 @@ impl<'a> FileBuilder<'a> {
         scope: &Scope,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
         let maybe_target = self.eval_expr(&def.target, scope)?;
-        let maybe_mac = self.eval_value(&Value::Symbol(def.mac.clone()), &self.scope.clone())?;
+        let maybe_mac = self.eval_value(&Value::Symbol(def.func.clone()), &self.scope.clone())?;
         let macdef = match maybe_mac.as_ref() {
-            &Val::Macro(ref macdef) => macdef,
+            &Val::Func(ref macdef) => macdef,
             _ => {
                 return Err(Box::new(error::BuildError::new(
-                    format!("Expected macro but got {:?}", def.mac),
+                    format!("Expected func but got {:?}", def.func),
                     error::ErrorType::TypeFail,
                     def.pos.clone(),
                 )));
@@ -1578,7 +1575,7 @@ impl<'a> FileBuilder<'a> {
             | &Val::Int(_)
             | &Val::Str(_)
             | &Val::List(_)
-            | &Val::Macro(_)
+            | &Val::Func(_)
             | &Val::Module(_) => {
                 // record an assertion type-failure result.
                 let msg = format!(
@@ -1737,7 +1734,7 @@ impl<'a> FileBuilder<'a> {
             "float" => val.is_float(),
             "tuple" => val.is_tuple(),
             "list" => val.is_list(),
-            "macro" => val.is_macro(),
+            "func" => val.is_func(),
             "module" => val.is_module(),
             other => {
                 return Err(Box::new(error::BuildError::new(
@@ -1761,9 +1758,9 @@ impl<'a> FileBuilder<'a> {
             &Expression::Grouped(ref expr) => self.eval_expr(expr, scope),
             &Expression::Format(ref def) => self.eval_format(def, scope),
             &Expression::Call(ref def) => self.eval_call(def, scope),
-            &Expression::Macro(ref def) => {
+            &Expression::Func(ref def) => {
                 let mut def_clone = def.clone();
-                self.eval_macro_def(&mut def_clone, scope)
+                self.eval_func_def(&mut def_clone, scope)
             }
             &Expression::Module(ref def) => {
                 let mut def_clone = def.clone();

@@ -1,4 +1,4 @@
-let bucketbase = macro(name, project, location) => {
+let bucketbase = func (name, project, location) => {
     name = name,
     type = "storage.v1.bucket",
     properties = {
@@ -25,16 +25,15 @@ let bucketbase = macro(name, project, location) => {
                 role = "READER",
             },
         ],
-
     },
 };
 
-let bucketSelfLink = macro(bucket) => {
+let bucketSelfLink = func (bucket) => {
     name = "@selfLink" % (bucket),
     value = "https://console.cloud.google.com/storage/browser/@" % (bucket),
 };
 
-let bucketGsLink = macro(bucket) => {
+let bucketGsLink = func (bucket) => {
     name = "@gsLink" % (bucket),
     value = "gs://@" % (bucket),
 };

@@ -289,7 +289,7 @@ impl Value {
 /// defined.
 #[derive(PartialEq, Debug, Clone)]
 pub struct CallDef {
-    pub macroref: Value,
+    pub funcref: Value,
     pub arglist: Vec<Expression>,
     pub pos: Position,
 }
@@ -372,11 +372,11 @@ impl<'a> From<&'a PositionedItem<String>> for PositionedItem<String> {
     }
 }
 
-/// Encodes a macro expression in the UCG AST..
+/// Encodes a func expression in the UCG AST..
 ///
-/// A macro is a pure function over a tuple.
+/// A func is a pure function over a tuple.
 #[derive(PartialEq, Debug, Clone)]
-pub struct MacroDef {
+pub struct FuncDef {
     pub scope: Option<Scope>,
     pub argdefs: Vec<PositionedItem<String>>,
     pub fields: Box<Expression>,
@@ -491,7 +491,7 @@ pub enum FuncOpDef {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ReduceOpDef {
-    pub mac: PositionedItem<String>,
+    pub func: PositionedItem<String>,
     pub acc: Box<Expression>,
     pub target: Box<Expression>,
     pub pos: Position,
@@ -500,7 +500,7 @@ pub struct ReduceOpDef {
 /// MapFilterOpDef implements the list operations in the UCG AST.
 #[derive(Debug, PartialEq, Clone)]
 pub struct MapFilterOpDef {
-    pub mac: PositionedItem<String>,
+    pub func: PositionedItem<String>,
     pub target: Box<Expression>,
     pub pos: Position,
 }
@@ -626,7 +626,7 @@ pub enum Expression {
     Include(IncludeDef),
     Import(ImportDef),
     Call(CallDef),
-    Macro(MacroDef),
+    Func(FuncDef),
     Select(SelectDef),
     FuncOp(FuncOpDef),
     Module(ModuleDef),
@@ -646,7 +646,7 @@ impl Expression {
             &Expression::Grouped(ref expr) => expr.pos(),
             &Expression::Format(ref def) => &def.pos,
             &Expression::Call(ref def) => &def.pos,
-            &Expression::Macro(ref def) => &def.pos,
+            &Expression::Func(ref def) => &def.pos,
             &Expression::Module(ref def) => &def.pos,
             &Expression::Select(ref def) => &def.pos,
             &Expression::FuncOp(ref def) => def.pos(),
@@ -685,8 +685,8 @@ impl fmt::Display for Expression {
             &Expression::Call(_) => {
                 write!(w, "<MacroCall>")?;
             }
-            &Expression::Macro(_) => {
-                write!(w, "<Macro>")?;
+            &Expression::Func(_) => {
+                write!(w, "<Func>")?;
             }
             &Expression::Module(_) => {
                 write!(w, "<Module>")?;

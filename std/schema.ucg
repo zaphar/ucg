@@ -7,21 +7,21 @@ let base_types = [
     "null",
     "tuple",
     "list",
-    "macro",
+    "func",
     "module",
 ];
 
-let base_type_reducer = macro(acc, f) => select (acc.val is f), f, {
+let base_type_reducer = func (acc, f) => select (acc.val is f), f, {
     true = acc{typ = f},
     false = acc,
 };
 
 // Computes the base type of a value.
-let base_type_of = macro(val) => (reduce base_type_reducer {val=val, typ="null"}, base_types).typ;
+let base_type_of = func (val) => (reduce base_type_reducer {val=val, typ="null"}, base_types).typ;
 
 // Turns any schema check module into a compile failure.
 // The module must export the computed value as the result field.
-let must = macro(m, msg) => select m.result, fail msg, {
+let must = func (m, msg) => select m.result, fail msg, {
     true = m.result,
 };
 
@@ -36,10 +36,10 @@ let any = module {
 } => {
     let schema = import "std/schema.ucg";
 
-    let reducer = macro(acc, t) => acc{
+    let reducer = func (acc, t) => acc{
         ok = acc.ok || (schema.shaped{val=acc.val, shape=t}.result),
     };
-    let any = macro(val, types) => reduce reducer {ok=false, val=val}, types;
+    let any = func (val, types) => reduce reducer {ok=false, val=val}, types;
 
     let result = any(mod.val, mod.types).ok;
 };
@@ -51,7 +51,7 @@ let any = module {
 // recurse into nested tuples.
 // 
 // Lists are assumed to be able to contain any type and can be any length.
-// We do not check that macros or modules have the same argument lengths or types
+// We do not check that functions or modules have the same argument lengths or types
 // nor we check that they output the same types.
 let shaped = module {
     // The source value to validate
@@ -68,9 +68,9 @@ let shaped = module {
 } => {
     let schema = import "std/schema.ucg";
 
-    let simple_handler = macro(val, shape) => val is (schema.base_type_of(shape));
+    let simple_handler = func (val, shape) => val is (schema.base_type_of(shape));
 
-    let tuple_handler = macro(acc, name, value) => acc{
+    let tuple_handler = func (acc, name, value) => acc{
         ok = select (name) in acc.shape, mod.partial, {
             true = schema.shaped{val=value, shape=acc.shape.(name)}.result,
         },
@@ -84,7 +84,7 @@ let shaped = module {
         null = simple_handler(mod.val, mod.shape), 
         tuple = (reduce tuple_handler {shape=mod.shape, ok=false}, (mod.val)).ok, 
         list = simple_handler(mod.val, mod.shape),
-        macro = simple_handler(mod.val, mod.shape),
+        func = simple_handler(mod.val, mod.shape),
         module = simple_handler(mod.val, mod.shape),
     };
 };

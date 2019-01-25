@@ -78,9 +78,9 @@ impl EnvConverter {
             &Val::Tuple(ref flds) => {
                 self.convert_tuple(flds, w)?;
             }
-            &Val::Macro(ref _def) => {
+            &Val::Func(ref _def) => {
                 // This is ignored
-                eprintln!("Skipping macro...");
+                eprintln!("Skipping func...");
             }
             &Val::Env(ref _fs) => {
                 // This is ignored

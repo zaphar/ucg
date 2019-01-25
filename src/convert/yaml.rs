@@ -61,8 +61,8 @@ impl YamlConverter {
                 _ => panic!("Int is too large or not a Number {}", i),
             },
             &Val::Str(ref s) => serde_yaml::Value::String(s.clone()),
-            &Val::Macro(_) => {
-                eprintln!("Skipping macro encoding as null...");
+            &Val::Func(_) => {
+                eprintln!("Skipping func encoding as null...");
                 serde_yaml::Value::Null
             }
             &Val::Module(_) => {

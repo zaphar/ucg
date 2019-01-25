@@ -12,7 +12,7 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 use super::assets::MemoryCache;
-use super::{CallDef, FileBuilder, MacroDef, SelectDef, Val};
+use super::{FileBuilder, SelectDef, Val};
 use crate::ast::*;
 
 use std;
@@ -228,50 +228,6 @@ fn test_expr_copy_field_type_error() {
             Val::Tuple(vec![(
                 value_node!("fld1".to_string(), Position::new(1, 1, 1)),
                 Rc::new(Val::Str("2".to_string())),
-            )]),
-        )],
-        b,
-    );
-}
-
-#[test]
-#[should_panic(expected = "Unable to find binding arg1")]
-fn test_macro_hermetic() {
-    let i_paths = Vec::new();
-    let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
-    b.scope
-        .build_output
-        .entry(value_node!("arg1".to_string(), Position::new(1, 0, 0)))
-        .or_insert(Rc::new(Val::Str("bar".to_string())));
-    b.scope
-        .build_output
-        .entry(value_node!("tstmac".to_string(), Position::new(1, 0, 0)))
-        .or_insert(Rc::new(Val::Macro(MacroDef {
-            scope: None,
-            argdefs: vec![value_node!("arg2".to_string(), Position::new(1, 0, 0))],
-            fields: Box::new(Expression::Simple(Value::Symbol(value_node!(
-                "arg1".to_string(),
-                Position::new(1, 1, 1)
-            )))),
-            pos: Position::new(1, 0, 0),
-        })));
-    test_expr_to_val(
-        vec![(
-            Expression::Call(CallDef {
-                macroref: Value::Symbol(PositionedItem::new(
-                    "tstmac".to_string(),
-                    Position::new(1, 1, 1),
-                )),
-                arglist: vec![Expression::Simple(Value::Str(value_node!(
-                    "bar".to_string(),
-                    Position::new(1, 1, 1)
-                )))],
-                pos: Position::new(1, 1, 1),
-            }),
-            Val::Tuple(vec![(
-                value_node!("foo".to_string(), Position::new(1, 1, 1)),
-                Rc::new(Val::Str("bar".to_string())),
             )]),
         )],
         b,

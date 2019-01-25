@@ -6,7 +6,7 @@ let tuple = {
     deeplist = ["foo", "bar"],
 };
 
-let testmacro = macro(arg) => {
+let testfunc = func (arg) => {
     output = arg,
 };
 
@@ -47,12 +47,12 @@ assert {
     desc = "[\"one\", \"two\", \"three\"].0 == \"one\"",
 };
 
-let macro_for_test = macro() => {
+let func_for_test = func () => {
     foo = "bar",
 };
 assert {
-    ok = macro_for_test().foo == "bar",
-    desc = "macro_for_test().foo == \"bar\"",
+    ok = func_for_test().foo == "bar",
+    desc = "func_for_test().foo == \"bar\"",
 };
 
 let mymodule = module { foo = "bar" } => {

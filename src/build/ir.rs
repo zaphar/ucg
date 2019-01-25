@@ -20,7 +20,7 @@ pub enum Val {
     List(Vec<Rc<Val>>),
     Tuple(Vec<(PositionedItem<String>, Rc<Val>)>),
     Env(Vec<(String, String)>),
-    Macro(MacroDef),
+    Func(FuncDef),
     Module(ModuleDef),
 }
 
@@ -36,7 +36,7 @@ impl Val {
             &Val::List(_) => "List".to_string(),
             &Val::Tuple(_) => "Tuple".to_string(),
             &Val::Env(_) => "Env".to_string(),
-            &Val::Macro(_) => "Macro".to_string(),
+            &Val::Func(_) => "Func".to_string(),
             &Val::Module(_) => "Module".to_string(),
         }
     }
@@ -54,7 +54,7 @@ impl Val {
             &Val::List(_),
             &Val::Tuple(_),
             &Val::Env(_),
-            &Val::Macro(_),
+            &Val::Func(_),
             &Val::Module(_)
         )
     }
@@ -99,8 +99,8 @@ impl Val {
                     Ok(true)
                 }
             }
-            (&Val::Macro(_), &Val::Macro(_)) => Err(error::BuildError::new(
-                "Macros are not comparable",
+            (&Val::Func(_), &Val::Func(_)) => Err(error::BuildError::new(
+                "Func are not comparable",
                 error::ErrorType::TypeFail,
                 pos,
             )),
@@ -185,8 +185,8 @@ impl Val {
         return false;
     }
 
-    pub fn is_macro(&self) -> bool {
-        if let &Val::Macro(_) = self {
+    pub fn is_func(&self) -> bool {
+        if let &Val::Func(_) = self {
             return true;
         }
         return false;
@@ -222,7 +222,7 @@ impl Display for Val {
                 }
                 write!(f, "]")
             }
-            &Val::Macro(_) => write!(f, "Macro(..)"),
+            &Val::Func(_) => write!(f, "Func(..)"),
             &Val::Module(_) => write!(f, "Module{{..}}"),
             &Val::Tuple(ref def) => {
                 write!(f, "{{\n")?;

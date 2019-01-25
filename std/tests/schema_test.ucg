@@ -52,8 +52,8 @@ assert t.equal{
 };
 
 assert t.equal{
-    left = schema.base_type_of(macro(arg) => arg),
-    right = "macro",
+    left = schema.base_type_of(func(arg) => arg),
+    right = "func",
 };
 
 assert t.equal{

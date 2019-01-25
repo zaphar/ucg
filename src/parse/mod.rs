@@ -341,7 +341,7 @@ make_fn!(
     )
 );
 
-fn tuple_to_macro<'a>(
+fn tuple_to_func<'a>(
     pos: Position,
     vals: Option<Vec<Value>>,
     val: Expression,
@@ -357,7 +357,7 @@ fn tuple_to_macro<'a>(
             val: s.to_string(),
         })
         .collect();
-    Ok(Expression::Macro(MacroDef {
+    Ok(Expression::Func(FuncDef {
         scope: None,
         argdefs: arglist,
         fields: Box::new(val),
@@ -401,10 +401,10 @@ fn module_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expres
     }
 }
 
-fn macro_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expression> {
+fn func_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expression> {
     let parsed = do_each!(input,
         pos => pos,
-        _ => word!("macro"),
+        _ => word!("func"),
         _ => must!(punct!("(")),
         arglist => trace_parse!(optional!(arglist)),
         _ => must!(punct!(")")),
@@ -416,10 +416,10 @@ fn macro_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Express
         Result::Abort(e) => Result::Abort(e),
         Result::Fail(e) => Result::Fail(e),
         Result::Incomplete(offset) => Result::Incomplete(offset),
-        Result::Complete(rest, (pos, arglist, map)) => match tuple_to_macro(pos, arglist, map) {
+        Result::Complete(rest, (pos, arglist, map)) => match tuple_to_func(pos, arglist, map) {
             Ok(expr) => Result::Complete(rest, expr),
             Err(e) => Result::Fail(Error::caused_by(
-                "Invalid Macro syntax",
+                "Invalid func syntax",
                 Box::new(e),
                 Box::new(rest.clone()),
             )),
@@ -522,7 +522,7 @@ fn tuple_to_call<'a>(
 ) -> ConvertResult<'a, Expression> {
     if let Value::Symbol(_) = val {
         Ok(Expression::Call(CallDef {
-            macroref: val,
+            funcref: val,
             arglist: exprs.unwrap_or_else(|| Vec::new()),
             pos: (&input).into(),
         }))
@@ -562,12 +562,12 @@ make_fn!(
     do_each!(
         pos => pos,
         _ => word!("reduce"),
-        macroname => must!(match_type!(BAREWORD)),
+        funcname => must!(match_type!(BAREWORD)),
         acc => must!(trace_parse!(non_op_expression)),
         _ => must!(punct!(",")),
         tgt => must!(trace_parse!(non_op_expression)),
         (Expression::FuncOp(FuncOpDef::Reduce(ReduceOpDef{
-            mac: (&macroname).into(),
+            func: (&funcname).into(),
             acc: Box::new(acc),
             target: Box::new(tgt),
             pos: pos,
@@ -580,10 +580,10 @@ make_fn!(
     do_each!(
         pos => pos,
         _ => word!("map"),
-        macroname => must!(match_type!(BAREWORD)),
+        funcname => must!(match_type!(BAREWORD)),
         list => must!(trace_parse!(non_op_expression)),
         (Expression::FuncOp(FuncOpDef::Map(MapFilterOpDef{
-            mac: (&macroname).into(),
+            func: (&funcname).into(),
             target: Box::new(list),
             pos: pos,
         })))
@@ -595,10 +595,10 @@ make_fn!(
     do_each!(
         pos => pos,
         _ => word!("filter"),
-        macroname => must!(match_type!(BAREWORD)),
+        funcname => must!(match_type!(BAREWORD)),
         list => must!(trace_parse!(non_op_expression)),
         (Expression::FuncOp(FuncOpDef::Filter(MapFilterOpDef{
-            mac: (&macroname).into(),
+            func: (&funcname).into(),
             target: Box::new(list),
             pos: pos,
         })))
@@ -696,7 +696,7 @@ make_fn!(
     non_op_expression<SliceIter<Token>, Expression>,
     either!(
         trace_parse!(func_op_expression),
-        trace_parse!(macro_expression),
+        trace_parse!(func_expression),
         trace_parse!(import_expression),
         trace_parse!(not_expression),
         trace_parse!(fail_expression),

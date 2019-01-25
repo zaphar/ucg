@@ -1,4 +1,4 @@
-assert {macro };
+assert {func };
 assert {{ foo = hello world}};
 assert {{ foo = "hello world"};
 assert {{ = }};

@@ -1,4 +1,4 @@
-let assert_tuple = macro(tpl) => select tpl is "tuple", NULL, {
+let assert_tuple = func (tpl) => select tpl is "tuple", NULL, {
     false = fail "@ is not a tuple" % (tpl),
 };
 
@@ -10,7 +10,7 @@ let fields = module{
     // First we check that mod.tpl is a tuple.
     assert_tuple(mod.tpl);
     
-    let reducer = macro(acc, field, value) =>  acc + [field];
+    let reducer = func (acc, field, value) =>  acc + [field];
 
     let result = reduce reducer [], (mod.tpl);
 };
@@ -23,7 +23,7 @@ let values = module{
     // First we check that mod.tpl is a tuple.
     assert_tuple(mod.tpl);
     
-    let reducer = macro(acc, field, value) =>  acc + [value];
+    let reducer = func (acc, field, value) =>  acc + [value];
 
     let result = reduce reducer [], (mod.tpl);
 };
@@ -35,7 +35,7 @@ let iter = module{
     // First we check that mod.tpl is a tuple.
     assert_tuple(mod.tpl);
     
-    let reducer = macro(acc, field, value) =>  acc + [[field, value]];
+    let reducer = func (acc, field, value) =>  acc + [[field, value]];
     
     let result = reduce reducer [], (mod.tpl);
 };
@@ -47,7 +47,7 @@ let strip_nulls = module{
     // First we check that mod.tpl is a tuple.
     assert_tuple(mod.tpl);
     
-    let filterer = macro(name, value) =>  value != NULL;
+    let filterer = func (name, value) =>  value != NULL;
 
     let result = filter filterer (mod.tpl);
 };
@@ -62,7 +62,7 @@ let has_fields = module{
 
     let fs = lib.fields{tpl=mod.tpl}.result;
 
-    let reducer = macro(acc, f) => acc && (f in fs);
+    let reducer = func (acc, f) => acc && (f in fs);
 
     let result = reduce reducer true, (mod.fields);
 };
@@ -90,7 +90,7 @@ let field_type = module{
     
     let it = lib.iter{tpl=mod.tpl}.result;
     
-    let reducer = macro(acc, l) => acc && (select l.0 == mod.field, NULL, {
+    let reducer = func (acc, l) => acc && (select l.0 == mod.field, NULL, {
         true = l.1 is mod.type, // if this is the field then we propagate if it's the right type.
         false = true, // if this isn't the field then we propagate true
     });

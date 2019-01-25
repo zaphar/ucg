@@ -1,6 +1,6 @@
 let port = 3306;
 
-let mk_site_config = macro(hostname, port) => {
+let mk_site_config = func (hostname, port) => {
     base_url = "https://@/" % (hostname),
     port = port,
     dbs = [],

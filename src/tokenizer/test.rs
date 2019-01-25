@@ -154,7 +154,7 @@ fn test_lteqtok() {
 #[test]
 fn test_tokenize_one_of_each() {
     let input = OffsetStrIter::new(
-        "map out filter assert let import macro select as => [ ] { } ; = % / * \
+        "map out filter assert let import func select as => [ ] { } ; = % / * \
          + - . ( ) , 1 . foo \"bar\" // comment\n ; true false == < > <= >= !=",
     );
     let result = tokenize(input.clone());

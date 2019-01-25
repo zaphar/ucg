@@ -41,7 +41,7 @@ impl FlagConverter {
         // first of all we need to make sure that each &Val is only a primitive type.
         for v in def.iter() {
             let vref = v.as_ref();
-            if vref.is_list() || vref.is_tuple() || vref.is_macro() {
+            if vref.is_list() || vref.is_tuple() || vref.is_func() {
                 eprintln!(
                     "Skipping non primitive val in list for flag {}{}",
                     pfx, name
@@ -96,7 +96,7 @@ impl FlagConverter {
                     }
                 }
             }
-            &Val::Macro(ref _def) => {
+            &Val::Func(ref _def) => {
                 // This is ignored
                 eprintln!("Skipping macro...");
             }

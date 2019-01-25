@@ -1,14 +1,14 @@
-let noargmacro = macro() => {
+let noargmacro = func () => {
     field1 = "value",
 };
 
-let simplemacro = macro(arg1, arg2, arg3) => {
+let simplemacro = func (arg1, arg2, arg3) => {
     field1 = arg1,
     field2 = arg2,
     field3 = arg3,
 };
 
-let cplxmacro = macro(argint, argstr, argfloat) => {
+let cplxmacro = func (argint, argstr, argfloat) => {
     field1 = argint + 1,
     field2 = argstr + " are here",
     field3 = argfloat - 1.0,
@@ -53,7 +53,7 @@ assert {
     desc = "cplxresult.boolfield == true",
 };
 
-let macro_tpl_arg = macro(tpl) => {
+let macro_tpl_arg = func (tpl) => {
     result = tpl.field,
 };
 
@@ -68,7 +68,7 @@ assert {
 
 let closed_over = "foo";
 
-let closure = macro(arg1) => {
+let closure = func (arg1) => {
     result = closed_over + arg1,
 };
 
@@ -77,7 +77,7 @@ assert {
     desc = "we closed over closed_over and got @" % (closure("bar").result),
 };
 
-let concat = macro(arg1, arg2) => arg1 + arg2;
+let concat = func (arg1, arg2) => arg1 + arg2;
 
 assert {
     ok = concat("foo", "bar") == "foobar",

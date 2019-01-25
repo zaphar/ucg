@@ -1,7 +1,7 @@
 let t = (import "std/testing.ucg").asserts{};
 let f = (import "std/functional.ucg");
 
-let op = macro(arg) => arg{foo="bar"};
+let op = func (arg) => arg{foo="bar"};
 
 assert t.equal{
     left = f.maybe{val=NULL}.do(op),

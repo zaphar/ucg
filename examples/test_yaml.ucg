@@ -6,7 +6,7 @@ let dbhost2 = "db2.prod.net";
 let dbname = "testdb";
 
 // Constructor for database connection strings.
-let mk_db_conn = macro (host, port, db) => {
+let mk_db_conn = func (host, port, db) => {
     host = host,
     port = port,
     db = db,
@@ -19,7 +19,7 @@ let db_conn2 = mk_db_conn(dbhost2, shared.port, dbname);
 // We have two database connections in a list
 let db_conn_list = [db_conn1, db_conn2];
 
-let connstr_mapper = macro (item) => {
+let connstr_mapper = func (item) => {
     str = item.conn_string
 };
 

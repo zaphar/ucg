@@ -1,7 +1,7 @@
 let maybe = module{
     val = NULL,
 } => {
-    let do = macro(op) =>  select (mod.val != NULL), NULL, {
+    let do = func (op) =>  select (mod.val != NULL), NULL, {
         true = op(mod.val),
     };
 };
@@ -9,9 +9,9 @@ let maybe = module{
 let if = module{
     test = false,
 } => {
-    let do = macro(op, arg) => select mod.test, arg, {
+    let do = func (op, arg) => select mod.test, arg, {
         true = op(arg),
     };
 };
 
-let identity = macro(arg) => arg;
+let identity = func (arg) => arg;

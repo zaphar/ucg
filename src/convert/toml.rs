@@ -69,8 +69,8 @@ impl TomlConverter {
             &Val::Float(f) => toml::Value::Float(f),
             &Val::Int(i) => toml::Value::Integer(i),
             &Val::Str(ref s) => toml::Value::String(s.clone()),
-            &Val::Macro(_) => {
-                let err = SimpleError::new("Macros are not allowed in Toml Conversions!");
+            &Val::Func(_) => {
+                let err = SimpleError::new("Functions are not allowed in Toml Conversions!");
                 return Err(Box::new(err));
             }
             &Val::Module(_) => {
