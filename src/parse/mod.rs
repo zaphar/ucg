@@ -480,23 +480,35 @@ fn select_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expres
     }
 }
 
-fn tuple_to_format(tok: Token, exprs: Vec<Expression>) -> Expression {
-    Expression::Format(FormatDef {
-        template: tok.fragment.to_string(),
-        args: exprs,
-        pos: tok.pos,
-    })
-}
+make_fn!(
+    simple_format_args<SliceIter<Token>, FormatArgs>,
+    do_each!(
+        _ => punct!("("),
+        args => separated!(punct!(","), trace_parse!(expression)),
+        _ => must!(punct!(")")),
+        (FormatArgs::List(args))
+    )
+);
+
+make_fn!(
+    expression_format_args<SliceIter<Token>, FormatArgs>,
+    do_each!(
+        expr => must!(expression),
+        (FormatArgs::Single(Box::new(expr)))
+    )
+);
 
 make_fn!(
     format_expression<SliceIter<Token>, Expression>,
     do_each!(
         tmpl => match_type!(STR),
         _ => punct!("%"),
-        _ => must!(punct!("(")),
-        args => separated!(punct!(","), trace_parse!(expression)),
-        _ => must!(punct!(")")),
-        (tuple_to_format(tmpl, args))
+        args => either!(simple_format_args, expression_format_args),
+        (Expression::Format(FormatDef {
+            template: tmpl.fragment.to_string(),
+            args: args,
+            pos: tmpl.pos,
+        }))
     )
 );
 

@@ -97,8 +97,9 @@ impl Scope {
     }
 
     /// Set the current value for our execution context.
-    pub fn set_curr_val(&mut self, val: Rc<Val>) {
+    pub fn set_curr_val(mut self, val: Rc<Val>) -> Self {
         self.curr_val = Some(val);
+        self
     }
 
     /// Lookup up a list index in the current value

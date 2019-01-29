@@ -65,11 +65,16 @@ impl<'a> AstWalker<'a> {
             Expression::Copy(ref mut def) => {
                 self.walk_fieldset(&mut def.fields);
             }
-            Expression::Format(ref mut def) => {
-                for expr in def.args.iter_mut() {
+            Expression::Format(ref mut def) => match def.args {
+                FormatArgs::List(ref mut args) => {
+                    for expr in args.iter_mut() {
+                        self.walk_expression(expr);
+                    }
+                }
+                FormatArgs::Single(ref mut expr) => {
                     self.walk_expression(expr);
                 }
-            }
+            },
             Expression::FuncOp(ref mut def) => match def {
                 FuncOpDef::Reduce(ref mut def) => {
                     self.walk_expression(def.target.as_mut());

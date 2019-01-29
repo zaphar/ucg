@@ -459,11 +459,18 @@ pub struct CopyDef {
     pub pos: Position,
 }
 
+/// Encodes one of two possible forms for format expression arguments.
+#[derive(Debug, PartialEq, Clone)]
+pub enum FormatArgs {
+    List(Vec<Expression>),
+    Single(Box<Expression>),
+}
+
 /// Encodes a format expression in the UCG AST.
 #[derive(Debug, PartialEq, Clone)]
 pub struct FormatDef {
     pub template: String,
-    pub args: Vec<Expression>,
+    pub args: FormatArgs,
     pub pos: Position,
 }
 

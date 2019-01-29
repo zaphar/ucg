@@ -33,7 +33,7 @@ use crate::ast::*;
 use crate::build::scope::{find_in_fieldlist, Scope, ValueMap};
 use crate::convert::ImporterRegistry;
 use crate::error;
-use crate::format;
+use crate::format::{ExpressionFormatter, FormatRenderer, SimpleFormatter};
 use crate::iter::OffsetStrIter;
 use crate::parse::parse;
 
@@ -908,8 +908,7 @@ impl<'a> FileBuilder<'a> {
             return Ok(Rc::new(Val::Boolean(false)));
         } else {
             // Handle our tuple case since this isn't a list.
-            let mut child_scope = scope.spawn_child();
-            child_scope.set_curr_val(right.clone());
+            let child_scope = scope.spawn_child().set_curr_val(right.clone());
             // Search for the field in our tuple or list.
             let maybe_val = self.do_dot_lookup(left, &child_scope);
             // Return the result of the search.
@@ -969,8 +968,7 @@ impl<'a> FileBuilder<'a> {
             }
         }
         let left = self.eval_expr(&def.left, scope)?;
-        let mut child_scope = scope.spawn_child();
-        child_scope.set_curr_val(left.clone());
+        let child_scope = scope.spawn_child().set_curr_val(left.clone());
         if let &BinaryExprType::DOT = kind {
             return self.do_dot_lookup(&def.right, &child_scope);
         };
@@ -1093,8 +1091,7 @@ impl<'a> FileBuilder<'a> {
     fn eval_copy(&self, def: &CopyDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         let v = self.eval_value(&def.selector, scope)?;
         if let &Val::Tuple(ref src_fields) = v.as_ref() {
-            let mut child_scope = scope.spawn_child();
-            child_scope.set_curr_val(v.clone());
+            let child_scope = scope.spawn_child().set_curr_val(v.clone());
             return self.copy_from_base(&src_fields, &def.fields, &child_scope);
         }
         if let &Val::Module(ref mod_def) = v.as_ref() {
@@ -1108,8 +1105,7 @@ impl<'a> FileBuilder<'a> {
                 //    argset.
                 // Push our base tuple on the stack so the copy can use
                 // self to reference it.
-                let mut child_scope = scope.spawn_child();
-                child_scope.set_curr_val(maybe_tpl.clone());
+                let child_scope = scope.spawn_child().set_curr_val(maybe_tpl.clone());
                 let mod_args = self.copy_from_base(src_fields, &def.fields, &child_scope)?;
                 // put our copied parameters tuple in our builder under the mod key.
                 let mod_key =
@@ -1156,14 +1152,27 @@ impl<'a> FileBuilder<'a> {
 
     fn eval_format(&self, def: &FormatDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         let tmpl = &def.template;
-        let args = &def.args;
-        let mut vals = Vec::new();
-        for v in args.iter() {
-            let rcv = self.eval_expr(v, scope)?;
-            vals.push(rcv.deref().clone());
-        }
-        let formatter = format::Formatter::new(tmpl.clone(), vals);
-        Ok(Rc::new(Val::Str(formatter.render(&def.pos)?)))
+        return match &def.args {
+            FormatArgs::List(ref args) => {
+                let mut vals = Vec::new();
+                for v in args.iter() {
+                    let rcv = self.eval_expr(v, scope)?;
+                    vals.push(rcv.deref().clone());
+                }
+                let formatter = SimpleFormatter::new(tmpl.clone(), vals);
+                Ok(Rc::new(Val::Str(formatter.render(&def.pos)?)))
+            }
+            FormatArgs::Single(ref expr) => {
+                let val = self.eval_expr(expr, scope)?;
+                let mut builder = self.clone_builder();
+                builder.scope.build_output.insert(
+                    PositionedItem::new("item".to_string(), expr.pos().clone()),
+                    val,
+                );
+                let formatter = ExpressionFormatter::new(tmpl.clone(), builder);
+                Ok(Rc::new(Val::Str(formatter.render(&def.pos)?)))
+            }
+        };
     }
 
     fn eval_call(&self, def: &CallDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {

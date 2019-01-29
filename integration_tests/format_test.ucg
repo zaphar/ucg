@@ -1,16 +1,36 @@
-assert {
-    ok = "hello @" % ("world") == "hello world",
-    desc = "\"hello @\" % (\"world\") == \"hello world\"",
+let t = import "std/testing.ucg".asserts{};
+
+assert t.equal{
+    left = "hello @" % ("world"),
+    right = "hello world",
 };
-assert {
-    ok = "1 @ @" % (2, 3) == "1 2 3",
-    desc = "\"1 @ @\" % (2, 3) == \"1 2 3\"",
+
+assert t.equal{
+    left = "1 @ @" % (2, 3),
+    right = "1 2 3",
 };
-assert {
-    ok = "@ or @" % (true, false) == "true or false",
-    desc = "\"@ or @\" % (true, false) == \"true or false\"",
+
+assert t.equal{
+    left = "@ or @" % (true, false),
+    right = "true or false",
 };
-assert {
-    ok = "@" % (NULL) == "NULL",
-    desc = "\"@\" % (NULL) == \"NULL\"",
+
+assert t.equal{
+    left = "@" % (NULL),
+    right = "NULL",
+};
+
+assert t.equal{
+    left = "bar is just great" % {foo="bar"},
+    right = "bar is just great",
+};
+
+assert t.equal{
+    left = "@{item.foo} is just great" % {foo="bar"},
+    right = "bar is just great",
+};
+
+assert t.equal{
+    left = "@{{foo=item.foo}.foo} is just great" % {foo="bar"},
+    right = "bar is just great",
 };
