@@ -34,3 +34,18 @@ assert t.equal{
     left = "@{{foo=item.foo}.foo} is just great" % {foo="bar"},
     right = "bar is just great",
 };
+
+assert t.equal{
+    left = "@{1 + 1} is just great" % {},
+    right = "2 is just great",
+};
+
+assert t.equal{
+    left = "@{item.0 + item.1 + item.2} is just great" % [0, 1, 2],
+    right = "3 is just great",
+};
+
+assert t.equal{
+    left = "@{item.op()} is just great" % {op=func() => "BOB!"},
+    right = "BOB! is just great",
+};
