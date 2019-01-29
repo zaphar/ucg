@@ -132,7 +132,9 @@ call_expr: bareword, lparen, [arglist], rparen ;
 #### Format Expression
 
 ```
-format_expr: str, percent, lparen, [arglist], rparen ;
+format_arg_list: lparen, [arglist], rparen ;
+foramt_expr_arg: expression ;
+format_expr: str, percent, (format_arg_list | format_expr_arg) ;
 ```
 
 ### Functional processing expressions

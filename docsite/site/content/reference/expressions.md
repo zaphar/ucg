@@ -258,14 +258,31 @@ let imported_val = (import "some_file.ucg").val;
 Format Expressions
 ----------
 
-UCG has a format expression that has a limited form of string templating. A
-format expression starts with a string followed by the `%` operator and a list
+UCG has a format expression that has a limited form of string templating. Format expressions come in two forms.
+
+The simplest form starts with a string followed by the `%` operator and a list
 of arguments in parentheses separated by commas. Trailing commas are allowed.
 The format string should have `@` characters in each location where a value
 should be placed. Any primitive value can be used as an argument.
 
 ```
 "https://@:@/" % (host, port)
+```
+
+A slightly more complex form starts with a string followed by the `%` operator and
+an expression. the template string can then reference the result of the expression
+in expressions embedded within the format string. The expressions result can be referenced using the special name `item` in the embedded expression. The result
+of the expression will be rendered as the default string representation in the
+resulting string.
+
+```
+let tpl = {
+    foo = {
+        bar = [0, 1, 2],
+    },
+};
+
+"foo.bar.1 == @{item.foo.bar.1}" % tpl;
 ```
 
 Range Expression
