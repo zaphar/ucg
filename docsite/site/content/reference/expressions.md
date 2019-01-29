@@ -269,11 +269,12 @@ should be placed. Any primitive value can be used as an argument.
 "https://@:@/" % (host, port)
 ```
 
-A slightly more complex form starts with a string followed by the `%` operator and
-an expression. the template string can then reference the result of the expression
-in expressions embedded within the format string. The expressions result can be referenced using the special name `item` in the embedded expression. The result
-of the expression will be rendered as the default string representation in the
-resulting string.
+A slightly more complex form starts with a string followed by the `%` operator
+and an unparenthesized expression. the template string can then reference the
+result of the expression in expressions embedded within the format string. The
+expressions result can be referenced using the special name `item` in the
+embedded expression. The result of the expression will be rendered as the
+default string representation in the resulting string.
 
 ```
 let tpl = {
@@ -284,6 +285,9 @@ let tpl = {
 
 "foo.bar.1 == @{item.foo.bar.1}" % tpl;
 ```
+
+If the `%` operator is followed by a parenthesized expression it will be treated
+as the first form with one item.
 
 Range Expression
 ----------------
