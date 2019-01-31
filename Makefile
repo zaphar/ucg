@@ -5,17 +5,27 @@ build:
 
 test: stdlibtest
 
-unit: 
-	cargo test 
+rustfiles := $(find . -type f -name '*.rs')
+stdlibfiles := $(find std -type f -name '*.ucg)
 
-integration: unit
-	cargo run -- test -r integration_tests 
+unittest.log: $(rustfiles)
+	cargo test | tee unittest.log
 
-stdlibtest: integration
-	cargo run -- test -r std/tests
+unit: unittest.log
+
+integration.log: unit
+	cargo run -- test -r integration_tests | tee integration.log
+
+integration: integration.log
+
+stdlibtest.log: $(stdlibfiles)
+	cargo run -- test -r std/tests | tee stdlibtest.log
+
+stdlibtest: stdlibtest.log integration
 
 install: test
 	cargo install --path . --force
 
 publish: build test
 	cargo publish
+	(cd docsite; make deploysite)
