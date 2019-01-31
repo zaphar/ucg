@@ -37,11 +37,11 @@ fn do_flags<'a, 'b>() -> clap::App<'a, 'b> {
             (author: crate_authors!())
             (about: "Universal Configuration Grammar compiler.")
             (@arg nostrict: --("no-strict") "Turn off strict checking.")
-            (@subcommand inspect =>
-             (about: "Inspect a specific symbol in a ucg file.")
-             (@arg expr: --expr +takes_value +required "Specify a specific binding in the ucg file to output.")
-             (@arg target: --format +required +takes_value "Inspect output type. (flags, json, env, exec)")
-             (@arg INPUT: +required "Input ucg file to inspect symbol from.")
+            (@subcommand eval =>
+             (about: "Evaluate an expression with an optional ucg file as context.")
+             (@arg expr: --expr -e +takes_value +required "Expression to evaluate.")
+             (@arg target: --format +takes_value "Output type. (flags, json, env, exec) defaults to json.")
+             (@arg INPUT: "ucg file to use as context for the expression.")
             )
             (@subcommand build =>
              (about: "Build a list of ucg files.")
@@ -244,9 +244,9 @@ fn inspect_command(
     registry: &ConverterRegistry,
     strict: bool,
 ) {
-    let file = matches.value_of("INPUT").unwrap();
+    let file = matches.value_of("INPUT").unwrap_or("std/functional.ucg");
     let sym = matches.value_of("expr");
-    let target = matches.value_of("target").unwrap();
+    let target = matches.value_of("target").unwrap_or("json");
     let mut builder =
         build::FileBuilder::new(std::env::current_dir().unwrap(), import_paths, cache);
     builder.set_strict(strict);
@@ -282,17 +282,20 @@ fn inspect_command(
                 Some(value) => {
                     // We use None here because we always output to stdout for an inspect.
                     run_converter(converter, value, None).unwrap();
-                    eprintln!("Build successful");
+                    println!("");
                     process::exit(0);
                 }
                 None => {
-                    eprintln!("Build results in no value.");
+                    eprintln!("No value.");
                     process::exit(1);
                 }
             }
         }
         None => {
-            eprintln!("No such converter {}", target);
+            eprintln!(
+                "No such format {}\nrun `ucg converters` to see available formats.",
+                target
+            );
             process::exit(1);
         }
     }
@@ -448,7 +451,7 @@ fn main() {
     } else {
         true
     };
-    if let Some(matches) = app_matches.subcommand_matches("inspect") {
+    if let Some(matches) = app_matches.subcommand_matches("eval") {
         inspect_command(matches, &import_paths, cache, &registry, strict);
     } else if let Some(matches) = app_matches.subcommand_matches("build") {
         build_command(matches, &import_paths, cache, &registry, strict);

@@ -32,17 +32,21 @@ Running ucg help will show the following output.
 Universal Configuration Grammar compiler.
 
 USAGE:
-    ucg [SUBCOMMAND]
+    ucg [FLAGS] [SUBCOMMAND]
 
 FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
+    -h, --help         Prints help information
+        --no-strict    Turn off strict checking.
+    -V, --version      Prints version information
 
 SUBCOMMANDS:
-    build       Build a specific ucg file.
-    help        Prints this message or the help of the given subcommand(s)
-    inspect     Inspect a specific symbol in a ucg file.
-    test        Check a specific ucg file for errors.
+    build         Build a list of ucg files.
+    converters    list the available converters
+    env           Describe the environment variables ucg uses.
+    eval          Evaluate an expression with an optional ucg file as context.
+    help          Prints this message or the help of the given subcommand(s)
+    importers     list the available importers for includes
+    test          Check a list of ucg files for errors and run test assertions.
 ```
 
 ## Compiling
