@@ -574,12 +574,13 @@ make_fn!(
     do_each!(
         pos => pos,
         _ => word!("reduce"),
-        funcname => must!(match_type!(BAREWORD)),
+        func => must!(expression),
+        _ => must!(punct!(",")),
         acc => must!(trace_parse!(non_op_expression)),
         _ => must!(punct!(",")),
         tgt => must!(trace_parse!(non_op_expression)),
         (Expression::FuncOp(FuncOpDef::Reduce(ReduceOpDef{
-            func: (&funcname).into(),
+            func: Box::new(func),
             acc: Box::new(acc),
             target: Box::new(tgt),
             pos: pos,
@@ -592,10 +593,11 @@ make_fn!(
     do_each!(
         pos => pos,
         _ => word!("map"),
-        funcname => must!(match_type!(BAREWORD)),
+        func => must!(expression),
+        _ => must!(punct!(",")),
         list => must!(trace_parse!(non_op_expression)),
         (Expression::FuncOp(FuncOpDef::Map(MapFilterOpDef{
-            func: (&funcname).into(),
+            func: Box::new(func),
             target: Box::new(list),
             pos: pos,
         })))
@@ -607,10 +609,11 @@ make_fn!(
     do_each!(
         pos => pos,
         _ => word!("filter"),
-        funcname => must!(match_type!(BAREWORD)),
+        func => must!(expression),
+        _ => must!(punct!(",")),
         list => must!(trace_parse!(non_op_expression)),
         (Expression::FuncOp(FuncOpDef::Filter(MapFilterOpDef{
-            func: (&funcname).into(),
+            func: Box::new(func),
             target: Box::new(list),
             pos: pos,
         })))

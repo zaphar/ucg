@@ -348,7 +348,7 @@ function is expected to take a single argument.
 let list1 = [1, 2, 3, 4];
 
 let mapper = func (item) =>  item + 1;
-map mapper list1 == [2, 3, 4, 5];
+map mapper, list1 == [2, 3, 4, 5];
 ```
 
 **For Tuples**
@@ -367,7 +367,7 @@ let tpl_mapper = func (name, val) =>  select name, [name, val], {
     "foo" = ["foo", "barbar"],
     quux = ["cute", "pygmy"],
 };
-map tpl_mapper test_tpl == {foo = "barbar", cute = "pygmy"};
+map tpl_mapper, test_tpl == {foo = "barbar", cute = "pygmy"};
 ```
 
 ### Filter expressions
@@ -384,7 +384,7 @@ let filtrator = func (item) => select item, NULL, {
     foo = item,
 };
 
-filter filtrator.result list2 == ["foo", "foo"];
+filter filtrator, list2 == ["foo", "foo"];
 ```
 
 **Tuples**
@@ -395,7 +395,7 @@ let test_tpl = {
     quux = "baz",
 };
 let tpl_filter = func (name, val) =>  name != "foo";
-filter tpl_filter test_tpl == { quux = "baz" };
+filter tpl_filter, test_tpl == { quux = "baz" };
 ```
 
 ### Reduce expressions
@@ -416,7 +416,7 @@ let tpl_reducer = func (acc, name, val) =>  acc{
     vals = self.vals + [val],
 };
 
-reduce tpl_reducer {keys = [], vals = []}, test_tpl == {keys = ["foo", "quux"], vals = ["bar", "baz"]};
+reduce tpl_reducer, {keys = [], vals = []}, test_tpl == {keys = ["foo", "quux"], vals = ["bar", "baz"]};
 ```
 
 **Lists**
@@ -425,7 +425,7 @@ reduce tpl_reducer {keys = [], vals = []}, test_tpl == {keys = ["foo", "quux"], 
 let list1 = [1, 2, 3, 4];
 let list_reducer = func (acc, item) =>  acc + item;
 
- list_reducer 0, list1 == 0 + 1 + 2 + 3 + 4;
+reduce list_reducer, 0, list1 == 0 + 1 + 2 + 3 + 4;
 ```
 
 Include expressions

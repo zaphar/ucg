@@ -1364,7 +1364,7 @@ impl<'a> FileBuilder<'a> {
     fn eval_reduce_op(&self, def: &ReduceOpDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         let maybe_target = self.eval_expr(&def.target, scope)?;
         let mut acc = self.eval_expr(&def.acc, scope)?;
-        let maybe_mac = self.eval_value(&Value::Symbol(def.func.clone()), &self.scope.clone())?;
+        let maybe_mac = self.eval_expr(&def.func, scope)?;
         let funcdef = match maybe_mac.as_ref() {
             &Val::Func(ref funcdef) => funcdef,
             _ => {
@@ -1472,7 +1472,7 @@ impl<'a> FileBuilder<'a> {
         scope: &Scope,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
         let maybe_target = self.eval_expr(&def.target, scope)?;
-        let maybe_mac = self.eval_value(&Value::Symbol(def.func.clone()), &self.scope.clone())?;
+        let maybe_mac = self.eval_expr(&def.func, scope)?;
         let macdef = match maybe_mac.as_ref() {
             &Val::Func(ref macdef) => macdef,
             _ => {

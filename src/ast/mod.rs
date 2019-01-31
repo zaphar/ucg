@@ -498,7 +498,7 @@ pub enum FuncOpDef {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ReduceOpDef {
-    pub func: PositionedItem<String>,
+    pub func: Box<Expression>,
     pub acc: Box<Expression>,
     pub target: Box<Expression>,
     pub pos: Position,
@@ -507,7 +507,7 @@ pub struct ReduceOpDef {
 /// MapFilterOpDef implements the list operations in the UCG AST.
 #[derive(Debug, PartialEq, Clone)]
 pub struct MapFilterOpDef {
-    pub func: PositionedItem<String>,
+    pub func: Box<Expression>,
     pub target: Box<Expression>,
     pub pos: Position,
 }
