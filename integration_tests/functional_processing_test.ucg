@@ -144,3 +144,22 @@ assert {
     ok = reduce((char_iter), [], "foo") == ["f", "o", "o"],
     desc = "We can use arbitrary expressions to refer to the macro.",
 };
+
+let tpl_with_list = {
+    list = [1, 2, 3],
+};
+
+assert {
+    ok = reduce(func(acc, s) => acc + [s + 1], [], tpl_with_list.list) == [2, 3, 4],
+    desc = "We can use full expressions for any of the arguments to reduce",
+};
+
+assert {
+    ok = map(func(item) => item + 1, tpl_with_list.list) == [2, 3, 4],
+    desc = "We can use full expressions for any of the arguments to map",
+};
+
+assert {
+    ok = filter(func(item) => item != 1, tpl_with_list.list) == [2, 3],
+    desc = "We can use full expressions for any of the arguments to map",
+};

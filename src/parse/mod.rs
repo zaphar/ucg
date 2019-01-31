@@ -577,9 +577,9 @@ make_fn!(
         _ => must!(punct!("(")),
         func => must!(expression),
         _ => must!(punct!(",")),
-        acc => must!(trace_parse!(non_op_expression)),
+        acc => must!(trace_parse!(expression)),
         _ => must!(punct!(",")),
-        tgt => must!(trace_parse!(non_op_expression)),
+        tgt => must!(trace_parse!(expression)),
         _ => must!(punct!(")")),
         (Expression::FuncOp(FuncOpDef::Reduce(ReduceOpDef{
             func: Box::new(func),
@@ -598,7 +598,7 @@ make_fn!(
         _ => must!(punct!("(")),
         func => must!(expression),
         _ => must!(punct!(",")),
-        list => must!(trace_parse!(non_op_expression)),
+        list => must!(trace_parse!(expression)),
         _ => must!(punct!(")")),
         (Expression::FuncOp(FuncOpDef::Map(MapFilterOpDef{
             func: Box::new(func),
@@ -616,7 +616,7 @@ make_fn!(
         _ => must!(punct!("(")),
         func => must!(expression),
         _ => must!(punct!(",")),
-        list => must!(trace_parse!(non_op_expression)),
+        list => must!(trace_parse!(expression)),
         _ => must!(punct!(")")),
         (Expression::FuncOp(FuncOpDef::Filter(MapFilterOpDef{
             func: Box::new(func),
