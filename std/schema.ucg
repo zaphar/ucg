@@ -17,7 +17,7 @@ let base_type_reducer = func (acc, f) => select (acc.val is f), f, {
 };
 
 // Computes the base type of a value.
-let base_type_of = func (val) => (reduce base_type_reducer, {val=val, typ="null"}, base_types).typ;
+let base_type_of = func (val) => reduce(base_type_reducer, {val=val, typ="null"}, base_types).typ;
 
 // Turns any schema check module into a compile failure.
 // The module must export the computed value as the result field.
@@ -39,7 +39,7 @@ let any = module {
     let reducer = func (acc, t) => acc{
         ok = acc.ok || (schema.shaped{val=acc.val, shape=t}.result),
     };
-    let any = func (val, types) => reduce reducer, {ok=false, val=val}, types;
+    let any = func (val, types) => reduce(reducer, {ok=false, val=val}, types);
 
     let result = any(mod.val, mod.types).ok;
 };
@@ -82,7 +82,7 @@ let shaped = module {
         float = simple_handler(mod.val, mod.shape),
         bool = simple_handler(mod.val, mod.shape),
         null = simple_handler(mod.val, mod.shape), 
-        tuple = (reduce tuple_handler, {shape=mod.shape, ok=false}, (mod.val)).ok, 
+        tuple = reduce(tuple_handler, {shape=mod.shape, ok=false}, (mod.val)).ok, 
         list = simple_handler(mod.val, mod.shape),
         func = simple_handler(mod.val, mod.shape),
         module = simple_handler(mod.val, mod.shape),

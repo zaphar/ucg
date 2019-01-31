@@ -13,8 +13,8 @@ let boolfiltrator = func (item) => item < 5;
 let identity_list_reducer = func (acc, item) =>  acc + [item];
 
 assert {
-    ok = reduce identity_list_reducer, [], list1 == list1,
-    desc = "reduce identity_list_reducer, [], list1 == list1",
+    ok = reduce(identity_list_reducer, [], list1) == list1,
+    desc = "reduce(identity_list_reducer, [], list1) == list1",
 };
 
 let nested_list = {
@@ -22,53 +22,53 @@ let nested_list = {
 };
 
 assert {
-    ok = reduce identity_list_reducer, [], (nested_list.list) == list1,
-    desc = "reduce identity_list_reducer, [], (nested_list.list) == list1",
+    ok = reduce(identity_list_reducer, [], (nested_list.list)) == list1,
+    desc = "reduce(identity_list_reducer, [], (nested_list.list)) == list1",
 };
 
 let list_reducer = func (acc, item) =>  acc + item;
 
 assert {
-    ok = reduce list_reducer, 0, list1 == 0 + 1 + 2 + 3 + 4,
-    desc = "reduce list_reducer, 0, list1 == 0 + 1 + 2 + 3 + 4",
+    ok = reduce(list_reducer, 0, list1) == 0 + 1 + 2 + 3 + 4,
+    desc = "reduce(list_reducer, 0, list1) == 0 + 1 + 2 + 3 + 4",
 };
 
 assert {
-    ok = map mapper, list1 == [2, 3, 4, 5],
-    desc = "map mapper, list1 == [2, 3, 4, 5]",
+    ok = map(mapper, list1) == [2, 3, 4, 5],
+    desc = "map(mapper, list1) == [2, 3, 4, 5]",
 };
 assert {
-    ok = (map mapper, [1, 2, 3, 4]) == [2, 3, 4, 5],
-    desc = "(map mapper, [1, 2, 3, 4]) == [2, 3, 4, 5]",
+    ok = (map(mapper, [1, 2, 3, 4])) == [2, 3, 4, 5],
+    desc = "(map(mapper, [1, 2, 3, 4])) == [2, 3, 4, 5]",
 };
 assert {
-    ok = map mapper, [1, 2, 3, 4] == [2, 3, 4, 5],
-    desc = "map mapper, [1, 2, 3, 4] == [2, 3, 4, 5]",
+    ok = map(mapper, [1, 2, 3, 4]) == [2, 3, 4, 5],
+    desc = "map(mapper, [1, 2, 3, 4]) == [2, 3, 4, 5]",
 };
 
 let s_mapper = func (arg) => arg + ",";
 
 assert {
-    ok = map s_mapper, "foo" == "f,o,o,",
+    ok = map(s_mapper, "foo") == "f,o,o,",
     desc = "we can map over each character",
 };
 
 assert {
-    ok = filter filtrator, list2 == ["foo", "foo"],
-    desc = "filter filtrator, list2 == [\"foo\", \"foo\"]",
+    ok = filter(filtrator, list2) == ["foo", "foo"],
+    desc = "filter(filtrator, list2) == [\"foo\", \"foo\"]",
 };
 
 assert {
-    ok = (filter filtrator, ["foo", "bar", "foo", "bar"]) == ["foo", "foo"],
-    desc = "(filter filtrator, [\"foo\", \"bar\", \"foo\", \"bar\"]) == [\"foo\", \"foo\"]",
+    ok = (filter(filtrator, ["foo", "bar", "foo", "bar"])) == ["foo", "foo"],
+    desc = "(filter(filtrator, [\"foo\", \"bar\", \"foo\", \"bar\"])) == [\"foo\", \"foo\"]",
 };
 assert {
-    ok = filter filtrator, ["foo", "bar", "foo", "bar"] == ["foo", "foo"],
-    desc = "filter filtrator, [\"foo\", \"bar\", \"foo\", \"bar\"] == [\"foo\", \"foo\"]",
+    ok = filter(filtrator, ["foo", "bar", "foo", "bar"]) == ["foo", "foo"],
+    desc = "filter(filtrator, [\"foo\", \"bar\", \"foo\", \"bar\"]) == [\"foo\", \"foo\"]",
 };
 assert {
-    ok = filter boolfiltrator, [1, 2, 3, 4, 5, 6, 7] == [1, 2, 3, 4],
-    desc = "filter boolfiltrator, [1, 2, 3, 4, 5, 6, 7] == [1, 2, 3, 4]",
+    ok = filter(boolfiltrator, [1, 2, 3, 4, 5, 6, 7]) == [1, 2, 3, 4],
+    desc = "filter(boolfiltrator, [1, 2, 3, 4, 5, 6, 7]) == [1, 2, 3, 4]",
 };
 
 // Tuple processing
@@ -80,8 +80,8 @@ let test_tpl = {
 let identity_tpl_mapper = func (name, val) => [name, val];
 
 assert {
-    ok = map identity_tpl_mapper, test_tpl == test_tpl,
-    desc = "map identity_tpl_mapper, test_tpl == test_tpl",
+    ok = map(identity_tpl_mapper, test_tpl) == test_tpl,
+    desc = "map(identity_tpl_mapper, test_tpl) == test_tpl",
 };
 
 let tpl_mapper = func (name, val) => select name, [name, val], {
@@ -90,8 +90,8 @@ let tpl_mapper = func (name, val) => select name, [name, val], {
 };
 
 assert {
-    ok = map tpl_mapper, test_tpl == {foo = "barbar", cute = "pygmy"},
-    desc = "map tpl_mapper, test_tpl == {foo = \"barbar\", cute = \"pygmy\"}",
+    ok = map(tpl_mapper, test_tpl) == {foo = "barbar", cute = "pygmy"},
+    desc = "map(tpl_mapper, test_tpl) == {foo = \"barbar\", cute = \"pygmy\"}",
 };
 
 let identity_tpl_filter = func (name, val) =>  true;
@@ -100,19 +100,19 @@ let identity_tpl_filter = func (name, val) =>  true;
 let tpl_filter = func (name, val) => name != "foo";
 
 assert {
-    ok = filter identity_tpl_filter, test_tpl == test_tpl,
-    desc = "filter identity_tpl_filter, test_tpl == test_tpl",
+    ok = filter(identity_tpl_filter, test_tpl) == test_tpl,
+    desc = "filter(identity_tpl_filter, test_tpl) == test_tpl",
 };
 
 assert {
-    ok = filter tpl_filter, test_tpl == { quux = "baz" },
-    desc = "filter tpl_filter, test_tpl == { quux = \"baz\" }",
+    ok = filter(tpl_filter, test_tpl) == { quux = "baz" },
+    desc = "filter(tpl_filter, test_tpl) == { quux = \"baz\" }",
 };
 
 let o_str_filter = func (s) => s != "o";
 
 assert {
-    ok = filter o_str_filter, "foobar" == "fbar",
+    ok = filter(o_str_filter, "foobar") == "fbar",
     desc = "We can strip out characters",
 };
 
@@ -122,25 +122,25 @@ let tpl_reducer = func (acc, name, val) => acc{
 };
 
 assert {
-    ok = reduce tpl_reducer, {keys = [], vals = []}, test_tpl == {keys = ["foo", "quux"], vals = ["bar", "baz"]},
-    desc = "reduce tpl_reducer, {keys = [], vals = []}, test_tpl == {keys = [\"foo\", \"quux\"], vals = [\"bar\", \"baz\"]}",
+    ok = reduce(tpl_reducer, {keys = [], vals = []}, test_tpl) == {keys = ["foo", "quux"], vals = ["bar", "baz"]},
+    desc = "reduce(tpl_reducer, {keys = [], vals = []}, test_tpl) == {keys = [\"foo\", \"quux\"], vals = [\"bar\", \"baz\"]}",
 };
 
 let str_identity_reducer = func (acc, s) => acc + s;
 
 assert {
-    ok = reduce str_identity_reducer, "", "foo" == "foo",
+    ok = reduce(str_identity_reducer, "", "foo") == "foo",
     desc = "identity reducer copies string",
 };
 
 let char_iter = func (acc, s) => acc + [s];
 
 assert {
-    ok = reduce char_iter, [], "foo" == ["f", "o", "o"],
+    ok = reduce(char_iter, [], "foo") == ["f", "o", "o"],
     desc = "we can split a string into grapheme clusters",
 };
 
 assert {
-    ok = reduce (char_iter), [], "foo" == ["f", "o", "o"],
+    ok = reduce((char_iter), [], "foo") == ["f", "o", "o"],
     desc = "We can use arbitrary expressions to refer to the macro.",
 };
