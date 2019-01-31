@@ -134,6 +134,13 @@ impl Scope {
         }
         if self.search_curr_val && self.curr_val.is_some() {
             match self.curr_val.as_ref().unwrap().as_ref() {
+                &Val::Env(ref fs) => {
+                    for (name, val) in fs.iter() {
+                        if name == &sym.val {
+                            return Some(Rc::new(Val::Str(val.clone())));
+                        }
+                    }
+                }
                 &Val::Tuple(ref fs) => match Self::lookup_in_tuple(&sym.pos, &sym.val, fs) {
                     Ok(v) => return Some(v),
                     Err(_) => {
