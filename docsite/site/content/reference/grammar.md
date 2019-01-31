@@ -141,8 +141,8 @@ format_expr: str, percent, (format_arg_list | format_expr_arg) ;
 
 ```
 func_op_kind: map_keyword | filter_keyword ;
-map_or_filter_expr: func_op_kind, expr, expr ;
-reduce_expr: reduce_keyword, expr, expr, expr ;
+map_or_filter_expr: func_op_kind, lparen, expr, expr, rparen ;
+reduce_expr: reduce_keyword, lparen, expr, expr, expr, rparen ;
 processing_expr: map_or_filter_expr | reduce_expr
 ```
 

@@ -330,7 +330,7 @@ Functional processing expressions
 UCG has a few functional processing expressions called `map`, `filter`, and
 `reduce`. All of them can process a string, list, or tuple.
 
-Their syntax starts with either `map` `filter`, or `reduce followed by a symbol
+Their syntax starts with either `map` `filter`, or `reduce` followed by a symbol
 that references a valid func and finally an expression that resolves to either
 a list or a tuple.
 
@@ -339,7 +339,7 @@ a list or a tuple.
 Map functions should produce either a valid value or a list of [field, value] that
 will replace the element or field it is curently processing.
 
-**For Lists**
+**Lists**
 
 When mapping a function across a list the result field can be any valid value. The
 function is expected to take a single argument.
@@ -348,10 +348,10 @@ function is expected to take a single argument.
 let list1 = [1, 2, 3, 4];
 
 let mapper = func (item) =>  item + 1;
-map mapper, list1 == [2, 3, 4, 5];
+map(mapper, list1) == [2, 3, 4, 5];
 ```
 
-**For Tuples**
+**Tuples**
 
 Functions for mapping across a tuple are expected to take two arguments. The first
 argument is the name of the field. The second argument is the value in that
@@ -367,7 +367,16 @@ let tpl_mapper = func (name, val) =>  select name, [name, val], {
     "foo" = ["foo", "barbar"],
     quux = ["cute", "pygmy"],
 };
-map tpl_mapper, test_tpl == {foo = "barbar", cute = "pygmy"};
+map(tpl_mapper, test_tpl) == {foo = "barbar", cute = "pygmy"};
+```
+
+**Strings**
+
+```
+let string = "foo";
+let string_mapper = func (item) =>  item + item;
+
+map(string_reducer, 0, string) == "ffoooo";
 ```
 
 ### Filter expressions
@@ -384,7 +393,7 @@ let filtrator = func (item) => select item, NULL, {
     foo = item,
 };
 
-filter filtrator, list2 == ["foo", "foo"];
+filter(filtrator, list2) == ["foo", "foo"];
 ```
 
 **Tuples**
@@ -395,14 +404,23 @@ let test_tpl = {
     quux = "baz",
 };
 let tpl_filter = func (name, val) =>  name != "foo";
-filter tpl_filter, test_tpl == { quux = "baz" };
+filter(tpl_filter, test_tpl) == { quux = "baz" };
+```
+
+**Strings**
+
+```
+let string = "foo";
+let string_filter = func (item) =>  item != "f";
+
+filter(string_reducer, 0, string) == "oo";
 ```
 
 ### Reduce expressions
 
 Reduce expressions start with the reduce keyword followed by a symbol
-referencing a func, an expression for the accumulator, and finally the tuple or
-list to process.
+referencing a func, an expression for the accumulator, and finally the tuple
+list, or string to process.
 
 **Tuples**
 
@@ -416,7 +434,7 @@ let tpl_reducer = func (acc, name, val) =>  acc{
     vals = self.vals + [val],
 };
 
-reduce tpl_reducer, {keys = [], vals = []}, test_tpl == {keys = ["foo", "quux"], vals = ["bar", "baz"]};
+reduce(tpl_reducer, {keys = [], vals = []}, test_tpl) == {keys = ["foo", "quux"], vals = ["bar", "baz"]};
 ```
 
 **Lists**
@@ -425,7 +443,16 @@ reduce tpl_reducer, {keys = [], vals = []}, test_tpl == {keys = ["foo", "quux"],
 let list1 = [1, 2, 3, 4];
 let list_reducer = func (acc, item) =>  acc + item;
 
-reduce list_reducer, 0, list1 == 0 + 1 + 2 + 3 + 4;
+reduce(list_reducer, 0, list1) == 0 + 1 + 2 + 3 + 4;
+```
+
+**Strings**
+
+```
+let string = "foo";
+let string_reducer = func (acc, item) =>  acc + [item];
+
+reduce(string_reducer, 0, string) == ["f", "o", "o"];
 ```
 
 Include expressions
