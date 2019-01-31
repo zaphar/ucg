@@ -15,3 +15,14 @@ let if = module{
 };
 
 let identity = func (arg) => arg;
+
+let s = import "std/schema.ucg";
+
+let map_list_reducer = func(acc, item) => acc{list = acc.list + [acc.op(item)]};
+
+let map_str_reducer = func(acc, item) => acc{str = acc.str + acc.op(item)};
+
+let map = func(op, coll) => select s.base_type_of(coll), NULL, {
+    list = reduce(map_list_reducer, {op=op, list=[]}, coll).list,
+    str = reduce(map_str_reducer, {op=op, str=""}, coll).str,
+};

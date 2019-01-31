@@ -574,55 +574,20 @@ make_fn!(
     do_each!(
         pos => pos,
         _ => word!("reduce"),
+        _ => must!(punct!("(")),
         func => must!(expression),
         _ => must!(punct!(",")),
         acc => must!(trace_parse!(non_op_expression)),
         _ => must!(punct!(",")),
         tgt => must!(trace_parse!(non_op_expression)),
-        (Expression::FuncOp(FuncOpDef::Reduce(ReduceOpDef{
+        _ => must!(punct!(")")),
+        (Expression::FuncOp(ReduceOpDef{
             func: Box::new(func),
             acc: Box::new(acc),
             target: Box::new(tgt),
             pos: pos,
-        })))
+        }))
     )
-);
-
-make_fn!(
-    map_expression<SliceIter<Token>, Expression>,
-    do_each!(
-        pos => pos,
-        _ => word!("map"),
-        func => must!(expression),
-        _ => must!(punct!(",")),
-        list => must!(trace_parse!(non_op_expression)),
-        (Expression::FuncOp(FuncOpDef::Map(MapFilterOpDef{
-            func: Box::new(func),
-            target: Box::new(list),
-            pos: pos,
-        })))
-    )
-);
-
-make_fn!(
-    filter_expression<SliceIter<Token>, Expression>,
-    do_each!(
-        pos => pos,
-        _ => word!("filter"),
-        func => must!(expression),
-        _ => must!(punct!(",")),
-        list => must!(trace_parse!(non_op_expression)),
-        (Expression::FuncOp(FuncOpDef::Filter(MapFilterOpDef{
-            func: Box::new(func),
-            target: Box::new(list),
-            pos: pos,
-        })))
-    )
-);
-
-make_fn!(
-    func_op_expression<SliceIter<Token>, Expression>,
-    either!(reduce_expression, map_expression, filter_expression)
 );
 
 make_fn!(
@@ -710,7 +675,7 @@ fn unprefixed_expression(input: SliceIter<Token>) -> ParseResult<Expression> {
 make_fn!(
     non_op_expression<SliceIter<Token>, Expression>,
     either!(
-        trace_parse!(func_op_expression),
+        trace_parse!(reduce_expression),
         trace_parse!(func_expression),
         trace_parse!(import_expression),
         trace_parse!(not_expression),

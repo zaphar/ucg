@@ -75,18 +75,10 @@ impl<'a> AstWalker<'a> {
                     self.walk_expression(expr);
                 }
             },
-            Expression::FuncOp(ref mut def) => match def {
-                FuncOpDef::Reduce(ref mut def) => {
-                    self.walk_expression(def.target.as_mut());
-                    self.walk_expression(def.acc.as_mut())
-                }
-                FuncOpDef::Map(ref mut def) => {
-                    self.walk_expression(def.target.as_mut());
-                }
-                FuncOpDef::Filter(ref mut def) => {
-                    self.walk_expression(def.target.as_mut());
-                }
-            },
+            Expression::FuncOp(ref mut def) => {
+                self.walk_expression(def.target.as_mut());
+                self.walk_expression(def.acc.as_mut());
+            }
             Expression::Binary(ref mut def) => {
                 self.walk_expression(def.left.as_mut());
                 self.walk_expression(def.right.as_mut());

@@ -490,13 +490,6 @@ pub struct ListDef {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum FuncOpDef {
-    Reduce(ReduceOpDef),
-    Map(MapFilterOpDef),
-    Filter(MapFilterOpDef),
-}
-
-#[derive(Debug, PartialEq, Clone)]
 pub struct ReduceOpDef {
     pub func: Box<Expression>,
     pub acc: Box<Expression>,
@@ -504,21 +497,9 @@ pub struct ReduceOpDef {
     pub pos: Position,
 }
 
-/// MapFilterOpDef implements the list operations in the UCG AST.
-#[derive(Debug, PartialEq, Clone)]
-pub struct MapFilterOpDef {
-    pub func: Box<Expression>,
-    pub target: Box<Expression>,
-    pub pos: Position,
-}
-
-impl FuncOpDef {
+impl ReduceOpDef {
     pub fn pos(&self) -> &Position {
-        match self {
-            FuncOpDef::Map(def) => &def.pos,
-            FuncOpDef::Filter(def) => &def.pos,
-            FuncOpDef::Reduce(def) => &def.pos,
-        }
+        &self.pos
     }
 }
 
@@ -635,7 +616,7 @@ pub enum Expression {
     Call(CallDef),
     Func(FuncDef),
     Select(SelectDef),
-    FuncOp(FuncOpDef),
+    FuncOp(ReduceOpDef),
     Module(ModuleDef),
 
     // Declarative failure expressions

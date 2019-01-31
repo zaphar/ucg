@@ -352,7 +352,7 @@ impl<'a> FileBuilder<'a> {
     fn check_reserved_word(name: &str) -> bool {
         match name {
             "self" | "assert" | "true" | "false" | "let" | "import" | "as" | "select" | "func"
-            | "module" | "env" | "map" | "filter" | "NULL" | "out" | "in" | "is" | "not" => true,
+            | "module" | "env" | "NULL" | "out" | "in" | "is" | "not" => true,
             _ => false,
         }
     }
@@ -1465,40 +1465,6 @@ impl<'a> FileBuilder<'a> {
         Ok(Rc::new(Val::Str(result)))
     }
 
-    fn eval_functional_processing(
-        &self,
-        def: &MapFilterOpDef,
-        typ: ProcessingOpType,
-        scope: &Scope,
-    ) -> Result<Rc<Val>, Box<dyn Error>> {
-        let maybe_target = self.eval_expr(&def.target, scope)?;
-        let maybe_mac = self.eval_expr(&def.func, scope)?;
-        let macdef = match maybe_mac.as_ref() {
-            &Val::Func(ref macdef) => macdef,
-            _ => {
-                return Err(Box::new(error::BuildError::new(
-                    format!("Expected func but got {:?}", def.func),
-                    error::ErrorType::TypeFail,
-                    def.pos.clone(),
-                )));
-            }
-        };
-        return match maybe_target.as_ref() {
-            &Val::List(ref elems) => self.eval_functional_list_processing(elems, macdef, typ),
-            &Val::Tuple(ref fs) => self.eval_functional_tuple_processing(fs, macdef, typ),
-            // TODO(jwall): Strings?
-            &Val::Str(ref s) => self.eval_functional_string_processing(s, macdef, typ),
-            other => Err(Box::new(error::BuildError::new(
-                format!(
-                    "Expected List or Tuple as target but got {:?}",
-                    other.type_name()
-                ),
-                error::ErrorType::TypeFail,
-                def.target.pos().clone(),
-            ))),
-        };
-    }
-
     fn record_assert_result(&mut self, msg: &str, is_success: bool) {
         if !is_success {
             let msg = format!("{} - NOT OK: {}\n", self.assert_collector.counter, msg);
@@ -1647,18 +1613,6 @@ impl<'a> FileBuilder<'a> {
         };
     }
 
-    fn eval_func_op(&self, def: &FuncOpDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
-        match def {
-            FuncOpDef::Filter(ref def) => {
-                self.eval_functional_processing(def, ProcessingOpType::Filter, scope)
-            }
-            FuncOpDef::Map(ref def) => {
-                self.eval_functional_processing(def, ProcessingOpType::Map, scope)
-            }
-            FuncOpDef::Reduce(ref def) => self.eval_reduce_op(def, scope),
-        }
-    }
-
     pub fn eval_range(&self, def: &RangeDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         let start = self.eval_expr(&def.start, scope)?;
         let start = match start.as_ref() {
@@ -1776,7 +1730,7 @@ impl<'a> FileBuilder<'a> {
                 self.eval_module_def(&mut def_clone, scope)
             }
             &Expression::Select(ref def) => self.eval_select(def, scope),
-            &Expression::FuncOp(ref def) => self.eval_func_op(def, scope),
+            &Expression::FuncOp(ref def) => self.eval_reduce_op(def, scope),
             &Expression::Include(ref def) => self.eval_include(def),
             &Expression::Import(ref def) => self.eval_import(def),
             &Expression::Fail(ref def) => {
