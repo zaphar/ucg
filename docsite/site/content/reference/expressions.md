@@ -146,12 +146,20 @@ let lst = [1, "two", {three = 3}];
 
 ### Boolean Operators
 
-UCG has the standard boolean operators: `&&` and `||`. Both of them short circuit and they require the expressions on each
-side to be boolean.
+UCG has the standard boolean operators: `&&` and `||`. Both of them short
+circuit and they require the expressions on each side to be boolean.
 
 ```
 true && false == false;
 false || true == true;
+```
+
+In addition to the binary operators `&&` and `||` UCG also has the unary
+operator `not` which reverses a boolean value.
+
+```
+not true == false;
+not false == true;
 ```
 
 #### Operator Precedence
