@@ -43,7 +43,7 @@ configuration or the results of test assertions.
 
 The assert statement defines an expression that must evaluate to tuple with an
 ok field that is either true or false and a desc field that is a string. Assert
-statements are noops except during a validation compile. They give you a way to
+statements are noops except when executing `ucg test`. They give you a way to
 assert certains properties about your data and can be used as a form of unit
 testing for your configurations. It starts with the `assert` keyword followed
 by a valid ucg expression.
@@ -74,7 +74,7 @@ your ucg configs.
 The Out statement defines the output for a UCG file. It identifies the output
 converter type and an expression that will be output. The output converter type
 is expected to be one of the registered converters unquoted (e.g. json, exec)
-and the value to convert. The generated artificact will take the same name as
+and the value to convert. The generated artifact will take the same name as
 the UCG file with the extension replaced by the defined extension for that
 converter.
 

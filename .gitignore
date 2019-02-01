@@ -5,3 +5,6 @@ target
 docsite/site/generated
 docsite/site/public
 rerast_rules/
+integration.log
+stdlibtest.log
+unittest.log

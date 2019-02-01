@@ -34,6 +34,7 @@ Some words are reserved in UCG and can not be used as a named binding.
 * env
 * map
 * filter
+* reduce
 * NULL
 * out
 

@@ -459,8 +459,10 @@ Include expressions
 -------------------
 
 UCG can include the contents of other files as an expression. Currently we only
-support strings but we plan to support yaml, and json and possibly base64 encoding
-in the future. include expressions start with the `include` keyword a type (currently only `str`), and a path. Relative paths are calculated relative to the including file.
+support strings and base64 encoding but we plan to support yaml, and json in
+the future. include expressions start with the `include` keyword a type
+(currently only `str`), and a path. Relative paths are calculated relative to
+the including file.
 
 ```
 let script = include str "./script.sh";
@@ -500,15 +502,18 @@ let ifresult = select true, NULL, {
 Modules
 -------
 
-UCG has another form of reusable execution that is a little more robust than functions
-are. Modules allow you to parameterize a set of statements and build the statements
-later. Modules are an expression. They can be bound to a value and then reused later.
-Modules do not close over their environment by they can import other UCG files into
-the module using import statements.
+UCG has another form of reusable execution that is a little more robust than
+functions are. Modules allow you to parameterize a set of statements and build
+the statements later. Modules are an expression. They can be bound to a value
+and then reused later. Modules do not close over their environment but they can
+import other UCG files into the module using import statements including the
+file they are located themselves. This works since the statements in a module
+until you attempt to call the module with a copy expression.
 
-Module expressions start with the module keyword followed by a tuple representing their
-parameters with any associated default values. The body of the module is separated from
-the parameter tuple by the `=>` symbol and is delimited by `{` and `}` respectively.
+Module expressions start with the module keyword followed by a tuple
+representing their parameters with any associated default values. The body of
+the module is separated from the parameter tuple by the `=>` symbol and is
+delimited by `{` and `}` respectively.
 
 The body of the module can contain any valid UCG statement.
 
@@ -528,9 +533,9 @@ let top_mod = module {
 };
 ```
 
-You instantiate a module via the copy expression. The resulting module instance can
-reference the bindings in the module similarly to selecting a tuple field or a binding
-from an imported file.
+You instantiate a module via the copy expression. The resulting module instance
+can reference the bindings in the module similarly to selecting a tuple field
+or a binding from an imported file.
 
 ```
 let embedded_default_params = top_mod{};
@@ -540,12 +545,20 @@ let embedded_with_params = embedded_mod{deep_value = "Some"};
 embedded_with_params.embedded.value == "Some";
 ```
 
+### Recursive Modules
+
+One consequence of a module being able to import the same file they are located in
+is that modules can be called recursively. They are the only expression that is
+capable of recursion in UCG. Recursion can be done by importing the module's file
+inside the module's definition and using it as normal.
+
 Fail Expression
 ---------------
 
 UCG has a way to declaratively trigger a build failure using the `fail` expression.
 
-Fail expression start with the `fail` keyword and are followed with either a string or a format expression with the build failure message.
+Fail expressions start with the `fail` keyword and are followed an expression
+that must resolve to a string with the build failure message.
 
 ```
 fail "Oh No This was not what we wanted!";

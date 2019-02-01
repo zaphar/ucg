@@ -28,7 +28,7 @@ from github and use cargo to build.
 git clone https://github.com/zaphar/ucg
 cd ucg
 # optionally checkout the current version
-git checkout v0.2.3
+git checkout v0.5.1
 # use cargo to build and install
 cargo install --path .
 ```
@@ -91,15 +91,11 @@ SUBCOMMANDS:
     build         Build a list of ucg files.
     converters    list the available converters
     env           Describe the environment variables ucg uses.
+    eval          Evaluate an expression with an optional ucg file as context.
     help          Prints this message or the help of the given subcommand(s)
-    inspect       Inspect a specific symbol in a ucg file.
+    importers     list the available importers for includes
     test          Check a list of ucg files for errors and run test assertions.
 ```
-
-* build will build a list of files or directories of files.
-* inspect will allow you to print out the contents of a specific named binding in a ucg file.
-* test compiles and runs any test assertions in the provided files or directories of files.
-* converters will list the available conversion formats that this ucg tool supports.
 
 You can get more information about the options for each command by running `ucg help $command`
 
