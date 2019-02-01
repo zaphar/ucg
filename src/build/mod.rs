@@ -106,7 +106,6 @@ pub struct FileBuilder<'a> {
     import_path: &'a Vec<PathBuf>,
     validate_mode: bool,
     pub assert_collector: AssertCollector,
-    strict: bool,
     scope: Scope,
     import_registry: ImporterRegistry,
     // NOTE(jwall): We use interior mutability here because we need
@@ -176,7 +175,6 @@ impl<'a> FileBuilder<'a> {
                 failures: String::new(),
             },
             scope: scope,
-            strict: true,
             import_registry: ImporterRegistry::make_registry(),
             assets: cache,
             out_lock: None,
@@ -197,7 +195,6 @@ impl<'a> FileBuilder<'a> {
                 summary: String::new(),
                 failures: String::new(),
             },
-            strict: true,
             assets: self.assets.clone(),
             // This is admittedly a little wasteful but we can live with it for now.
             import_registry: ImporterRegistry::make_registry(),
@@ -252,7 +249,7 @@ impl<'a> FileBuilder<'a> {
     }
 
     pub fn set_strict(&mut self, to: bool) {
-        self.strict = to;
+        self.scope.strict = to;
     }
 
     fn eval_tuple(

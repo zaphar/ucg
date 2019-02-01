@@ -40,6 +40,7 @@ pub struct Scope {
     pub curr_val: Option<Rc<Val>>,
     pub build_output: ValueMap,
     pub search_curr_val: bool,
+    pub strict: bool,
 }
 
 impl Scope {
@@ -53,7 +54,13 @@ impl Scope {
             curr_val: None,
             build_output: HashMap::new(),
             search_curr_val: false,
+            strict: false,
         }
+    }
+
+    pub fn use_strict(mut self) -> Self {
+        self.strict = true;
+        self
     }
 
     pub fn use_curr_val(mut self) -> Self {
@@ -71,6 +78,7 @@ impl Scope {
             curr_val: None,
             build_output: self.build_output.clone(),
             search_curr_val: false,
+            strict: self.strict,
         }
     }
 
@@ -82,6 +90,7 @@ impl Scope {
             curr_val: None,
             build_output: HashMap::new(),
             search_curr_val: false,
+            strict: self.strict,
         }
     }
 
@@ -139,6 +148,9 @@ impl Scope {
                         if name == &sym.val {
                             return Some(Rc::new(Val::Str(val.clone())));
                         }
+                    }
+                    if !self.strict {
+                        return Some(Rc::new(Val::Empty));
                     }
                 }
                 Val::Tuple(ref fs) => match Self::lookup_in_tuple(&sym.pos, &sym.val, fs) {
