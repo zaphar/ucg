@@ -254,7 +254,12 @@ fn parse_operand_list<'a>(i: SliceIter<'a, Token>) -> ParseResult<'a, Vec<Elemen
                     // if we have successfully parsed an element and an operator then
                     // failing to parse a second expression is an abort since we know
                     // for sure now that the next expression is supposed to be there.
-                    return Result::Abort(e);
+                    let err = Error::caused_by(
+                        "Missing operand for binary expression",
+                        Box::new(e),
+                        Box::new(_i.clone()),
+                    );
+                    return Result::Abort(err);
                 }
                 return Result::Fail(e);
             }
@@ -388,7 +393,6 @@ pub fn parse_precedence(i: SliceIter<Element>) -> Result<SliceIter<Element>, Exp
 
 /// Parse a binary operator expression.
 pub fn op_expression<'a>(i: SliceIter<'a, Token>) -> Result<SliceIter<Token>, Expression> {
-    // TODO(jwall): We need to implement the full on precedence climbing method here.
     let preparse = parse_operand_list(i.clone());
     match preparse {
         Result::Fail(e) => {
@@ -401,11 +405,11 @@ pub fn op_expression<'a>(i: SliceIter<'a, Token>) -> Result<SliceIter<Token>, Ex
         }
         Result::Abort(e) => {
             let err = Error::caused_by(
-                "Failed while parsing operator expression",
+                "Abort while parsing operator expression",
                 Box::new(e),
                 Box::new(i),
             );
-            Result::Fail(err)
+            Result::Abort(err)
         }
         Result::Incomplete(i) => Result::Incomplete(i),
         Result::Complete(rest, oplist) => {

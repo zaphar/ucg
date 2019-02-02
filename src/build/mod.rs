@@ -507,16 +507,17 @@ impl<'a> FileBuilder<'a> {
 
     fn add_vals(
         &self,
-        pos: &Position,
+        lpos: &Position,
+        rpos: &Position,
         left: Rc<Val>,
         right: Rc<Val>,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
         match *left {
             Val::Int(i) => {
-                eval_binary_expr!(&Val::Int(ii), pos, right, Val::Int(i + ii), "Integer")
+                eval_binary_expr!(&Val::Int(ii), rpos, right, Val::Int(i + ii), "Integer")
             }
             Val::Float(f) => {
-                eval_binary_expr!(&Val::Float(ff), pos, right, Val::Float(f + ff), "Float")
+                eval_binary_expr!(&Val::Float(ff), rpos, right, Val::Float(f + ff), "Float")
             }
             Val::Str(ref s) => match right.as_ref() {
                 &Val::Str(ref ss) => {
@@ -532,7 +533,7 @@ impl<'a> FileBuilder<'a> {
                             val
                         ),
                         error::ErrorType::TypeFail,
-                        pos.clone(),
+                        rpos.clone(),
                     )));
                 }
             },
@@ -553,7 +554,7 @@ impl<'a> FileBuilder<'a> {
                             val
                         ),
                         error::ErrorType::TypeFail,
-                        pos.clone(),
+                        rpos.clone(),
                     )));
                 }
             },
@@ -561,7 +562,7 @@ impl<'a> FileBuilder<'a> {
                 return Err(Box::new(error::BuildError::new(
                     format!("{} does not support the '+' operation", expr.type_name()),
                     error::ErrorType::Unsupported,
-                    pos.clone(),
+                    lpos.clone(),
                 )));
             }
         }
@@ -569,22 +570,23 @@ impl<'a> FileBuilder<'a> {
 
     fn subtract_vals(
         &self,
-        pos: &Position,
+        lpos: &Position,
+        rpos: &Position,
         left: Rc<Val>,
         right: Rc<Val>,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
         match *left {
             Val::Int(i) => {
-                eval_binary_expr!(&Val::Int(ii), pos, right, Val::Int(i - ii), "Integer")
+                eval_binary_expr!(&Val::Int(ii), rpos, right, Val::Int(i - ii), "Integer")
             }
             Val::Float(f) => {
-                eval_binary_expr!(&Val::Float(ff), pos, right, Val::Float(f - ff), "Float")
+                eval_binary_expr!(&Val::Float(ff), rpos, right, Val::Float(f - ff), "Float")
             }
             ref expr => {
                 return Err(Box::new(error::BuildError::new(
                     format!("{} does not support the '-' operation", expr.type_name()),
                     error::ErrorType::Unsupported,
-                    pos.clone(),
+                    lpos.clone(),
                 )));
             }
         }
@@ -592,22 +594,23 @@ impl<'a> FileBuilder<'a> {
 
     fn multiply_vals(
         &self,
-        pos: &Position,
+        lpos: &Position,
+        rpos: &Position,
         left: Rc<Val>,
         right: Rc<Val>,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
         match *left {
             Val::Int(i) => {
-                eval_binary_expr!(&Val::Int(ii), pos, right, Val::Int(i * ii), "Integer")
+                eval_binary_expr!(&Val::Int(ii), rpos, right, Val::Int(i * ii), "Integer")
             }
             Val::Float(f) => {
-                eval_binary_expr!(&Val::Float(ff), pos, right, Val::Float(f * ff), "Float")
+                eval_binary_expr!(&Val::Float(ff), rpos, right, Val::Float(f * ff), "Float")
             }
             ref expr => {
                 return Err(Box::new(error::BuildError::new(
                     format!("{} does not support the '*' operation", expr.type_name()),
                     error::ErrorType::Unsupported,
-                    pos.clone(),
+                    lpos.clone(),
                 )));
             }
         }
@@ -615,22 +618,23 @@ impl<'a> FileBuilder<'a> {
 
     fn divide_vals(
         &self,
-        pos: &Position,
+        lpos: &Position,
+        rpos: &Position,
         left: Rc<Val>,
         right: Rc<Val>,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
         match *left {
             Val::Int(i) => {
-                eval_binary_expr!(&Val::Int(ii), pos, right, Val::Int(i / ii), "Integer")
+                eval_binary_expr!(&Val::Int(ii), rpos, right, Val::Int(i / ii), "Integer")
             }
             Val::Float(f) => {
-                eval_binary_expr!(&Val::Float(ff), pos, right, Val::Float(f / ff), "Float")
+                eval_binary_expr!(&Val::Float(ff), rpos, right, Val::Float(f / ff), "Float")
             }
             ref expr => {
                 return Err(Box::new(error::BuildError::new(
                     format!("{} does not support the '*' operation", expr.type_name()),
                     error::ErrorType::Unsupported,
-                    pos.clone(),
+                    lpos.clone(),
                 )));
             }
         }
@@ -976,10 +980,10 @@ impl<'a> FileBuilder<'a> {
         };
         match kind {
             // Handle math and concatenation operators here
-            &BinaryExprType::Add => self.add_vals(&def.pos, left, right),
-            &BinaryExprType::Sub => self.subtract_vals(&def.pos, left, right),
-            &BinaryExprType::Mul => self.multiply_vals(&def.pos, left, right),
-            &BinaryExprType::Div => self.divide_vals(&def.pos, left, right),
+            &BinaryExprType::Add => self.add_vals(&def.pos, def.right.pos(), left, right),
+            &BinaryExprType::Sub => self.subtract_vals(&def.pos, def.right.pos(), left, right),
+            &BinaryExprType::Mul => self.multiply_vals(&def.pos, def.right.pos(), left, right),
+            &BinaryExprType::Div => self.divide_vals(&def.pos, def.right.pos(), left, right),
             // Handle Comparison operators here
             &BinaryExprType::Equal => self.do_deep_equal(&def.pos, left, right),
             &BinaryExprType::GT => self.do_gt(&def.pos, left, right),

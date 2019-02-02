@@ -42,13 +42,14 @@ fn assert_build_failure(input: &str, expect: Vec<Regex>) {
             for r in expect.iter() {
                 if !b.assert_collector.success {
                     if let None = r.find(&b.assert_collector.failures) {
-                        panic!(
+                        assert!(
+                            false,
                             "[{}] was not found in Assertion Failures:\n{}",
                             r, b.assert_collector.failures
                         );
                     }
                 } else {
-                    panic!("Building input Did not panic!");
+                    assert!(false, "Building input Did not panic!");
                 }
             }
         }
@@ -57,7 +58,11 @@ fn assert_build_failure(input: &str, expect: Vec<Regex>) {
                 let stack_trace = format!("{}", err);
                 // Look for each expect to match the string.
                 if let None = r.find(&stack_trace) {
-                    panic!("[{}] was not found in stacktrace:\n{}", r, stack_trace);
+                    assert!(
+                        false,
+                        "[{}] was not found in stacktrace:\n{}",
+                        r, stack_trace
+                    );
                 }
             }
         }
@@ -223,4 +228,50 @@ fn test_assert_partial_tuple_bad_desc_compile_failures() {
             Regex::new(r"line: 1, column: 8").unwrap(),
         ],
     );
+}
+
+#[test]
+fn test_import_missing_path_compile_failure() {
+    assert_build_failure(
+        "import ;",
+        vec![
+            Regex::new(r"Expected import path: at <eval> line: 1, column: 8").unwrap(),
+            Regex::new(r"Not a String: at <eval> line: 1, column: 8").unwrap(),
+        ],
+    )
+}
+
+#[test]
+fn test_import_path_not_a_string_compile_failure() {
+    assert_build_failure(
+        "import 1;",
+        vec![
+            Regex::new(r"Expected import path: at <eval> line: 1, column: 8").unwrap(),
+            Regex::new(r"Not a String: at <eval> line: 1, column: 8").unwrap(),
+        ],
+    )
+}
+
+#[test]
+fn test_binary_operator_missing_operand_compile_failure() {
+    assert_build_failure(
+        "1 +",
+        vec![
+            Regex::new(r"Abort while parsing operator expression: at <eval> line: 1, column: 1")
+                .unwrap(),
+            Regex::new(r"Missing operand for binary expression: at <eval> line: 1, column: 4")
+                .unwrap(),
+        ],
+    )
+}
+
+#[test]
+fn test_binary_operator_wrong_type_on_rhs_compile_failure() {
+    assert_build_failure(
+        "1 + \"foo\";",
+        vec![
+            Regex::new(r"Expected Integer but got .foo.").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 5").unwrap(),
+        ],
+    )
 }
