@@ -630,7 +630,7 @@ macro_rules! match_token {
             } else {
                 Result::Fail(Error::new(
                     format!("Expected {} Instead is ({})", $msg, tok.fragment),
-                    Box::new(i_),
+                    Box::new($i.clone()),
                 ))
             }
         } else {

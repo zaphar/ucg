@@ -15,6 +15,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use regex::Regex;
+
 use super::assets::MemoryCache;
 use super::FileBuilder;
 
@@ -26,6 +28,39 @@ fn assert_build(input: &str) {
     b.eval_string(input).unwrap();
     if !b.assert_collector.success {
         assert!(false, b.assert_collector.failures);
+    }
+}
+
+fn assert_build_failure(input: &str, expect: Vec<Regex>) {
+    let i_paths = Vec::new();
+    let cache = MemoryCache::new();
+    let mut b = FileBuilder::new("<Eval>", &i_paths, Rc::new(RefCell::new(cache)));
+    b.enable_validate_mode();
+    let err = b.eval_string(input);
+    match err {
+        Ok(_) => {
+            for r in expect.iter() {
+                if !b.assert_collector.success {
+                    if let None = r.find(&b.assert_collector.failures) {
+                        panic!(
+                            "[{}] was not found in Assertion Failures:\n{}",
+                            r, b.assert_collector.failures
+                        );
+                    }
+                } else {
+                    panic!("Building input Did not panic!");
+                }
+            }
+        }
+        Err(ref err) => {
+            for r in expect.iter() {
+                let stack_trace = format!("{}", err);
+                // Look for each expect to match the string.
+                if let None = r.find(&stack_trace) {
+                    panic!("[{}] was not found in stacktrace:\n{}", r, stack_trace);
+                }
+            }
+        }
     }
 }
 
@@ -118,4 +153,74 @@ fn test_declarative_failures_are_caused_by_msg() {
 #[should_panic(expected = "1 is a failure!")]
 fn test_declarative_failures_can_with_format_expr() {
     assert_build("fail \"@ is a failure!\" % (1);");
+}
+
+#[test]
+fn test_assert_just_keyword_compile_failures() {
+    assert_build_failure(
+        "assert ",
+        vec![
+            Regex::new(r"line: 1, column: 1").unwrap(),
+            Regex::new(r"Expected Tuple \{ok=<bool>, desc=<str>\}: at <eval> line: 1, column: 8")
+                .unwrap(),
+            Regex::new(r"Expected Expression: at <eval> line: 1, column: 8").unwrap(),
+        ],
+    );
+}
+
+#[test]
+fn test_assert_partial_tuple_compile_failures() {
+    assert_build_failure(
+        "assert {",
+        vec![
+            Regex::new(r"line: 1, column: 1").unwrap(),
+            Regex::new(r"Expected Tuple \{ok=<bool>, desc=<str>\}: at <eval> line: 1, column: 8")
+                .unwrap(),
+            Regex::new(r"Expected \(\}\) Instead is \(\): at <eval> line: 1, column: 9").unwrap(),
+        ],
+    );
+}
+
+#[test]
+fn test_assert_partial_tuple_missing_ok_compile_failures() {
+    assert_build_failure(
+        "assert {};",
+        vec![
+            Regex::new(r"0 - NOT OK: TYPE FAIL - Expected Boolean field ok in tuple \{").unwrap(),
+            Regex::new(r"line: 1, column: 8").unwrap(),
+        ],
+    );
+}
+
+#[test]
+fn test_assert_partial_tuple_bad_ok_compile_failures() {
+    assert_build_failure(
+        "assert { ok = 1, };",
+        vec![
+            Regex::new(r"0 - NOT OK: TYPE FAIL - Expected Boolean field ok in tuple \{").unwrap(),
+            Regex::new(r"line: 1, column: 8").unwrap(),
+        ],
+    );
+}
+
+#[test]
+fn test_assert_partial_tuple_missing_desc_compile_failures() {
+    assert_build_failure(
+        "assert { ok=true, };",
+        vec![
+            Regex::new(r"0 - NOT OK: TYPE FAIL - Expected String field desc in tuple \{").unwrap(),
+            Regex::new(r"line: 1, column: 8").unwrap(),
+        ],
+    );
+}
+
+#[test]
+fn test_assert_partial_tuple_bad_desc_compile_failures() {
+    assert_build_failure(
+        "assert { ok=true, desc = 1 };",
+        vec![
+            Regex::new(r"0 - NOT OK: TYPE FAIL - Expected String field desc in tuple \{").unwrap(),
+            Regex::new(r"line: 1, column: 8").unwrap(),
+        ],
+    );
 }

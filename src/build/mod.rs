@@ -1535,7 +1535,7 @@ impl<'a> FileBuilder<'a> {
                         &Val::Boolean(b) => b,
                         _ => {
                             let msg = format!(
-                                    "TYPE FAIL - Expected Boolean field ok in tuple {}, line: {} column: {}",
+                                    "TYPE FAIL - Expected Boolean field ok in tuple {}, line: {}, column: {}",
                                     ok.as_ref(), expr.pos().line, expr.pos().column
                                 );
                             self.record_assert_result(&msg, false);
@@ -1544,7 +1544,7 @@ impl<'a> FileBuilder<'a> {
                     },
                     None => {
                         let msg = format!(
-                            "TYPE FAIL - Expected Boolean field ok in tuple {}, line: {} column: {}",
+                            "TYPE FAIL - Expected Boolean field ok in tuple {}, line: {}, column: {}",
                             ok.as_ref(), expr.pos().line, expr.pos().column
                         );
                         self.record_assert_result(&msg, false);
@@ -1556,7 +1556,7 @@ impl<'a> FileBuilder<'a> {
                         Val::Str(ref s) => s.clone(),
                         _ => {
                             let msg = format!(
-                                    "TYPE FAIL - Expected Boolean field desc in tuple {} line: {} column: {}",
+                                    "TYPE FAIL - Expected String field desc in tuple {} line: {}, column: {}",
                                     ok, expr.pos().line, expr.pos().column
                                 );
                             self.record_assert_result(&msg, false);
@@ -1565,7 +1565,7 @@ impl<'a> FileBuilder<'a> {
                     },
                     None => {
                         let msg = format!(
-                            "TYPE FAIL - Expected Boolean field desc in tuple {} line: {} column: {}\n",
+                            "TYPE FAIL - Expected String field desc in tuple {} line: {}, column: {}\n",
                             ok, expr.pos().line, expr.pos().column
                         );
                         self.record_assert_result(&msg, false);

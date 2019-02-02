@@ -81,7 +81,7 @@ impl BuildError {
         };
         write!(
             w,
-            "{} at {} line: {} column: {}\nCaused By:\n\t{} ",
+            "{} at {} line: {}, column: {}\nCaused By:\n\t{} ",
             self.err_type, file, self.pos.line, self.pos.column, self.msg
         )?;
         Ok(())

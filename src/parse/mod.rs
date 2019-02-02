@@ -733,7 +733,7 @@ fn expression(input: SliceIter<Token>) -> ParseResult<Expression> {
     let _input = input.clone();
     match trace_parse!(_input, op_expression) {
         Result::Incomplete(i) => Result::Incomplete(i),
-        Result::Fail(_) => trace_parse!(input, non_op_expression),
+        Result::Fail(_) => trace_parse!(input, wrap_err!(non_op_expression, "Expected Expression")),
         Result::Abort(e) => Result::Abort(e),
         Result::Complete(rest, expr) => Result::Complete(rest, expr),
     }
@@ -782,7 +782,7 @@ make_fn!(
     assert_statement<SliceIter<Token>, Statement>,
     do_each!(
         _ => word!("assert"),
-        expr => must!(expression),
+        expr => wrap_err!(must!(expression), "Expected Tuple {ok=<bool>, desc=<str>}"),
         _ => must!(punct!(";")),
         (Statement::Assert(expr))
     )

@@ -100,13 +100,17 @@ impl<'a> Positioned for OffsetStrIter<'a> {
     }
 }
 
-impl<'a> InputIter for OffsetStrIter<'a> {}
+impl<'a> InputIter for OffsetStrIter<'a> {
+    fn curr(&self) -> Self::Item {
+        self.clone().peek_next().unwrap()
+    }
+}
 
 impl<'a> From<&'a SliceIter<'a, Token>> for Position {
     fn from(source: &'a SliceIter<'a, Token>) -> Self {
         match source.peek_next() {
             Some(t) => t.pos.clone(),
-            None => Position::new(0, 0, 0),
+            None => source.curr().pos.clone(),
         }
     }
 }
