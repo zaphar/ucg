@@ -680,11 +680,7 @@ impl<'a> FileBuilder<'a> {
             }
         }
         Err(Box::new(error::BuildError::new(
-            format!(
-                "Incompatible types for numeric comparison {} with {}",
-                left.type_name(),
-                right.type_name()
-            ),
+            format!("Expected {} but got {}", left.type_name(), right,),
             error::ErrorType::TypeFail,
             pos.clone(),
         )))
@@ -708,11 +704,7 @@ impl<'a> FileBuilder<'a> {
             }
         }
         Err(Box::new(error::BuildError::new(
-            format!(
-                "Incompatible types for numeric comparison {} with {}",
-                left.type_name(),
-                right.type_name()
-            ),
+            format!("Expected {} but got {}", left.type_name(), right,),
             error::ErrorType::TypeFail,
             pos.clone(),
         )))
@@ -735,11 +727,7 @@ impl<'a> FileBuilder<'a> {
             }
         }
         Err(Box::new(error::BuildError::new(
-            format!(
-                "Incompatible types for numeric comparison {} with {}",
-                left.type_name(),
-                right.type_name()
-            ),
+            format!("Expected {} but got {}", left.type_name(), right),
             error::ErrorType::TypeFail,
             pos.clone(),
         )))
@@ -762,11 +750,7 @@ impl<'a> FileBuilder<'a> {
             }
         }
         Err(Box::new(error::BuildError::new(
-            format!(
-                "Incompatible types for numeric comparison {} with {}",
-                left.type_name(),
-                right.type_name()
-            ),
+            format!("Expected {} but got {}", left.type_name(), right,),
             error::ErrorType::TypeFail,
             pos.clone(),
         )))
@@ -879,7 +863,7 @@ impl<'a> FileBuilder<'a> {
     ) -> Result<Rc<Val>, Box<dyn Error>> {
         // First we evaluate our right hand side so we have a something to search
         // inside for our left hand expression.
-        let right_pos = right.pos().clone();
+        let right_pos = right.pos();
         let right = self.eval_expr(right, scope)?;
         // presence checks are only valid for tuples and lists.
         if !(right.is_tuple() || right.is_list()) {
@@ -889,14 +873,13 @@ impl<'a> FileBuilder<'a> {
                     right.type_name()
                 ),
                 error::ErrorType::TypeFail,
-                right_pos,
+                right_pos.clone(),
             )));
         }
         if let &Val::List(ref els) = right.as_ref() {
-            let left_pos = left.pos().clone();
             let left = self.eval_expr(left, scope)?;
             for val in els.iter() {
-                if let Ok(b) = self.do_deep_equal(&left_pos, left.clone(), val.clone()) {
+                if let Ok(b) = self.do_deep_equal(right_pos, left.clone(), val.clone()) {
                     if let &Val::Boolean(b) = b.as_ref() {
                         if b {
                             // We found a match
@@ -985,12 +968,12 @@ impl<'a> FileBuilder<'a> {
             &BinaryExprType::Mul => self.multiply_vals(&def.pos, def.right.pos(), left, right),
             &BinaryExprType::Div => self.divide_vals(&def.pos, def.right.pos(), left, right),
             // Handle Comparison operators here
-            &BinaryExprType::Equal => self.do_deep_equal(&def.pos, left, right),
-            &BinaryExprType::GT => self.do_gt(&def.pos, left, right),
-            &BinaryExprType::LT => self.do_lt(&def.pos, left, right),
-            &BinaryExprType::GTEqual => self.do_gtequal(&def.pos, left, right),
-            &BinaryExprType::LTEqual => self.do_ltequal(&def.pos, left, right),
-            &BinaryExprType::NotEqual => self.do_not_deep_equal(&def.pos, left, right),
+            &BinaryExprType::Equal => self.do_deep_equal(def.right.pos(), left, right),
+            &BinaryExprType::GT => self.do_gt(&def.right.pos(), left, right),
+            &BinaryExprType::LT => self.do_lt(&def.right.pos(), left, right),
+            &BinaryExprType::GTEqual => self.do_gtequal(&def.right.pos(), left, right),
+            &BinaryExprType::LTEqual => self.do_ltequal(&def.right.pos(), left, right),
+            &BinaryExprType::NotEqual => self.do_not_deep_equal(&def.right.pos(), left, right),
             &BinaryExprType::REMatch => {
                 self.eval_re_match(left, def.left.pos(), right, def.right.pos(), false)
             }

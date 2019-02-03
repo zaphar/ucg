@@ -609,7 +609,7 @@ macro_rules! match_token {
             $i,
             TokenType::BAREWORD,
             $f,
-            format!("Not a BAREWORD ({})", $f),
+            format!("Expected BAREWORD but got ({})", $f),
             $h
         )
     };
@@ -629,7 +629,7 @@ macro_rules! match_token {
                 }
             } else {
                 Result::Fail(Error::new(
-                    format!("Expected {} Instead is ({})", $msg, tok.fragment),
+                    format!("Expected {} but got ({})", $msg, tok.fragment),
                     Box::new($i.clone()),
                 ))
             }

@@ -113,7 +113,7 @@ impl Val {
             (&Val::Empty, _) => Ok(false),
             (_, &Val::Empty) => Ok(false),
             (me, tgt) => Err(error::BuildError::new(
-                format!("Types differ for {}, {}", me, tgt),
+                format!("Expected {} but got {}", me.type_name(), tgt),
                 error::ErrorType::TypeFail,
                 pos,
             )),

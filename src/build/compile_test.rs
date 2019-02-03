@@ -181,7 +181,7 @@ fn test_assert_partial_tuple_compile_failures() {
             Regex::new(r"line: 1, column: 1").unwrap(),
             Regex::new(r"Expected Tuple \{ok=<bool>, desc=<str>\}: at <eval> line: 1, column: 8")
                 .unwrap(),
-            Regex::new(r"Expected \(\}\) Instead is \(\): at <eval> line: 1, column: 9").unwrap(),
+            Regex::new(r"Expected \(\}\) but got \(\): at <eval> line: 1, column: 9").unwrap(),
         ],
     );
 }
@@ -266,12 +266,133 @@ fn test_binary_operator_missing_operand_compile_failure() {
 }
 
 #[test]
-fn test_binary_operator_wrong_type_on_rhs_compile_failure() {
+fn test_binary_sum_operator_wrong_type_on_rhs_compile_failure() {
     assert_build_failure(
         "1 + \"foo\";",
         vec![
             Regex::new(r"Expected Integer but got .foo.").unwrap(),
             Regex::new(r"at <eval> line: 1, column: 5").unwrap(),
+        ],
+    )
+}
+
+#[test]
+fn test_binary_minus_operator_wrong_type_on_rhs_compile_failure() {
+    assert_build_failure(
+        "1 - \"foo\";",
+        vec![
+            Regex::new(r"Expected Integer but got .foo.").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 5").unwrap(),
+        ],
+    )
+}
+
+#[test]
+fn test_binary_mul_operator_wrong_type_on_rhs_compile_failure() {
+    assert_build_failure(
+        "1 * \"foo\";",
+        vec![
+            Regex::new(r"Expected Integer but got .foo.").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 5").unwrap(),
+        ],
+    )
+}
+
+#[test]
+fn test_binary_div_operator_wrong_type_on_rhs_compile_failure() {
+    assert_build_failure(
+        "1 / \"foo\";",
+        vec![
+            Regex::new(r"Expected Integer but got .foo.").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 5").unwrap(),
+        ],
+    )
+}
+
+#[test]
+fn test_binary_gt_operator_wrong_type_on_rhs_compile_failure() {
+    assert_build_failure(
+        "1 > \"foo\";",
+        vec![
+            Regex::new(r"Expected Integer but got .foo.").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 5").unwrap(),
+        ],
+    )
+}
+
+#[test]
+fn test_binary_lt_operator_wrong_type_on_rhs_compile_failure() {
+    assert_build_failure(
+        "1 < \"foo\";",
+        vec![
+            Regex::new(r"Expected Integer but got .foo.").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 5").unwrap(),
+        ],
+    )
+}
+
+#[test]
+fn test_binary_lteq_operator_wrong_type_on_rhs_compile_failure() {
+    assert_build_failure(
+        "1 <= \"foo\";",
+        vec![
+            Regex::new(r"Expected Integer but got .foo.").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 6").unwrap(),
+        ],
+    )
+}
+
+#[test]
+fn test_binary_gteq_operator_wrong_type_on_rhs_compile_failure() {
+    assert_build_failure(
+        "1 >= \"foo\";",
+        vec![
+            Regex::new(r"Expected Integer but got .foo.").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 6").unwrap(),
+        ],
+    )
+}
+
+#[test]
+fn test_binary_eqeq_operator_wrong_type_on_rhs_compile_failure() {
+    assert_build_failure(
+        "1 == \"foo\";",
+        vec![
+            Regex::new(r"Expected Integer but got .foo.").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 6").unwrap(),
+        ],
+    )
+}
+
+#[test]
+fn test_incomplete_tuple_compile_failure() {
+    assert_build_failure(
+        "{;",
+        vec![
+            Regex::new(r"Expected \(\}\) but got \(;\)").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 2").unwrap(),
+        ],
+    )
+}
+
+#[test]
+fn test_incomplete_tuple_key_value_missing_eq_compile_failure() {
+    assert_build_failure(
+        "{foo",
+        vec![
+            Regex::new(r"Expected \(=\) but got \(\)").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 5").unwrap(),
+        ],
+    )
+}
+
+#[test]
+fn test_incomplete_tuple_key_value_missing_value_compile_failure() {
+    assert_build_failure(
+        "{foo=",
+        vec![
+            Regex::new(r"Expected Expression").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 6").unwrap(),
         ],
     )
 }
