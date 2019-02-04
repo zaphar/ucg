@@ -396,3 +396,25 @@ fn test_incomplete_tuple_key_value_missing_value_compile_failure() {
         ],
     )
 }
+
+#[test]
+fn test_format_expr_missing_expr_compile_error() {
+    assert_build_failure(
+        "\"foo\" %",
+        vec![
+            Regex::new(r"Expected format arguments").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 8").unwrap(),
+        ],
+    )
+}
+
+#[test]
+fn test_format_expr_unclosed_parens_compile_failure() {
+    assert_build_failure(
+        "\"foo\" % (1",
+        vec![
+            Regex::new(r"Expected \(\)\) but got \(\)").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 9").unwrap(),
+        ],
+    )
+}

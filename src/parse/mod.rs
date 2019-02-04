@@ -503,7 +503,8 @@ make_fn!(
     do_each!(
         tmpl => match_type!(STR),
         _ => punct!("%"),
-        args => either!(simple_format_args, expression_format_args),
+        args => wrap_err!(must!(either!(simple_format_args, expression_format_args)),
+            "Expected format arguments"),
         (Expression::Format(FormatDef {
             template: tmpl.fragment.to_string(),
             args: args,
