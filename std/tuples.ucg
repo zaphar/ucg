@@ -1,8 +1,9 @@
+// Assert that a value is a tuple. Generate a compile failure if it is not.
 let assert_tuple = func (tpl) => select tpl is "tuple", NULL, {
     false = fail "@ is not a tuple" % (tpl),
 };
 
-// return a list of the fields in a tuple.
+// Return a list of the fields in a tuple.
 let fields = module{
     tpl = NULL,
 } => {
@@ -13,7 +14,7 @@ let fields = module{
     let result = reduce(func (acc, field, value) =>  acc + [field], [], (mod.tpl));
 };
 
-// return a list of the values in a tuple.
+// Return a list of the values in a tuple.
 let values = module{
     tpl = NULL,
 } => {
@@ -24,6 +25,7 @@ let values = module{
     let result = reduce(func (acc, field, value) =>  acc + [value], [], (mod.tpl));
 };
 
+// Return a list of the key value pairs in the tuple.
 let iter = module{
     tpl = NULL,
 } => {
@@ -34,6 +36,7 @@ let iter = module{
     let result = reduce(func (acc, field, value) =>  acc + [[field, value]], [], (mod.tpl));
 };
 
+// Strip all the null fields from a tuple.
 let strip_nulls = module{
     tpl = NULL,
 } => {
@@ -44,6 +47,7 @@ let strip_nulls = module{
     let result = filter(func (name, value) =>  value != NULL, (mod.tpl));
 };
 
+// Check if a tuple has all the fields in a given list.
 let has_fields = module{
     tpl = NULL,
     fields = [],
@@ -57,6 +61,7 @@ let has_fields = module{
     let result = reduce(reducer = func (acc, f) => acc && (f in fs), true, (mod.fields));
 };
 
+// Check if a field in a tuple is a given type.
 let field_type = module{
     tpl = NULL,
     field = NULL,
@@ -76,12 +81,15 @@ let field_type = module{
         false = fail "@ is not a string" % (mod.type),
     };
 
+    // Get the list of field value pairs.
     let it = lib.iter{tpl=mod.tpl}.result;
-    
+
+    // The reducer function used to check the field's types if it exists. 
     let reducer = func (acc, l) => acc && (select l.0 == mod.field, NULL, {
         true = l.1 is mod.type, // if this is the field then we propagate if it's the right type.
         false = true, // if this isn't the field then we propagate true
     });
 
+    // The computed answer true or false.
     let result = lib.has_fields{tpl=mod.tpl, fields=[mod.field]}.result && reduce(reducer, true, it);
 };
