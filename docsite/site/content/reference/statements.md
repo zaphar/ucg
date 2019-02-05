@@ -46,7 +46,10 @@ ok field that is either true or false and a desc field that is a string. Assert
 statements are noops except when executing `ucg test`. They give you a way to
 assert certains properties about your data and can be used as a form of unit
 testing for your configurations. It starts with the `assert` keyword followed
-by a valid ucg expression.
+by a valid ucg expression that resolves to a tuple with an `ok` field and a
+`desc` field. The `ok` field must contain a boolean value. The `desc` field
+must contain a description for this assertion. The `ok` field is `true` the
+assert test succeeds. When it is `false` the assert test fails.
 
 ```
 assert {
