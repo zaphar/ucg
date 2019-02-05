@@ -418,3 +418,14 @@ fn test_format_expr_unclosed_parens_compile_failure() {
         ],
     )
 }
+
+#[test]
+fn test_list_unclosed_bracket_compile_failure() {
+    assert_build_failure(
+        "[1",
+        vec![
+            Regex::new(r"Expected \(\]\) but got \(\)").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 3").unwrap(),
+        ],
+    )
+}
