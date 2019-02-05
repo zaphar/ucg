@@ -58,7 +58,7 @@ let has_fields = module{
 
     let fs = lib.fields{tpl=mod.tpl}.result;
 
-    let result = reduce(reducer = func (acc, f) => acc && (f in fs), true, (mod.fields));
+    let result = reduce(func (acc, f) => acc && (f in fs), true, mod.fields);
 };
 
 // Check if a field in a tuple is a given type.
