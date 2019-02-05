@@ -10,9 +10,7 @@ let fields = module{
     // First we check that mod.tpl is a tuple.
     assert_tuple(mod.tpl);
     
-    let reducer = func (acc, field, value) =>  acc + [field];
-
-    let result = reduce(reducer, [], (mod.tpl));
+    let result = reduce(func (acc, field, value) =>  acc + [field], [], (mod.tpl));
 };
 
 // return a list of the values in a tuple.
@@ -23,9 +21,7 @@ let values = module{
     // First we check that mod.tpl is a tuple.
     assert_tuple(mod.tpl);
     
-    let reducer = func (acc, field, value) =>  acc + [value];
-
-    let result = reduce(reducer, [], (mod.tpl));
+    let result = reduce(func (acc, field, value) =>  acc + [value], [], (mod.tpl));
 };
 
 let iter = module{
@@ -35,9 +31,7 @@ let iter = module{
     // First we check that mod.tpl is a tuple.
     assert_tuple(mod.tpl);
     
-    let reducer = func (acc, field, value) =>  acc + [[field, value]];
-    
-    let result = reduce(reducer, [], (mod.tpl));
+    let result = reduce(func (acc, field, value) =>  acc + [[field, value]], [], (mod.tpl));
 };
 
 let strip_nulls = module{
@@ -47,9 +41,7 @@ let strip_nulls = module{
     // First we check that mod.tpl is a tuple.
     assert_tuple(mod.tpl);
     
-    let filterer = func (name, value) =>  value != NULL;
-
-    let result = filter(filterer, (mod.tpl));
+    let result = filter(func (name, value) =>  value != NULL, (mod.tpl));
 };
 
 let has_fields = module{
@@ -62,9 +54,7 @@ let has_fields = module{
 
     let fs = lib.fields{tpl=mod.tpl}.result;
 
-    let reducer = func (acc, f) => acc && (f in fs);
-
-    let result = reduce(reducer, true, (mod.fields));
+    let result = reduce(reducer = func (acc, f) => acc && (f in fs), true, (mod.fields));
 };
 
 let field_type = module{
@@ -86,8 +76,6 @@ let field_type = module{
         false = fail "@ is not a string" % (mod.type),
     };
 
-    let has_field = lib.has_fields{tpl=mod.tpl, fields=[mod.field]}.result; 
-    
     let it = lib.iter{tpl=mod.tpl}.result;
     
     let reducer = func (acc, l) => acc && (select l.0 == mod.field, NULL, {
@@ -95,7 +83,5 @@ let field_type = module{
         false = true, // if this isn't the field then we propagate true
     });
 
-    let is_type = reduce(reducer, true, it);
-
-    let result = has_field && is_type;
+    let result = lib.has_fields{tpl=mod.tpl, fields=[mod.field]}.result && reduce(reducer, true, it);
 };

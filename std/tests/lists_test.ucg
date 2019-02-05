@@ -11,12 +11,12 @@ assert asserts.equal{
 };
 
 assert asserts.equal{
-    left=list.len{list=[0, 1, 2, 3]}.result,
+    left=list.len([0, 1, 2, 3]),
     right=4,
 };
 
 assert asserts.equal{
-    left = list.reverse{list=[0, 1, 2, 3]}.result,
+    left = list.reverse([0, 1, 2, 3]),
     right = [3, 2, 1, 0],
 };
 

@@ -14,21 +14,9 @@ let str_join = module{
     let result = reduce(joiner, {sep=mod.sep, out=""}, (mod.list)).out;
 };
 
-let len = module{
-    list = NULL,
-} => {
-    let counter = func (acc, item) =>  acc + 1;
+let len = func(list) => reduce(func(acc, item) => acc + 1, 0, list);
 
-    let result = reduce(counter, 0, (mod.list));
-};
-
-let reverse = module{
-    list = NULL,
-} => {
-    let reducer = func (acc, item) =>  [item] + acc;
-
-    let result = reduce(reducer, [], (mod.list)); 
-};
+let reverse = func(list) => reduce(func (acc, item) =>  [item] + acc, [], list);
 
 let enumerate = module{
     start = 0,
@@ -50,10 +38,11 @@ let zip = module{
     list1 = NULL,
     list2 = NULL,
 } => {
-    let counter = func (acc, item) =>  acc + 1;
+    let len = import "std/lists.ucg".len;
 
-    let len1 = reduce(counter, 0, (mod.list1));
-    let len2 = reduce(counter, 0, (mod.list2));
+
+    let len1 = len(mod.list1);
+    let len2 = len(mod.list2);
 
     let rng = select (len1 >= len2), NULL, {
         true = 0:(len1 - 1),
