@@ -11,13 +11,11 @@ let base_types = [
     "module",
 ];
 
-let base_type_reducer = func (acc, f) => select (acc.val is f), f, {
+// Computes the base type of a value.
+let base_type_of = func (val) => reduce(func (acc, f) => select (acc.val is f), f, {
     true = acc{typ = f},
     false = acc,
-};
-
-// Computes the base type of a value.
-let base_type_of = func (val) => reduce(base_type_reducer, {val=val, typ="null"}, base_types).typ;
+}, {val=val, typ="null"}, base_types).typ;
 
 // Turns any schema check module into a compile failure.
 // The module must export the computed value as the result field.
