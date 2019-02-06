@@ -1,3 +1,5 @@
+SHELL = /bin/bash -o pipefail
+
 all: test build
 
 build:
@@ -29,3 +31,6 @@ install: test
 publish: build test
 	cargo publish
 	(cd docsite; make deploysite)
+
+clean:
+	rm -f integration.log stdlibtest.log unittest.log
