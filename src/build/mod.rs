@@ -30,16 +30,18 @@ use simple_error;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::ast::*;
+use crate::build::format::{ExpressionFormatter, FormatRenderer, SimpleFormatter};
 use crate::build::scope::{find_in_fieldlist, Scope, ValueMap};
 use crate::convert::ImporterRegistry;
 use crate::error;
-use crate::format::{ExpressionFormatter, FormatRenderer, SimpleFormatter};
 use crate::iter::OffsetStrIter;
 use crate::parse::parse;
 
 pub mod assets;
+pub mod format;
 pub mod ir;
 pub mod scope;
+
 mod stdlib;
 
 pub use self::ir::Val;

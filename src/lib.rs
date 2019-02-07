@@ -41,8 +41,6 @@ pub mod error;
 pub mod iter;
 pub mod parse;
 
-mod format;
-
 pub use crate::ast::Expression;
 pub use crate::ast::Statement;
 pub use crate::ast::Value;
