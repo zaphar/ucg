@@ -486,7 +486,7 @@ impl<'a> FileBuilder<'a> {
     fn eval_stmt(&mut self, stmt: &Statement) -> Result<Rc<Val>, Box<dyn Error>> {
         let child_scope = self.scope.clone();
         match stmt {
-            &Statement::Assert(ref expr) => self.build_assert(&expr, &child_scope),
+            &Statement::Assert(ref expr) => self.eval_assert(&expr, &child_scope),
             &Statement::Let(ref def) => self.eval_let(def),
             &Statement::Expression(ref expr) => self.eval_expr(expr, &child_scope),
             // Only one output can be used per file. Right now we enforce this by
@@ -1498,11 +1498,7 @@ impl<'a> FileBuilder<'a> {
         self.assert_collector.counter += 1;
     }
 
-    fn build_assert(
-        &mut self,
-        expr: &Expression,
-        scope: &Scope,
-    ) -> Result<Rc<Val>, Box<dyn Error>> {
+    fn eval_assert(&mut self, expr: &Expression, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         if !self.validate_mode {
             // we are not in validate_mode so build_asserts are noops.
             return Ok(Rc::new(Val::Empty));
