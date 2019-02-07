@@ -792,11 +792,12 @@ make_fn!(
 make_fn!(
     out_statement<SliceIter<Token>, Statement>,
     do_each!(
+        pos => pos,
         _ => word!("out"),
         typ => wrap_err!(must!(match_type!(BAREWORD)), "Expected converter name"),
         expr => wrap_err!(must!(expression), "Expected Expression to export"),
         _ => must!(punct!(";")),
-        (Statement::Output(typ.clone(), expr.clone()))
+        (Statement::Output(pos, typ.clone(), expr.clone()))
     )
 );
 

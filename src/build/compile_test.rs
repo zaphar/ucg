@@ -429,3 +429,37 @@ fn test_list_unclosed_bracket_compile_failure() {
         ],
     )
 }
+
+#[test]
+fn test_out_missing_type_compile_failure() {
+    assert_build_failure(
+        "out",
+        vec![
+            Regex::new(r"Expected converter name").unwrap(),
+            Regex::new(r"Not a Bareword").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 4").unwrap(),
+        ],
+    )
+}
+
+#[test]
+fn test_out_missing_out_expr_compile_failure() {
+    assert_build_failure(
+        "out json",
+        vec![
+            Regex::new(r"Expected Expression to export").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 9").unwrap(),
+        ],
+    )
+}
+
+#[test]
+fn test_out_multiple_times_compile_failure() {
+    assert_build_failure(
+        "out json {};\nout json {};",
+        vec![
+            Regex::new(r"You can only have one output per file").unwrap(),
+            Regex::new(r"at <eval> line: 2, column: 1").unwrap(),
+        ],
+    )
+}

@@ -42,7 +42,7 @@ impl<'a> AstWalker<'a> {
             Statement::Assert(ref mut expr) => {
                 self.walk_expression(expr);
             }
-            Statement::Output(_, ref mut expr) => {
+            Statement::Output(_, _, ref mut expr) => {
                 self.walk_expression(expr);
             }
         }

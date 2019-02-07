@@ -738,5 +738,5 @@ pub enum Statement {
     Assert(Expression),
 
     // Identify an Expression for output.
-    Output(Token, Expression),
+    Output(Position, Token, Expression),
 }

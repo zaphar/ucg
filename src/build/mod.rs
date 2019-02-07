@@ -491,7 +491,7 @@ impl<'a> FileBuilder<'a> {
             &Statement::Expression(ref expr) => self.eval_expr(expr, &child_scope),
             // Only one output can be used per file. Right now we enforce this by
             // having a single builder per file.
-            &Statement::Output(ref typ, ref expr) => {
+            &Statement::Output(ref pos, ref typ, ref expr) => {
                 if let None = self.out_lock {
                     let val = self.eval_expr(expr, &child_scope)?;
                     self.out_lock = Some((typ.fragment.to_string(), val.clone()));
@@ -499,8 +499,8 @@ impl<'a> FileBuilder<'a> {
                 } else {
                     Err(Box::new(error::BuildError::new(
                         format!("You can only have one output per file."),
-                        error::ErrorType::DuplicateBinding,
-                        typ.pos.clone(),
+                        error::ErrorType::Unsupported,
+                        pos.clone(),
                     )))
                 }
             }
