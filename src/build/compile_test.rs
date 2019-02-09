@@ -270,7 +270,7 @@ fn test_binary_sum_operator_wrong_type_on_rhs_compile_failure() {
     assert_build_failure(
         "1 + \"foo\";",
         vec![
-            Regex::new(r"Expected Integer but got .foo.").unwrap(),
+            Regex::new(r"Expected Integer but got \(.foo.\)").unwrap(),
             Regex::new(r"at <eval> line: 1, column: 5").unwrap(),
         ],
     )
@@ -281,7 +281,7 @@ fn test_binary_minus_operator_wrong_type_on_rhs_compile_failure() {
     assert_build_failure(
         "1 - \"foo\";",
         vec![
-            Regex::new(r"Expected Integer but got .foo.").unwrap(),
+            Regex::new(r"Expected Integer but got \(.foo.\)").unwrap(),
             Regex::new(r"at <eval> line: 1, column: 5").unwrap(),
         ],
     )
@@ -292,7 +292,7 @@ fn test_binary_mul_operator_wrong_type_on_rhs_compile_failure() {
     assert_build_failure(
         "1 * \"foo\";",
         vec![
-            Regex::new(r"Expected Integer but got .foo.").unwrap(),
+            Regex::new(r"Expected Integer but got \(.foo.\)").unwrap(),
             Regex::new(r"at <eval> line: 1, column: 5").unwrap(),
         ],
     )
@@ -303,7 +303,7 @@ fn test_binary_div_operator_wrong_type_on_rhs_compile_failure() {
     assert_build_failure(
         "1 / \"foo\";",
         vec![
-            Regex::new(r"Expected Integer but got .foo.").unwrap(),
+            Regex::new(r"Expected Integer but got \(.foo.\)").unwrap(),
             Regex::new(r"at <eval> line: 1, column: 5").unwrap(),
         ],
     )
@@ -314,7 +314,7 @@ fn test_binary_gt_operator_wrong_type_on_rhs_compile_failure() {
     assert_build_failure(
         "1 > \"foo\";",
         vec![
-            Regex::new(r"Expected Integer but got .foo.").unwrap(),
+            Regex::new(r"Expected Integer but got \(.foo.\)").unwrap(),
             Regex::new(r"at <eval> line: 1, column: 5").unwrap(),
         ],
     )
@@ -325,7 +325,7 @@ fn test_binary_lt_operator_wrong_type_on_rhs_compile_failure() {
     assert_build_failure(
         "1 < \"foo\";",
         vec![
-            Regex::new(r"Expected Integer but got .foo.").unwrap(),
+            Regex::new(r"Expected Integer but got \(.foo.\)").unwrap(),
             Regex::new(r"at <eval> line: 1, column: 5").unwrap(),
         ],
     )
@@ -336,7 +336,7 @@ fn test_binary_lteq_operator_wrong_type_on_rhs_compile_failure() {
     assert_build_failure(
         "1 <= \"foo\";",
         vec![
-            Regex::new(r"Expected Integer but got .foo.").unwrap(),
+            Regex::new(r"Expected Integer but got \(.foo.\)").unwrap(),
             Regex::new(r"at <eval> line: 1, column: 6").unwrap(),
         ],
     )
@@ -347,7 +347,7 @@ fn test_binary_gteq_operator_wrong_type_on_rhs_compile_failure() {
     assert_build_failure(
         "1 >= \"foo\";",
         vec![
-            Regex::new(r"Expected Integer but got .foo.").unwrap(),
+            Regex::new(r"Expected Integer but got \(.foo.\)").unwrap(),
             Regex::new(r"at <eval> line: 1, column: 6").unwrap(),
         ],
     )
@@ -358,7 +358,7 @@ fn test_binary_eqeq_operator_wrong_type_on_rhs_compile_failure() {
     assert_build_failure(
         "1 == \"foo\";",
         vec![
-            Regex::new(r"Expected Integer but got .foo.").unwrap(),
+            Regex::new(r"Expected Integer but got \(.foo.\)").unwrap(),
             Regex::new(r"at <eval> line: 1, column: 6").unwrap(),
         ],
     )
@@ -526,6 +526,32 @@ fn test_copy_expression_wrong_field_type_compile_failure() {
         vec![
             Regex::new(r"Expected type Integer for field bar but got \(List\)").unwrap(),
             Regex::new(r"at <eval> line: 2, column: 5").unwrap(),
+        ],
+    )
+}
+
+// TODO(jwall): Function call errors
+
+#[test]
+fn test_func_call_wrong_argument_length_compile_failure() {
+    assert_build_failure(
+        "let foo = func() => 1;\nfoo(1);",
+        vec![
+            Regex::new(r"Func called with too many args").unwrap(),
+            Regex::new(r"at <eval> line: 2, column: 1").unwrap(),
+        ],
+    )
+}
+
+#[test]
+fn test_func_call_wrong_argument_type_compile_failure() {
+    assert_build_failure(
+        "let foo = func(i) => 1 + i;\nfoo(\"bar\");",
+        vec![
+            Regex::new(r"Func evaluation failed").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 26").unwrap(),
+            Regex::new(r"Expected Integer but got \(.bar.\)").unwrap(),
+            Regex::new(r"at <eval> line: 2, column: 1").unwrap(),
         ],
     )
 }

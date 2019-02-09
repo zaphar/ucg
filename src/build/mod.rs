@@ -55,8 +55,6 @@ impl FuncDef {
     /// Expands a ucg function using the given arguments into a new Tuple.
     pub fn eval(
         &self,
-        // TODO(jwall): This should come from the FuncDef instead.
-        root: PathBuf,
         parent_builder: &FileBuilder,
         mut args: Vec<Rc<Val>>,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
@@ -64,10 +62,7 @@ impl FuncDef {
         // func call error.
         if args.len() > self.argdefs.len() {
             return Err(Box::new(error::BuildError::new(
-                format!(
-                    "Func called with too many args in file: {}",
-                    root.to_string_lossy()
-                ),
+                "Func called with too many args",
                 error::ErrorType::BadArgLen,
                 self.pos.clone(),
             )));
@@ -135,7 +130,7 @@ macro_rules! eval_binary_expr {
             }
             val => {
                 return Err(Box::new(error::BuildError::new(
-                    format!("Expected {} but got {}", $msg, val),
+                    format!("Expected {} but got ({})", $msg, val),
                     error::ErrorType::TypeFail,
                     $pos.clone(),
                 )));
@@ -682,7 +677,7 @@ impl<'a> FileBuilder<'a> {
             }
         }
         Err(Box::new(error::BuildError::new(
-            format!("Expected {} but got {}", left.type_name(), right,),
+            format!("Expected {} but got ({})", left.type_name(), right,),
             error::ErrorType::TypeFail,
             pos.clone(),
         )))
@@ -706,7 +701,7 @@ impl<'a> FileBuilder<'a> {
             }
         }
         Err(Box::new(error::BuildError::new(
-            format!("Expected {} but got {}", left.type_name(), right,),
+            format!("Expected {} but got ({})", left.type_name(), right,),
             error::ErrorType::TypeFail,
             pos.clone(),
         )))
@@ -729,7 +724,7 @@ impl<'a> FileBuilder<'a> {
             }
         }
         Err(Box::new(error::BuildError::new(
-            format!("Expected {} but got {}", left.type_name(), right),
+            format!("Expected {} but got ({})", left.type_name(), right),
             error::ErrorType::TypeFail,
             pos.clone(),
         )))
@@ -752,7 +747,7 @@ impl<'a> FileBuilder<'a> {
             }
         }
         Err(Box::new(error::BuildError::new(
-            format!("Expected {} but got {}", left.type_name(), right,),
+            format!("Expected {} but got ({})", left.type_name(), right,),
             error::ErrorType::TypeFail,
             pos.clone(),
         )))
@@ -839,7 +834,7 @@ impl<'a> FileBuilder<'a> {
             }
             return Err(Box::new(error::BuildError::new(
                 format!(
-                    "Expected boolean value for operator but got {}",
+                    "Expected boolean value for operator but got ({})",
                     left.type_name()
                 ),
                 error::ErrorType::TypeFail,
@@ -848,7 +843,7 @@ impl<'a> FileBuilder<'a> {
         } else {
             return Err(Box::new(error::BuildError::new(
                 format!(
-                    "Expected boolean value for operator but got {}",
+                    "Expected boolean value for operator but got ({})",
                     left.type_name()
                 ),
                 error::ErrorType::TypeFail,
@@ -914,7 +909,7 @@ impl<'a> FileBuilder<'a> {
             regex::Regex::new(s.as_ref())?
         } else {
             return Err(Box::new(error::BuildError::new(
-                format!("Expected string for regex but got {}", right.type_name()),
+                format!("Expected string for regex but got ({})", right.type_name()),
                 error::ErrorType::TypeFail,
                 right_pos.clone(),
             )));
@@ -923,7 +918,7 @@ impl<'a> FileBuilder<'a> {
             s.as_ref()
         } else {
             return Err(Box::new(error::BuildError::new(
-                format!("Expected string but got {}", left.type_name()),
+                format!("Expected string but got ({})", left.type_name()),
                 error::ErrorType::TypeFail,
                 left_pos.clone(),
             )));
@@ -1164,13 +1159,21 @@ impl<'a> FileBuilder<'a> {
     fn eval_call(&self, def: &CallDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         let args = &def.arglist;
         let v = self.eval_value(&def.funcref, scope)?;
+        let call_pos = def.pos.clone();
         if let &Val::Func(ref def) = v.deref() {
             // Congratulations this is actually a function.
             let mut argvals: Vec<Rc<Val>> = Vec::new();
             for arg in args.iter() {
                 argvals.push(self.eval_expr(arg, scope)?);
             }
-            return Ok(def.eval(self.working_dir.clone(), self, argvals)?);
+            return match def.eval(self, argvals) {
+                Ok(v) => Ok(v),
+                Err(e) => Err(Box::new(error::BuildError::new(
+                    format!("Func evaluation failed\nCaused by:\n\t{}", e),
+                    error::ErrorType::TypeFail,
+                    call_pos,
+                ))),
+            };
         }
         Err(Box::new(error::BuildError::new(
             // We should pretty print the selectors here.
@@ -1259,7 +1262,7 @@ impl<'a> FileBuilder<'a> {
         let mut out = Vec::new();
         for item in elems.iter() {
             let argvals = vec![item.clone()];
-            let val = def.eval(self.working_dir.clone(), self, argvals)?;
+            let val = def.eval(self, argvals)?;
             match typ {
                 ProcessingOpType::Map => {
                     out.push(val.clone());
@@ -1288,7 +1291,7 @@ impl<'a> FileBuilder<'a> {
         let mut out = Vec::new();
         for &(ref name, ref val) in fs {
             let argvals = vec![Rc::new(Val::Str(name.val.clone())), val.clone()];
-            let result = def.eval(self.working_dir.clone(), self, argvals)?;
+            let result = def.eval(self, argvals)?;
             match typ {
                 ProcessingOpType::Map => {
                     if let &Val::List(ref fs) = result.as_ref() {
@@ -1324,7 +1327,7 @@ impl<'a> FileBuilder<'a> {
                     } else {
                         return Err(Box::new(error::BuildError::new(
                             format!(
-                                "map on a tuple field expects a list as output but got {:?}",
+                                "map on a tuple field expects a list as output but got ({})",
                                 result.type_name()
                             ),
                             error::ErrorType::TypeFail,
@@ -1365,7 +1368,7 @@ impl<'a> FileBuilder<'a> {
             &Val::List(ref elems) => {
                 for item in elems.iter() {
                     let argvals = vec![acc.clone(), item.clone()];
-                    let result = funcdef.eval(self.working_dir.clone(), self, argvals)?;
+                    let result = funcdef.eval(self, argvals)?;
                     acc = result;
                 }
             }
@@ -1376,14 +1379,14 @@ impl<'a> FileBuilder<'a> {
                         Rc::new(Val::Str(name.val.clone())),
                         val.clone(),
                     ];
-                    let result = funcdef.eval(self.working_dir.clone(), self, argvals)?;
+                    let result = funcdef.eval(self, argvals)?;
                     acc = result;
                 }
             }
             &Val::Str(ref s) => {
                 for gc in s.graphemes(true) {
                     let argvals = vec![acc.clone(), Rc::new(Val::Str(gc.to_string()))];
-                    let result = funcdef.eval(self.working_dir.clone(), self, argvals)?;
+                    let result = funcdef.eval(self, argvals)?;
                     acc = result;
                 }
             }
@@ -1410,7 +1413,7 @@ impl<'a> FileBuilder<'a> {
         let mut result = String::new();
         for gc in s.graphemes(true) {
             let arg = Rc::new(Val::Str(gc.to_string()));
-            let out = def.eval(self.working_dir.clone(), self, vec![arg])?;
+            let out = def.eval(self, vec![arg])?;
             match typ {
                 ProcessingOpType::Filter => {
                     match out.as_ref() {
@@ -1425,7 +1428,7 @@ impl<'a> FileBuilder<'a> {
                         _ => {
                             return Err(Box::new(error::BuildError::new(
                                 format!(
-                                    "Expected boolean or NULL for filter return but got {}",
+                                    "Expected boolean or NULL for filter return but got ({})",
                                     out.type_name()
                                 ),
                                 error::ErrorType::TypeFail,
@@ -1440,7 +1443,7 @@ impl<'a> FileBuilder<'a> {
                     }
                     _ => {
                         return Err(Box::new(error::BuildError::new(
-                            format!("Expected string map return but got {}", out.type_name()),
+                            format!("Expected string map return but got ({})", out.type_name()),
                             error::ErrorType::TypeFail,
                             def.pos.clone(),
                         )));
@@ -1648,7 +1651,7 @@ impl<'a> FileBuilder<'a> {
             _ => {
                 return Err(Box::new(error::BuildError::new(
                     format!(
-                        "Expected an integer for range start but got {}",
+                        "Expected an integer for range start but got ({})",
                         start.type_name()
                     ),
                     error::ErrorType::TypeFail,
@@ -1665,7 +1668,7 @@ impl<'a> FileBuilder<'a> {
                     _ => {
                         return Err(Box::new(error::BuildError::new(
                             format!(
-                                "Expected an integer for range step but got {}",
+                                "Expected an integer for range step but got ({})",
                                 step.type_name()
                             ),
                             error::ErrorType::TypeFail,
@@ -1684,7 +1687,7 @@ impl<'a> FileBuilder<'a> {
             _ => {
                 return Err(Box::new(error::BuildError::new(
                     format!(
-                        "Expected an integer for range start but got {}",
+                        "Expected an integer for range start but got ({})",
                         end.type_name()
                     ),
                     error::ErrorType::TypeFail,
@@ -1710,7 +1713,7 @@ impl<'a> FileBuilder<'a> {
             Val::Str(ref s) => s.clone(),
             _ => {
                 return Err(Box::new(error::BuildError::new(
-                    format!("Expected string expression but got {}", tval),
+                    format!("Expected string expression but got ({})", tval),
                     error::ErrorType::TypeFail,
                     def.right.pos().clone(),
                 )));
@@ -1729,7 +1732,7 @@ impl<'a> FileBuilder<'a> {
             "module" => val.is_module(),
             other => {
                 return Err(Box::new(error::BuildError::new(
-                    format!("Expected valid type name but got {}", other),
+                    format!("Expected valid type name but got ({})", other),
                     error::ErrorType::TypeFail,
                     def.right.pos().clone(),
                 )));
@@ -1772,7 +1775,7 @@ impl<'a> FileBuilder<'a> {
                 } else {
                     Err(Box::new(error::BuildError::new(
                         format!(
-                            "Expected string for message but got {}",
+                            "Expected string for message but got ({})",
                             def.message.as_ref()
                         ),
                         error::ErrorType::TypeFail,
@@ -1787,7 +1790,7 @@ impl<'a> FileBuilder<'a> {
                 } else {
                     Err(Box::new(error::BuildError::new(
                         format!(
-                            "Expected boolean for expression but got {}",
+                            "Expected boolean for expression but got ({})",
                             def.expr.as_ref()
                         ),
                         error::ErrorType::TypeFail,
