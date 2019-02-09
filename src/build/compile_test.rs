@@ -463,3 +463,47 @@ fn test_out_multiple_times_compile_failure() {
         ],
     )
 }
+
+#[test]
+fn test_let_missing_name_compile_failure() {
+    assert_build_failure(
+        "let ",
+        vec![
+            Regex::new(r"Expected name for binding").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 5").unwrap(),
+        ],
+    )
+}
+
+#[test]
+fn test_let_missing_equal_compile_failure() {
+    assert_build_failure(
+        "let foo ",
+        vec![
+            Regex::new(r"Expected \(=\) but got \(\)").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 9").unwrap(),
+        ],
+    )
+}
+
+#[test]
+fn test_let_missing_expression_compile_failure() {
+    assert_build_failure(
+        "let foo =",
+        vec![
+            Regex::new(r"Expected Expression").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 10").unwrap(),
+        ],
+    )
+}
+
+#[test]
+fn test_let_missing_semicolon_compile_failure() {
+    assert_build_failure(
+        "let foo = 1",
+        vec![
+            Regex::new(r"Expected \(;\) but got \(\)").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 12").unwrap(),
+        ],
+    )
+}
