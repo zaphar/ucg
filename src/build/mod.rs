@@ -1042,7 +1042,7 @@ impl<'a> FileBuilder<'a> {
                     } else {
                         return Err(Box::new(error::BuildError::new(
                             format!(
-                                "Expected type {} for field {} but got {}",
+                                "Expected type {} for field {} but got ({})",
                                 src_val.1.type_name(),
                                 key.fragment,
                                 expr_result.type_name()
@@ -1130,7 +1130,7 @@ impl<'a> FileBuilder<'a> {
             }
         }
         Err(Box::new(error::BuildError::new(
-            format!("Expected Tuple or Module got {}", v),
+            format!("Expected Tuple or Module but got ({})", v),
             error::ErrorType::TypeFail,
             def.selector.pos().clone(),
         )))

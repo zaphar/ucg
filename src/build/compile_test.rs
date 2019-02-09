@@ -507,3 +507,25 @@ fn test_let_missing_semicolon_compile_failure() {
         ],
     )
 }
+
+#[test]
+fn test_copy_expression_not_a_tuple_compile_failure() {
+    assert_build_failure(
+        "let foo = 1;\nfoo{};",
+        vec![
+            Regex::new(r"Expected Tuple or Module but got \(1\)").unwrap(),
+            Regex::new(r"at <eval> line: 2, column: 1").unwrap(),
+        ],
+    )
+}
+
+#[test]
+fn test_copy_expression_wrong_field_type_compile_failure() {
+    assert_build_failure(
+        "let foo = {bar=1};\nfoo{bar=[]};",
+        vec![
+            Regex::new(r"Expected type Integer for field bar but got \(List\)").unwrap(),
+            Regex::new(r"at <eval> line: 2, column: 5").unwrap(),
+        ],
+    )
+}
