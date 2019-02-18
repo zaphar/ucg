@@ -24,7 +24,7 @@ content := $(shell find site/content -type f -iname *.md)
 
 site/.built: $(content)
 	cd site; \
-	gutenberg build -o generated
+	zola build -o generated
 	touch site/.built
 
 gensite: site/.built
