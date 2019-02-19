@@ -101,6 +101,7 @@ tbody td:nth-child(even) {
 <tr>
 <td><b>Std Lib</b></td><td>Minimal</td><td>x</td><td>Prelude</td>
 </tr>
+<tr><td><b>Type Safety</b></td><td>Inferred types and schema validation<td>Unknown</td><td>Inferred types</td></tr>
 </table>
 <table>
 
