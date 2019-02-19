@@ -1,0 +1,11 @@
+{
+    "foo": "bar",
+    "one": 1,
+    "inner": {
+        "list": [
+            1,
+            true,
+            null
+        ]
+    }
+}

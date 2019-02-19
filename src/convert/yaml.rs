@@ -100,13 +100,21 @@ impl YamlConverter {
             serde_yaml::Value::Mapping(m) => {
                 let mut fs = Vec::with_capacity(m.len());
                 for (key, value) in m {
+                    // This is a little gross but since yaml allows maps to be keyed
+                    // by more than just a string it's necessary.
+                    let key = match key {
+                        serde_yaml::Value::Bool(b) => b.to_string(),
+                        serde_yaml::Value::Null => "null".to_string(),
+                        serde_yaml::Value::Number(n) => n.to_string(),
+                        serde_yaml::Value::String(s) => s.clone(),
+                        serde_yaml::Value::Sequence(_) | serde_yaml::Value::Mapping(_) => {
+                            eprintln!("Unsupported key type in yaml import skipping");
+                            continue;
+                        }
+                    };
+                    eprintln!("yaml key is: {}", key);
                     fs.push((
-                        ast::PositionedItem::new(
-                            // This is a little gross but since yaml allows maps to be keyed
-                            // by more than just a string it's necessary.
-                            serde_yaml::to_string(key)?,
-                            ast::Position::new(0, 0, 0),
-                        ),
+                        ast::PositionedItem::new(key, ast::Position::new(0, 0, 0)),
                         Rc::new(self.convert_json_val(value)?),
                     ));
                 }

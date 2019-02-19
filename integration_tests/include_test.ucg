@@ -1,3 +1,5 @@
+let t = import "std/testing.ucg".asserts{};
+
 let script = include str "./include_example.sh";
 assert {
     ok = script == "#!/usr/bin/env bash
@@ -15,3 +17,41 @@ assert {
     ok = base64safe == expected,
     desc = "base64safe == expected",
 };
+
+let json_conf = include json "./include_example.json";
+
+assert t.equal{
+    left = json_conf.foo,
+    right = "bar",
+ };
+
+assert t.equal{
+    left = json_conf.one,
+    right = 1,
+ };
+
+assert t.equal{
+    left = json_conf.inner,
+    right = {
+        list = [1, true, NULL],
+    },
+ };
+
+let yaml_conf = include yaml "./include_example.yaml";
+
+assert t.equal{
+    left = yaml_conf.foo,
+    right = "bar",
+ };
+
+assert t.equal{
+    left = yaml_conf.one,
+    right = 1,
+ };
+
+assert t.equal{
+    left = yaml_conf.inner,
+    right = {
+        list = [1, true, NULL],
+    },
+ };
