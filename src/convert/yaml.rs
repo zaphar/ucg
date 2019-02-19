@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use serde_yaml;
 
-use super::traits::{Converter, Result};
+use super::traits::{ConvertResult, Converter};
 use crate::ast;
 use crate::build::Val;
 
@@ -76,7 +76,7 @@ impl YamlConverter {
         Ok(yaml_val)
     }
 
-    fn write(&self, v: &Val, w: &mut Write) -> Result {
+    fn write(&self, v: &Val, w: &mut Write) -> ConvertResult {
         let jsn_val = self.convert_value(v)?;
         serde_yaml::to_writer(w, &jsn_val)?;
         Ok(())
@@ -84,7 +84,7 @@ impl YamlConverter {
 }
 
 impl Converter for YamlConverter {
-    fn convert(&self, v: Rc<Val>, mut w: &mut Write) -> Result {
+    fn convert(&self, v: Rc<Val>, mut w: &mut Write) -> ConvertResult {
         self.write(&v, &mut w)
     }
 

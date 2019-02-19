@@ -65,7 +65,7 @@ fn do_flags<'a, 'b>() -> clap::App<'a, 'b> {
     )
 }
 
-fn run_converter(c: &traits::Converter, v: Rc<Val>, f: Option<&str>) -> traits::Result {
+fn run_converter(c: &traits::Converter, v: Rc<Val>, f: Option<&str>) -> traits::ConvertResult {
     let mut file: Box<std::io::Write> = match f {
         Some(f) => {
             let mut path_buf = PathBuf::from(f);

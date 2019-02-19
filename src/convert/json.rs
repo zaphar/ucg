@@ -17,7 +17,7 @@ use serde_json;
 
 use crate::ast;
 use crate::build::Val;
-use crate::convert::traits::{Converter, ImportResult, Importer, Result};
+use crate::convert::traits::{ConvertResult, Converter, ImportResult, Importer};
 
 /// JsonConverter implements the logic for converting a Val into the json output format.
 pub struct JsonConverter {}
@@ -123,7 +123,7 @@ impl JsonConverter {
         })
     }
 
-    fn write(&self, v: &Val, w: &mut Write) -> Result {
+    fn write(&self, v: &Val, w: &mut Write) -> ConvertResult {
         let jsn_val = self.convert_value(v)?;
         serde_json::to_writer_pretty(w, &jsn_val)?;
         Ok(())
@@ -131,7 +131,7 @@ impl JsonConverter {
 }
 
 impl Converter for JsonConverter {
-    fn convert(&self, v: Rc<Val>, mut w: &mut Write) -> Result {
+    fn convert(&self, v: Rc<Val>, mut w: &mut Write) -> ConvertResult {
         self.write(&v, &mut w)
     }
 

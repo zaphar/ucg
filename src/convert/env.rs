@@ -18,7 +18,7 @@ use std::rc::Rc;
 
 use crate::ast::PositionedItem;
 use crate::build::Val;
-use crate::convert::traits::{Converter, Result};
+use crate::convert::traits::{ConvertResult, Converter};
 
 /// EnvConverter implements the conversion logic for converting a Val into a
 /// set of environment variables.
@@ -33,7 +33,7 @@ impl EnvConverter {
         &self,
         flds: &Vec<(PositionedItem<String>, Rc<Val>)>,
         w: &mut Write,
-    ) -> Result {
+    ) -> ConvertResult {
         for &(ref name, ref val) in flds.iter() {
             if val.is_tuple() {
                 eprintln!("Skipping embedded tuple...");
@@ -49,12 +49,12 @@ impl EnvConverter {
         Ok(())
     }
 
-    fn convert_list(&self, _items: &Vec<Rc<Val>>, _w: &mut Write) -> Result {
+    fn convert_list(&self, _items: &Vec<Rc<Val>>, _w: &mut Write) -> ConvertResult {
         eprintln!("Skipping List...");
         Ok(())
     }
 
-    fn write(&self, v: &Val, w: &mut Write) -> Result {
+    fn write(&self, v: &Val, w: &mut Write) -> ConvertResult {
         match v {
             &Val::Empty => {
                 // Empty is a noop.
@@ -96,7 +96,7 @@ impl EnvConverter {
 }
 
 impl Converter for EnvConverter {
-    fn convert(&self, v: Rc<Val>, mut w: &mut Write) -> Result {
+    fn convert(&self, v: Rc<Val>, mut w: &mut Write) -> ConvertResult {
         self.write(&v, &mut w)
     }
 

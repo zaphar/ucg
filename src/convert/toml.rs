@@ -22,18 +22,18 @@ use toml;
 
 use crate::ast;
 use crate::build::Val;
-use crate::convert::traits::{Converter, Result};
+use crate::convert::traits::{ConvertResult, Converter};
 
 pub struct TomlConverter {}
 
-type ConvertResult = std::result::Result<toml::Value, Box<error::Error>>;
+type Result = std::result::Result<toml::Value, Box<error::Error>>;
 
 impl TomlConverter {
     pub fn new() -> Self {
         TomlConverter {}
     }
 
-    fn convert_list(&self, items: &Vec<Rc<Val>>) -> ConvertResult {
+    fn convert_list(&self, items: &Vec<Rc<Val>>) -> Result {
         let mut v = Vec::new();
         for val in items.iter() {
             v.push(self.convert_value(val)?);
@@ -41,7 +41,7 @@ impl TomlConverter {
         Ok(toml::Value::Array(v))
     }
 
-    fn convert_tuple(&self, items: &Vec<(ast::PositionedItem<String>, Rc<Val>)>) -> ConvertResult {
+    fn convert_tuple(&self, items: &Vec<(ast::PositionedItem<String>, Rc<Val>)>) -> Result {
         let mut mp = toml::value::Table::new();
         for &(ref k, ref v) in items.iter() {
             mp.entry(k.val.clone()).or_insert(self.convert_value(v)?);
@@ -49,7 +49,7 @@ impl TomlConverter {
         Ok(toml::Value::Table(mp))
     }
 
-    fn convert_env(&self, items: &Vec<(String, String)>) -> ConvertResult {
+    fn convert_env(&self, items: &Vec<(String, String)>) -> Result {
         let mut mp = toml::value::Table::new();
         for &(ref k, ref v) in items.iter() {
             mp.entry(k.clone())
@@ -58,7 +58,7 @@ impl TomlConverter {
         Ok(toml::Value::Table(mp))
     }
 
-    fn convert_value(&self, v: &Val) -> ConvertResult {
+    fn convert_value(&self, v: &Val) -> Result {
         let toml_val = match v {
             &Val::Boolean(b) => toml::Value::Boolean(b),
             // TODO(jwall): This is an error apparently
@@ -84,7 +84,7 @@ impl TomlConverter {
         Ok(toml_val)
     }
 
-    fn write(&self, v: &Val, w: &mut Write) -> Result {
+    fn write(&self, v: &Val, w: &mut Write) -> ConvertResult {
         let toml_val = self.convert_value(v)?;
         let toml_bytes = toml::ser::to_string_pretty(&toml_val)?;
         write!(w, "{}", toml_bytes)?;
@@ -93,7 +93,7 @@ impl TomlConverter {
 }
 
 impl Converter for TomlConverter {
-    fn convert(&self, v: Rc<Val>, mut w: &mut Write) -> Result {
+    fn convert(&self, v: Rc<Val>, mut w: &mut Write) -> ConvertResult {
         self.write(&v, &mut w)
     }
 

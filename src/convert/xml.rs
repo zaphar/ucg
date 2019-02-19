@@ -17,7 +17,7 @@ use std::error::Error;
 use std::io::Write;
 use std::rc::Rc;
 
-use super::traits::{Converter, Result};
+use super::traits::{ConvertResult, Converter};
 use crate::ast::{Position, PositionedItem};
 use crate::build::Val;
 use crate::error::BuildError;
@@ -69,7 +69,7 @@ impl XmlConverter {
         }
     }
 
-    fn write_node<W: std::io::Write>(&self, v: &Val, w: &mut EventWriter<W>) -> Result {
+    fn write_node<W: std::io::Write>(&self, v: &Val, w: &mut EventWriter<W>) -> ConvertResult {
         // First we determine if this is a tag or text node
         if let Val::Tuple(ref fs) = v {
             let mut name: Option<&str> = None;
@@ -168,7 +168,7 @@ impl XmlConverter {
         Ok(())
     }
 
-    fn write(&self, v: &Val, w: &mut Write) -> Result {
+    fn write(&self, v: &Val, w: &mut Write) -> ConvertResult {
         if let Val::Tuple(ref fs) = v {
             let mut version: Option<&str> = None;
             let mut encoding: Option<&str> = None;
@@ -242,7 +242,7 @@ impl XmlConverter {
 }
 
 impl Converter for XmlConverter {
-    fn convert(&self, v: Rc<Val>, mut w: &mut Write) -> Result {
+    fn convert(&self, v: Rc<Val>, mut w: &mut Write) -> ConvertResult {
         self.write(&v, &mut w)
     }
 
