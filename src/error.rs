@@ -59,31 +59,44 @@ impl fmt::Display for ErrorType {
 /// Error defines an Error type for parsing and building UCG code.
 pub struct BuildError {
     pub err_type: ErrorType,
-    pub pos: Position,
+    pub pos: Option<Position>,
     pub msg: String,
     _pkgonly: (),
 }
 
 impl BuildError {
-    pub fn new<S: Into<String>>(msg: S, t: ErrorType, pos: Position) -> Self {
+    pub fn new_with_pos<S: Into<String>>(msg: S, t: ErrorType, pos: Position) -> Self {
         BuildError {
             err_type: t,
-            pos: pos,
+            pos: Some(pos),
+            msg: msg.into(),
+            _pkgonly: (),
+        }
+    }
+
+    pub fn new<S: Into<String>>(msg: S, t: ErrorType) -> Self {
+        BuildError {
+            err_type: t,
+            pos: None,
             msg: msg.into(),
             _pkgonly: (),
         }
     }
 
     fn render(&self, w: &mut fmt::Formatter) -> fmt::Result {
-        let file = match self.pos.file {
-            Some(ref pb) => pb.to_string_lossy().to_string(),
-            None => "<eval>".to_string(),
-        };
-        write!(
-            w,
-            "{} at {} line: {}, column: {}\nCaused By:\n\t{} ",
-            self.err_type, file, self.pos.line, self.pos.column, self.msg
-        )?;
+        if let Some(ref pos) = self.pos {
+            let file = match pos.file {
+                Some(ref pb) => pb.to_string_lossy().to_string(),
+                None => "<eval>".to_string(),
+            };
+            write!(
+                w,
+                "{} at {} line: {}, column: {}\nCaused By:\n\t{} ",
+                self.err_type, file, pos.line, pos.column, self.msg
+            )?;
+        } else {
+            write!(w, "{} \nCaused By:\n\t{} ", self.err_type, self.msg)?;
+        }
         Ok(())
     }
 }

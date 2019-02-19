@@ -71,6 +71,11 @@ impl Position {
             offset: offset,
         }
     }
+
+    pub fn with_file<P: Into<PathBuf>>(mut self, file: P) -> Self {
+        self.file = Some(file.into());
+        self
+    }
 }
 
 impl<'a> From<&'a Position> for Position {

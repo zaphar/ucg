@@ -18,7 +18,6 @@ use std::io::Write;
 use std::rc::Rc;
 
 use super::traits::{ConvertResult, Converter};
-use crate::ast::Position;
 use crate::build::Val;
 use crate::error::BuildError;
 use crate::error::ErrorType;
@@ -38,7 +37,6 @@ impl XmlConverter {
             Err(Box::new(BuildError::new(
                 "Not a String value",
                 ErrorType::TypeFail,
-                Position::new(0, 0, 0),
             )))
         }
     }
@@ -50,7 +48,6 @@ impl XmlConverter {
             Err(Box::new(BuildError::new(
                 "Not a tuple value",
                 ErrorType::TypeFail,
-                Position::new(0, 0, 0),
             )))
         }
     }
@@ -62,7 +59,6 @@ impl XmlConverter {
             Err(Box::new(BuildError::new(
                 "Not a List value",
                 ErrorType::TypeFail,
-                Position::new(0, 0, 0),
             )))
         }
     }
@@ -123,7 +119,6 @@ impl XmlConverter {
                 return Err(Box::new(BuildError::new(
                     "XML nodes can not have both text and name fields",
                     ErrorType::TypeFail,
-                    Position::new(0, 0, 0),
                 )));
             }
             if name.is_some() {
@@ -160,7 +155,6 @@ impl XmlConverter {
             return Err(Box::new(BuildError::new(
                 "XML nodes must be a Tuple or a string",
                 ErrorType::TypeFail,
-                Position::new(0, 0, 0),
             )));
         }
         Ok(())
@@ -209,7 +203,6 @@ impl XmlConverter {
                                 return Err(Box::new(BuildError::new(
                                     "XML version must be either 1.0 or 1.1",
                                     ErrorType::TypeFail,
-                                    Position::new(0, 0, 0),
                                 )));
                             }
                         }
@@ -226,14 +219,12 @@ impl XmlConverter {
                 None => Err(Box::new(BuildError::new(
                     "XML doc tuples must have a root field",
                     ErrorType::TypeFail,
-                    Position::new(0, 0, 0),
                 ))),
             }
         } else {
             Err(Box::new(BuildError::new(
                 "XML outputs must be a Tuple",
                 ErrorType::TypeFail,
-                Position::new(0, 0, 0),
             )))
         }
     }

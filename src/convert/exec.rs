@@ -17,7 +17,6 @@ use std;
 use std::io::{Cursor, Write};
 use std::rc::Rc;
 
-use crate::ast::Position;
 use crate::build::Val;
 use crate::build::Val::Tuple;
 use crate::convert;
@@ -46,21 +45,18 @@ impl ExecConverter {
                 return Err(Box::new(BuildError::new(
                     "Exec tuples must have no more than 3 fields",
                     ErrorType::TypeFail,
-                    Position::new(0, 0, 0),
                 )));
             }
             let mut env: Option<&Vec<(String, Rc<Val>)>> = None;
             let mut command: Option<&str> = None;
             let mut args: Option<&Vec<Rc<Val>>> = None;
             for &(ref name, ref val) in fields.iter() {
-                // FIXME(jwall): BuildError should not require a Position.
                 // We require a command field in our exec tuple.
                 if name == "command" {
                     if command.is_some() {
                         return Err(Box::new(BuildError::new(
                             "There can only be one command field in an exec tuple",
                             ErrorType::TypeFail,
-                            Position::new(0, 0, 0),
                         )));
                     }
                     if let &Val::Str(ref s) = val.as_ref() {
@@ -70,7 +66,6 @@ impl ExecConverter {
                     return Err(Box::new(BuildError::new(
                         "The command field of an exec tuple must be a string",
                         ErrorType::TypeFail,
-                        Position::new(0, 0, 0),
                     )));
                 }
                 // We optionally allow an env field in our exec tuple.
@@ -80,7 +75,6 @@ impl ExecConverter {
                             return Err(Box::new(BuildError::new(
                                 "There can only be one env field in an exec tuple",
                                 ErrorType::TypeFail,
-                                Position::new(0, 0, 0),
                             )));
                         }
                         env = Some(l);
@@ -89,7 +83,6 @@ impl ExecConverter {
                     return Err(Box::new(BuildError::new(
                         "The env field of an exec tuple must be a list",
                         ErrorType::TypeFail,
-                        Position::new(0, 0, 0),
                     )));
                 }
                 // We optionally allow an args field in our exec tuple.
@@ -99,7 +92,6 @@ impl ExecConverter {
                             return Err(Box::new(BuildError::new(
                                 "There can only be one args field of an exec tuple",
                                 ErrorType::TypeFail,
-                                Position::new(0, 0, 0),
                             )));
                         }
                         args = Some(l);
@@ -108,7 +100,6 @@ impl ExecConverter {
                     return Err(Box::new(BuildError::new(
                         "The args field of an exec tuple must be a list",
                         ErrorType::TypeFail,
-                        Position::new(0, 0, 0),
                     )));
                 }
             }
@@ -116,7 +107,6 @@ impl ExecConverter {
                 return Err(Box::new(BuildError::new(
                     "An exec tuple must have a command field",
                     ErrorType::TypeFail,
-                    Position::new(0, 0, 0),
                 )));
             }
             // Okay if we have made it this far then we are ready to start creating our script.
@@ -137,7 +127,6 @@ impl ExecConverter {
                     return Err(Box::new(BuildError::new(
                         "The env fields of an exec tuple must contain only string values",
                         ErrorType::TypeFail,
-                        Position::new(0, 0, 0),
                     )));
                 }
             }
@@ -158,7 +147,6 @@ impl ExecConverter {
                             return Err(Box::new(BuildError::new(
                                 "Exec args must be a list of strings or tuples of strings.",
                                 ErrorType::TypeFail,
-                                Position::new(0, 0, 0),
                             )));
                         }
                     }
@@ -174,7 +162,6 @@ impl ExecConverter {
         Err(Box::new(BuildError::new(
             "Exec outputs must be of type Tuple",
             ErrorType::TypeFail,
-            Position::new(0, 0, 0),
         )))
     }
 }

@@ -60,7 +60,7 @@ impl Val {
         )
     }
 
-    pub fn equal(&self, target: &Self, pos: Position) -> Result<bool, error::BuildError> {
+    pub fn equal(&self, target: &Self) -> Result<bool, error::BuildError> {
         // first we do a type equality comparison
         match (self, target) {
             // Empty values are always equal.
@@ -74,7 +74,7 @@ impl Val {
                     Ok(false)
                 } else {
                     for (i, lv) in ldef.iter().enumerate() {
-                        if !lv.equal(rdef[i].as_ref(), pos.clone())? {
+                        if !lv.equal(rdef[i].as_ref())? {
                             return Ok(false);
                         }
                     }
@@ -92,7 +92,7 @@ impl Val {
                             return Ok(false);
                         } else {
                             // field value equality.
-                            if !lv.1.equal(field_target.1.as_ref(), pos.clone())? {
+                            if !lv.1.equal(field_target.1.as_ref())? {
                                 return Ok(false);
                             }
                         }
@@ -100,16 +100,13 @@ impl Val {
                     Ok(true)
                 }
             }
-            // FIXME(jwall): Maybe we don't require positions here?
             (&Val::Func(_), &Val::Func(_)) => Err(error::BuildError::new(
                 "Func are not comparable",
                 error::ErrorType::TypeFail,
-                pos,
             )),
             (&Val::Module(_), &Val::Module(_)) => Err(error::BuildError::new(
                 "Module are not comparable",
                 error::ErrorType::TypeFail,
-                pos,
             )),
             // EMPTY is always comparable for equality.
             (&Val::Empty, _) => Ok(false),
@@ -117,7 +114,6 @@ impl Val {
             (me, tgt) => Err(error::BuildError::new(
                 format!("Expected {} but got ({})", me.type_name(), tgt),
                 error::ErrorType::TypeFail,
-                pos,
             )),
         }
     }

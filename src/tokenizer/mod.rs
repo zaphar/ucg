@@ -664,7 +664,12 @@ pub fn pos<'a>(i: SliceIter<'a, Token>) -> Result<SliceIter<'a, Token>, Position
     let tok = _i.next().unwrap();
     let line = tok.pos.line;
     let column = tok.pos.column;
-    Result::Complete(i.clone(), Position::new(line, column, i.get_offset()))
+    let pos = Position::new(line, column, i.get_offset());
+    let pos = match tok.pos.file {
+        Some(ref f) => pos.with_file(f),
+        None => pos,
+    };
+    Result::Complete(i.clone(), pos)
 }
 
 #[cfg(test)]

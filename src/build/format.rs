@@ -54,7 +54,7 @@ impl<V: Into<String> + Clone> FormatRenderer for SimpleFormatter<V> {
         for c in self.tmpl.chars() {
             if c == '@' && !should_escape {
                 if count == self.args.len() {
-                    return Err(Box::new(error::BuildError::new(
+                    return Err(Box::new(error::BuildError::new_with_pos(
                         "Too few arguments to string \
                          formatter.",
                         error::ErrorType::FormatError,
@@ -72,7 +72,7 @@ impl<V: Into<String> + Clone> FormatRenderer for SimpleFormatter<V> {
             }
         }
         if self.args.len() != count {
-            return Err(Box::new(error::BuildError::new(
+            return Err(Box::new(error::BuildError::new_with_pos(
                 "Too many arguments to string \
                  formatter.",
                 error::ErrorType::FormatError,
@@ -111,7 +111,7 @@ impl<'a> ExpressionFormatter<'a> {
                 if c == '{' {
                     brace_count += 1;
                 } else {
-                    return Err(Box::new(error::BuildError::new(
+                    return Err(Box::new(error::BuildError::new_with_pos(
                         format!(
                             "Invalid syntax for format string expected '{{' but got {}",
                             c
@@ -122,7 +122,7 @@ impl<'a> ExpressionFormatter<'a> {
                 }
             }
             None => {
-                return Err(Box::new(error::BuildError::new(
+                return Err(Box::new(error::BuildError::new_with_pos(
                     "Invalid syntax for format string expected '{' but string ended",
                     error::ErrorType::FormatError,
                     pos.clone(),
@@ -148,7 +148,7 @@ impl<'a> ExpressionFormatter<'a> {
                 }
                 // empty expressions are an error
                 if expr_string.is_empty() {
-                    return Err(Box::new(error::BuildError::new(
+                    return Err(Box::new(error::BuildError::new_with_pos(
                         "Got an empty expression in format string",
                         error::ErrorType::FormatError,
                         pos.clone(),
@@ -163,7 +163,7 @@ impl<'a> ExpressionFormatter<'a> {
                 expr_string.push(c);
             }
         }
-        return Err(Box::new(error::BuildError::new(
+        return Err(Box::new(error::BuildError::new_with_pos(
             "Expected '}' but got end of string",
             error::ErrorType::FormatError,
             pos.clone(),
