@@ -84,7 +84,7 @@ impl FlagConverter {
             &Val::Tuple(ref flds) => {
                 for &(ref name, ref val) in flds.iter() {
                     if let &Val::Empty = val.as_ref() {
-                        self.write_flag_name(pfx, &name.val, w)?;
+                        self.write_flag_name(pfx, name, w)?;
                         continue;
                     }
                     match val.as_ref() {
@@ -93,10 +93,10 @@ impl FlagConverter {
                             self.write(&new_pfx, val, w)?;
                         }
                         &Val::List(ref def) => {
-                            self.write_list_flag(pfx, &name.val, def, w)?;
+                            self.write_list_flag(pfx, name, def, w)?;
                         }
                         _ => {
-                            self.write_flag_name(pfx, &name.val, w)?;
+                            self.write_flag_name(pfx, name, w)?;
                             self.write(pfx, &val, w)?;
                         }
                     }

@@ -16,7 +16,6 @@
 use std::io::Write;
 use std::rc::Rc;
 
-use crate::ast::PositionedItem;
 use crate::build::Val;
 use crate::convert::traits::{ConvertResult, Converter};
 
@@ -29,11 +28,7 @@ impl EnvConverter {
         EnvConverter {}
     }
 
-    fn convert_tuple(
-        &self,
-        flds: &Vec<(PositionedItem<String>, Rc<Val>)>,
-        w: &mut Write,
-    ) -> ConvertResult {
+    fn convert_tuple(&self, flds: &Vec<(String, Rc<Val>)>, w: &mut Write) -> ConvertResult {
         for &(ref name, ref val) in flds.iter() {
             if val.is_tuple() {
                 eprintln!("Skipping embedded tuple...");
@@ -43,7 +38,7 @@ impl EnvConverter {
                 eprintln!("Skipping empty variable: {}", name);
                 return Ok(());
             }
-            write!(w, "{}=", name.val)?;
+            write!(w, "{}=", name)?;
             self.write(&val, w)?;
         }
         Ok(())

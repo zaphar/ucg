@@ -18,7 +18,8 @@ pub enum Val {
     Float(f64),
     Str(String),
     List(Vec<Rc<Val>>),
-    Tuple(Vec<(PositionedItem<String>, Rc<Val>)>),
+    // TODO(jwall): Remove the need for PositionedItem here
+    Tuple(Vec<(String, Rc<Val>)>),
     Env(Vec<(String, String)>),
     Func(FuncDef),
     Module(ModuleDef),
@@ -86,12 +87,12 @@ impl Val {
                 } else {
                     for (i, lv) in ldef.iter().enumerate() {
                         let field_target = &rdef[i];
-                        if lv.0.val != field_target.0.val {
+                        if lv.0 != field_target.0 {
                             // field name equality
                             return Ok(false);
                         } else {
                             // field value equality.
-                            if !lv.1.equal(field_target.1.as_ref(), lv.0.pos.clone())? {
+                            if !lv.1.equal(field_target.1.as_ref(), pos.clone())? {
                                 return Ok(false);
                             }
                         }
@@ -99,6 +100,7 @@ impl Val {
                     Ok(true)
                 }
             }
+            // FIXME(jwall): Maybe we don't require positions here?
             (&Val::Func(_), &Val::Func(_)) => Err(error::BuildError::new(
                 "Func are not comparable",
                 error::ErrorType::TypeFail,
@@ -121,7 +123,7 @@ impl Val {
     }
 
     /// Returns the fields if this Val is a tuple. None otherwise.
-    pub fn get_fields(&self) -> Option<&Vec<(PositionedItem<String>, Rc<Val>)>> {
+    pub fn get_fields(&self) -> Option<&Vec<(String, Rc<Val>)>> {
         if let &Val::Tuple(ref fs) = self {
             Some(fs)
         } else {
@@ -227,7 +229,7 @@ impl Display for Val {
             &Val::Tuple(ref def) => {
                 write!(f, "{{\n")?;
                 for v in def.iter() {
-                    write!(f, "\t{} = {},\n", v.0.val, v.1)?;
+                    write!(f, "\t{} = {},\n", v.0, v.1)?;
                 }
                 write!(f, "}}")
             }

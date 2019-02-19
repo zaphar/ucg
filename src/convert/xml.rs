@@ -18,7 +18,7 @@ use std::io::Write;
 use std::rc::Rc;
 
 use super::traits::{ConvertResult, Converter};
-use crate::ast::{Position, PositionedItem};
+use crate::ast::Position;
 use crate::build::Val;
 use crate::error::BuildError;
 use crate::error::ErrorType;
@@ -43,9 +43,7 @@ impl XmlConverter {
         }
     }
 
-    fn get_tuple_val(
-        v: &Val,
-    ) -> std::result::Result<&Vec<(PositionedItem<String>, Rc<Val>)>, Box<dyn Error>> {
+    fn get_tuple_val(v: &Val) -> std::result::Result<&Vec<(String, Rc<Val>)>, Box<dyn Error>> {
         if let Val::Tuple(ref fs) = v {
             Ok(fs)
         } else {
@@ -73,15 +71,15 @@ impl XmlConverter {
         // First we determine if this is a tag or text node
         if let Val::Tuple(ref fs) = v {
             let mut name: Option<&str> = None;
-            let mut attrs: Option<&Vec<(PositionedItem<String>, Rc<Val>)>> = None;
+            let mut attrs: Option<&Vec<(String, Rc<Val>)>> = None;
             let mut children: Option<&Vec<Rc<Val>>> = None;
             let mut text: Option<&str> = None;
             let mut ns: Option<(&str, &str)> = None;
             for (ref field, ref val) in fs.iter() {
-                if field.val == "name" {
+                if field == "name" {
                     name = Some(Self::get_str_val(val.as_ref())?);
                 }
-                if field.val == "ns" {
+                if field == "ns" {
                     if let Val::Tuple(ref fs) = val.as_ref() {
                         let mut prefix = "";
                         let mut uri = "";
@@ -89,10 +87,10 @@ impl XmlConverter {
                             if val.is_empty() {
                                 continue;
                             }
-                            if name.val == "uri" {
+                            if name == "uri" {
                                 uri = Self::get_str_val(val.as_ref())?;
                             }
-                            if name.val == "prefix" {
+                            if name == "prefix" {
                                 prefix = Self::get_str_val(val.as_ref())?;
                             }
                         }
@@ -103,19 +101,19 @@ impl XmlConverter {
                         ns = Some(("", s));
                     }
                 }
-                if field.val == "attrs" {
+                if field == "attrs" {
                     // This should be a tuple.
                     if !val.is_empty() {
                         attrs = Some(Self::get_tuple_val(val.as_ref())?);
                     }
                 }
-                if field.val == "children" {
+                if field == "children" {
                     // This should be a list of tuples.
                     if !val.is_empty() {
                         children = Some(Self::get_list_val(val.as_ref())?);
                     }
                 }
-                if field.val == "text" {
+                if field == "text" {
                     if !val.is_empty() {
                         text = Some(Self::get_str_val(val.as_ref())?);
                     }
@@ -135,7 +133,7 @@ impl XmlConverter {
                         if val.is_empty() {
                             continue;
                         }
-                        start = start.attr(name.val.as_ref(), Self::get_str_val(val.as_ref())?);
+                        start = start.attr(name.as_ref(), Self::get_str_val(val.as_ref())?);
                     }
                 }
                 if let Some((prefix, uri)) = ns {
@@ -175,19 +173,19 @@ impl XmlConverter {
             let mut standalone: Option<bool> = None;
             let mut root: Option<Rc<Val>> = None;
             for &(ref name, ref val) in fs.iter() {
-                if name.val == "version" {
+                if name == "version" {
                     version = Some(Self::get_str_val(val)?);
                 }
-                if name.val == "encoding" {
+                if name == "encoding" {
                     encoding = Some(Self::get_str_val(val)?);
                 }
-                if name.val == "standalone" {
+                if name == "standalone" {
                     standalone = match val.as_ref() {
                         Val::Boolean(b) => Some(*b),
                         _ => None,
                     };
                 }
-                if name.val == "root" {
+                if name == "root" {
                     root = Some(val.clone());
                 }
             }

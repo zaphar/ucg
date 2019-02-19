@@ -15,7 +15,6 @@ use std::rc::Rc;
 
 use serde_json;
 
-use crate::ast;
 use crate::build::Val;
 use crate::convert::traits::{ConvertResult, Converter, ImportResult, Importer};
 
@@ -35,13 +34,10 @@ impl JsonConverter {
         Ok(serde_json::Value::Array(v))
     }
 
-    fn convert_tuple(
-        &self,
-        items: &Vec<(ast::PositionedItem<String>, Rc<Val>)>,
-    ) -> std::io::Result<serde_json::Value> {
+    fn convert_tuple(&self, items: &Vec<(String, Rc<Val>)>) -> std::io::Result<serde_json::Value> {
         let mut mp = serde_json::Map::new();
         for &(ref k, ref v) in items.iter() {
-            mp.entry(k.val.clone()).or_insert(self.convert_value(v)?);
+            mp.entry(k.clone()).or_insert(self.convert_value(v)?);
         }
         Ok(serde_json::Value::Object(mp))
     }
@@ -113,10 +109,7 @@ impl JsonConverter {
             serde_json::Value::Object(m) => {
                 let mut fs = Vec::with_capacity(m.len());
                 for (key, value) in m {
-                    fs.push((
-                        ast::PositionedItem::new(key.to_string(), ast::Position::new(0, 0, 0)),
-                        Rc::new(self.convert_json_val(value)?),
-                    ));
+                    fs.push((key.to_string(), Rc::new(self.convert_json_val(value)?)));
                 }
                 Val::Tuple(fs)
             }

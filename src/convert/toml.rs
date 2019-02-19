@@ -20,7 +20,6 @@ use std::rc::Rc;
 use simple_error::SimpleError;
 use toml;
 
-use crate::ast;
 use crate::build::Val;
 use crate::convert::traits::{ConvertResult, Converter};
 
@@ -41,10 +40,10 @@ impl TomlConverter {
         Ok(toml::Value::Array(v))
     }
 
-    fn convert_tuple(&self, items: &Vec<(ast::PositionedItem<String>, Rc<Val>)>) -> Result {
+    fn convert_tuple(&self, items: &Vec<(String, Rc<Val>)>) -> Result {
         let mut mp = toml::value::Table::new();
         for &(ref k, ref v) in items.iter() {
-            mp.entry(k.val.clone()).or_insert(self.convert_value(v)?);
+            mp.entry(k.clone()).or_insert(self.convert_value(v)?);
         }
         Ok(toml::Value::Table(mp))
     }

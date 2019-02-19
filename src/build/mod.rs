@@ -254,10 +254,10 @@ impl<'a> FileBuilder<'a> {
         fields: &Vec<(Token, Expression)>,
         scope: &Scope,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
-        let mut new_fields = Vec::<(PositionedItem<String>, Rc<Val>)>::new();
+        let mut new_fields = Vec::<(String, Rc<Val>)>::new();
         for &(ref name, ref expr) in fields.iter() {
             let val = self.eval_expr(expr, scope)?;
-            new_fields.push((name.into(), val));
+            new_fields.push((name.fragment.clone(), val));
         }
         Ok(Rc::new(Val::Tuple(new_fields)))
     }
@@ -1014,18 +1014,22 @@ impl<'a> FileBuilder<'a> {
     }
 
     fn get_outputs_as_val(&mut self) -> Rc<Val> {
-        let fields: Vec<(PositionedItem<String>, Rc<Val>)> =
-            self.scope.build_output.drain().collect();
+        let fields: Vec<(String, Rc<Val>)> = self
+            .scope
+            .build_output
+            .drain()
+            .map(|v| (v.0.val, v.1))
+            .collect();
         Rc::new(Val::Tuple(fields))
     }
 
     fn copy_from_base(
         &self,
-        src_fields: &Vec<(PositionedItem<String>, Rc<Val>)>,
+        src_fields: &Vec<(String, Rc<Val>)>,
         overrides: &Vec<(Token, Expression)>,
         scope: &Scope,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
-        let mut m = HashMap::<PositionedItem<String>, (i32, Rc<Val>)>::new();
+        let mut m = HashMap::<String, (i32, Rc<Val>)>::new();
         // loop through fields and build  up a hashmap
         let mut count = 0;
         for &(ref key, ref val) in src_fields.iter() {
@@ -1038,16 +1042,16 @@ impl<'a> FileBuilder<'a> {
                         "Duplicate \
                          field: {} in \
                          tuple",
-                        key.val
+                        key
                     ),
                     error::ErrorType::TypeFail,
-                    key.pos.clone(),
+                    Position::new(0, 0, 0),
                 )));
             }
         }
         for &(ref key, ref val) in overrides.iter() {
             let expr_result = self.eval_expr(val, scope)?;
-            match m.entry(key.into()) {
+            match m.entry(key.fragment.clone()) {
                 // brand new field here.
                 Entry::Vacant(v) => {
                     v.insert((count, expr_result));
@@ -1077,7 +1081,7 @@ impl<'a> FileBuilder<'a> {
                 }
             };
         }
-        let mut new_fields: Vec<(PositionedItem<String>, (i32, Rc<Val>))> = m.drain().collect();
+        let mut new_fields: Vec<(String, (i32, Rc<Val>))> = m.drain().collect();
         // We want to maintain our order for the fields to make comparing tuples
         // easier in later code. So we sort by the field order before constructing a new tuple.
         new_fields.sort_by(|a, b| {
@@ -1312,13 +1316,13 @@ impl<'a> FileBuilder<'a> {
 
     fn eval_functional_tuple_processing(
         &self,
-        fs: &Vec<(PositionedItem<String>, Rc<Val>)>,
+        fs: &Vec<(String, Rc<Val>)>,
         def: &FuncDef,
         typ: ProcessingOpType,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
         let mut out = Vec::new();
         for &(ref name, ref val) in fs {
-            let argvals = vec![Rc::new(Val::Str(name.val.clone())), val.clone()];
+            let argvals = vec![Rc::new(Val::Str(name.clone())), val.clone()];
             let result = def.eval(self, argvals)?;
             match typ {
                 ProcessingOpType::Map => {
@@ -1338,10 +1342,7 @@ impl<'a> FileBuilder<'a> {
                                     def.pos.clone(),
                                 )));
                             };
-                            out.push((
-                                PositionedItem::new(new_name, name.pos.clone()),
-                                fs[1].clone(),
-                            ));
+                            out.push((new_name, fs[1].clone()));
                         } else {
                             return Err(Box::new(error::BuildError::new(
                                 format!(
@@ -1402,11 +1403,7 @@ impl<'a> FileBuilder<'a> {
             }
             &Val::Tuple(ref fs) => {
                 for &(ref name, ref val) in fs.iter() {
-                    let argvals = vec![
-                        acc.clone(),
-                        Rc::new(Val::Str(name.val.clone())),
-                        val.clone(),
-                    ];
+                    let argvals = vec![acc.clone(), Rc::new(Val::Str(name.clone())), val.clone()];
                     let result = funcdef.eval(self, argvals)?;
                     acc = result;
                 }

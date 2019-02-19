@@ -7,7 +7,6 @@ use std::result::Result;
 use serde_yaml;
 
 use super::traits::{ConvertResult, Converter, ImportResult, Importer};
-use crate::ast;
 use crate::build::Val;
 
 pub struct YamlConverter {}
@@ -36,16 +35,10 @@ impl YamlConverter {
         Ok(serde_yaml::Value::Mapping(mp))
     }
 
-    fn convert_tuple(
-        &self,
-        items: &Vec<(ast::PositionedItem<String>, Rc<Val>)>,
-    ) -> std::io::Result<serde_yaml::Value> {
+    fn convert_tuple(&self, items: &Vec<(String, Rc<Val>)>) -> std::io::Result<serde_yaml::Value> {
         let mut mapping = serde_yaml::Mapping::new();
         for &(ref k, ref v) in items.iter() {
-            mapping.insert(
-                serde_yaml::Value::String(k.val.clone()),
-                self.convert_value(v)?,
-            );
+            mapping.insert(serde_yaml::Value::String(k.clone()), self.convert_value(v)?);
         }
         Ok(serde_yaml::Value::Mapping(mapping))
     }
@@ -113,10 +106,7 @@ impl YamlConverter {
                         }
                     };
                     eprintln!("yaml key is: {}", key);
-                    fs.push((
-                        ast::PositionedItem::new(key, ast::Position::new(0, 0, 0)),
-                        Rc::new(self.convert_json_val(value)?),
-                    ));
+                    fs.push((key, Rc::new(self.convert_json_val(value)?)));
                 }
                 Val::Tuple(fs)
             }

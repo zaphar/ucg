@@ -17,7 +17,7 @@ use std;
 use std::io::{Cursor, Write};
 use std::rc::Rc;
 
-use crate::ast::{Position, PositionedItem};
+use crate::ast::Position;
 use crate::build::Val;
 use crate::build::Val::Tuple;
 use crate::convert;
@@ -49,17 +49,18 @@ impl ExecConverter {
                     Position::new(0, 0, 0),
                 )));
             }
-            let mut env: Option<&Vec<(PositionedItem<String>, Rc<Val>)>> = None;
+            let mut env: Option<&Vec<(String, Rc<Val>)>> = None;
             let mut command: Option<&str> = None;
             let mut args: Option<&Vec<Rc<Val>>> = None;
             for &(ref name, ref val) in fields.iter() {
+                // FIXME(jwall): BuildError should not require a Position.
                 // We require a command field in our exec tuple.
-                if name.val == "command" {
+                if name == "command" {
                     if command.is_some() {
                         return Err(Box::new(BuildError::new(
                             "There can only be one command field in an exec tuple",
                             ErrorType::TypeFail,
-                            name.pos.clone(),
+                            Position::new(0, 0, 0),
                         )));
                     }
                     if let &Val::Str(ref s) = val.as_ref() {
@@ -69,17 +70,17 @@ impl ExecConverter {
                     return Err(Box::new(BuildError::new(
                         "The command field of an exec tuple must be a string",
                         ErrorType::TypeFail,
-                        name.pos.clone(),
+                        Position::new(0, 0, 0),
                     )));
                 }
                 // We optionally allow an env field in our exec tuple.
-                if name.val == "env" {
+                if name == "env" {
                     if let &Val::Tuple(ref l) = val.as_ref() {
                         if env.is_some() {
                             return Err(Box::new(BuildError::new(
                                 "There can only be one env field in an exec tuple",
                                 ErrorType::TypeFail,
-                                name.pos.clone(),
+                                Position::new(0, 0, 0),
                             )));
                         }
                         env = Some(l);
@@ -88,17 +89,17 @@ impl ExecConverter {
                     return Err(Box::new(BuildError::new(
                         "The env field of an exec tuple must be a list",
                         ErrorType::TypeFail,
-                        name.pos.clone(),
+                        Position::new(0, 0, 0),
                     )));
                 }
                 // We optionally allow an args field in our exec tuple.
-                if name.val == "args" {
+                if name == "args" {
                     if let &Val::List(ref l) = val.as_ref() {
                         if args.is_some() {
                             return Err(Box::new(BuildError::new(
                                 "There can only be one args field of an exec tuple",
                                 ErrorType::TypeFail,
-                                name.pos.clone(),
+                                Position::new(0, 0, 0),
                             )));
                         }
                         args = Some(l);
@@ -107,7 +108,7 @@ impl ExecConverter {
                     return Err(Box::new(BuildError::new(
                         "The args field of an exec tuple must be a list",
                         ErrorType::TypeFail,
-                        name.pos.clone(),
+                        Position::new(0, 0, 0),
                     )));
                 }
             }
@@ -130,13 +131,13 @@ impl ExecConverter {
                 for &(ref name, ref v) in env_list.iter() {
                     // We only allow string fields in our env tuple.
                     if let &Val::Str(ref s) = v.as_ref() {
-                        write!(script, "{}=\"{}\"\n", name.val, s)?;
+                        write!(script, "{}=\"{}\"\n", name, s)?;
                         continue;
                     }
                     return Err(Box::new(BuildError::new(
                         "The env fields of an exec tuple must contain only string values",
                         ErrorType::TypeFail,
-                        name.pos.clone(),
+                        Position::new(0, 0, 0),
                     )));
                 }
             }

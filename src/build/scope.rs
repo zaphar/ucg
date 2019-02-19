@@ -10,12 +10,9 @@ use crate::ast::PositionedItem;
 use crate::build::ir::Val;
 use crate::error;
 
-pub fn find_in_fieldlist(
-    target: &str,
-    fs: &Vec<(PositionedItem<String>, Rc<Val>)>,
-) -> Option<Rc<Val>> {
+pub fn find_in_fieldlist(target: &str, fs: &Vec<(String, Rc<Val>)>) -> Option<Rc<Val>> {
     for (key, val) in fs.iter().cloned() {
-        if target == &key.val {
+        if target == &key {
             return Some(val.clone());
         }
     }
@@ -187,7 +184,7 @@ impl Scope {
     fn lookup_in_tuple(
         pos: &Position,
         field: &str,
-        fs: &Vec<(PositionedItem<String>, Rc<Val>)>,
+        fs: &Vec<(String, Rc<Val>)>,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
         if let Some(vv) = find_in_fieldlist(&field, fs) {
             Ok(vv)
