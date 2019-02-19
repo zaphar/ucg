@@ -1,7 +1,7 @@
 [package]
 edition     = "2018"
 name        = "ucg"
-version     = "0.5.2"
+version     = "0.5.3"
 authors     = ["Jeremy Wall <jeremy@marzhillstudios.com>"]
 description = "A configuration generation grammar."
 repository  = "https://github.com/zaphar/ucg"
