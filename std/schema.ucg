@@ -73,6 +73,10 @@ let shaped = module {
             true = schema.shaped{val=value, shape=acc.shape.(name)}.result,
         },
     };
+
+    let list_handler = func(acc, value) => acc{
+        ok = false || schema.any{val=value, types=acc.shape}.result,
+    };
     
     let result =select schema.base_type_of(mod.val), false, {
         str = simple_handler(mod.val, mod.shape),
@@ -80,8 +84,10 @@ let shaped = module {
         float = simple_handler(mod.val, mod.shape),
         bool = simple_handler(mod.val, mod.shape),
         null = simple_handler(mod.val, mod.shape), 
-        tuple = reduce(tuple_handler, {shape=mod.shape, ok=false}, (mod.val)).ok, 
-        list = simple_handler(mod.val, mod.shape),
+        tuple = reduce(tuple_handler, {shape=mod.shape, ok=false}, mod.val).ok, 
+        list = select mod.shape == [], true, {
+            false = reduce(list_handler, {shape=mod.shape, ok=false}, mod.val).ok,
+        },
         func = simple_handler(mod.val, mod.shape),
         module = simple_handler(mod.val, mod.shape),
     };
