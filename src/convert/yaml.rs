@@ -1,10 +1,12 @@
 use std;
+use std::error::Error;
 use std::io::Write;
 use std::rc::Rc;
+use std::result::Result;
 
 use serde_yaml;
 
-use super::traits::{ConvertResult, Converter};
+use super::traits::{ConvertResult, Converter, ImportResult, Importer};
 use crate::ast;
 use crate::build::Val;
 
@@ -76,6 +78,43 @@ impl YamlConverter {
         Ok(yaml_val)
     }
 
+    fn convert_json_val(&self, v: &serde_yaml::Value) -> Result<Val, Box<dyn Error>> {
+        Ok(match v {
+            serde_yaml::Value::String(s) => Val::Str(s.clone()),
+            serde_yaml::Value::Number(n) => {
+                if let Some(i) = n.as_i64() {
+                    Val::Int(i)
+                } else {
+                    Val::Float(n.as_f64().expect("Number was not an int or a float!!"))
+                }
+            }
+            serde_yaml::Value::Bool(b) => Val::Boolean(*b),
+            serde_yaml::Value::Null => Val::Empty,
+            serde_yaml::Value::Sequence(l) => {
+                let mut vs = Vec::with_capacity(l.len());
+                for aval in l {
+                    vs.push(Rc::new(self.convert_json_val(aval)?));
+                }
+                Val::List(vs)
+            }
+            serde_yaml::Value::Mapping(m) => {
+                let mut fs = Vec::with_capacity(m.len());
+                for (key, value) in m {
+                    fs.push((
+                        ast::PositionedItem::new(
+                            // This is a little gross but since yaml allows maps to be keyed
+                            // by more than just a string it's necessary.
+                            serde_yaml::to_string(key)?,
+                            ast::Position::new(0, 0, 0),
+                        ),
+                        Rc::new(self.convert_json_val(value)?),
+                    ));
+                }
+                Val::Tuple(fs)
+            }
+        })
+    }
+
     fn write(&self, v: &Val, w: &mut Write) -> ConvertResult {
         let jsn_val = self.convert_value(v)?;
         serde_yaml::to_writer(w, &jsn_val)?;
@@ -94,5 +133,12 @@ impl Converter for YamlConverter {
 
     fn description(&self) -> String {
         "Convert ucg Vals into valid yaml.".to_string()
+    }
+}
+
+impl Importer for YamlConverter {
+    fn import(&self, bytes: &[u8]) -> ImportResult {
+        let json_val = serde_yaml::from_slice(bytes)?;
+        Ok(Rc::new(self.convert_json_val(&json_val)?))
     }
 }
