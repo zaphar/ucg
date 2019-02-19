@@ -1,0 +1,24 @@
+let strings = import "std/strings.ucg";
+let t = import "std/testing.ucg".asserts{};
+
+let str_class = strings.ops{str="foo bar"};
+
+assert t.equal{
+    left = str_class.split_on{}.result,
+    right = ["foo", "bar"],
+};
+
+assert t.equal{
+    left = strings.ops{str="foo"}.split_on{}.result,
+    right = ["foo"],
+};
+
+assert t.equal{
+    left = strings.ops{str=""}.split_on{}.result,
+    right = [""],
+};
+
+assert t.equal{
+    left = str_class.split_at(3),
+    right = {left="foo", right=" bar"},
+};

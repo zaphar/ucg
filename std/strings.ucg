@@ -1,0 +1,38 @@
+let ops = module {
+    str="",
+} => {
+    let split_on = module{
+        on=" ",
+        str=mod.str,
+    } => {
+        let splitter = func(acc, char) => acc{
+            out = select char == mod.on, acc.out, {
+                true = acc.out + [acc.buf],
+            },
+            buf = select char != mod.on, "", {
+                true = acc.buf + char,
+            },
+        };
+
+        let accumulated = reduce(splitter, {out=[], buf=""}, mod.str);
+
+        let result = accumulated.out + [accumulated.buf];
+    };
+    
+    let split_at = func(idx) => filter(
+        func(name, val) => name != "counter",
+        reduce(
+            func(acc, char) => acc{
+                counter = acc.counter + 1,
+                left = select acc.counter < idx, acc.left, {
+                    true = acc.left + char,
+                },
+                right = select acc.counter >= idx, acc.right, {
+                    true = acc.right + char,
+                },
+            },
+            {counter = 0, left = "", right = ""},
+            mod.str
+        )
+    );
+};
