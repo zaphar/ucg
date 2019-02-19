@@ -5,25 +5,20 @@ all: test build
 build:
 	cargo build
 
-test: stdlibtest
+test: unit integration stdlibtest 
 
 rustfiles := $(find . -type f -name '*.rs')
-stdlibfiles := $(find std -type f -name '*.ucg)
+stdlibfiles := $(find std -type f -name '*.ucg')
 
-unittest.log: $(rustfiles)
-	cargo test | tee unittest.log
 
-unit: unittest.log
+unit:
+	cargo test
 
-integration.log: unit
-	cargo run -- test -r integration_tests | tee integration.log
+integration:
+	cargo run -- test -r integration_tests
 
-integration: integration.log
-
-stdlibtest.log: $(stdlibfiles)
-	cargo run -- test -r std/tests | tee stdlibtest.log
-
-stdlibtest: stdlibtest.log integration
+stdlibtest:
+	cargo run -- test -r std/tests
 
 install: test
 	cargo install --path . --force
