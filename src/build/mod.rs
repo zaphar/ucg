@@ -1648,7 +1648,12 @@ impl<'a> FileBuilder<'a> {
                 Some(importer) => {
                     let file_contents =
                         self.get_file_as_string(&def.path.pos, &def.path.fragment)?;
-                    let val = importer.import(file_contents.as_bytes())?;
+                    let val = if file_contents.len() == 0 {
+                        eprintln!("including an empty file. Use NULL as the result");
+                        Rc::new(Val::Empty)
+                    } else {
+                        importer.import(file_contents.as_bytes())?
+                    };
                     Ok(val)
                 }
                 None => Err(Box::new(error::BuildError::new(
