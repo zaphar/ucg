@@ -613,6 +613,33 @@ impl<'a> FileBuilder<'a> {
         }
     }
 
+    fn mod_vals(
+        &self,
+        lpos: &Position,
+        rpos: &Position,
+        left: Rc<Val>,
+        right: Rc<Val>,
+    ) -> Result<Rc<Val>, Box<dyn Error>> {
+        match *left {
+            Val::Int(i) => {
+                eval_binary_expr!(&Val::Int(ii), rpos, right, Val::Int(i % ii), "Integer")
+            }
+            Val::Float(f) => {
+                eval_binary_expr!(&Val::Float(ff), rpos, right, Val::Float(f % ff), "Float")
+            }
+            ref expr => {
+                return Err(Box::new(error::BuildError::new(
+                    format!(
+                        "{} does not support the 'modulus' operation",
+                        expr.type_name()
+                    ),
+                    error::ErrorType::Unsupported,
+                    lpos.clone(),
+                )));
+            }
+        }
+    }
+
     fn divide_vals(
         &self,
         lpos: &Position,
@@ -964,6 +991,7 @@ impl<'a> FileBuilder<'a> {
             &BinaryExprType::Sub => self.subtract_vals(&def.pos, def.right.pos(), left, right),
             &BinaryExprType::Mul => self.multiply_vals(&def.pos, def.right.pos(), left, right),
             &BinaryExprType::Div => self.divide_vals(&def.pos, def.right.pos(), left, right),
+            &BinaryExprType::Mod => self.mod_vals(&def.pos, def.right.pos(), left, right),
             // Handle Comparison operators here
             &BinaryExprType::Equal => self.do_deep_equal(def.right.pos(), left, right),
             &BinaryExprType::GT => self.do_gt(&def.right.pos(), left, right),

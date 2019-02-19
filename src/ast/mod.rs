@@ -392,6 +392,7 @@ pub enum BinaryExprType {
     Sub,
     Mul,
     Div,
+    Mod,
     // Boolean
     AND,
     OR,
@@ -433,6 +434,7 @@ impl BinaryExprType {
             // Product operators are next tightly bound
             BinaryExprType::Mul => 4,
             BinaryExprType::Div => 4,
+            BinaryExprType::Mod => 4,
             // Boolean operators bind tighter than math
             BinaryExprType::AND => 5,
             BinaryExprType::OR => 5,

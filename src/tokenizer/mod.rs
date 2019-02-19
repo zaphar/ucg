@@ -198,6 +198,10 @@ make_fn!(slashtok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, "/")
 );
 
+make_fn!(modulustok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, "%%")
+);
+
 make_fn!(pcttok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, "%")
 );
@@ -403,6 +407,7 @@ fn token<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Token> {
         startok,
         comment, // Note comment must come before slashtok
         slashtok,
+        modulustok,
         pcttok,
         eqeqtok,
         notequaltok,

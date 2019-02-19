@@ -59,7 +59,10 @@ make_fn!(
             (Element::Op(BinaryExprType::Mul))),
         do_each!(
             _ => punct!("/"),
-            (Element::Op(BinaryExprType::Div)))
+            (Element::Op(BinaryExprType::Div))),
+        do_each!(
+            _ => punct!("%%"),
+            (Element::Op(BinaryExprType::Mod)))
     )
 );
 
@@ -173,6 +176,9 @@ fn parse_product_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, B
                 return Result::Complete(i_.clone(), op.clone());
             }
             &BinaryExprType::Div => {
+                return Result::Complete(i_.clone(), op.clone());
+            }
+            &BinaryExprType::Mod => {
                 return Result::Complete(i_.clone(), op.clone());
             }
             _other => {
@@ -423,9 +429,9 @@ pub fn op_expression<'a>(i: SliceIter<'a, Token>) -> Result<SliceIter<Token>, Ex
                     );
                     Result::Fail(err)
                 }
-                Result::Abort(_e) => {
+                Result::Abort(e) => {
                     let err = Error::new(
-                        "Abort while parsing operator expression",
+                        format!("Abort while parsing operator expression\n{}", e),
                         Box::new(rest.clone()),
                     );
                     Result::Abort(err)
