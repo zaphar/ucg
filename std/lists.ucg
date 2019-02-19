@@ -46,10 +46,10 @@ let enumerate = module{
         list=acc.list + [[acc.count, item]],
     };
 
-    let acc = {count=mod.start, list=[], step=mod.step};
-
-    let enumerated = reduce(reducer, acc, (mod.list));
-    let result = enumerated.list;
+    let result = reduce(
+        reducer,
+        {count=mod.start, list=[], step=mod.step},
+        (mod.list)).list;
 };
 
 // zips two lists together.

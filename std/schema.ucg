@@ -48,7 +48,9 @@ let any = module {
 // source value and must be of the same base type and shape. This module will
 // recurse into nested tuples.
 // 
-// Lists are assumed to be able to contain any type and can be any length.
+// Lists are must contain types from the list shape they are compared against.
+// and empty list shape means the list val can have any types it wants inside.
+//
 // We do not check that functions or modules have the same argument lengths or types
 // nor we check that they output the same types.
 let shaped = module {
@@ -66,7 +68,7 @@ let shaped = module {
 } => {
     let schema = import "std/schema.ucg";
 
-    let simple_handler = func (val, shape) => val is (schema.base_type_of(shape));
+    let simple_handler = func (val, shape) => val is schema.base_type_of(shape);
 
     let tuple_handler = func (acc, name, value) => acc{
         ok = select (name) in acc.shape, mod.partial, {
