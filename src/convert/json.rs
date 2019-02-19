@@ -9,6 +9,7 @@
 //  limitations under the License.
 //! Flags contains code for converting a UCG Val into the json output target.
 use std;
+use std::error::Error;
 use std::io::Write;
 use std::rc::Rc;
 
@@ -16,7 +17,7 @@ use serde_json;
 
 use crate::ast;
 use crate::build::Val;
-use crate::convert::traits::{Converter, Result};
+use crate::convert::traits::{Converter, ImportResult, Importer, Result};
 
 /// JsonConverter implements the logic for converting a Val into the json output format.
 pub struct JsonConverter {}
@@ -90,6 +91,38 @@ impl JsonConverter {
         Ok(jsn_val)
     }
 
+    fn convert_json_val(&self, v: &serde_json::Value) -> std::result::Result<Val, Box<dyn Error>> {
+        Ok(match v {
+            serde_json::Value::String(s) => Val::Str(s.clone()),
+            serde_json::Value::Number(n) => {
+                if let Some(i) = n.as_i64() {
+                    Val::Int(i)
+                } else {
+                    Val::Float(n.as_f64().expect("Number was not an int or a float!!"))
+                }
+            }
+            serde_json::Value::Bool(b) => Val::Boolean(*b),
+            serde_json::Value::Null => Val::Empty,
+            serde_json::Value::Array(l) => {
+                let mut vs = Vec::with_capacity(l.len());
+                for aval in l {
+                    vs.push(Rc::new(self.convert_json_val(aval)?));
+                }
+                Val::List(vs)
+            }
+            serde_json::Value::Object(m) => {
+                let mut fs = Vec::with_capacity(m.len());
+                for (key, value) in m {
+                    fs.push((
+                        ast::PositionedItem::new(key.to_string(), ast::Position::new(0, 0, 0)),
+                        Rc::new(self.convert_json_val(value)?),
+                    ));
+                }
+                Val::Tuple(fs)
+            }
+        })
+    }
+
     fn write(&self, v: &Val, w: &mut Write) -> Result {
         let jsn_val = self.convert_value(v)?;
         serde_json::to_writer_pretty(w, &jsn_val)?;
@@ -108,5 +141,12 @@ impl Converter for JsonConverter {
 
     fn description(&self) -> String {
         "Convert ucg Vals into valid json.".to_string()
+    }
+}
+
+impl Importer for JsonConverter {
+    fn import(&self, bytes: &[u8]) -> ImportResult {
+        let json_val = serde_json::from_slice(bytes)?;
+        Ok(Rc::new(self.convert_json_val(&json_val)?))
     }
 }

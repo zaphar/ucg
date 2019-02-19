@@ -92,6 +92,7 @@ impl ImporterRegistry {
             "b64urlsafe",
             Box::new(b64::Base64Importer { url_safe: true }),
         );
+        registry.register("json", Box::new(json::JsonConverter {}));
         registry
     }
 
