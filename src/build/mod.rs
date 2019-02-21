@@ -1658,8 +1658,20 @@ impl<'a> FileBuilder<'a> {
                         eprintln!("including an empty file. Use NULL as the result");
                         Rc::new(Val::Empty)
                     } else {
-                        // FIXME(jwall): This should be wrapped in a BuildError
-                        importer.import(file_contents.as_bytes())?
+                        match importer.import(file_contents.as_bytes()) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                let err = Box::new(error::BuildError::with_pos(
+                                    format!(
+                                        "{} include failed for {}",
+                                        &def.typ.fragment, &def.path.fragment
+                                    ),
+                                    error::ErrorType::IncludeError,
+                                    def.pos.clone(),
+                                ));
+                                return Err(err.wrap_cause(e).to_boxed());
+                            }
+                        }
                     };
                     Ok(val)
                 }

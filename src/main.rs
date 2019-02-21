@@ -271,7 +271,7 @@ fn inspect_command(
                     match builder.eval_string(&normalized) {
                         Ok(v) => Some(v.clone()),
                         Err(e) => {
-                            eprintln!("Err: {}", e);
+                            eprintln!("{}", e);
                             process::exit(1);
                         }
                     }

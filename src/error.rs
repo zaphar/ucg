@@ -30,6 +30,7 @@ pub enum ErrorType {
     NoSuchSymbol,
     BadArgLen,
     FormatError,
+    IncludeError,
     ReservedWordError,
     // Parsing Errors
     ParseError,
@@ -47,6 +48,7 @@ impl fmt::Display for ErrorType {
             &ErrorType::NoSuchSymbol => "NoSuchSymbol",
             &ErrorType::BadArgLen => "BadArgLen",
             &ErrorType::FormatError => "FormatError",
+            &ErrorType::IncludeError => "IncludeError",
             &ErrorType::ReservedWordError => "ReservedWordError",
             &ErrorType::ParseError => "ParseError",
             &ErrorType::AssertError => "AssertError",
@@ -91,6 +93,10 @@ impl BuildError {
     pub fn wrap_cause(mut self, cause: Box<dyn error::Error>) -> Self {
         self.cause = Some(cause);
         self
+    }
+
+    pub fn to_boxed(self) -> Box<Self> {
+        Box::new(self)
     }
 
     fn render(&self, w: &mut fmt::Formatter) -> fmt::Result {
