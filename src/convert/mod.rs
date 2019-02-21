@@ -94,6 +94,7 @@ impl ImporterRegistry {
         );
         registry.register("json", Box::new(json::JsonConverter {}));
         registry.register("yaml", Box::new(yaml::YamlConverter {}));
+        registry.register("toml", Box::new(toml::TomlConverter {}));
         registry
     }
 

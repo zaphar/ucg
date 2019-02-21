@@ -14,6 +14,7 @@
 
 use std;
 use std::error;
+use std::error::Error;
 use std::io::Write;
 use std::rc::Rc;
 
@@ -21,7 +22,7 @@ use simple_error::SimpleError;
 use toml;
 
 use crate::build::Val;
-use crate::convert::traits::{ConvertResult, Converter};
+use crate::convert::traits::{ConvertResult, Converter, ImportResult, Importer};
 
 pub struct TomlConverter {}
 
@@ -83,6 +84,30 @@ impl TomlConverter {
         Ok(toml_val)
     }
 
+    fn convert_toml_val(&self, v: &toml::Value) -> std::result::Result<Val, Box<dyn Error>> {
+        Ok(match v {
+            toml::Value::String(s) => Val::Str(s.clone()),
+            toml::Value::Integer(i) => Val::Int(*i),
+            toml::Value::Float(f) => Val::Float(*f),
+            toml::Value::Boolean(b) => Val::Boolean(*b),
+            toml::Value::Array(l) => {
+                let mut vs = Vec::with_capacity(l.len());
+                for aval in l {
+                    vs.push(Rc::new(self.convert_toml_val(aval)?));
+                }
+                Val::List(vs)
+            }
+            toml::Value::Table(m) => {
+                let mut fs = Vec::with_capacity(m.len());
+                for (key, value) in m {
+                    fs.push((key.to_string(), Rc::new(self.convert_toml_val(value)?)));
+                }
+                Val::Tuple(fs)
+            }
+            toml::Value::Datetime(d) => Val::Str(format!("{}", d)),
+        })
+    }
+
     fn write(&self, v: &Val, w: &mut Write) -> ConvertResult {
         let toml_val = self.convert_value(v)?;
         let toml_bytes = toml::ser::to_string_pretty(&toml_val)?;
@@ -102,5 +127,12 @@ impl Converter for TomlConverter {
 
     fn description(&self) -> String {
         "Convert ucg Vals into valid ucg.".to_string()
+    }
+}
+
+impl Importer for TomlConverter {
+    fn import(&self, bytes: &[u8]) -> ImportResult {
+        let json_val = toml::from_slice(bytes)?;
+        Ok(Rc::new(self.convert_toml_val(&json_val)?))
     }
 }
