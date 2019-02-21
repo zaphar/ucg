@@ -71,7 +71,7 @@ impl YamlConverter {
         Ok(yaml_val)
     }
 
-    fn convert_json_val(&self, v: &serde_yaml::Value) -> Result<Val, Box<dyn Error>> {
+    fn convert_yaml_val(&self, v: &serde_yaml::Value) -> Result<Val, Box<dyn Error>> {
         Ok(match v {
             serde_yaml::Value::String(s) => Val::Str(s.clone()),
             serde_yaml::Value::Number(n) => {
@@ -86,7 +86,7 @@ impl YamlConverter {
             serde_yaml::Value::Sequence(l) => {
                 let mut vs = Vec::with_capacity(l.len());
                 for aval in l {
-                    vs.push(Rc::new(self.convert_json_val(aval)?));
+                    vs.push(Rc::new(self.convert_yaml_val(aval)?));
                 }
                 Val::List(vs)
             }
@@ -106,7 +106,7 @@ impl YamlConverter {
                         }
                     };
                     eprintln!("yaml key is: {}", key);
-                    fs.push((key, Rc::new(self.convert_json_val(value)?)));
+                    fs.push((key, Rc::new(self.convert_yaml_val(value)?)));
                 }
                 Val::Tuple(fs)
             }
@@ -137,6 +137,6 @@ impl Converter for YamlConverter {
 impl Importer for YamlConverter {
     fn import(&self, bytes: &[u8]) -> ImportResult {
         let json_val = serde_yaml::from_slice(bytes)?;
-        Ok(Rc::new(self.convert_json_val(&json_val)?))
+        Ok(Rc::new(self.convert_yaml_val(&json_val)?))
     }
 }
