@@ -42,10 +42,11 @@ impl ExecConverter {
         if let &Tuple(ref fields) = v {
             // We expect no more than three fields in our exec tuple.
             if fields.len() > 3 {
-                return Err(Box::new(BuildError::new(
+                return Err(BuildError::new(
                     "Exec tuples must have no more than 3 fields",
                     ErrorType::TypeFail,
-                )));
+                )
+                .to_boxed());
             }
             let mut env: Option<&Vec<(String, Rc<Val>)>> = None;
             let mut command: Option<&str> = None;
@@ -54,60 +55,67 @@ impl ExecConverter {
                 // We require a command field in our exec tuple.
                 if name == "command" {
                     if command.is_some() {
-                        return Err(Box::new(BuildError::new(
+                        return Err(BuildError::new(
                             "There can only be one command field in an exec tuple",
                             ErrorType::TypeFail,
-                        )));
+                        )
+                        .to_boxed());
                     }
                     if let &Val::Str(ref s) = val.as_ref() {
                         command = Some(s);
                         continue;
                     }
-                    return Err(Box::new(BuildError::new(
+                    return Err(BuildError::new(
                         "The command field of an exec tuple must be a string",
                         ErrorType::TypeFail,
-                    )));
+                    )
+                    .to_boxed());
                 }
                 // We optionally allow an env field in our exec tuple.
                 if name == "env" {
                     if let &Val::Tuple(ref l) = val.as_ref() {
                         if env.is_some() {
-                            return Err(Box::new(BuildError::new(
+                            return Err(BuildError::new(
                                 "There can only be one env field in an exec tuple",
                                 ErrorType::TypeFail,
-                            )));
+                            )
+                            .to_boxed());
                         }
                         env = Some(l);
                         continue;
                     }
-                    return Err(Box::new(BuildError::new(
+                    return Err(BuildError::new(
                         "The env field of an exec tuple must be a list",
                         ErrorType::TypeFail,
-                    )));
+                    )
+                    .to_boxed());
                 }
                 // We optionally allow an args field in our exec tuple.
                 if name == "args" {
                     if let &Val::List(ref l) = val.as_ref() {
                         if args.is_some() {
-                            return Err(Box::new(BuildError::new(
+                            return Err(BuildError::new(
                                 "There can only be one args field of an exec tuple",
                                 ErrorType::TypeFail,
-                            )));
+                            )
+                            .to_boxed());
                         }
                         args = Some(l);
                         continue;
                     }
-                    return Err(Box::new(BuildError::new(
+                    return Err(BuildError::new(
                         "The args field of an exec tuple must be a list",
                         ErrorType::TypeFail,
-                    )));
+                    )
+                    .to_boxed());
                 }
             }
             if command.is_none() {
-                return Err(Box::new(BuildError::new(
+                return Err(BuildError::new(
                     "An exec tuple must have a command field",
                     ErrorType::TypeFail,
-                )));
+                )
+                .to_boxed());
             }
             // Okay if we have made it this far then we are ready to start creating our script.
             let mut script = Cursor::new(vec![]);
@@ -124,10 +132,11 @@ impl ExecConverter {
                         write!(script, "{}=\"{}\"\n", name, s)?;
                         continue;
                     }
-                    return Err(Box::new(BuildError::new(
+                    return Err(BuildError::new(
                         "The env fields of an exec tuple must contain only string values",
                         ErrorType::TypeFail,
-                    )));
+                    )
+                    .to_boxed());
                 }
             }
             write!(script, "\n")?;
@@ -144,10 +153,11 @@ impl ExecConverter {
                         }
                         &Val::Tuple(_) => flag_converter.convert(v.clone(), &mut script)?,
                         _ => {
-                            return Err(Box::new(BuildError::new(
+                            return Err(BuildError::new(
                                 "Exec args must be a list of strings or tuples of strings.",
                                 ErrorType::TypeFail,
-                            )));
+                            )
+                            .to_boxed());
                         }
                     }
                 }
@@ -159,10 +169,7 @@ impl ExecConverter {
             return Ok(());
         }
 
-        Err(Box::new(BuildError::new(
-            "Exec outputs must be of type Tuple",
-            ErrorType::TypeFail,
-        )))
+        Err(BuildError::new("Exec outputs must be of type Tuple", ErrorType::TypeFail).to_boxed())
     }
 }
 

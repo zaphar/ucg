@@ -54,12 +54,13 @@ impl<V: Into<String> + Clone> FormatRenderer for SimpleFormatter<V> {
         for c in self.tmpl.chars() {
             if c == '@' && !should_escape {
                 if count == self.args.len() {
-                    return Err(Box::new(error::BuildError::with_pos(
+                    return Err(error::BuildError::with_pos(
                         "Too few arguments to string \
                          formatter.",
                         error::ErrorType::FormatError,
                         pos.clone(),
-                    )));
+                    )
+                    .to_boxed());
                 }
                 let arg = self.args[count].clone();
                 let strval = arg.into();
@@ -72,12 +73,13 @@ impl<V: Into<String> + Clone> FormatRenderer for SimpleFormatter<V> {
             }
         }
         if self.args.len() != count {
-            return Err(Box::new(error::BuildError::with_pos(
+            return Err(error::BuildError::with_pos(
                 "Too many arguments to string \
                  formatter.",
                 error::ErrorType::FormatError,
                 pos.clone(),
-            )));
+            )
+            .to_boxed());
         }
         return Ok(buf);
     }
@@ -111,22 +113,24 @@ impl<'a> ExpressionFormatter<'a> {
                 if c == '{' {
                     brace_count += 1;
                 } else {
-                    return Err(Box::new(error::BuildError::with_pos(
+                    return Err(error::BuildError::with_pos(
                         format!(
                             "Invalid syntax for format string expected '{{' but got {}",
                             c
                         ),
                         error::ErrorType::FormatError,
                         pos.clone(),
-                    )));
+                    )
+                    .to_boxed());
                 }
             }
             None => {
-                return Err(Box::new(error::BuildError::with_pos(
+                return Err(error::BuildError::with_pos(
                     "Invalid syntax for format string expected '{' but string ended",
                     error::ErrorType::FormatError,
                     pos.clone(),
-                )));
+                )
+                .to_boxed());
             }
         };
         loop {
@@ -148,11 +152,12 @@ impl<'a> ExpressionFormatter<'a> {
                 }
                 // empty expressions are an error
                 if expr_string.is_empty() {
-                    return Err(Box::new(error::BuildError::with_pos(
+                    return Err(error::BuildError::with_pos(
                         "Got an empty expression in format string",
                         error::ErrorType::FormatError,
                         pos.clone(),
-                    )));
+                    )
+                    .to_boxed());
                 }
                 if !expr_string.ends_with(";") {
                     expr_string.push(';');
@@ -163,11 +168,12 @@ impl<'a> ExpressionFormatter<'a> {
                 expr_string.push(c);
             }
         }
-        return Err(Box::new(error::BuildError::with_pos(
+        return Err(error::BuildError::with_pos(
             "Expected '}' but got end of string",
             error::ErrorType::FormatError,
             pos.clone(),
-        )));
+        )
+        .to_boxed());
     }
 }
 

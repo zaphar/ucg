@@ -61,11 +61,12 @@ impl FuncDef {
         // Error conditions. If the args don't match the length and types of the argdefs then this is
         // func call error.
         if args.len() > self.argdefs.len() {
-            return Err(Box::new(error::BuildError::with_pos(
+            return Err(error::BuildError::with_pos(
                 "Func called with too many args",
                 error::ErrorType::BadArgLen,
                 self.pos.clone(),
-            )));
+            )
+            .to_boxed());
         }
         // If the args don't match the types required by the expressions then that is a TypeFail.
         // If the expressions reference Symbols not defined in the FuncDef that is also an error.
@@ -129,11 +130,12 @@ macro_rules! eval_binary_expr {
                 return Ok(Rc::new($result));
             }
             val => {
-                return Err(Box::new(error::BuildError::with_pos(
+                return Err(error::BuildError::with_pos(
                     format!("Expected {} but got ({})", $msg, val),
                     error::ErrorType::TypeFail,
                     $pos.clone(),
-                )));
+                )
+                .to_boxed());
             }
         }
     };
@@ -416,17 +418,18 @@ impl<'a> FileBuilder<'a> {
                 mut_assets_cache.stash(path, result.clone())?;
                 return Ok(result);
             } else {
-                return Err(Box::new(error::BuildError::with_pos(
+                return Err(error::BuildError::with_pos(
                     format!("No such import {} in the std library.", def.path.fragment),
                     error::ErrorType::Unsupported,
                     def.pos.clone(),
-                )));
+                )
+                .to_boxed());
             }
         }
         // Try a relative path first.
         let normalized = self.find_file(&def.path.fragment, true)?;
         if self.detect_import_cycle(normalized.to_string_lossy().as_ref()) {
-            return Err(Box::new(error::BuildError::with_pos(
+            return Err(error::BuildError::with_pos(
                 format!(
                     "Import Cycle Detected!!!! {} is already in import stack: {:?}",
                     normalized.to_string_lossy(),
@@ -434,7 +437,8 @@ impl<'a> FileBuilder<'a> {
                 ),
                 error::ErrorType::Unsupported,
                 def.pos.clone(),
-            )));
+            )
+            .to_boxed());
         }
         // Introduce a scope so the above borrow is dropped before we modify
         // the cache below.
@@ -458,15 +462,16 @@ impl<'a> FileBuilder<'a> {
         let val = self.eval_expr(&def.value, &child_scope)?;
         let name = &def.name;
         if Self::check_reserved_word(&name.fragment) {
-            return Err(Box::new(error::BuildError::with_pos(
+            return Err(error::BuildError::with_pos(
                 format!("Let {} binding collides with reserved word", name.fragment),
                 error::ErrorType::ReservedWordError,
                 name.pos.clone(),
-            )));
+            )
+            .to_boxed());
         }
         match self.scope.build_output.entry(name.into()) {
             Entry::Occupied(e) => {
-                return Err(Box::new(error::BuildError::with_pos(
+                return Err(error::BuildError::with_pos(
                     format!(
                         "Binding \
                          for {:?} already \
@@ -475,7 +480,8 @@ impl<'a> FileBuilder<'a> {
                     ),
                     error::ErrorType::DuplicateBinding,
                     def.name.pos.clone(),
-                )));
+                )
+                .to_boxed());
             }
             Entry::Vacant(e) => {
                 e.insert(val.clone());
@@ -498,11 +504,12 @@ impl<'a> FileBuilder<'a> {
                     self.out_lock = Some((typ.fragment.to_string(), val.clone()));
                     Ok(val)
                 } else {
-                    Err(Box::new(error::BuildError::with_pos(
+                    Err(error::BuildError::with_pos(
                         format!("You can only have one output per file."),
                         error::ErrorType::Unsupported,
                         pos.clone(),
-                    )))
+                    )
+                    .to_boxed())
                 }
             }
         }
@@ -527,7 +534,7 @@ impl<'a> FileBuilder<'a> {
                     return Ok(Rc::new(Val::Str([s.to_string(), ss.clone()].concat())));
                 }
                 val => {
-                    return Err(Box::new(error::BuildError::with_pos(
+                    return Err(error::BuildError::with_pos(
                         format!(
                             "Expected \
                              String \
@@ -537,7 +544,8 @@ impl<'a> FileBuilder<'a> {
                         ),
                         error::ErrorType::TypeFail,
                         rpos.clone(),
-                    )));
+                    )
+                    .to_boxed());
                 }
             },
             Val::List(ref l) => match right.as_ref() {
@@ -548,7 +556,7 @@ impl<'a> FileBuilder<'a> {
                     return Ok(Rc::new(Val::List(new_vec)));
                 }
                 val => {
-                    return Err(Box::new(error::BuildError::with_pos(
+                    return Err(error::BuildError::with_pos(
                         format!(
                             "Expected \
                              List \
@@ -558,15 +566,17 @@ impl<'a> FileBuilder<'a> {
                         ),
                         error::ErrorType::TypeFail,
                         rpos.clone(),
-                    )));
+                    )
+                    .to_boxed());
                 }
             },
             ref expr => {
-                return Err(Box::new(error::BuildError::with_pos(
+                return Err(error::BuildError::with_pos(
                     format!("{} does not support the '+' operation", expr.type_name()),
                     error::ErrorType::Unsupported,
                     lpos.clone(),
-                )));
+                )
+                .to_boxed());
             }
         }
     }
@@ -586,11 +596,12 @@ impl<'a> FileBuilder<'a> {
                 eval_binary_expr!(&Val::Float(ff), rpos, right, Val::Float(f - ff), "Float")
             }
             ref expr => {
-                return Err(Box::new(error::BuildError::with_pos(
+                return Err(error::BuildError::with_pos(
                     format!("{} does not support the '-' operation", expr.type_name()),
                     error::ErrorType::Unsupported,
                     lpos.clone(),
-                )));
+                )
+                .to_boxed());
             }
         }
     }
@@ -610,11 +621,12 @@ impl<'a> FileBuilder<'a> {
                 eval_binary_expr!(&Val::Float(ff), rpos, right, Val::Float(f * ff), "Float")
             }
             ref expr => {
-                return Err(Box::new(error::BuildError::with_pos(
+                return Err(error::BuildError::with_pos(
                     format!("{} does not support the '*' operation", expr.type_name()),
                     error::ErrorType::Unsupported,
                     lpos.clone(),
-                )));
+                )
+                .to_boxed());
             }
         }
     }
@@ -634,14 +646,15 @@ impl<'a> FileBuilder<'a> {
                 eval_binary_expr!(&Val::Float(ff), rpos, right, Val::Float(f % ff), "Float")
             }
             ref expr => {
-                return Err(Box::new(error::BuildError::with_pos(
+                return Err(error::BuildError::with_pos(
                     format!(
                         "{} does not support the 'modulus' operation",
                         expr.type_name()
                     ),
                     error::ErrorType::Unsupported,
                     lpos.clone(),
-                )));
+                )
+                .to_boxed());
             }
         }
     }
@@ -661,11 +674,12 @@ impl<'a> FileBuilder<'a> {
                 eval_binary_expr!(&Val::Float(ff), rpos, right, Val::Float(f / ff), "Float")
             }
             ref expr => {
-                return Err(Box::new(error::BuildError::with_pos(
+                return Err(error::BuildError::with_pos(
                     format!("{} does not support the '*' operation", expr.type_name()),
                     error::ErrorType::Unsupported,
                     lpos.clone(),
-                )));
+                )
+                .to_boxed());
             }
         }
     }
@@ -678,11 +692,7 @@ impl<'a> FileBuilder<'a> {
     ) -> Result<Rc<Val>, Box<dyn Error>> {
         match left.equal(right.as_ref()) {
             Ok(b) => Ok(Rc::new(Val::Boolean(b))),
-            Err(e) => Err(Box::new(error::BuildError::with_pos(
-                e.msg,
-                e.err_type,
-                pos.clone(),
-            ))),
+            Err(e) => Err(error::BuildError::with_pos(e.msg, e.err_type, pos.clone()).to_boxed()),
         }
     }
 
@@ -694,11 +704,7 @@ impl<'a> FileBuilder<'a> {
     ) -> Result<Rc<Val>, Box<dyn Error>> {
         match left.equal(right.as_ref()) {
             Ok(b) => Ok(Rc::new(Val::Boolean(!b))),
-            Err(e) => Err(Box::new(error::BuildError::with_pos(
-                e.msg,
-                e.err_type,
-                pos.clone(),
-            ))),
+            Err(e) => Err(error::BuildError::with_pos(e.msg, e.err_type, pos.clone()).to_boxed()),
         }
     }
 
@@ -719,11 +725,12 @@ impl<'a> FileBuilder<'a> {
                 return Ok(Rc::new(Val::Boolean(l > r)));
             }
         }
-        Err(Box::new(error::BuildError::with_pos(
+        Err(error::BuildError::with_pos(
             format!("Expected {} but got ({})", left.type_name(), right,),
             error::ErrorType::TypeFail,
             pos.clone(),
-        )))
+        )
+        .to_boxed())
     }
 
     fn do_lt(
@@ -743,11 +750,12 @@ impl<'a> FileBuilder<'a> {
                 return Ok(Rc::new(Val::Boolean(l < r)));
             }
         }
-        Err(Box::new(error::BuildError::with_pos(
+        Err(error::BuildError::with_pos(
             format!("Expected {} but got ({})", left.type_name(), right,),
             error::ErrorType::TypeFail,
             pos.clone(),
-        )))
+        )
+        .to_boxed())
     }
 
     fn do_ltequal(
@@ -766,11 +774,12 @@ impl<'a> FileBuilder<'a> {
                 return Ok(Rc::new(Val::Boolean(l <= r)));
             }
         }
-        Err(Box::new(error::BuildError::with_pos(
+        Err(error::BuildError::with_pos(
             format!("Expected {} but got ({})", left.type_name(), right),
             error::ErrorType::TypeFail,
             pos.clone(),
-        )))
+        )
+        .to_boxed())
     }
 
     fn do_gtequal(
@@ -789,11 +798,12 @@ impl<'a> FileBuilder<'a> {
                 return Ok(Rc::new(Val::Boolean(l >= r)));
             }
         }
-        Err(Box::new(error::BuildError::with_pos(
+        Err(error::BuildError::with_pos(
             format!("Expected {} but got ({})", left.type_name(), right,),
             error::ErrorType::TypeFail,
             pos.clone(),
-        )))
+        )
+        .to_boxed())
     }
 
     fn do_dot_lookup(&self, right: &Expression, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
@@ -834,11 +844,12 @@ impl<'a> FileBuilder<'a> {
                             error::ErrorType::NoSuchSymbol,
                             pos,
                         ))),
-                    _ => Err(Box::new(error::BuildError::with_pos(
+                    _ => Err(error::BuildError::with_pos(
                         format!("Invalid selector lookup {}", val.type_name(),),
                         error::ErrorType::NoSuchSymbol,
                         pos,
-                    ))),
+                    )
+                    .to_boxed()),
                 }
             }
         }
@@ -875,23 +886,25 @@ impl<'a> FileBuilder<'a> {
                     return Ok(right);
                 }
             }
-            return Err(Box::new(error::BuildError::with_pos(
+            return Err(error::BuildError::with_pos(
                 format!(
                     "Expected boolean value for operator but got ({})",
                     left.type_name()
                 ),
                 error::ErrorType::TypeFail,
                 right_pos.clone(),
-            )));
+            )
+            .to_boxed());
         } else {
-            return Err(Box::new(error::BuildError::with_pos(
+            return Err(error::BuildError::with_pos(
                 format!(
                     "Expected boolean value for operator but got ({})",
                     left.type_name()
                 ),
                 error::ErrorType::TypeFail,
                 left_pos.clone(),
-            )));
+            )
+            .to_boxed());
         }
     }
 
@@ -907,14 +920,15 @@ impl<'a> FileBuilder<'a> {
         let right = self.eval_expr(right, scope)?;
         // presence checks are only valid for tuples and lists.
         if !(right.is_tuple() || right.is_list()) {
-            return Err(Box::new(error::BuildError::with_pos(
+            return Err(error::BuildError::with_pos(
                 format!(
                     "Invalid righthand type for in operator {}",
                     right.type_name()
                 ),
                 error::ErrorType::TypeFail,
                 right_pos.clone(),
-            )));
+            )
+            .to_boxed());
         }
         if let &Val::List(ref els) = right.as_ref() {
             let left = self.eval_expr(left, scope)?;
@@ -951,20 +965,22 @@ impl<'a> FileBuilder<'a> {
         let re = if let Val::Str(ref s) = right.as_ref() {
             regex::Regex::new(s.as_ref())?
         } else {
-            return Err(Box::new(error::BuildError::with_pos(
+            return Err(error::BuildError::with_pos(
                 format!("Expected string for regex but got ({})", right.type_name()),
                 error::ErrorType::TypeFail,
                 right_pos.clone(),
-            )));
+            )
+            .to_boxed());
         };
         let tgt = if let Val::Str(ref s) = left.as_ref() {
             s.as_ref()
         } else {
-            return Err(Box::new(error::BuildError::with_pos(
+            return Err(error::BuildError::with_pos(
                 format!("Expected string but got ({})", left.type_name()),
                 error::ErrorType::TypeFail,
                 left_pos.clone(),
-            )));
+            )
+            .to_boxed());
         };
         return if negate {
             Ok(Rc::new(Val::Boolean(!re.is_match(tgt))))
@@ -1053,7 +1069,7 @@ impl<'a> FileBuilder<'a> {
                 v.insert((count, val.clone()));
                 count += 1;
             } else {
-                return Err(Box::new(error::BuildError::new(
+                return Err(error::BuildError::new(
                     format!(
                         "Duplicate \
                          field: {} in \
@@ -1061,7 +1077,8 @@ impl<'a> FileBuilder<'a> {
                         key
                     ),
                     error::ErrorType::TypeFail,
-                )));
+                )
+                .to_boxed());
             }
         }
         for &(ref key, ref val) in overrides.iter() {
@@ -1082,7 +1099,7 @@ impl<'a> FileBuilder<'a> {
                     {
                         v.insert((src_val.0, expr_result));
                     } else {
-                        return Err(Box::new(error::BuildError::with_pos(
+                        return Err(error::BuildError::with_pos(
                             format!(
                                 "Expected type {} for field {} but got ({})",
                                 src_val.1.type_name(),
@@ -1091,7 +1108,8 @@ impl<'a> FileBuilder<'a> {
                             ),
                             error::ErrorType::TypeFail,
                             key.pos.clone(),
-                        )));
+                        )
+                        .to_boxed());
                     }
                 }
             };
@@ -1140,7 +1158,7 @@ impl<'a> FileBuilder<'a> {
                     PositionedItem::new_with_pos(String::from("mod"), Position::new(0, 0, 0));
                 match b.scope.build_output.entry(mod_key) {
                     Entry::Occupied(e) => {
-                        return Err(Box::new(error::BuildError::with_pos(
+                        return Err(error::BuildError::with_pos(
                             format!(
                                 "Binding \
                                  for {:?} already \
@@ -1149,7 +1167,8 @@ impl<'a> FileBuilder<'a> {
                             ),
                             error::ErrorType::DuplicateBinding,
                             mod_def.pos.clone(),
-                        )));
+                        )
+                        .to_boxed());
                     }
                     Entry::Vacant(e) => {
                         e.insert(mod_args.clone());
@@ -1161,21 +1180,23 @@ impl<'a> FileBuilder<'a> {
                 //    tuple using them.
                 return Ok(b.get_outputs_as_val());
             } else {
-                return Err(Box::new(error::BuildError::with_pos(
+                return Err(error::BuildError::with_pos(
                     format!(
                         "Weird value stored in our module parameters slot {:?}",
                         mod_def.arg_tuple
                     ),
                     error::ErrorType::TypeFail,
                     def.selector.pos().clone(),
-                )));
+                )
+                .to_boxed());
             }
         }
-        Err(Box::new(error::BuildError::with_pos(
+        Err(error::BuildError::with_pos(
             format!("Expected Tuple or Module but got ({})", v),
             error::ErrorType::TypeFail,
             def.selector.pos().clone(),
-        )))
+        )
+        .to_boxed())
     }
 
     fn eval_format(&self, def: &FormatDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
@@ -1215,19 +1236,21 @@ impl<'a> FileBuilder<'a> {
             }
             return match def.eval(self, argvals) {
                 Ok(v) => Ok(v),
-                Err(e) => Err(Box::new(error::BuildError::with_pos(
+                Err(e) => Err(error::BuildError::with_pos(
                     format!("Func evaluation failed\nCaused by:\n\t{}", e),
                     error::ErrorType::TypeFail,
                     call_pos,
-                ))),
+                )
+                .to_boxed()),
             };
         }
-        Err(Box::new(error::BuildError::with_pos(
+        Err(error::BuildError::with_pos(
             // We should pretty print the selectors here.
             format!("{} is not a Function", v),
             error::ErrorType::TypeFail,
             def.pos.clone(),
-        )))
+        )
+        .to_boxed())
     }
 
     fn eval_func_def(&self, def: &mut FuncDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
@@ -1288,7 +1311,7 @@ impl<'a> FileBuilder<'a> {
             // Otherwise return the default.
             return self.eval_expr(def_expr, scope);
         } else {
-            return Err(Box::new(error::BuildError::with_pos(
+            return Err(error::BuildError::with_pos(
                 format!(
                     "Expected String but got \
                      {} in Select expression",
@@ -1296,7 +1319,8 @@ impl<'a> FileBuilder<'a> {
                 ),
                 error::ErrorType::TypeFail,
                 def.pos.clone(),
-            )));
+            )
+            .to_boxed());
         }
     }
 
@@ -1348,35 +1372,36 @@ impl<'a> FileBuilder<'a> {
                             let new_name = if let &Val::Str(ref s) = fs[0].as_ref() {
                                 s.clone()
                             } else {
-                                return Err(Box::new(error::BuildError::with_pos(
+                                return Err(error::BuildError::with_pos(
                                     format!(
                                         "map on tuple expects the first item out list to be a string but got size {}",
                                         fs[0].type_name()
                                     ),
                                     error::ErrorType::TypeFail,
                                     def.pos.clone(),
-                                )));
+                                ).to_boxed());
                             };
                             out.push((new_name, fs[1].clone()));
                         } else {
-                            return Err(Box::new(error::BuildError::with_pos(
+                            return Err(error::BuildError::with_pos(
                                 format!(
                                     "map on a tuple field expects a list of size 2 as output but got size {}",
                                     fs.len()
                                 ),
                                 error::ErrorType::TypeFail,
                                 def.pos.clone(),
-                            )));
+                            ).to_boxed());
                         }
                     } else {
-                        return Err(Box::new(error::BuildError::with_pos(
+                        return Err(error::BuildError::with_pos(
                             format!(
                                 "map on a tuple field expects a list as output but got ({})",
                                 result.type_name()
                             ),
                             error::ErrorType::TypeFail,
                             def.pos.clone(),
-                        )));
+                        )
+                        .to_boxed());
                     }
                 }
                 ProcessingOpType::Filter => {
@@ -1401,11 +1426,12 @@ impl<'a> FileBuilder<'a> {
         let funcdef = match maybe_mac.as_ref() {
             &Val::Func(ref funcdef) => funcdef,
             _ => {
-                return Err(Box::new(error::BuildError::with_pos(
+                return Err(error::BuildError::with_pos(
                     format!("Expected func but got {:?}", def.func),
                     error::ErrorType::TypeFail,
                     def.pos.clone(),
-                )));
+                )
+                .to_boxed());
             }
         };
         match maybe_target.as_ref() {
@@ -1431,14 +1457,15 @@ impl<'a> FileBuilder<'a> {
                 }
             }
             other => {
-                return Err(Box::new(error::BuildError::with_pos(
+                return Err(error::BuildError::with_pos(
                     format!(
                         "Expected List Str, or Tuple as target but got {:?}",
                         other.type_name()
                     ),
                     error::ErrorType::TypeFail,
                     def.target.pos().clone(),
-                )));
+                )
+                .to_boxed());
             }
         }
         Ok(acc)
@@ -1466,14 +1493,15 @@ impl<'a> FileBuilder<'a> {
                             // noop
                         }
                         _ => {
-                            return Err(Box::new(error::BuildError::with_pos(
+                            return Err(error::BuildError::with_pos(
                                 format!(
                                     "Expected boolean or NULL for filter return but got ({})",
                                     out.type_name()
                                 ),
                                 error::ErrorType::TypeFail,
                                 def.pos.clone(),
-                            )));
+                            )
+                            .to_boxed());
                         }
                     }
                 }
@@ -1482,11 +1510,12 @@ impl<'a> FileBuilder<'a> {
                         result.push_str(&s);
                     }
                     _ => {
-                        return Err(Box::new(error::BuildError::with_pos(
+                        return Err(error::BuildError::with_pos(
                             format!("Expected string map return but got ({})", out.type_name()),
                             error::ErrorType::TypeFail,
                             def.pos.clone(),
-                        )));
+                        )
+                        .to_boxed());
                     }
                 },
             }
@@ -1505,11 +1534,12 @@ impl<'a> FileBuilder<'a> {
         let macdef = match maybe_mac.as_ref() {
             &Val::Func(ref macdef) => macdef,
             _ => {
-                return Err(Box::new(error::BuildError::with_pos(
+                return Err(error::BuildError::with_pos(
                     format!("Expected func but got {:?}", def.func),
                     error::ErrorType::TypeFail,
                     def.pos.clone(),
-                )));
+                )
+                .to_boxed());
             }
         };
         return match maybe_target.as_ref() {
@@ -1517,14 +1547,15 @@ impl<'a> FileBuilder<'a> {
             &Val::Tuple(ref fs) => self.eval_functional_tuple_processing(fs, macdef, typ),
             // TODO(jwall): Strings?
             &Val::Str(ref s) => self.eval_functional_string_processing(s, macdef, typ),
-            other => Err(Box::new(error::BuildError::with_pos(
+            other => Err(error::BuildError::with_pos(
                 format!(
                     "Expected List or Tuple as target but got {:?}",
                     other.type_name()
                 ),
                 error::ErrorType::TypeFail,
                 def.target.pos().clone(),
-            ))),
+            )
+            .to_boxed()),
         };
     }
 
@@ -1627,21 +1658,23 @@ impl<'a> FileBuilder<'a> {
         let normalized = match self.find_file(path, false) {
             Ok(p) => p,
             Err(e) => {
-                return Err(Box::new(error::BuildError::with_pos(
+                return Err(error::BuildError::with_pos(
                     format!("Error finding file {} {}", path, e),
                     error::ErrorType::TypeFail,
                     pos.clone(),
-                )));
+                )
+                .to_boxed());
             }
         };
         let mut f = match File::open(&normalized) {
             Ok(f) => f,
             Err(e) => {
-                return Err(Box::new(error::BuildError::with_pos(
+                return Err(error::BuildError::with_pos(
                     format!("Error opening file {} {}", normalized.to_string_lossy(), e),
                     error::ErrorType::TypeFail,
                     pos.clone(),
-                )));
+                )
+                .to_boxed());
             }
         };
         let mut contents = String::new();
@@ -1681,11 +1714,12 @@ impl<'a> FileBuilder<'a> {
                     };
                     Ok(val)
                 }
-                None => Err(Box::new(error::BuildError::with_pos(
+                None => Err(error::BuildError::with_pos(
                     format!("Unknown include conversion type {}", def.typ.fragment),
                     error::ErrorType::Unsupported,
                     def.typ.pos.clone(),
-                ))),
+                )
+                .to_boxed()),
             }
         };
     }
@@ -1707,14 +1741,15 @@ impl<'a> FileBuilder<'a> {
         let start = match start.as_ref() {
             &Val::Int(i) => i,
             _ => {
-                return Err(Box::new(error::BuildError::with_pos(
+                return Err(error::BuildError::with_pos(
                     format!(
                         "Expected an integer for range start but got ({})",
                         start.type_name()
                     ),
                     error::ErrorType::TypeFail,
                     def.start.pos().clone(),
-                )));
+                )
+                .to_boxed());
             }
         };
         // See if there was a step.
@@ -1724,14 +1759,15 @@ impl<'a> FileBuilder<'a> {
                 match step.as_ref() {
                     &Val::Int(i) => i,
                     _ => {
-                        return Err(Box::new(error::BuildError::with_pos(
+                        return Err(error::BuildError::with_pos(
                             format!(
                                 "Expected an integer for range step but got ({})",
                                 step.type_name()
                             ),
                             error::ErrorType::TypeFail,
                             def.start.pos().clone(),
-                        )));
+                        )
+                        .to_boxed());
                     }
                 }
             }
@@ -1743,14 +1779,15 @@ impl<'a> FileBuilder<'a> {
         let end = match end.as_ref() {
             &Val::Int(i) => i,
             _ => {
-                return Err(Box::new(error::BuildError::with_pos(
+                return Err(error::BuildError::with_pos(
                     format!(
                         "Expected an integer for range start but got ({})",
                         end.type_name()
                     ),
                     error::ErrorType::TypeFail,
                     def.start.pos().clone(),
-                )));
+                )
+                .to_boxed());
             }
         };
 
@@ -1770,11 +1807,12 @@ impl<'a> FileBuilder<'a> {
         let typ = match tval.as_ref() {
             Val::Str(ref s) => s.clone(),
             _ => {
-                return Err(Box::new(error::BuildError::with_pos(
+                return Err(error::BuildError::with_pos(
                     format!("Expected string expression but got ({})", tval),
                     error::ErrorType::TypeFail,
                     def.right.pos().clone(),
-                )));
+                )
+                .to_boxed());
             }
         };
         let val = self.eval_expr(def.left.as_ref(), scope)?;
@@ -1789,11 +1827,12 @@ impl<'a> FileBuilder<'a> {
             "func" => val.is_func(),
             "module" => val.is_module(),
             other => {
-                return Err(Box::new(error::BuildError::with_pos(
+                return Err(error::BuildError::with_pos(
                     format!("Expected valid type name but got ({})", other),
                     error::ErrorType::TypeFail,
                     def.right.pos().clone(),
-                )));
+                )
+                .to_boxed());
             }
         };
         Ok(Rc::new(Val::Boolean(result)))
@@ -1825,20 +1864,22 @@ impl<'a> FileBuilder<'a> {
             &Expression::Fail(ref def) => {
                 let err = self.eval_expr(&def.message, scope)?;
                 return if let Val::Str(ref s) = err.as_ref() {
-                    Err(Box::new(error::BuildError::with_pos(
+                    Err(error::BuildError::with_pos(
                         s.clone(),
                         error::ErrorType::UserDefined,
                         def.pos.clone(),
-                    )))
+                    )
+                    .to_boxed())
                 } else {
-                    Err(Box::new(error::BuildError::with_pos(
+                    Err(error::BuildError::with_pos(
                         format!(
                             "Expected string for message but got ({})",
                             def.message.as_ref()
                         ),
                         error::ErrorType::TypeFail,
                         def.message.pos().clone(),
-                    )))
+                    )
+                    .to_boxed())
                 };
             }
             &Expression::Not(ref def) => {
@@ -1846,14 +1887,15 @@ impl<'a> FileBuilder<'a> {
                 return if let Val::Boolean(b) = val.as_ref() {
                     Ok(Rc::new(Val::Boolean(!b)))
                 } else {
-                    Err(Box::new(error::BuildError::with_pos(
+                    Err(error::BuildError::with_pos(
                         format!(
                             "Expected boolean for expression but got ({})",
                             def.expr.as_ref()
                         ),
                         error::ErrorType::TypeFail,
                         def.expr.pos().clone(),
-                    )))
+                    )
+                    .to_boxed())
                 };
             }
         }

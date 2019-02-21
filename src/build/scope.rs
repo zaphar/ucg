@@ -115,11 +115,12 @@ impl Scope {
                 return Self::lookup_in_list(pos, idx, fs);
             }
         }
-        Err(Box::new(error::BuildError::with_pos(
+        Err(error::BuildError::with_pos(
             "Not a list in index lookup.",
             error::ErrorType::TypeFail,
             pos.clone(),
-        )))
+        )
+        .to_boxed())
     }
 
     /// Lookup a symbol in the current execution context.
@@ -189,11 +190,12 @@ impl Scope {
         if let Some(vv) = find_in_fieldlist(&field, fs) {
             Ok(vv)
         } else {
-            Err(Box::new(error::BuildError::with_pos(
+            Err(error::BuildError::with_pos(
                 format!("Unable to {} match element in tuple.", field,),
                 error::ErrorType::NoSuchSymbol,
                 pos.clone(),
-            )))
+            )
+            .to_boxed())
         }
     }
 
@@ -206,21 +208,23 @@ impl Scope {
             &Val::Int(i) => i as usize,
             &Val::Str(ref s) => s.parse::<usize>()?,
             _ => {
-                return Err(Box::new(error::BuildError::with_pos(
+                return Err(error::BuildError::with_pos(
                     format!("Invalid idx type {} for list lookup", field),
                     error::ErrorType::TypeFail,
                     pos.clone(),
-                )));
+                )
+                .to_boxed());
             }
         };
         if idx < elems.len() {
             Ok(elems[idx].clone())
         } else {
-            Err(Box::new(error::BuildError::with_pos(
+            Err(error::BuildError::with_pos(
                 format!("idx {} out of bounds in list", idx),
                 error::ErrorType::NoSuchSymbol,
                 pos.clone(),
-            )))
+            )
+            .to_boxed())
         }
     }
 }

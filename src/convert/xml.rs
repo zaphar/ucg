@@ -34,10 +34,7 @@ impl XmlConverter {
         if let Val::Str(ref s) = v {
             Ok(s)
         } else {
-            Err(Box::new(BuildError::new(
-                "Not a String value",
-                ErrorType::TypeFail,
-            )))
+            Err(BuildError::new("Not a String value", ErrorType::TypeFail).to_boxed())
         }
     }
 
@@ -45,10 +42,7 @@ impl XmlConverter {
         if let Val::Tuple(ref fs) = v {
             Ok(fs)
         } else {
-            Err(Box::new(BuildError::new(
-                "Not a tuple value",
-                ErrorType::TypeFail,
-            )))
+            Err(BuildError::new("Not a tuple value", ErrorType::TypeFail).to_boxed())
         }
     }
 
@@ -56,10 +50,7 @@ impl XmlConverter {
         if let Val::List(ref fs) = v {
             Ok(fs)
         } else {
-            Err(Box::new(BuildError::new(
-                "Not a List value",
-                ErrorType::TypeFail,
-            )))
+            Err(BuildError::new("Not a List value", ErrorType::TypeFail).to_boxed())
         }
     }
 
@@ -116,10 +107,11 @@ impl XmlConverter {
                 }
             }
             if name.is_some() && text.is_some() {
-                return Err(Box::new(BuildError::new(
+                return Err(BuildError::new(
                     "XML nodes can not have both text and name fields",
                     ErrorType::TypeFail,
-                )));
+                )
+                .to_boxed());
             }
             if name.is_some() {
                 let mut start = XmlEvent::start_element(name.unwrap());
@@ -152,10 +144,11 @@ impl XmlConverter {
         } else if let Val::Str(ref s) = v {
             w.write(XmlEvent::characters(s.as_ref()))?;
         } else {
-            return Err(Box::new(BuildError::new(
+            return Err(BuildError::new(
                 "XML nodes must be a Tuple or a string",
                 ErrorType::TypeFail,
-            )));
+            )
+            .to_boxed());
         }
         Ok(())
     }
@@ -200,10 +193,11 @@ impl XmlConverter {
                             } else {
                                 // If they specified the wrong version then
                                 // error out.
-                                return Err(Box::new(BuildError::new(
+                                return Err(BuildError::new(
                                     "XML version must be either 1.0 or 1.1",
                                     ErrorType::TypeFail,
-                                )));
+                                )
+                                .to_boxed());
                             }
                         }
                         None => None,
@@ -216,16 +210,14 @@ impl XmlConverter {
                     })?;
                     self.write_node(n.as_ref(), &mut writer)
                 }
-                None => Err(Box::new(BuildError::new(
+                None => Err(BuildError::new(
                     "XML doc tuples must have a root field",
                     ErrorType::TypeFail,
-                ))),
+                )
+                .to_boxed()),
             }
         } else {
-            Err(Box::new(BuildError::new(
-                "XML outputs must be a Tuple",
-                ErrorType::TypeFail,
-            )))
+            Err(BuildError::new("XML outputs must be a Tuple", ErrorType::TypeFail).to_boxed())
         }
     }
 }
