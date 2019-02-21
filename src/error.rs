@@ -61,15 +61,19 @@ pub struct BuildError {
     pub err_type: ErrorType,
     pub pos: Option<Position>,
     pub msg: String,
+    pub cause: Option<Box<dyn error::Error>>,
+    // This field is only present to prevent people from constructing these
+    // outside of the module they are defined in.
     _pkgonly: (),
 }
 
 impl BuildError {
-    pub fn new_with_pos<S: Into<String>>(msg: S, t: ErrorType, pos: Position) -> Self {
+    pub fn with_pos<S: Into<String>>(msg: S, t: ErrorType, pos: Position) -> Self {
         BuildError {
             err_type: t,
             pos: Some(pos),
             msg: msg.into(),
+            cause: None,
             _pkgonly: (),
         }
     }
@@ -79,8 +83,14 @@ impl BuildError {
             err_type: t,
             pos: None,
             msg: msg.into(),
+            cause: None,
             _pkgonly: (),
         }
+    }
+
+    pub fn wrap_cause(mut self, cause: Box<dyn error::Error>) -> Self {
+        self.cause = Some(cause);
+        self
     }
 
     fn render(&self, w: &mut fmt::Formatter) -> fmt::Result {
@@ -91,11 +101,14 @@ impl BuildError {
             };
             write!(
                 w,
-                "{} at {} line: {}, column: {}\nCaused By:\n\t{} ",
-                self.err_type, file, pos.line, pos.column, self.msg
+                "{}: {} at {} line: {}, column: {}",
+                self.err_type, self.msg, file, pos.line, pos.column
             )?;
         } else {
-            write!(w, "{} \nCaused By:\n\t{} ", self.err_type, self.msg)?;
+            write!(w, "{}: {}", self.err_type, self.msg)?;
+        }
+        if let Some(ref cause) = self.cause {
+            write!(w, "\nCaused By:\n\t{}", cause)?;
         }
         Ok(())
     }

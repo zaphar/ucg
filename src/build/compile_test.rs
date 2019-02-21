@@ -143,13 +143,7 @@ fn test_type_checks() {
 }
 
 #[test]
-#[should_panic(expected = "UserDefined")]
-fn test_declarative_failures_are_user_defined() {
-    assert_build("fail \"I am a failure!\";");
-}
-
-#[test]
-#[should_panic(expected = "Caused By:\n\tI am a failure!")]
+#[should_panic(expected = "UserDefined: I am a failure!")]
 fn test_declarative_failures_are_caused_by_msg() {
     assert_build("fail \"I am a failure!\";");
 }
