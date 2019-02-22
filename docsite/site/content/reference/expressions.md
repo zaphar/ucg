@@ -516,14 +516,16 @@ the statements later. Modules are an expression. They can be bound to a value
 and then reused later. Modules do not close over their environment but they can
 import other UCG files into the module using import statements including the
 file they are located themselves. This works since the statements in a module
-until you attempt to call the module with a copy expression.
+are not evaluated until you attempt to call the module with a copy expression.
 
 Module expressions start with the module keyword followed by a tuple
 representing their parameters with any associated default values. The body of
-the module is separated from the parameter tuple by the `=>` symbol and is
-delimited by `{` and `}` respectively.
-
-The body of the module can contain any valid UCG statement.
+the module is separated from the parameter tuple by the `=>` symbol an optional
+`(expr)` defining the out expression, and a series of statements delimited by
+`{` and `}` respectively. The body of the module can contain any valid UCG
+statement. You instantiate a module via the copy expression. By default if
+there is no out expression then the module will export all of the named
+bindings in the statements.
 
 ```
 let top_mod = module {
@@ -539,18 +541,40 @@ let top_mod = module {
 
     let embedded = embedded_def{deep_value = mod.deep_value};
 };
-```
 
-You instantiate a module via the copy expression. The resulting module instance
-can reference the bindings in the module similarly to selecting a tuple field
-or a binding from an imported file.
+let embedded_with_params = top_mod{deep_value = "Some"};
 
-```
-let embedded_default_params = top_mod{};
-embedded_default_params.embedded.value == "None";
-
-let embedded_with_params = embedded_mod{deep_value = "Some"};
+// By default all of the named bindings in a module are exported so we can
+// get the embedded tuple out via a selector.
 embedded_with_params.embedded.value == "Some";
+```
+
+### Out Expressions
+
+If there is an out expression then the module will only export the result of
+that expression. The out expression is computed after the last statement in the
+module has been evaluated.
+
+```
+let top_mod_out_expr = module {
+    deep_value = "None",
+} => (embedded) { // we will only expose the embedded binding in our module
+    let shared_funcs = import "shared.UCG";
+
+    let embedded_def = module {
+        deep_value = "None",
+    } => {
+        let value = mod.deep_value;
+    };
+
+    let embedded = embedded_def{deep_value = mod.deep_value};
+};
+
+let embedded_default_params = top_mod_out_expr{};
+
+// We don't have to dereference the embedded binding since the out expression
+// exported it for us.
+embedded_default_params.value == "None";
 ```
 
 ### Recursive Modules
