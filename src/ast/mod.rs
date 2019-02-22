@@ -535,6 +535,7 @@ pub struct ModuleDef {
     pub scope: Option<Scope>,
     pub pos: Position,
     pub arg_set: FieldList,
+    pub out_expr: Option<Box<Expression>>,
     pub arg_tuple: Option<Rc<Val>>,
     pub statements: Vec<Statement>,
 }
@@ -545,9 +546,14 @@ impl ModuleDef {
             scope: None,
             pos: pos.into(),
             arg_set: arg_set,
+            out_expr: None,
             arg_tuple: None,
             statements: stmts,
         }
+    }
+
+    pub fn set_out_expr(&mut self, expr: Expression) {
+        self.out_expr = Some(Box::new(expr));
     }
 
     pub fn imports_to_absolute(&mut self, base: PathBuf) {

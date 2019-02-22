@@ -1134,6 +1134,68 @@ impl<'a> FileBuilder<'a> {
         )));
     }
 
+    fn eval_module_copy(
+        &self,
+        def: &CopyDef,
+        mod_def: &ModuleDef,
+        scope: &Scope,
+    ) -> Result<Rc<Val>, Box<dyn Error>> {
+        let maybe_tpl = mod_def.clone().arg_tuple.unwrap().clone();
+        if let &Val::Tuple(ref src_fields) = maybe_tpl.as_ref() {
+            // 1. First we create a builder.
+            // TODO(jwall): This file should optionally come from the module def itself.
+            let mut b = self.clone_builder();
+            b.is_module = true;
+            // 2. We construct an argument tuple by copying from the defs
+            //    argset.
+            // Push our base tuple on the stack so the copy can use
+            // self to reference it.
+            let child_scope = scope.spawn_child().set_curr_val(maybe_tpl.clone());
+            let mod_args = self.copy_from_base(src_fields, &def.fields, &child_scope)?;
+            // put our copied parameters tuple in our builder under the mod key.
+            let mod_key = PositionedItem::new_with_pos(String::from("mod"), Position::new(0, 0, 0));
+            match b.scope.build_output.entry(mod_key) {
+                Entry::Occupied(e) => {
+                    return Err(error::BuildError::with_pos(
+                        format!(
+                            "Binding \
+                             for {:?} already \
+                             exists in module",
+                            e.key(),
+                        ),
+                        error::ErrorType::DuplicateBinding,
+                        mod_def.pos.clone(),
+                    )
+                    .to_boxed());
+                }
+                Entry::Vacant(e) => {
+                    e.insert(mod_args.clone());
+                }
+            }
+            // 4. Evaluate all the statements using the builder.
+            b.eval_stmts(&mod_def.statements)?;
+            if let Some(ref expr) = mod_def.out_expr {
+                // 5. Produce the out expression in the context of the statements
+                // we evaluated previously.
+                return b.eval_expr(expr, &b.scope);
+            } else {
+                // 5. Take all of the bindings in the module and construct a new
+                //    tuple using them.
+                return Ok(b.get_outputs_as_val());
+            }
+        } else {
+            return Err(error::BuildError::with_pos(
+                format!(
+                    "Weird value stored in our module parameters slot {:?}",
+                    mod_def.arg_tuple
+                ),
+                error::ErrorType::TypeFail,
+                def.selector.pos().clone(),
+            )
+            .to_boxed());
+        }
+    }
+
     fn eval_copy(&self, def: &CopyDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         let v = self.eval_value(&def.selector, scope)?;
         if let &Val::Tuple(ref src_fields) = v.as_ref() {
@@ -1141,55 +1203,7 @@ impl<'a> FileBuilder<'a> {
             return self.copy_from_base(&src_fields, &def.fields, &child_scope);
         }
         if let &Val::Module(ref mod_def) = v.as_ref() {
-            let maybe_tpl = mod_def.clone().arg_tuple.unwrap().clone();
-            if let &Val::Tuple(ref src_fields) = maybe_tpl.as_ref() {
-                // 1. First we create a builder.
-                // TODO(jwall): This file should optionally come from the module def itself.
-                let mut b = self.clone_builder();
-                b.is_module = true;
-                // 2. We construct an argument tuple by copying from the defs
-                //    argset.
-                // Push our base tuple on the stack so the copy can use
-                // self to reference it.
-                let child_scope = scope.spawn_child().set_curr_val(maybe_tpl.clone());
-                let mod_args = self.copy_from_base(src_fields, &def.fields, &child_scope)?;
-                // put our copied parameters tuple in our builder under the mod key.
-                let mod_key =
-                    PositionedItem::new_with_pos(String::from("mod"), Position::new(0, 0, 0));
-                match b.scope.build_output.entry(mod_key) {
-                    Entry::Occupied(e) => {
-                        return Err(error::BuildError::with_pos(
-                            format!(
-                                "Binding \
-                                 for {:?} already \
-                                 exists in module",
-                                e.key(),
-                            ),
-                            error::ErrorType::DuplicateBinding,
-                            mod_def.pos.clone(),
-                        )
-                        .to_boxed());
-                    }
-                    Entry::Vacant(e) => {
-                        e.insert(mod_args.clone());
-                    }
-                }
-                // 4. Evaluate all the statements using the builder.
-                b.eval_stmts(&mod_def.statements)?;
-                // 5. Take all of the bindings in the module and construct a new
-                //    tuple using them.
-                return Ok(b.get_outputs_as_val());
-            } else {
-                return Err(error::BuildError::with_pos(
-                    format!(
-                        "Weird value stored in our module parameters slot {:?}",
-                        mod_def.arg_tuple
-                    ),
-                    error::ErrorType::TypeFail,
-                    def.selector.pos().clone(),
-                )
-                .to_boxed());
-            }
+            return self.eval_module_copy(def, mod_def, scope);
         }
         Err(error::BuildError::with_pos(
             format!("Expected Tuple or Module but got ({})", v),

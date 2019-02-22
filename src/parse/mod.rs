@@ -379,17 +379,28 @@ fn module_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expres
         _ => optional!(punct!(",")),
         _ => must!(punct!("}")),
         _ => must!(punct!("=>")),
+        out_expr => optional!(
+            do_each!(
+                _ => punct!("("),
+                expr => must!(expression),
+                _ => must!(punct!(")")),
+                (expr)
+            )
+        ),
         _ => must!(punct!("{")),
         stmt_list =>  trace_parse!(repeat!(statement)),
         _ => must!(punct!("}")),
-        (pos, arglist, stmt_list)
+        (pos, arglist, out_expr, stmt_list)
     );
     match parsed {
         Result::Abort(e) => Result::Abort(e),
         Result::Fail(e) => Result::Fail(e),
         Result::Incomplete(offset) => Result::Incomplete(offset),
-        Result::Complete(rest, (pos, arglist, stmt_list)) => {
-            let def = ModuleDef::new(arglist.unwrap_or_else(|| Vec::new()), stmt_list, pos);
+        Result::Complete(rest, (pos, arglist, out_expr, stmt_list)) => {
+            let mut def = ModuleDef::new(arglist.unwrap_or_else(|| Vec::new()), stmt_list, pos);
+            if let Some(expr) = out_expr {
+                def.set_out_expr(expr);
+            }
             //eprintln!(
             //    "module def at: {:?} arg_typle len {} stmts len {}",
             //    def.pos,
