@@ -119,7 +119,7 @@ func_def: func_keyword, lparen, [ arglist ], rparen, fatcomma, tuple ;
 #### Module Definition
 
 ```
-module_def: module_keyword, tuple, fatcomma, lbrace, [ { statement } ], rbrace ;
+module_def: module_keyword, tuple, fatcomma, [lparen, expr, rparen], lbrace, [ { statement } ], rbrace ;
 ```
 
 #### Copy and Call Expression
