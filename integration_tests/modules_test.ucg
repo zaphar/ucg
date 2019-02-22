@@ -1,3 +1,5 @@
+let t = import "std/testing.ucg".asserts{};
+
 let test_empty_mod = module {
 } => {
 };
@@ -67,4 +69,44 @@ assert {
 assert {
     ok = embedded_mod{dep_value="Some"}.embedded_def{}.value == "None",
     desc = "embedded_mod{dep_value=\"Some\"}.embedded_def{}.value == \"None\"",
+};
+
+let export_module = module {
+    foo = "",
+} => (result) {
+    let foo = mod.foo;
+
+    let result = {
+        out_foo = foo,
+    };
+};
+
+assert t.ok{
+    test = out_foo in export_module{foo="bar"},
+    desc = "out_foo is in our output tuple",
+};
+
+assert t.equal{
+    left = export_module{foo="bar"},
+    right = {out_foo = "bar"},
+};
+
+let export_module_tuple = module {
+    foo = "",
+} => ({quux = result.out_foo}) {
+    let foo = mod.foo;
+
+    let result = {
+        out_foo = foo,
+    };
+};
+
+assert t.ok{
+    test = quux in export_module_tuple{foo="bar"},
+    desc = "quux is in our output tuple",
+};
+
+assert t.equal{
+    left = export_module_tuple{foo="bar"},
+    right = {quux = "bar"},
 };
