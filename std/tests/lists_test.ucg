@@ -6,7 +6,7 @@ let list_to_join = [1, 2, 3];
 let asserts = t.asserts{};
 
 assert asserts.equal{
-    left=list.str_join{sep=",", list=list_to_join}.result,
+    left=list.str_join{sep=",", list=list_to_join},
     right="1,2,3"
 };
 
@@ -21,12 +21,12 @@ assert asserts.equal{
 };
 
 assert asserts.equal{
-    left=list.enumerate{list=["foo", "bar"]}.result,
+    left=list.enumerate{list=["foo", "bar"]},
     right=[[0, "foo"], [1, "bar"]],
 };
 
 assert asserts.equal{
-    left=list.enumerate{start=1, list=["foo", "bar"]}.result,
+    left=list.enumerate{start=1, list=["foo", "bar"]},
     right=[[1, "foo"], [2, "bar"]],
 };
 
@@ -35,11 +35,11 @@ assert asserts.equal{
         start=1,
         step=2,
         list=["foo", "bar"]
-    }.result,
+    },
     right=[[1, "foo"], [3, "bar"]],
 };
 
 assert asserts.equal{
-    left=list.zip{list1=[0, 1], list2=[3, 4]}.result,
+    left=list.zip{list1=[0, 1], list2=[3, 4]},
     right=[[0, 3], [1, 4]],
 };

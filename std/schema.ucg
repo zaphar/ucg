@@ -19,8 +19,8 @@ let base_type_of = func (val) => reduce(func (acc, f) => select (acc.val is f), 
 
 // Turns any schema check module into a compile failure.
 // The module must export the computed value as the result field.
-let must = func (m, msg) => select m.result, fail msg, {
-    true = m.result,
+let must = func (m, msg) => select m, fail msg, {
+    true = m,
 };
 
 // Any does a boolean match against a set of allowed shapes for a type.
@@ -31,11 +31,11 @@ let any = module {
     val=NULL,
     // The set of allowed type shapes it can be.
     types=[],
-} => {
+} => (result) {
     let schema = import "std/schema.ucg";
 
     let reducer = func (acc, t) => acc{
-        ok = acc.ok || (schema.shaped{val=acc.val, shape=t}.result),
+        ok = acc.ok || (schema.shaped{val=acc.val, shape=t}),
     };
     let any = func (val, types) => reduce(reducer, {ok=false, val=val}, types);
 
@@ -65,19 +65,19 @@ let shaped = module {
     // fields in tuples that are not present in the
     // shape it is compared with.
     partial = true,
-} => {
+} => (result) {
     let schema = import "std/schema.ucg";
 
     let simple_handler = func (val, shape) => val is schema.base_type_of(shape);
 
     let tuple_handler = func (acc, name, value) => acc{
         ok = select (name) in acc.shape, mod.partial, {
-            true = schema.shaped{val=value, shape=acc.shape.(name)}.result,
+            true = schema.shaped{val=value, shape=acc.shape.(name)},
         },
     };
 
     let list_handler = func(acc, value) => acc{
-        ok = false || schema.any{val=value, types=acc.shape}.result,
+        ok = false || schema.any{val=value, types=acc.shape},
     };
     
     let result =select schema.base_type_of(mod.val), false, {

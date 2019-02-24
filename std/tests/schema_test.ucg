@@ -7,7 +7,7 @@ assert t.ok{
 };
 
 assert t.not_ok{
-    test = schema.any{val=1, types=[1.0, ""]}.result,
+    test = schema.any{val=1, types=[1.0, ""]},
     desc = "1 is not a float or string",
 };
 
@@ -62,61 +62,61 @@ assert t.equal{
 };
 
 assert t.equal{
-    left = schema.shaped{val="foo", shape=""}.result,
+    left = schema.shaped{val="foo", shape=""},
     right = true,
 }; 
 
 assert t.ok{
-    test = schema.shaped{val="foo", shape=""}.result,
+    test = schema.shaped{val="foo", shape=""},
     desc = "\"foo\" is same shape as \"\"",
 }; 
 
 assert t.not_ok{
-    test = schema.shaped{val="foo", shape=0}.result,
+    test = schema.shaped{val="foo", shape=0},
     desc = "\"foo\" is not the same shape as 0",
 };
  
 assert t.ok{
-    test = schema.shaped{val={foo="bar"}, shape={foo=""}}.result,
+    test = schema.shaped{val={foo="bar"}, shape={foo=""}},
     desc = "shaped for simple tuples works",
 };
 
 assert t.ok{
-    test = schema.shaped{val={foo="bar", count=1}, shape={foo=""}}.result,
+    test = schema.shaped{val={foo="bar", count=1}, shape={foo=""}},
     desc = "shaped for partial tuples works",
 };
 
 assert t.not_ok{
-    test = schema.shaped{partial=false, val={foo="bar", count=1}, shape={foo=""}}.result,
+    test = schema.shaped{partial=false, val={foo="bar", count=1}, shape={foo=""}},
     desc = "shaped for non partial tuples also works",
 };
 
 assert t.ok{
-    test = schema.shaped{val={foo="bar", inner={one=1}}, shape={foo="", inner={one=0}}}.result,
+    test = schema.shaped{val={foo="bar", inner={one=1}}, shape={foo="", inner={one=0}}},
     desc = "shaped for nested tuples works",
 };
 
 assert t.ok{
-    test = schema.shaped{val={foo="bar", inner=[1, 2]}, shape={foo="", inner=[0]}}.result,
+    test = schema.shaped{val={foo="bar", inner=[1, 2]}, shape={foo="", inner=[0]}},
     desc = "shaped for nested list in tuple works",
 };
 
 assert t.not_ok{
-    test = schema.shaped{val={inner={foo="bar"}}, shape={inner={foo=1}}}.result,
+    test = schema.shaped{val={inner={foo="bar"}}, shape={inner={foo=1}}},
     desc = "shaped fails when the shape doesn't match",
 };
 
 assert t.ok{
-    test = schema.shaped{val={list=[1, "foo"]}, shape={list=[0, ""]}}.result,
+    test = schema.shaped{val={list=[1, "foo"]}, shape={list=[0, ""]}},
     desc="inner list with valid types matches shape",
 };
 
 assert t.not_ok{
-    test = schema.shaped{val={list=[1, "foo", true]}, shape={list=[0, ""]}}.result,
+    test = schema.shaped{val={list=[1, "foo", true]}, shape={list=[0, ""]}},
     desc="inner list with invalid types does not match shape",
 };
 
 assert t.ok{
-    test = schema.shaped{val={list=[1, "foo"]}, shape={list=[]}}.result,
+    test = schema.shaped{val={list=[1, "foo"]}, shape={list=[]}},
     desc="inner list with valid types matches empty list shape",
 };

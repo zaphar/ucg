@@ -4,7 +4,7 @@ let ops = module {
     let split_on = module{
         on=" ",
         str=mod.str,
-    } => {
+    } => (result) {
         let splitter = func(acc, char) => acc{
             out = select char == mod.on, acc.out, {
                 true = acc.out + [acc.buf],

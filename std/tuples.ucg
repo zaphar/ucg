@@ -6,7 +6,7 @@ let assert_tuple = func (tpl) => select tpl is "tuple", NULL, {
 // Return a list of the fields in a tuple.
 let fields = module{
     tpl = NULL,
-} => {
+} => (result) {
     let assert_tuple = import "std/tuples.ucg".assert_tuple;
     // First we check that mod.tpl is a tuple.
     assert_tuple(mod.tpl);
@@ -17,7 +17,7 @@ let fields = module{
 // Return a list of the values in a tuple.
 let values = module{
     tpl = NULL,
-} => {
+} => (result) {
     let assert_tuple = import "std/tuples.ucg".assert_tuple;
     // First we check that mod.tpl is a tuple.
     assert_tuple(mod.tpl);
@@ -28,7 +28,7 @@ let values = module{
 // Return a list of the key value pairs in the tuple.
 let iter = module{
     tpl = NULL,
-} => {
+} => (result) {
     let assert_tuple = import "std/tuples.ucg".assert_tuple;
     // First we check that mod.tpl is a tuple.
     assert_tuple(mod.tpl);
@@ -39,7 +39,7 @@ let iter = module{
 // Strip all the null fields from a tuple.
 let strip_nulls = module{
     tpl = NULL,
-} => {
+} => (result) {
     let assert_tuple = import "std/tuples.ucg".assert_tuple;
     // First we check that mod.tpl is a tuple.
     assert_tuple(mod.tpl);
@@ -51,12 +51,12 @@ let strip_nulls = module{
 let has_fields = module{
     tpl = NULL,
     fields = [],
-} => {
+} => (result) {
     let lib = import "std/tuples.ucg";
     // First we check that mod.tpl is a tuple.
     lib.assert_tuple(mod.tpl);
 
-    let fs = lib.fields{tpl=mod.tpl}.result;
+    let fs = lib.fields{tpl=mod.tpl};
 
     let result = reduce(func (acc, f) => acc && (f in fs), true, mod.fields);
 };
@@ -66,7 +66,7 @@ let field_type = module{
     tpl = NULL,
     field = NULL,
     type = NULL,
-} => {
+} => (result) {
     let lib = import "std/tuples.ucg";
     // First we check that mod.tpl is a tuple.
     lib.assert_tuple(mod.tpl);
@@ -82,7 +82,7 @@ let field_type = module{
     };
 
     // Get the list of field value pairs.
-    let it = lib.iter{tpl=mod.tpl}.result;
+    let it = lib.iter{tpl=mod.tpl};
 
     // The reducer function used to check the field's types if it exists. 
     let reducer = func (acc, l) => acc && (select l.0 == mod.field, NULL, {
@@ -91,5 +91,5 @@ let field_type = module{
     });
 
     // The computed answer true or false.
-    let result = lib.has_fields{tpl=mod.tpl, fields=[mod.field]}.result && reduce(reducer, true, it);
+    let result = lib.has_fields{tpl=mod.tpl, fields=[mod.field]} && reduce(reducer, true, it);
 };

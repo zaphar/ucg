@@ -7,7 +7,7 @@ let str_join = module{
     sep=" ",
     // The list is a required parameter.
     list=NULL,
-} => {
+} => (result) {
     // The function used by reduce to join the list into a string.
     let joiner = func (acc, item) =>  select (acc.out == ""), NULL, {
         true = acc{
@@ -40,7 +40,7 @@ let enumerate = module{
     step = 1,
     // The list to enumerate.
     list = NULL,
-} => {
+} => (result) {
     let reducer = func (acc, item) =>  acc{
         count = acc.count + acc.step,
         list=acc.list + [[acc.count, item]],
@@ -58,7 +58,7 @@ let enumerate = module{
 let zip = module{
     list1 = NULL,
     list2 = NULL,
-} => {
+} => (result) {
     let len = import "std/lists.ucg".len;
 
     // Compute the length of each list.

@@ -4,17 +4,17 @@ let t = import "std/testing.ucg".asserts{};
 let str_class = strings.ops{str="foo bar"};
 
 assert t.equal{
-    left = str_class.split_on{}.result,
+    left = str_class.split_on{},
     right = ["foo", "bar"],
 };
 
 assert t.equal{
-    left = strings.ops{str="foo"}.split_on{}.result,
+    left = strings.ops{str="foo"}.split_on{},
     right = ["foo"],
 };
 
 assert t.equal{
-    left = strings.ops{str=""}.split_on{}.result,
+    left = strings.ops{str=""}.split_on{},
     right = [""],
 };
 
