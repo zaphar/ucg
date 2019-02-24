@@ -16,7 +16,7 @@ result field of the computed tuple will be true.
 let fits = schema.shaped{
     val={foo="bar", inner=[1, 2]},
     shape={foo="", inner=[]}
-}.result;
+};
 
 fits == true;
 ```
@@ -28,7 +28,7 @@ let exact_fit = schema.shaped{
     partial=false,
     val={foo="bar", count=1},
     shape={foo=""},
- }.result;
+ };
 
  exact_fit == false;
 ```
@@ -42,7 +42,7 @@ The `any` module tests a value against a list of possible shapes. If the value
 fits any of the candidate shapes then it stores true in the result field. If it does not then it returns false in that result field.
 
 ```
-let fits_one_of = any{val={foo="bar"}, types=[1, {foo=""}]}.result;
+let fits_one_of = any{val={foo="bar"}, types=[1, {foo=""}]};
 fits_one_of == true;
 ```
 

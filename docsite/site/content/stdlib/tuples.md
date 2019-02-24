@@ -17,7 +17,7 @@ parameter.
 
 ```
 let tpl = import "std/tuples.ucg";
-tpl.fields{tpl={foo=1, bar=2}}.result == ["foo", "bar"];
+tpl.fields{tpl={foo=1, bar=2}} == ["foo", "bar"];
 ```
 
 ## values
@@ -28,7 +28,7 @@ The `values` module retrieves all the values in a tuple. It has one parameter.
 
 ```
 let tpl = import "std/tuples.ucg";
-tpl.values{tpl={foo=1, bar=2}}.result == [1, 2];
+tpl.values{tpl={foo=1, bar=2}} == [1, 2];
 ```
 
 ## iter
@@ -40,5 +40,5 @@ It has one parameter.
 
 ```
 let tpl = import "std/tuples.ucg";
-tpl.enumerate{tpl={foo=1, bar=2}}.result == [["foo", 1], ["bar", 2]];
+tpl.enumerate{tpl={foo=1, bar=2}} == [["foo", 1], ["bar", 2]];
 ```

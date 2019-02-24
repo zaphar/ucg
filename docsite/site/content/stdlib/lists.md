@@ -15,7 +15,7 @@ The reverse module reverses a list. It has a single required parameter:
 
 ```
 let l = import "std/lists.ucg";
-l.reverse{list=[1, 2, 3]}.result == [3, 2, 1];
+l.reverse{list=[1, 2, 3]} == [3, 2, 1];
 ```
 
 ## str_join
@@ -31,7 +31,7 @@ let l = import "std/lists.ucg";
 l.str_join{
     sep=" ",
     list=[1, 2, 3]
-}.result == "1,2,3";
+} == "1,2,3";
 ```
 
 ## len
@@ -42,7 +42,7 @@ The len module returns the length of a list. It has a single required parameter.
 
 ```
 let l = import "std/lists.ucg";
-l.len{list=[0, 1, 2, 3]}.result == 4;
+l.len{list=[0, 1, 2, 3]} == 4;
 ```
 
 ## enumerate
@@ -57,12 +57,12 @@ The enumerate module enumerates the elements of a list. It has three parameters.
 let l = import "std/lists.ucg";
 
 // with defaults
-l.enumerate{list=[1, 2, 3]}.result == [[0, 1], [1, 2], [3, 4]];
+l.enumerate{list=[1, 2, 3]} == [[0, 1], [1, 2], [3, 4]];
 
 // With all parameters
 l.enumerate{
     start=1,
     step=2,
     list=["foo", "bar", "foobar"],
-}.result == [[1, "foo"], [3, "bar"], [5, "foobar"]];
+} == [[1, "foo"], [3, "bar"], [5, "foobar"]];
 ```
