@@ -1,17 +1,32 @@
+// maybe is our monadic optional. It wraps a value that may or may not be the empty
+// type NULL. It exports three operations.
+//
+// * do - runs a user provided function of one argument on the value.
+//        Returns a maybe wrapped result.
+// 
+// * is_null - a function with no arguments that returns true if the value is
+//             NULL and false if it is not.
+//
+// * unwrap -  returns the wrapped value from the maybe.
+//
+// * expect - Throws a compile error if the value is NULL.
 let maybe = module{
     val = NULL,
-} => {
-    let do = func (op) =>  select (mod.val != NULL), NULL, {
-        true = op(mod.val),
+} => ({do=do, is_null=is_null, unwrap=unwrap, expect=expect}) {
+    let maybe = import "std/functional.ucg".maybe;
+
+    let do = func (op) =>  select (mod.val != NULL), maybe{val=NULL}, {
+        true = maybe{val=op(mod.val)},
+    };
+
+    let is_null = func() => mod.val == NULL;
+    
+    let unwrap = func() => mod.val;
+
+    let expect = func(msg) => select mod.val != NULL, fail msg, {
+        true = mod.val,
     };
 };
 
-let if = module{
-    test = false,
-} => {
-    let do = func (op, arg) => select mod.test, arg, {
-        true = op(arg),
-    };
-};
-
+// identity is the identity function.
 let identity = func (arg) => arg;
