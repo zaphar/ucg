@@ -85,23 +85,28 @@ tbody td:nth-child(even) {
 <thead><th></th><th>UCG</th><th>JSonnet</th><th>Dhall</th></thead>
 <tr>
 <td><b>Variables</b></td><td>x</td> <td>x</td><td>x</td>
-<tr>
 </tr>
+<tr>
 <td><b>Conditionals</b></td><td>x</td><td>x</td><td>x</td>
-<tr>
 </tr>
+<tr>
 <td><b>Functions</b></td><td>x</td><td>x</td><td>x</td>
-<tr>
 </tr>
+<tr>
 <td><b>Modules/Classes</b></td><td>x</td><td>x</td><td>x</td>
-<tr>
 </tr>
-<td><b>Imports</b></td><td>x</td><td>x</td><td>x</td>
 <tr>
+<td><b>Imports</b></td><td>x</td><td>x</td><td>x</td>
+</tr>
 <tr>
 <td><b>Std Lib</b></td><td>Minimal</td><td>x</td><td>Prelude</td>
 </tr>
-<tr><td><b>Type Safety</b></td><td>Inferred types and schema validation<td>Unknown</td><td>Inferred types</td></tr>
+<tr>
+<td><b>Type Safety</b></td><td>Inferred types and schema validation<td>Unknown</td><td>Inferred types</td>
+</tr>
+<tr>
+<td><b>Guaranteed to terminate</b></td><td>No</td><td>No</td><td>Yes</td>
+</tr>
 </table>
 <table>
 
