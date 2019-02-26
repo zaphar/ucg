@@ -168,6 +168,32 @@ UCG binary operators follow the typical operator precedence for math. `*` and
 `/` are higher precendence than `+` and `-` which are higher precedence than
 any of the comparison operators.
 
+**Precedence table**
+
+Higher values bind tighter than lower values.
+
+<table>
+<thead><th>Operator</th><th>Precedence</th><th>Description</th></thead>
+<tr><td>==</td><td>1</td><td>Equality Comparison</td></tr>
+<tr><td>!=</td><td>1</td><td>Inequality Comparison</td></tr>
+<tr><td>>=</td><td>1</td><td>Greater Than or Equal</td></tr>
+<tr><td><=</td><td>1</td><td>Less Than or Equal</td></tr>
+<tr><td><</td><td>1</td><td>Greater Than</td></tr>
+<tr><td>></td><td>1</td><td>Less Than</td></tr>
+<tr><td>=~</td><td>1</td><td>Regex Match</td></tr>
+<tr><td>!~</td><td>1</td><td>Negated Regex Match</td></tr>
+<tr><td>in</td><td>2</td><td>Contains field or item</td></tr>
+<tr><td>is</td><td>2</td><td>Type check</td></tr>
+<tr><td>+</td><td>3</td><td>Sum or concatenation</td></tr>
+<tr><td>-</td><td>3</td><td>Subtraction</td></tr>
+<tr><td>*</td><td>4</td><td>Product</td></tr>
+<tr><td>/</td><td>4</td><td>Division</td></tr>
+<tr><td>%%</td><td>4</td><td>Modulus</td></tr>
+<tr><td>&&</td><td>5</td><td>And</td></tr>
+<tr><td>||</td><td>5</td><td>Or</td></tr>
+<tr><td>.</td><td>6</td><td>Dot Selector</td></tr>
+</table>
+
 Type test expressions
 ---------------------
 
