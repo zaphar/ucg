@@ -1,5 +1,5 @@
 +++
-title = "UCG Expressions"
+title = "Expressions"
 weight = 3
 sort_by = "weight"
 in_search_index = true

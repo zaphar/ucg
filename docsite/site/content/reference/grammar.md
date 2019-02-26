@@ -1,5 +1,5 @@
 +++
-title = "UCG Formal Grammar"
+title = "Formal Grammar"
 slug = "grammar"
 weight = 1
 sort_by = "weight"

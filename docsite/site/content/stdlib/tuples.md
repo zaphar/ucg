@@ -1,5 +1,5 @@
 +++
-title = "UCG Tuple Modules"
+title = "Tuple Operations"
 weight = 2
 sort_by = "weight"
 in_search_index = true

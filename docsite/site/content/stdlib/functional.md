@@ -1,5 +1,5 @@
 +++
-title = "UCG functional operations"
+title = "Functional operations"
 weight = 5
 sort_by = "weight"
 in_search_index = true

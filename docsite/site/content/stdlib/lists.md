@@ -1,5 +1,5 @@
 +++
-title = "UCG List Modules"
+title = "List Operations"
 weight = 1
 sort_by = "weight"
 in_search_index = true

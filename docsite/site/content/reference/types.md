@@ -1,5 +1,5 @@
 +++
-title = "UCG types"
+title = "Types"
 weight = 2
 sort_by = "weight"
 in_search_index = true
@@ -50,7 +50,9 @@ Strings are any double quoted text. You can use the `\` to esacpe characters in 
 ### NULL or the Empty type
 
 NULL is the empty type. It represents the absence of a value. It is represented by the
-symbol `NULL`.
+symbol `NULL`. The empty type is special in that any field regardless of type can be assigned
+the `NULL` value and any field of NULL value can be assigned any type. This is most useful when
+you need a module, tuple, or function to have fields or parameters that can be any type.
 
 ```
 let empty = NULL;
