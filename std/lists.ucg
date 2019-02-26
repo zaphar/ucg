@@ -29,6 +29,24 @@ let len = func(list) => reduce(func(acc, item) => acc + 1, 0, list);
 // Reverses the provided list.
 let reverse = func(list) => reduce(func (acc, item) =>  [item] + acc, [], list);
 
+// head returns the first item in a list as a list of one item.
+// This function is safe for empty list inputs but is not safe
+// for NULL inputs.
+let head = func(list) => select len(list) > 0, [], {
+    true = [list.0],
+};
+
+// tail returns the tail of a list without the head.
+// This function is safe for empty lists but is not safe
+// for NULL inputs.
+let tail = func(list) => reduce(
+    func (acc, item) => select acc.count > 0, acc{count=1, tail=[]}, {
+        true = acc{count = acc.count + 1, tail = acc.tail + [item]},
+    },
+    {count=0},
+    list,
+).tail;
+
 // Enumerates the provided list with optional start and step parameters for the
 // enumeration. Prodices a list of pairs with the numeration and the list item.
 //

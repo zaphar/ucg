@@ -36,13 +36,31 @@ l.str_join{
 
 ## len
 
-The len module returns the length of a list. It has a single required parameter.
+The len function returns the length of a list. It has a single required parameter.
 
 * `list` The list to reverse.
 
 ```
 let l = import "std/lists.ucg";
 l.len{list=[0, 1, 2, 3]} == 4;
+```
+
+## head and tail
+
+The `tail` function returns the tail of a list minus it's head.
+
+```
+let l = import "std/lists.ucg";
+let tail = l.tail([0,1,2,3]);
+tail == [1,2,3];
+```
+
+The `head` function returns the head of the list as a list of one item.
+
+```
+let l = import "std/lists.ucg";
+let hd = l.head([0,1,2,3]);
+tail == [0];
 ```
 
 ## enumerate

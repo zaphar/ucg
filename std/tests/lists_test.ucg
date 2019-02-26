@@ -43,3 +43,13 @@ assert asserts.equal{
     left=list.zip{list1=[0, 1], list2=[3, 4]},
     right=[[0, 3], [1, 4]],
 };
+
+assert asserts.equal{
+    left=list.tail([0,1,2,3,4]),
+    right=[1,2,3,4],
+};
+
+assert asserts.equal{
+    left=list.head([0,1,2,3,4]),
+    right=[0],
+};
