@@ -53,3 +53,28 @@ assert asserts.equal{
     left=list.head([0,1,2,3,4]),
     right=[0],
 };
+
+assert asserts.equal{
+    left=list.slice{end=2, list=[0,1,2,3]},
+    right=[0,1,2],
+};
+
+assert asserts.equal{
+    left=list.slice{list=[0,1,2,3]},
+    right=[0,1,2,3],
+};
+
+assert asserts.equal{
+    left=list.slice{end=0, list=[0,1,2,3]},
+    right=[0],
+};
+
+assert asserts.equal{
+    left=list.slice{list=[]},
+    right=[],
+};
+
+assert asserts.equal{
+    left=list.slice{list=[0]},
+    right=[0],
+};

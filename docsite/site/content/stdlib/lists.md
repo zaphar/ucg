@@ -63,6 +63,19 @@ let hd = l.head([0,1,2,3]);
 tail == [0];
 ```
 
+## slice
+
+The slice module returns a slice of the input list. The slice module takes three
+parameters.
+
+* `start` which is optional and defaults to 0
+* `end` which is optional and defaults the length of the list
+* `list` which is required and must be a list.
+
+```
+list.slice{start=0, end=2, list=[0,1,2,3]} == [0,1,2];
+```
+
 ## enumerate
 
 The enumerate module enumerates the elements of a list. It has three parameters.

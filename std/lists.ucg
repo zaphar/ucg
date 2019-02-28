@@ -70,6 +70,39 @@ let enumerate = module{
         (mod.list)).list;
 };
 
+// slice returns a slice of a list starting at index start up to and 
+// including index end, inclusive.
+let slice = module {
+    start = 0,
+    end = NULL,
+    list = NULL,
+} => (result) {
+    let list = import "std/lists.ucg";
+
+    let list_len = list.len(mod.list);
+
+    let end = select mod.end is "null", mod.end, {
+        true = list_len,
+    };
+
+    // ensure some invariants
+    (mod.start >= 0) || fail "Slice must be positive";
+    (mod.start <= list_len) || fail "Slice start cannot be larger than the list len of @" % (list_len);
+    (end <= list_len) || fail "Slice end cannot be larger than list len of @" % (list_len);
+
+    let reducer = func(acc, item) => acc{
+        count = acc.count + 1,
+        list = select (acc.count >= mod.start) && (acc.count <= end), acc.list, {
+            true = acc.list + [item],
+        },
+    };
+
+    let result = reduce(
+        reducer,
+        {count=mod.start, list=[]},
+        mod.list).list;
+};
+
 // zips two lists together.
 //
 // zip{list1=[0,2,4],list2=[1,3,5]}.result == [[0, 1], [2, 3], [4, 5]]
