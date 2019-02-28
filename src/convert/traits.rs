@@ -20,7 +20,6 @@ use std::result;
 
 use crate::build::Val;
 
-// TODO Rename to ConvertResult
 pub type ConvertResult = result::Result<(), Box<dyn Error>>;
 
 pub type ImportResult = result::Result<Rc<Val>, Box<dyn Error>>;

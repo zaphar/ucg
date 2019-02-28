@@ -331,7 +331,6 @@ impl<'a> FileBuilder<'a> {
                     Some(val) => Ok(val),
                 }
             }
-            // TODO(jwall): We can probably use actual errors now?
             Err(err) => {
                 let cause = Box::new(simple_error::SimpleError::new(err));
                 Err(error::BuildError::with_pos(
@@ -345,7 +344,6 @@ impl<'a> FileBuilder<'a> {
         }
     }
 
-    // TODO Non file builder specific.
     /// Evaluate an input string as UCG.
     pub fn eval_string(&mut self, input: &str) -> Result<Rc<Val>, Box<dyn Error>> {
         self.eval_input(OffsetStrIter::new(input))
@@ -374,7 +372,6 @@ impl<'a> FileBuilder<'a> {
     ) -> Result<PathBuf, Box<dyn Error>> {
         // Try a relative path first.
         let path = path.into();
-        // TODO(jwall): Change this to take a root directory.
         let mut normalized = self.working_dir.clone();
         if path.is_relative() {
             normalized.push(&path);
@@ -408,7 +405,6 @@ impl<'a> FileBuilder<'a> {
                 let result = match maybe_asset {
                     Some(v) => v.clone(),
                     None => {
-                        // TODO(jwall): This does not need to be a FileBuilder specifically
                         let mut b = self.clone_builder();
                         b.eval_string(self.std.get(&def.path.fragment).unwrap())?;
                         b.get_outputs_as_val()
@@ -1012,7 +1008,6 @@ impl<'a> FileBuilder<'a> {
         if let &BinaryExprType::DOT = kind {
             return self.do_dot_lookup(&def.right, &child_scope);
         };
-        // TODO(jwall): We need to handle call and copy expressions specially.
         let right = match self.eval_expr(&def.right, scope) {
             Ok(v) => v,
             Err(e) => return Err(e),
@@ -1143,7 +1138,6 @@ impl<'a> FileBuilder<'a> {
         let maybe_tpl = mod_def.clone().arg_tuple.unwrap().clone();
         if let &Val::Tuple(ref src_fields) = maybe_tpl.as_ref() {
             // 1. First we create a builder.
-            // TODO(jwall): This file should optionally come from the module def itself.
             let mut b = self.clone_builder();
             b.is_module = true;
             // 2. We construct an argument tuple by copying from the defs
@@ -1272,7 +1266,6 @@ impl<'a> FileBuilder<'a> {
         Ok(Rc::new(Val::Func(def.clone())))
     }
 
-    // TODO(jwall): This stays with the FileBuilder specifically.
     fn file_dir(&self) -> PathBuf {
         return if self.working_dir.is_file() {
             // Only use the dirname portion if the root is a file.
@@ -1284,7 +1277,6 @@ impl<'a> FileBuilder<'a> {
     }
 
     fn eval_module_def(&self, def: &ModuleDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
-        // TODO(jwall): This should actually be passed in to here.
         let root = self.file_dir();
         // Always work on a copy. The original should not be modified.
         let mut def = def.clone();
@@ -1559,7 +1551,6 @@ impl<'a> FileBuilder<'a> {
         return match maybe_target.as_ref() {
             &Val::List(ref elems) => self.eval_functional_list_processing(elems, macdef, typ),
             &Val::Tuple(ref fs) => self.eval_functional_tuple_processing(fs, macdef, typ),
-            // TODO(jwall): Strings?
             &Val::Str(ref s) => self.eval_functional_string_processing(s, macdef, typ),
             other => Err(error::BuildError::with_pos(
                 format!(

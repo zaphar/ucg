@@ -524,8 +524,6 @@ fn test_copy_expression_wrong_field_type_compile_failure() {
     )
 }
 
-// TODO(jwall): Function call errors
-
 #[test]
 fn test_func_call_wrong_argument_length_compile_failure() {
     assert_build_failure(

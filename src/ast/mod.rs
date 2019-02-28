@@ -529,7 +529,6 @@ impl FuncOpDef {
     }
 }
 
-// TODO(jwall): this should probably be moved to a Val::Module IR type.
 #[derive(Debug, PartialEq, Clone)]
 pub struct ModuleDef {
     pub scope: Option<Scope>,

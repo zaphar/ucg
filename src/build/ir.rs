@@ -18,7 +18,6 @@ pub enum Val {
     Float(f64),
     Str(String),
     List(Vec<Rc<Val>>),
-    // TODO(jwall): Remove the need for PositionedItem here
     Tuple(Vec<(String, Rc<Val>)>),
     Env(Vec<(String, String)>),
     Func(FuncDef),

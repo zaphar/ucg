@@ -61,7 +61,6 @@ impl TomlConverter {
     fn convert_value(&self, v: &Val) -> Result {
         let toml_val = match v {
             &Val::Boolean(b) => toml::Value::Boolean(b),
-            // TODO(jwall): This is an error apparently
             &Val::Empty => {
                 let err = SimpleError::new("Nulls are not allowed in Toml Conversions!");
                 return Err(Box::new(err));

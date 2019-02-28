@@ -105,7 +105,6 @@ impl<'a> ExpressionFormatter<'a> {
         pos: &Position,
     ) -> Result<Val, Box<dyn Error>> {
         // we expect the next char to be { or we error.
-        // TODO(jwall): Consume until you reach the last '}'
         let mut expr_string = String::new();
         let mut brace_count = 0;
         match iter.next() {
