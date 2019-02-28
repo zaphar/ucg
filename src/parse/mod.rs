@@ -563,6 +563,7 @@ fn call_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expressi
         callee_name => trace_parse!(symbol),
         _ => punct!("("),
         args => optional!(separated!(punct!(","), trace_parse!(expression))),
+        _ => optional!(punct!(",")),
         _ => must!(punct!(")")),
         (callee_name, args)
     );
@@ -592,6 +593,7 @@ make_fn!(
         acc => must!(trace_parse!(expression)),
         _ => must!(punct!(",")),
         tgt => must!(trace_parse!(expression)),
+        _ => optional!(punct!(",")),
         _ => must!(punct!(")")),
         (Expression::FuncOp(FuncOpDef::Reduce(ReduceOpDef{
             func: Box::new(func),
@@ -611,6 +613,7 @@ make_fn!(
         func => must!(expression),
         _ => must!(punct!(",")),
         list => must!(trace_parse!(expression)),
+        _ => optional!(punct!(",")),
         _ => must!(punct!(")")),
         (Expression::FuncOp(FuncOpDef::Map(MapFilterOpDef{
             func: Box::new(func),
@@ -629,6 +632,7 @@ make_fn!(
         func => must!(expression),
         _ => must!(punct!(",")),
         list => must!(trace_parse!(expression)),
+        _ => optional!(punct!(",")),
         _ => must!(punct!(")")),
         (Expression::FuncOp(FuncOpDef::Filter(MapFilterOpDef{
             func: Box::new(func),
