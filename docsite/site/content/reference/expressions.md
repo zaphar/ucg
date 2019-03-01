@@ -507,10 +507,11 @@ Conditionals
 
 UCG supports a limited conditional expression called a select. A select
 expression starts with the `select` keyword and is followed by a an expression
-resolving to a string or boolean naming the field to select, an expression
-resolving to the default value, and finally a tuple literal to select the field
-from. If the field selected is not in the tuple then the default value will be
-used.
+resolving to a string or boolean naming the field to select, an optional
+expression resolving to the default value, and finally a tuple literal to
+select the field from. If the field selected is not in the tuple then the
+default value will be used. If no default is specified then select will
+throw a compile failure for the unhandled case.
 
 ```
 let want = "baz";
@@ -527,7 +528,7 @@ select "quack", "quux", {
     fuzz = "bang",
 }; // result will be "quux"
 
-let ifresult = select true, NULL, {
+let ifresult = select true, {
     true = "true result",
     false = "false result",
 }; // result will be "true result"
