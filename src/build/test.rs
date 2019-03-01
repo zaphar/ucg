@@ -187,10 +187,10 @@ fn test_select_expr_not_a_string() {
                     "foo".to_string(),
                     Position::new(1, 1, 1)
                 )))),
-                default: Box::new(Expression::Simple(Value::Int(value_node!(
+                default: Some(Box::new(Expression::Simple(Value::Int(value_node!(
                     1,
                     Position::new(1, 1, 1)
-                )))),
+                ))))),
                 tuple: vec![
                     (
                         make_tok!("bar", Position::new(1, 1, 1)),

@@ -109,7 +109,14 @@ impl<'a> AstWalker<'a> {
                 }
             }
             Expression::Select(ref mut def) => {
-                self.walk_expression(def.default.as_mut());
+                match def.default {
+                    Some(ref mut e) => {
+                        self.walk_expression(e.as_mut());
+                    }
+                    None => {
+                        // noop;
+                    }
+                };
                 self.walk_expression(def.val.as_mut());
                 self.walk_fieldset(&mut def.tuple);
             }

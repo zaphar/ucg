@@ -303,7 +303,7 @@ pub struct CallDef {
 #[derive(PartialEq, Debug, Clone)]
 pub struct SelectDef {
     pub val: Box<Expression>,
-    pub default: Box<Expression>,
+    pub default: Option<Box<Expression>>,
     pub tuple: FieldList,
     pub pos: Position,
 }

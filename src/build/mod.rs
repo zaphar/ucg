@@ -1290,7 +1290,8 @@ impl<'a> FileBuilder<'a> {
 
     fn eval_select(&self, def: &SelectDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         let target = &def.val;
-        let def_expr = &def.default;
+        // FIXME(jwall): Handle the no default case in here.
+        let def_expr = def.default.as_ref().unwrap();
         let fields = &def.tuple;
         // First resolve the target expression.
         let v = self.eval_expr(target, scope)?;
