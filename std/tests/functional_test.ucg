@@ -19,6 +19,16 @@ assert t.ok{
 };
 
 assert t.equal{
+    left = f.maybe{val=NULL}.or(func() => "foo").unwrap(),
+    right = "foo",
+};
+
+assert t.equal{
+    left = f.maybe{val="bar"}.or(func() => "foo").unwrap(),
+    right = "bar",
+};
+
+assert t.equal{
     left = f.maybe{val={}}.do(op).unwrap(),
     right = {foo="bar"},
 };

@@ -3,6 +3,9 @@
 //
 // * do - runs a user provided function of one argument on the value.
 //        Returns a maybe wrapped result.
+//
+// * or - runs a user provided function of no arguments if the value is NULL.
+//         Returns a maybe wrapped result.
 // 
 // * is_null - a function with no arguments that returns true if the value is
 //             NULL and false if it is not.
@@ -12,11 +15,15 @@
 // * expect - Throws a compile error if the value is NULL.
 let maybe = module{
     val = NULL,
-} => ({do=do, is_null=is_null, unwrap=unwrap, expect=expect}) {
+} => ({do=do, is_null=is_null, or=or, unwrap=unwrap, expect=expect}) {
     let maybe = import "std/functional.ucg".maybe;
 
     let do = func (op) =>  select (mod.val != NULL), maybe{val=NULL}, {
         true = maybe{val=op(mod.val)},
+    };
+
+    let or = func (op) => select (mod.val == NULL), maybe{val=mod.val}, {
+        true = maybe{val=op()},
     };
 
     let is_null = func() => mod.val == NULL;
