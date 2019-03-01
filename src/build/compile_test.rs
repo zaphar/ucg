@@ -547,3 +547,25 @@ fn test_func_call_wrong_argument_type_compile_failure() {
         ],
     )
 }
+
+#[test]
+fn test_select_missed_case_string_no_default_compile_failure() {
+    assert_build_failure(
+        "select \"a\", { b = 1, };",
+        vec![
+            Regex::new(r"Unhandled select case .a. with no default").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 8").unwrap(),
+        ],
+    )
+}
+
+#[test]
+fn test_select_missed_case_boolean_no_default_compile_failure() {
+    assert_build_failure(
+        "select true, { false = 1, };",
+        vec![
+            Regex::new(r"Unhandled select case true with no default").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 8").unwrap(),
+        ],
+    )
+}

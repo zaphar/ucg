@@ -53,3 +53,18 @@ assert {
     ok = iflike == "I was true",
     desc = "iflike == \"I was true\"",
 };
+
+let no_default_test = func(b) => select b, {
+    true = "I was true",
+    false = "I was false",
+};
+
+assert {
+    ok = no_default_test(true) == "I was true",
+    desc = "no default successfully detects true",
+};
+
+assert {
+    ok = no_default_test(false) == "I was false",
+    desc = "no default successfully detects false",
+};

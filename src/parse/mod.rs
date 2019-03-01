@@ -466,11 +466,11 @@ fn select_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expres
             _ => must!(punct!(",")),
             (expr)
         ),
-        default => do_each!(
+        default => optional!(do_each!(
             expr => trace_parse!(must!(expression)),
-            _ => must!(punct!(",")),
+            _ => punct!(","),
             (expr)
-        ),
+        )),
         map => trace_parse!(must!(tuple)),
         (val, default, map)
     );
@@ -479,7 +479,7 @@ fn select_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expres
         Result::Fail(e) => Result::Fail(e),
         Result::Incomplete(offset) => Result::Incomplete(offset),
         Result::Complete(rest, (val, default, map)) => {
-            match tuple_to_select(input.clone(), val, Some(default), map) {
+            match tuple_to_select(input.clone(), val, default, map) {
                 Ok(expr) => Result::Complete(rest, expr),
                 Err(e) => Result::Fail(Error::caused_by(
                     "Invalid Select Expression",

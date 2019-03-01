@@ -1291,7 +1291,6 @@ impl<'a> FileBuilder<'a> {
     fn eval_select(&self, def: &SelectDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         let target = &def.val;
         // FIXME(jwall): Handle the no default case in here.
-        let def_expr = def.default.as_ref().unwrap();
         let fields = &def.tuple;
         // First resolve the target expression.
         let v = self.eval_expr(target, scope)?;
@@ -1305,7 +1304,17 @@ impl<'a> FileBuilder<'a> {
                 }
             }
             // Otherwise return the default.
-            return self.eval_expr(def_expr, scope);
+            match def.default.as_ref() {
+                Some(e) => self.eval_expr(e, scope),
+                None => {
+                    return Err(error::BuildError::with_pos(
+                        format!("Unhandled select case \"{}\" with no default", name),
+                        error::ErrorType::TypeFail,
+                        def.val.pos().clone(),
+                    )
+                    .to_boxed());
+                }
+            }
         } else if let &Val::Boolean(b) = v.deref() {
             for &(ref fname, ref val_expr) in fields.iter() {
                 if &fname.fragment == "true" && b {
@@ -1316,7 +1325,17 @@ impl<'a> FileBuilder<'a> {
                 }
             }
             // Otherwise return the default.
-            return self.eval_expr(def_expr, scope);
+            match def.default.as_ref() {
+                Some(e) => self.eval_expr(e, scope),
+                None => {
+                    return Err(error::BuildError::with_pos(
+                        format!("Unhandled select case {} with no default", b),
+                        error::ErrorType::TypeFail,
+                        def.val.pos().clone(),
+                    )
+                    .to_boxed());
+                }
+            }
         } else {
             return Err(error::BuildError::with_pos(
                 format!(
