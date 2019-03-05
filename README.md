@@ -67,7 +67,7 @@ ARGS:
 ```
 
 ## Testing
- ```sh
+```sh
  Check a list of ucg files for errors and run test assertions.
 
 USAGE:
