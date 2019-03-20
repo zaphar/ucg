@@ -31,10 +31,12 @@ pub enum ErrorType {
     BadArgLen,
     FormatError,
     IncludeError,
+    ImportError,
     ReservedWordError,
     // Parsing Errors
     ParseError,
     AssertError,
+    OSError,
     // User Defined Declarative Errors
     UserDefined,
 }
@@ -49,9 +51,11 @@ impl fmt::Display for ErrorType {
             &ErrorType::BadArgLen => "BadArgLen",
             &ErrorType::FormatError => "FormatError",
             &ErrorType::IncludeError => "IncludeError",
+            &ErrorType::ImportError => "ImportError",
             &ErrorType::ReservedWordError => "ReservedWordError",
             &ErrorType::ParseError => "ParseError",
             &ErrorType::AssertError => "AssertError",
+            &ErrorType::OSError => "OSError",
             &ErrorType::UserDefined => "UserDefined",
         };
         w.write_str(name)

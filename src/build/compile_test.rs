@@ -569,3 +569,14 @@ fn test_select_missed_case_boolean_no_default_compile_failure() {
         ],
     )
 }
+
+#[test]
+fn test_bad_import_path_compile_failure() {
+    assert_build_failure(
+        "let bad = import \"no/such/path.ucg\";",
+        vec![
+            Regex::new(r"OSError: Path not found").unwrap(),
+            Regex::new(r"at <eval> line: 1, column: 18").unwrap(),
+        ],
+    )
+}

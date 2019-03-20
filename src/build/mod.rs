@@ -213,7 +213,7 @@ impl<'a> FileBuilder<'a> {
     pub fn build<P: Into<PathBuf>>(&mut self, file: P) -> BuildResult {
         let file = file.into();
         self.working_dir = file.parent().unwrap().to_path_buf();
-        let mut f = File::open(&file)?;
+        let mut f = self.open_file(&Position::new(0, 0, 0), &file)?;
         let mut s = String::new();
         f.read_to_string(&mut s)?;
         let input = OffsetStrIter::new(&s).with_src_file(file.clone());
@@ -389,7 +389,15 @@ impl<'a> FileBuilder<'a> {
         } else {
             normalized = path;
         }
-        Ok(normalized.canonicalize()?)
+        match normalized.canonicalize() {
+            Ok(p) => Ok(p),
+            Err(e) => Err(error::BuildError::new(
+                format!("Path not found {}", normalized.to_string_lossy()),
+                error::ErrorType::OSError,
+            )
+            .wrap_cause(Box::new(e))
+            .to_boxed()),
+        }
     }
 
     fn eval_import(&self, def: &ImportDef) -> Result<Rc<Val>, Box<dyn Error>> {
@@ -423,7 +431,18 @@ impl<'a> FileBuilder<'a> {
             }
         }
         // Try a relative path first.
-        let normalized = self.find_file(&def.path.fragment, true)?;
+        let normalized = match self.find_file(&def.path.fragment, true) {
+            Ok(p) => p,
+            Err(e) => {
+                return Err(error::BuildError::with_pos(
+                    "No Such Import",
+                    error::ErrorType::ImportError,
+                    def.path.pos.clone(),
+                )
+                .wrap_cause(e)
+                .to_boxed());
+            }
+        };
         if self.detect_import_cycle(normalized.to_string_lossy().as_ref()) {
             return Err(error::BuildError::with_pos(
                 format!(
@@ -444,8 +463,18 @@ impl<'a> FileBuilder<'a> {
             Some(v) => v.clone(),
             None => {
                 let mut b = self.clone_builder();
-                b.build(&normalized)?;
-                b.get_outputs_as_val()
+                match b.build(&normalized) {
+                    Ok(_) => b.get_outputs_as_val(),
+                    Err(e) => {
+                        return Err(error::BuildError::with_pos(
+                            "Import failed",
+                            error::ErrorType::ImportError,
+                            def.pos.clone(),
+                        )
+                        .wrap_cause(e)
+                        .to_boxed());
+                    }
+                }
             }
         };
         let mut mut_assets_cache = self.assets.borrow_mut();
@@ -1679,6 +1708,19 @@ impl<'a> FileBuilder<'a> {
         Ok(ok)
     }
 
+    fn open_file<P: Into<PathBuf>>(&self, pos: &Position, path: P) -> Result<File, Box<dyn Error>> {
+        let path = path.into();
+        match File::open(&path) {
+            Ok(f) => Ok(f),
+            Err(e) => Err(error::BuildError::with_pos(
+                format!("Error opening file {} {}", path.to_string_lossy(), e),
+                error::ErrorType::TypeFail,
+                pos.clone(),
+            )
+            .to_boxed()),
+        }
+    }
+
     fn get_file_as_string(&self, pos: &Position, path: &str) -> Result<String, Box<dyn Error>> {
         let normalized = match self.find_file(path, false) {
             Ok(p) => p,
@@ -1691,17 +1733,7 @@ impl<'a> FileBuilder<'a> {
                 .to_boxed());
             }
         };
-        let mut f = match File::open(&normalized) {
-            Ok(f) => f,
-            Err(e) => {
-                return Err(error::BuildError::with_pos(
-                    format!("Error opening file {} {}", normalized.to_string_lossy(), e),
-                    error::ErrorType::TypeFail,
-                    pos.clone(),
-                )
-                .to_boxed());
-            }
-        };
+        let mut f = self.open_file(pos, normalized)?;
         let mut contents = String::new();
         f.read_to_string(&mut contents)?;
         Ok(contents)
