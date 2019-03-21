@@ -430,8 +430,10 @@ impl<'a> FileBuilder<'a> {
                 .to_boxed());
             }
         }
+        let sep = format!("{}", std::path::MAIN_SEPARATOR);
+        let raw_path = def.path.fragment.replace("/", &sep);
         // Try a relative path first.
-        let normalized = match self.find_file(&def.path.fragment, true) {
+        let normalized = match self.find_file(&raw_path, true) {
             Ok(p) => p,
             Err(e) => {
                 return Err(error::BuildError::with_pos(
@@ -1722,7 +1724,9 @@ impl<'a> FileBuilder<'a> {
     }
 
     fn get_file_as_string(&self, pos: &Position, path: &str) -> Result<String, Box<dyn Error>> {
-        let normalized = match self.find_file(path, false) {
+        let sep = format!("{}", std::path::MAIN_SEPARATOR);
+        let raw_path = path.replace("/", &sep);
+        let normalized = match self.find_file(raw_path, false) {
             Ok(p) => p,
             Err(e) => {
                 return Err(error::BuildError::with_pos(
