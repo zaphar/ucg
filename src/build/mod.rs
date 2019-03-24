@@ -141,7 +141,7 @@ macro_rules! eval_binary_expr {
     };
 }
 
-// TODO(jwall): Use the builder patter here. Just like AstWalker.
+// TODO(jwall): Use the builder pattern here. Just like AstWalker.
 impl<'a> FileBuilder<'a> {
     /// Constructs a new Builder.
     pub fn new<P: Into<PathBuf>>(
@@ -1019,7 +1019,6 @@ impl<'a> FileBuilder<'a> {
     fn eval_binary(&self, def: &BinaryOpDef, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         let kind = &def.kind;
         if let &BinaryExprType::IN = kind {
-            // TODO Should we support this operation on strings too?
             return self.do_element_check(&def.left, &def.right, scope);
         }
         if let &BinaryExprType::IS = kind {
