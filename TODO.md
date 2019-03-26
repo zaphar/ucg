@@ -1,6 +1,5 @@
 # Documentation TODO
 
-* Recursive Modules
 * Schema Checking With Modules
 
 # Major Planned Features
@@ -8,14 +7,13 @@
 ## Standard Library
 
 * String processing
-* Schema checking.
 
 ## Query Language (Experimental)
 
 You should be able to ask the compiler to tell you any value or set of values in the
 compiled configuration.
 
-Inspect is probably the correct location for this.
+Eval is probably the correct location for this.
 
 # Minor Fixes and Polish
 
