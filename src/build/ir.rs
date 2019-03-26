@@ -210,8 +210,7 @@ impl Display for Val {
             &Val::Empty => write!(f, "NULL"),
             &Val::Float(ref ff) => write!(f, "{}", ff),
             &Val::Int(ref i) => write!(f, "{}", i),
-            // TODO(jwall): Escape quotes in the string.
-            &Val::Str(ref s) => write!(f, "\"{}\"", s),
+            &Val::Str(ref s) => write!(f, "\"{}\"", s.replace("\"", "\\\"")),
             &Val::List(ref def) => {
                 write!(f, "[")?;
                 for v in def.iter() {
