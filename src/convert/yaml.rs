@@ -1,5 +1,6 @@
 use std;
 use std::error::Error;
+use std::fmt::Write as FmtWrite;
 use std::io::Write;
 use std::rc::Rc;
 use std::result::Result;
@@ -131,6 +132,24 @@ impl Converter for YamlConverter {
 
     fn description(&self) -> String {
         "Convert ucg Vals into valid yaml.".to_string()
+    }
+
+    #[allow(unused_must_use)]
+    fn help(&self) -> String {
+        let mut h = String::new();
+        writeln!(h, "YAML conversions expect any ucg value.");
+        writeln!(h, "");
+        writeln!(
+            h,
+            "They are transformed into toml using the following rules:"
+        );
+        writeln!(h, "- tuples become maps {{}}");
+        writeln!(h, "- lists become lists []");
+        writeln!(h, "- Int becomes an Int");
+        writeln!(h, "- Float becomes a Float");
+        writeln!(h, "- Strings become Strings.");
+        writeln!(h, "- Functions and Modules are ignored.");
+        h
     }
 }
 

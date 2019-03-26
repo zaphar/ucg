@@ -14,6 +14,7 @@
 
 //! Contains code for converting a UCG Val into an executable script output target.
 use std;
+use std::fmt::Write as FmtWrite;
 use std::io::{Cursor, Write};
 use std::rc::Rc;
 
@@ -184,6 +185,40 @@ impl Converter for ExecConverter {
 
     fn description(&self) -> String {
         "Convert ucg Vals into an bash script with \nenvironment variables set and command line arguments sent..".to_string()
+    }
+
+    #[allow(unused_must_use)]
+    fn help(&self) -> String {
+        let mut h = String::new();
+        writeln!(
+            h,
+            "Exec conversions expect a tuple with an expected set of keys."
+        );
+        writeln!(h, "");
+        writeln!(h, "The expected keys are:");
+        writeln!(h, "");
+        writeln!(h, "- command (string, required)");
+        writeln!(h, "\t The command to run in the script.");
+        writeln!(h, "");
+        writeln!(h, "- env (tuple, optional)");
+        writeln!(
+            h,
+            "\t Any environment variables that should be set in the script."
+        );
+        writeln!(
+            h,
+            "\t The env tuple is converted using the same rules as the env converter."
+        );
+        writeln!(h, "");
+        writeln!(h, "- args (tuple, optional");
+        writeln!(h, "\t Any command line arguments for the command line.");
+        writeln!(
+            h,
+            "\t The arguments are converted using the same rules as the flags converter."
+        );
+        writeln!(h, "");
+        writeln!(h, "- Functions and Modules are ignored.");
+        h
     }
 }
 

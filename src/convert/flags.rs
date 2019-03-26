@@ -13,6 +13,7 @@
 //  limitations under the License.
 
 //! Contains code for converting a UCG Val into the command line flag output target.
+use std::fmt::Write as FmtWrite;
 use std::io::Write;
 use std::rc::Rc;
 
@@ -131,6 +132,37 @@ impl Converter for FlagConverter {
     fn description(&self) -> String {
         "Convert ucg Vals into command line flags.".to_string()
     }
-}
 
-// We need some unit tests for this now :D
+    #[allow(unused_must_use)]
+    fn help(&self) -> String {
+        let mut h = String::new();
+        writeln!(
+            h,
+            "Flags converts a tuple into a set of command line arguments for command line application."
+        );
+        writeln!(h, "");
+        writeln!(h, "The flags are converted using the following rules:");
+        writeln!(h, "");
+        writeln!(h, "- keys in a tuple are converted into the argument name.");
+        writeln!(
+            h,
+            "- values in a tuple are converted into the argument value."
+        );
+        writeln!(h, "- NULL values are not emitted");
+        writeln!(
+            h,
+            "- lists expand out into an argument for each item in the list."
+        );
+        writeln!(h, "\te.g. {{foo = [1, 2]}} becomes --foo=1 --foo=2");
+        writeln!(
+            h,
+            "- tuples expand out into an argument with the key as a prefix separated by a `.`."
+        );
+        writeln!(
+            h,
+            "\te.g. {{foo = {{bar = 1, baz = 2}}}} becomes --foo.bar=1 --foo.baz=2"
+        );
+        writeln!(h, "- Functions and Modules are ignored.");
+        h
+    }
+}

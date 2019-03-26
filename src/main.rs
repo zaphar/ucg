@@ -55,6 +55,7 @@ fn do_flags<'a, 'b>() -> clap::App<'a, 'b> {
             )
             (@subcommand converters =>
              (about: "list the available converters")
+             (@arg converter: "Converter name to get help for.")
             )
             (@subcommand importers =>
              (about: "list the available importers for includes")
@@ -252,7 +253,6 @@ fn inspect_command(
     builder.set_strict(strict);
     match registry.get_converter(target) {
         Some(converter) => {
-            // TODO(jwall): We should warn if this is a test file.
             let result = builder.build(file);
             if !result.is_ok() {
                 eprintln!("{:?}", result.err().unwrap());
@@ -393,14 +393,32 @@ fn test_command(
     process::exit(0);
 }
 
-fn converters_command(registry: &ConverterRegistry) {
-    println!("Available converters:");
-    println!("");
-    for (name, c) in registry.get_converter_list().iter() {
-        println!("- {}", name);
-        println!("  Description: {}", c.description());
-        println!("  Output Extension: `.{}`", c.file_ext());
+fn converters_command(matches: &clap::ArgMatches, registry: &ConverterRegistry) {
+    if let Some(ref cname) = matches.value_of("converter") {
+        let mut found = false;
+        for (name, c) in registry.get_converter_list().iter() {
+            if cname == name {
+                println!("* {}", name);
+                println!("Description: {}", c.description());
+                println!("Output Extension: `.{}`", c.file_ext());
+                println!("");
+                println!("{}", c.help());
+                found = true;
+            }
+        }
+        if !found {
+            println!("No such converter {}", cname);
+            process::exit(1);
+        }
+    } else {
+        println!("Available converters:");
         println!("");
+        for (name, c) in registry.get_converter_list().iter() {
+            println!("* {}", name);
+            println!("Description: {}", c.description());
+            println!("Output Extension: `.{}`", c.file_ext());
+            println!("");
+        }
     }
 }
 
@@ -457,8 +475,8 @@ fn main() {
         build_command(matches, &import_paths, cache, &registry, strict);
     } else if let Some(matches) = app_matches.subcommand_matches("test") {
         test_command(matches, &import_paths, cache, &registry, strict);
-    } else if let Some(_) = app_matches.subcommand_matches("converters") {
-        converters_command(&registry)
+    } else if let Some(matches) = app_matches.subcommand_matches("converters") {
+        converters_command(matches, &registry)
     } else if let Some(_) = app_matches.subcommand_matches("importers") {
         let registry = ImporterRegistry::make_registry();
         importers_command(&registry)

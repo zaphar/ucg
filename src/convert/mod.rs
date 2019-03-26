@@ -66,8 +66,6 @@ impl ConverterRegistry {
     pub fn get_converter_list(&self) -> Vec<(&String, &Box<traits::Converter>)> {
         self.converters.iter().collect()
     }
-
-    // TODO(jwall): Support converter help descriptions.
 }
 
 pub struct ImporterRegistry {
@@ -109,6 +107,4 @@ impl ImporterRegistry {
     pub fn get_importer_list(&self) -> Vec<(&String, &Box<dyn traits::Importer>)> {
         self.importers.iter().collect()
     }
-
-    // TODO(jwall): Support converter help descriptions.
 }

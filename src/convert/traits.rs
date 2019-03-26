@@ -30,6 +30,7 @@ pub trait Converter {
     fn convert(&self, vs: Rc<Val>, w: &mut Write) -> ConvertResult;
     fn file_ext(&self) -> String;
     fn description(&self) -> String;
+    fn help(&self) -> String;
 }
 
 pub trait Importer {

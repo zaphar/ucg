@@ -14,6 +14,7 @@
 
 use std;
 use std::error::Error;
+use std::fmt::Write as FmtWrite;
 use std::io::Write;
 use std::rc::Rc;
 
@@ -233,5 +234,44 @@ impl Converter for XmlConverter {
 
     fn description(&self) -> String {
         String::from("Convert a ucg DSL into xml.")
+    }
+
+    #[allow(unused_must_use)]
+    fn help(&self) -> String {
+        let mut h = String::new();
+        writeln!(h, "XML converts ucg tuples into xml documents.");
+        writeln!(h, "");
+        writeln!(h, "The tuple converts into xml using a declarative DSL.");
+        writeln!(h, "The top tuple describes the xml document:");
+        writeln!(
+            h,
+            "{{
+    version = \"1.1\" // Optional, Defaults to 1.1
+    encoding = \"utf-8\" // Optional, Defaults to UTF-8
+    standalone = true // Optional Defaults to false
+    root = {{ // Required defines the root element of the document.
+        name = \"top\",
+    }}
+}};"
+        );
+        writeln!(h, "XML nodes are constructed like :");
+        writeln!(
+            h,
+            "{{
+    name = \"ns:element-name\",
+    ns = {{
+        prefix = \"myns\",
+        uri = \"http://example.org\",
+    }},
+    attrs = {{
+        id = \"foo\",
+    }},
+    children = [
+        // child elements go here.
+    ],
+}};"
+        );
+        writeln!(h, "Text nodes are just strings.");
+        h
     }
 }

@@ -15,6 +15,7 @@
 use std;
 use std::error;
 use std::error::Error;
+use std::fmt::Write as FmtWrite;
 use std::io::Write;
 use std::rc::Rc;
 
@@ -126,6 +127,28 @@ impl Converter for TomlConverter {
 
     fn description(&self) -> String {
         "Convert ucg Vals into valid ucg.".to_string()
+    }
+
+    #[allow(unused_must_use)]
+    fn help(&self) -> String {
+        let mut h = String::new();
+        writeln!(h, "TOML conversions expect any ucg value.");
+        writeln!(h, "");
+        writeln!(
+            h,
+            "They are transformed into toml using the following rules:"
+        );
+        writeln!(h, "- tuples become maps {{}}");
+        writeln!(h, "- lists become lists []");
+        writeln!(h, "- Int becomes an Int");
+        writeln!(h, "- Float becomes a Float");
+        writeln!(h, "- Strings become Strings.");
+        writeln!(
+            h,
+            "- NULL is not allowed in toml documents and will generate a compile error"
+        );
+        writeln!(h, "- Functions and Modules are ignored.");
+        h
     }
 }
 

@@ -13,7 +13,8 @@
 //  limitations under the License.
 
 //! Contains code for converting a UCG Val into the environment variable output target.
-use std::io::Write;
+use std::fmt::Write as FmtWrite;
+use std::io::Write as IOWrite;
 use std::rc::Rc;
 
 use crate::build::Val;
@@ -28,7 +29,7 @@ impl EnvConverter {
         EnvConverter {}
     }
 
-    fn convert_tuple(&self, flds: &Vec<(String, Rc<Val>)>, w: &mut Write) -> ConvertResult {
+    fn convert_tuple(&self, flds: &Vec<(String, Rc<Val>)>, w: &mut IOWrite) -> ConvertResult {
         for &(ref name, ref val) in flds.iter() {
             if val.is_tuple() {
                 eprintln!("Skipping embedded tuple...");
@@ -44,12 +45,12 @@ impl EnvConverter {
         Ok(())
     }
 
-    fn convert_list(&self, _items: &Vec<Rc<Val>>, _w: &mut Write) -> ConvertResult {
+    fn convert_list(&self, _items: &Vec<Rc<Val>>, _w: &mut IOWrite) -> ConvertResult {
         eprintln!("Skipping List...");
         Ok(())
     }
 
-    fn write(&self, v: &Val, w: &mut Write) -> ConvertResult {
+    fn write(&self, v: &Val, w: &mut IOWrite) -> ConvertResult {
         match v {
             &Val::Empty => {
                 // Empty is a noop.
@@ -91,7 +92,7 @@ impl EnvConverter {
 }
 
 impl Converter for EnvConverter {
-    fn convert(&self, v: Rc<Val>, mut w: &mut Write) -> ConvertResult {
+    fn convert(&self, v: Rc<Val>, mut w: &mut IOWrite) -> ConvertResult {
         self.write(&v, &mut w)
     }
 
@@ -101,5 +102,22 @@ impl Converter for EnvConverter {
 
     fn description(&self) -> String {
         "Convert ucg Vals into environment variables.".to_string()
+    }
+
+    #[allow(unused_must_use)]
+    fn help(&self) -> String {
+        let mut h = String::new();
+        writeln!(
+            h,
+            "Env conversions expect a tuple. With keys represent the variable name."
+        );
+        writeln!(h, "");
+        writeln!(h, "Allowed values can be:");
+        writeln!(h, "- Bool converts to true or false");
+        writeln!(h, "- Int");
+        writeln!(h, "- Float");
+        writeln!(h, "- String converted to a quoted string");
+        writeln!(h, "- Functions and Modules are ignored.");
+        h
     }
 }
