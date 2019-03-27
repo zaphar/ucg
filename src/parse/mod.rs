@@ -299,20 +299,21 @@ make_fn!(
     )
 );
 
-fn expression_to_grouped_expression(e: Expression) -> Expression {
-    Expression::Grouped(Box::new(e))
+fn expression_to_grouped_expression(e: Expression, pos: Position) -> Expression {
+    Expression::Grouped(Box::new(e), pos)
 }
 
 make_fn!(
     grouped_expression<SliceIter<Token>, Expression>,
     do_each!(
+        pos => pos,
         _ => punct!("("),
         expr => do_each!(
             expr => trace_parse!(expression),
             _ => must!(punct!(")")),
             (expr)
         ),
-        (expression_to_grouped_expression(expr))
+        (expression_to_grouped_expression(expr, pos))
     )
 );
 

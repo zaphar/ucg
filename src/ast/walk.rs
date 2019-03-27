@@ -91,7 +91,7 @@ impl<'a> AstWalker<'a> {
                 self.walk_expression(def.left.as_mut());
                 self.walk_expression(def.right.as_mut());
             }
-            Expression::Grouped(ref mut expr) => {
+            Expression::Grouped(ref mut expr, _) => {
                 self.walk_expression(expr);
             }
             Expression::Func(ref mut def) => self.walk_expression(def.fields.as_mut()),

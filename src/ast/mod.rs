@@ -639,8 +639,7 @@ pub enum Expression {
     // Complex Expressions
     Copy(CopyDef),
     Range(RangeDef),
-    // TODO(jwall): This should really store it's position :-(
-    Grouped(Box<Expression>),
+    Grouped(Box<Expression>, Position),
     Format(FormatDef),
     Include(IncludeDef),
     Import(ImportDef),
@@ -662,7 +661,7 @@ impl Expression {
             &Expression::Binary(ref def) => &def.pos,
             &Expression::Copy(ref def) => &def.pos,
             &Expression::Range(ref def) => &def.pos,
-            &Expression::Grouped(ref expr) => expr.pos(),
+            &Expression::Grouped(_, ref pos) => pos,
             &Expression::Format(ref def) => &def.pos,
             &Expression::Call(ref def) => &def.pos,
             &Expression::Func(ref def) => &def.pos,
@@ -695,7 +694,7 @@ impl fmt::Display for Expression {
             &Expression::Range(_) => {
                 write!(w, "<Range>")?;
             }
-            &Expression::Grouped(_) => {
+            &Expression::Grouped(_, _) => {
                 write!(w, "(<Expr>)")?;
             }
             &Expression::Format(_) => {

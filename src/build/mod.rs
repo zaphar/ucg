@@ -1905,7 +1905,7 @@ impl<'a> FileBuilder<'a> {
             &Expression::Binary(ref def) => self.eval_binary(def, scope),
             &Expression::Copy(ref def) => self.eval_copy(def, scope),
             &Expression::Range(ref def) => self.eval_range(def, scope),
-            &Expression::Grouped(ref expr) => self.eval_expr(expr, scope),
+            &Expression::Grouped(ref expr, _) => self.eval_expr(expr, scope),
             &Expression::Format(ref def) => self.eval_format(def, scope),
             &Expression::Call(ref def) => self.eval_call(def, scope),
             &Expression::Func(ref def) => {
