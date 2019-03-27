@@ -1,6 +1,6 @@
 use super::*;
 
-use abortable_parser::{Result, SliceIter};
+use abortable_parser::{Offsetable, Result, SliceIter};
 
 use crate::iter::OffsetStrIter;
 

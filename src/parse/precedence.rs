@@ -83,7 +83,7 @@ fn parse_expression(i: SliceIter<Element>) -> Result<SliceIter<Element>, Express
     abort_on_end!(i_);
     let el = i_.next();
     if let Some(&Element::Expr(ref expr)) = el {
-        return Result::Complete(i_.clone(), expr.clone());
+        return Result::Complete(i_, expr.clone());
     }
     return Result::Fail(Error::new(
         format!(
@@ -101,7 +101,7 @@ fn parse_bool_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, Bina
     if let Some(&Element::Op(ref op)) = el {
         match op {
             BinaryExprType::AND | BinaryExprType::OR => {
-                return Result::Complete(i_.clone(), op.clone());
+                return Result::Complete(i_, op.clone());
             }
             _other => {
                 // noop
@@ -124,7 +124,7 @@ fn parse_dot_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, Binar
     if let Some(&Element::Op(ref op)) = el {
         match op {
             &BinaryExprType::DOT => {
-                return Result::Complete(i_.clone(), op.clone());
+                return Result::Complete(i_, op.clone());
             }
             _other => {
                 // noop
@@ -147,10 +147,10 @@ fn parse_sum_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, Binar
     if let Some(&Element::Op(ref op)) = el {
         match op {
             &BinaryExprType::Add => {
-                return Result::Complete(i_.clone(), op.clone());
+                return Result::Complete(i_, op.clone());
             }
             &BinaryExprType::Sub => {
-                return Result::Complete(i_.clone(), op.clone());
+                return Result::Complete(i_, op.clone());
             }
             _other => {
                 // noop
@@ -173,13 +173,13 @@ fn parse_product_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, B
     if let Some(&Element::Op(ref op)) = el {
         match op {
             &BinaryExprType::Mul => {
-                return Result::Complete(i_.clone(), op.clone());
+                return Result::Complete(i_, op.clone());
             }
             &BinaryExprType::Div => {
-                return Result::Complete(i_.clone(), op.clone());
+                return Result::Complete(i_, op.clone());
             }
             &BinaryExprType::Mod => {
-                return Result::Complete(i_.clone(), op.clone());
+                return Result::Complete(i_, op.clone());
             }
             _other => {
                 // noop
@@ -227,7 +227,7 @@ fn parse_compare_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, B
             | &BinaryExprType::Equal
             | &BinaryExprType::IS
             | &BinaryExprType::IN => {
-                return Result::Complete(i_.clone(), op.clone());
+                return Result::Complete(i_, op.clone());
             }
             _other => {
                 // noop
@@ -263,7 +263,7 @@ fn parse_operand_list<'a>(i: SliceIter<'a, Token>) -> ParseResult<'a, Vec<Elemen
                     let err = Error::caused_by(
                         "Missing operand for binary expression",
                         Box::new(e),
-                        Box::new(_i.clone()),
+                        Box::new(_i),
                     );
                     return Result::Abort(err);
                 }
@@ -360,7 +360,6 @@ fn parse_op(
         if !eoi(i.clone()).is_complete() {
             let (_, peek_op) = try_parse!(parse_operator_element(i.clone()));
             lookahead_op = peek_op;
-        } else {
         }
         while !eoi(i.clone()).is_complete()
             && (lookahead_op.precedence_level() > op.precedence_level())
@@ -437,8 +436,8 @@ pub fn op_expression<'a>(i: SliceIter<'a, Token>) -> Result<SliceIter<Token>, Ex
                     Result::Abort(err)
                 }
                 Result::Incomplete(_) => Result::Incomplete(i.clone()),
-                Result::Complete(_rest_ops, expr) => {
-                    if _rest_ops.peek_next().is_some() {
+                Result::Complete(rest_ops, expr) => {
+                    if rest_ops.peek_next().is_some() {
                         panic!("premature abort parsing Operator expression!");
                     }
                     Result::Complete(rest.clone(), expr)

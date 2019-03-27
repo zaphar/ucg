@@ -17,7 +17,7 @@ use std;
 
 use abortable_parser::combinators::*;
 use abortable_parser::iter::SliceIter;
-use abortable_parser::{Error, Offsetable, Result};
+use abortable_parser::{Error, Result};
 
 use crate::ast::*;
 use crate::error::StackPrinter;
@@ -662,14 +662,8 @@ macro_rules! word {
 pub fn pos<'a>(i: SliceIter<'a, Token>) -> Result<SliceIter<'a, Token>, Position> {
     let mut _i = i.clone();
     let tok = _i.next().unwrap();
-    let line = tok.pos.line;
-    let column = tok.pos.column;
-    let pos = Position::new(line, column, i.get_offset());
-    let pos = match tok.pos.file {
-        Some(ref f) => pos.with_file(f),
-        None => pos,
-    };
-    Result::Complete(i.clone(), pos)
+    let pos = tok.pos.clone();
+    Result::Complete(i, pos)
 }
 
 #[cfg(test)]
