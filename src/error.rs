@@ -161,9 +161,9 @@ impl<C: FilePositioned> StackPrinter<C> {
                         Some(ref pb) => pb.to_string_lossy().to_string(),
                         None => "<eval>".to_string(),
                     };
-                    write!(
+                    writeln!(
                         w,
-                        "{}{}: at {} line: {}, column: {}\n",
+                        "{}{}: at {} line: {}, column: {}",
                         tabstop,
                         err.get_msg(),
                         file,
@@ -173,7 +173,7 @@ impl<C: FilePositioned> StackPrinter<C> {
                     tabstop = "\t";
                     curr_err = err.get_cause();
                     if curr_err.is_some() {
-                        write!(w, "Caused by: \n")?;
+                        writeln!(w, "Caused by:")?;
                     }
                 }
             }
