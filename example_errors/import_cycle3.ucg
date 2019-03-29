@@ -1,1 +1,1 @@
-import "import_cycle1.ucg" as cycle1;
+let cycle1 = import "import_cycle1.ucg";

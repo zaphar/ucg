@@ -465,6 +465,10 @@ impl<'a> FileBuilder<'a> {
             Some(v) => v.clone(),
             None => {
                 let mut b = self.clone_builder();
+                b.scope
+                    .import_stack
+                    .push(normalized.to_string_lossy().to_string());
+
                 match b.build(&normalized) {
                     Ok(_) => b.get_outputs_as_val(),
                     Err(e) => {
