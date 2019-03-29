@@ -1,7 +1,7 @@
 +++
 title = "Recursive Modules and their Uses"
 slug = "recursive-modules"
-weight = 2
+weight = 3
 in_search_index = true
 +++
 
