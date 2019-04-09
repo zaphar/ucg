@@ -141,7 +141,6 @@ macro_rules! eval_binary_expr {
     };
 }
 
-// TODO(jwall): Use the builder pattern here. Just like AstWalker.
 impl<'a> FileBuilder<'a> {
     /// Constructs a new Builder.
     pub fn new<P: Into<PathBuf>>(
@@ -151,16 +150,6 @@ impl<'a> FileBuilder<'a> {
     ) -> Self {
         let env_vars: Vec<(String, String)> = env::vars().collect();
         let scope = scope::Scope::new(Rc::new(Val::Env(env_vars)));
-        Self::new_with_scope(working_dir, import_paths, cache, scope)
-    }
-
-    /// Constructs a new Builder with a provided scope.
-    pub fn new_with_scope<P: Into<PathBuf>>(
-        working_dir: P,
-        import_paths: &'a Vec<PathBuf>,
-        cache: Rc<RefCell<assets::Cache>>,
-        scope: Scope,
-    ) -> Self {
         FileBuilder {
             // Our import stack is initialized with ourself.
             working_dir: working_dir.into(),
@@ -202,11 +191,6 @@ impl<'a> FileBuilder<'a> {
             is_module: false,
             last: None,
         }
-    }
-
-    // TODO(jwall): With builder pattern
-    pub fn set_build_output(&mut self, scope: ValueMap) {
-        self.scope.build_output = scope;
     }
 
     /// Builds a ucg file at the named path.
