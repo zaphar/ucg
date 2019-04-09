@@ -1,0 +1,10 @@
+JSON conversions expect any ucg value.
+
+They are transformed into json using the following rules:
+
+- NULL becomes `null`
+- tuples become objects `{...}`
+- lists become lists `[...]`
+- Int and Float become numbers
+- Strings become strings.
+- Functions and Modules are ignored.

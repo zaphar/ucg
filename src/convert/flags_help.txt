@@ -1,0 +1,12 @@
+Flags converts a tuple into a set of command line arguments for command line application.
+
+The flags are converted using the following rules:
+
+- keys in a tuple are converted into the argument name.
+- values in a tuple are converted into the argument value.
+- NULL values are not emitted.
+- lists expand out into an argument for each item in the list.
+  e.g. {{foo = [1, 2]}} becomes --foo=1 --foo=2
+- tuples expand out into an argument with the key as a prefix separated by a `.`.
+  e.g. {{foo = {{bar = 1, baz = 2}}}} becomes --foo.bar=1 --foo.baz=2
+- Functions and Modules are ignored.

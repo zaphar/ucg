@@ -13,7 +13,6 @@
 //  limitations under the License.
 
 //! Contains code for converting a UCG Val into the environment variable output target.
-use std::fmt::Write as FmtWrite;
 use std::io::Write as IOWrite;
 use std::rc::Rc;
 
@@ -106,18 +105,6 @@ impl Converter for EnvConverter {
 
     #[allow(unused_must_use)]
     fn help(&self) -> String {
-        let mut h = String::new();
-        writeln!(
-            h,
-            "Env conversions expect a tuple. With keys represent the variable name."
-        );
-        writeln!(h, "");
-        writeln!(h, "Allowed values can be:");
-        writeln!(h, "- Bool converts to true or false");
-        writeln!(h, "- Int");
-        writeln!(h, "- Float");
-        writeln!(h, "- String converted to a quoted string");
-        writeln!(h, "- Functions and Modules are ignored.");
-        h
+        include_str!("env_help.txt").to_string()
     }
 }

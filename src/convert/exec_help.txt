@@ -1,0 +1,16 @@
+Exec conversions expect a tuple with an expected set of keys.
+
+The expected keys are:
+
+- command (string, required)
+   The command to run in the script.
+
+- env (tuple, optional)
+  Any environment variables that should be set in the script.
+  The env tuple is converted using the same rules as the env converter.
+
+- args (tuple, optional
+  Any command line arguments for the command line.
+  The arguments are converted using the same rules as the flags converter.
+
+- Functions and Modules are ignored.

@@ -1,0 +1,9 @@
+Env conversions expect a tuple. With keys represent the variable name.
+
+Values are converted according to the following rules:
+
+- Bool converts to "true" or "false"
+- Int convert to the string representation of the number
+- Float converts to the string representation of the number
+- String converts to a quoted string
+- All other values are ignored

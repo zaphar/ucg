@@ -13,7 +13,6 @@
 //  limitations under the License.
 
 //! Contains code for converting a UCG Val into the command line flag output target.
-use std::fmt::Write as FmtWrite;
 use std::io::Write;
 use std::rc::Rc;
 
@@ -22,11 +21,18 @@ use crate::convert::traits::{ConvertResult, Converter};
 
 /// FlagConverter implements the conversion logic for converting a Val into a set
 /// of command line flags.
-pub struct FlagConverter {}
+pub struct FlagConverter {
+    sep: &'static str,
+}
 
 impl FlagConverter {
     pub fn new() -> Self {
-        FlagConverter {}
+        FlagConverter { sep: "." }
+    }
+
+    pub fn with_sep(mut self, sep: &'static str) -> Self {
+        self.sep = sep;
+        self
     }
 
     fn write_flag_name(&self, pfx: &str, name: &str, w: &mut Write) -> ConvertResult {
@@ -90,7 +96,7 @@ impl FlagConverter {
                     }
                     match val.as_ref() {
                         &Val::Tuple(_) => {
-                            let new_pfx = format!("{}{}.", pfx, name);
+                            let new_pfx = format!("{}{}{}", pfx, name, self.sep);
                             self.write(&new_pfx, val, w)?;
                         }
                         &Val::List(ref def) => {
@@ -135,34 +141,6 @@ impl Converter for FlagConverter {
 
     #[allow(unused_must_use)]
     fn help(&self) -> String {
-        let mut h = String::new();
-        writeln!(
-            h,
-            "Flags converts a tuple into a set of command line arguments for command line application."
-        );
-        writeln!(h, "");
-        writeln!(h, "The flags are converted using the following rules:");
-        writeln!(h, "");
-        writeln!(h, "- keys in a tuple are converted into the argument name.");
-        writeln!(
-            h,
-            "- values in a tuple are converted into the argument value."
-        );
-        writeln!(h, "- NULL values are not emitted");
-        writeln!(
-            h,
-            "- lists expand out into an argument for each item in the list."
-        );
-        writeln!(h, "\te.g. {{foo = [1, 2]}} becomes --foo=1 --foo=2");
-        writeln!(
-            h,
-            "- tuples expand out into an argument with the key as a prefix separated by a `.`."
-        );
-        writeln!(
-            h,
-            "\te.g. {{foo = {{bar = 1, baz = 2}}}} becomes --foo.bar=1 --foo.baz=2"
-        );
-        writeln!(h, "- Functions and Modules are ignored.");
-        h
+        include_str!("flags_help.txt").to_string()
     }
 }

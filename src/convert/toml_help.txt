@@ -1,0 +1,11 @@
+TOML conversions expect any ucg value.
+
+They are transformed into toml using the following rules:
+
+- tuples become maps `{...}`
+- lists become lists `[...]`
+- Int becomes an Int
+- Float becomes a Float
+- Strings become Strings.
+- NULL is not allowed in toml documents and will generate a compile error
+- Functions and Modules are ignored.

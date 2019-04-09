@@ -10,7 +10,6 @@
 //! Flags contains code for converting a UCG Val into the json output target.
 use std;
 use std::error::Error;
-use std::fmt::Write as FmtWrite;
 use std::io::Write;
 use std::rc::Rc;
 
@@ -139,20 +138,7 @@ impl Converter for JsonConverter {
 
     #[allow(unused_must_use)]
     fn help(&self) -> String {
-        let mut h = String::new();
-        writeln!(h, "JSON conversions expect any ucg value.");
-        writeln!(h, "");
-        writeln!(
-            h,
-            "They are transformed into json using the following rules:"
-        );
-        writeln!(h, "- NULL becomes null");
-        writeln!(h, "- tuples become objects {{}}");
-        writeln!(h, "- lists become lists []");
-        writeln!(h, "- Int and Float become numbers");
-        writeln!(h, "- Strings become strings.");
-        writeln!(h, "- Functions and Modules are ignored.");
-        h
+        include_str!("json_help.txt").to_string()
     }
 }
 

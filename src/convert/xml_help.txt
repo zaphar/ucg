@@ -1,0 +1,29 @@
+XML converts ucg tuples into xml documents.
+
+The tuple converts into xml using a declarative DSL.
+The top tuple describes the xml document:
+{
+    version = "1.1"    // Optional, Defaults to 1.1
+    encoding = "utf-8" // Optional, Defaults to UTF-8
+    standalone = true  // Optional, Defaults to false
+    root = {           // Required, defines the root element of the document.
+        name = "top",
+    }
+};
+
+XML nodes are constructed like so:
+{
+    name = "ns:element-name",
+    ns = {
+        prefix = "myns",
+        uri = "http://example.org",
+    },
+    attrs = {
+        id = "foo",
+    },
+    children = [
+        // child elements go here.
+    ],
+};
+
+Text nodes are just strings.
