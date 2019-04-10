@@ -10,26 +10,16 @@ It has a number of helpful assertions you can use in unit testing.
 
 ## The asserts modules
 
-The asserts module exposes a number of asserts. It contains nested modules for each
-available assertion. You can configure the asserts module with a default description if desired.
-
-Each of the asserts results in a `result` field that is a tuple with the shape that
-the assert statement expects.
-
-The asserts module has one parameter.
-
-* `default_description` which is optional and defaults to "TODO description"
-
 ### ok assertion
 
 The `ok` assertion module tests that something is true. It has two parameters.
 
 * `test` which is required and is represents the expression to test.
 * `desc` which is an optional description to output for your test. This defaults to
-    the `default_description` that the `asserts` modules was set to.
+    the `todo_desc` that is set in the testing library.
 
 ```
-let t = import "std/testing.ucg".asserts{};
+let t = import "std/testing.ucg";
 
 assert t.ok{
     test=true,
@@ -43,10 +33,10 @@ parameters.
 
 * `test` which is required and is represents the expression to test.
 * `desc` which is an optional description to output for your test. This defaults to
-    the `default_description` that the `asserts` modules was set to.
+    the `todo_desc` that is set in the testing library.
 
 ```
-let t = import "std/testing.ucg".asserts{};
+let t = import "std/testing.ucg";
 
 assert t.ok{
     test=true,
@@ -64,7 +54,7 @@ parameters.
   a description created from the compared values.
 
 ```
-let t = import "std/testing.ucg".asserts{};
+let t = import "std/testing.ucg";
 
 assert t.equal{
     left=1,
@@ -83,7 +73,7 @@ parameters.
   a description created from the compared values.
 
 ```
-let t = import "std/testing.ucg".asserts{};
+let t = import "std/testing.ucg";
 
 assert t.not_equal{
     left=1,
