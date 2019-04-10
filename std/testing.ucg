@@ -1,68 +1,60 @@
-// A module with helper test assertions for ucg tests.
-// Each contained module will output a struct with 
-// ok and desc fields.
-//
-// ok will be a boolean.
-// desc will be a descriptive message.
-let asserts = module{
-        // allows you to specify a a prefix for messages.
-        // specify the prefix to add when the condition is not true.
-        // A default description to use for messages.
-        default_description = "TODO description",
-    } => {
-    
-    // Test that a value is true.
-    let ok = module{
-        // test value expected to be true for success.
-        test=false,
-        // descriptive message to use in output.
-        desc=mod.default_description,
-    } => {
-        let ok = mod.test;
+let todo_desc = "TODO description";
 
-        let desc = "@" % (mod.desc);
+// Test that a value is true.
+let ok = module{
+    // test value expected to be true for success.
+    test=false,
+    // descriptive message to use in output.
+    desc=todo_desc,
+} => ({ok=ok, desc=desc}) {
+    assert mod.desc != NULL;
+
+    let ok = mod.test;
+    let desc = "@" % (mod.desc);
+};
+
+// Test that a value is not true.
+let not_ok = module{
+    // Test value expected to to be false for success.
+    test=true,
+    // descriptive message to use in output.
+    desc=todo_desc,
+} => ({ok=ok, desc=desc}) {
+    assert mod.desc != NULL;
+
+    let ok = not mod.test;
+    let desc = "@" % (mod.desc);
+
+};
+
+// Asserts that two values are equal. Does deep equal comparisons.
+let equal = module{
+    // Left value for deep equal comparison.
+    left=NULL,
+    // right value for deep equal comparison.
+    right=NULL,
+    desc="",
+} => ({ok=ok, desc=desc}) {
+    assert mod.desc != NULL;
+
+    let ok = mod.left == mod.right;
+    let desc = select (mod.desc == ""), "@ == @" % (mod.left, mod.right), {
+        false = mod.desc,
     };
+};
 
-    // Test that a value is not true.
-    let not_ok = module{
-        // Test value expected to to be false for success.
-        test=true,
-        // descriptive message to use in output.
-        desc=mod.default_description,
-    } => {
-        let ok = not mod.test;
+// Asserts that two values are not equal. Does deep equal comparisons.
+let not_equal = module{
+    // Left value for deep equal comparison.
+    left=NULL,
+    // right value for deep equal comparison.
+    right=NULL,
+    desc="",
+} => ({ok=ok, desc=desc}) {
+    assert mod.desc != NULL;
 
-        let desc = "@" % (mod.desc);
-
-    };
-
-    // Asserts that two values are equal. Does deep equal comparisons.
-    let equal = module{
-        // Left value for deep equal comparison.
-        left=NULL,
-        // right value for deep equal comparison.
-        right=NULL,
-        desc="",
-    } => {
-        let ok = mod.left == mod.right;
-
-        let desc = select (mod.desc == ""), "@ == @" % (mod.left, mod.right), {
-            false = mod.desc,
-        };
-    };
-
-    // Asserts that two values are not equal. Does deep equal comparisons.
-    let not_equal = module{
-        // Left value for deep equal comparison.
-        left=NULL,
-        // right value for deep equal comparison.
-        right=NULL,
-        desc="",
-    } => {
-        let ok = mod.left != mod.right;
-
-        let desc = select (mod.desc == ""), "@ != @" % (mod.left, mod.right), {
-            false = mod.desc,
-        };
+    let ok = mod.left != mod.right;
+    let desc = select (mod.desc == ""), "@ != @" % (mod.left, mod.right), {
+        false = mod.desc,
     };
 };

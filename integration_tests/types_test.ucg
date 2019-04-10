@@ -1,4 +1,4 @@
-let t = import "std/testing.ucg".asserts{};
+let t = import "std/testing.ucg";
 
 assert t.ok{
     test = "foo" is "str",

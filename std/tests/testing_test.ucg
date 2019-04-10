@@ -1,6 +1,4 @@
-let t = import "std/testing.ucg";
-
-let asserts = t.asserts{};
+let asserts = import "std/testing.ucg";
 
 let not_equal_result = asserts.not_equal{
     left=1,
