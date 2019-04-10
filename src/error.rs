@@ -37,6 +37,8 @@ pub enum ErrorType {
     ParseError,
     AssertError,
     OSError,
+    // Conversion errors
+    ConvertError,
     // User Defined Declarative Errors
     UserDefined,
 }
@@ -56,6 +58,7 @@ impl fmt::Display for ErrorType {
             &ErrorType::ParseError => "ParseError",
             &ErrorType::AssertError => "AssertError",
             &ErrorType::OSError => "OSError",
+            &ErrorType::ConvertError => "ConvertError",
             &ErrorType::UserDefined => "UserDefined",
         };
         w.write_str(name)

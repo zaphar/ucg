@@ -18,6 +18,7 @@ use std::rc::Rc;
 
 use crate::build::Val;
 use crate::convert::traits::{ConvertResult, Converter};
+use crate::error::{BuildError, ErrorType};
 
 /// FlagConverter implements the conversion logic for converting a Val into a set
 /// of command line flags.
@@ -128,6 +129,12 @@ impl FlagConverter {
 
 impl Converter for FlagConverter {
     fn convert(&self, v: Rc<Val>, mut w: &mut Write) -> ConvertResult {
+        if !v.is_tuple() {
+            return Err(Box::new(BuildError::new(
+                "Flag outputs must be a tuple",
+                ErrorType::ConvertError,
+            )));
+        }
         self.write("", &v, &mut w)
     }
 
