@@ -1,6 +1,8 @@
 let ops = module {
     str="",
 } => {
+    let len = import "std/lists.ucg".len(mod.str);
+
     let split_on = module{
         on=" ",
         str=mod.str,
@@ -35,4 +37,19 @@ let ops = module {
             mod.str
         )
     );
+
+    let substr = module{
+        str = mod.str,
+        start = 0,
+        end = len,
+    } => (result) {
+        let reducer = func(acc, char) => acc{
+            counter = acc.counter + 1,
+            str = select ((acc.counter >= mod.start) && (acc.counter <= mod.end)), acc.str, {
+                true = acc.str + char,
+            },
+        };
+        let result = reduce(
+            reducer, {counter = 0, str = ""}, mod.str).str;
+    };
 };

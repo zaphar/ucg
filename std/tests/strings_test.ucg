@@ -22,3 +22,23 @@ assert asserts.equal{
     left = str_class.split_at(3),
     right = {left="foo", right=" bar"},
 };
+
+assert asserts.equal{
+    left = str_class.len,
+    right = 7,
+};
+
+assert asserts.equal{
+    left = str_class.substr{start=1},
+    right = "oo bar",
+};
+
+assert asserts.equal{
+    left = str_class.substr{end=5},
+    right = "foo ba",
+};
+
+assert asserts.equal{
+    left = str_class.substr{end=8},
+    right = "foo bar",
+};

@@ -48,9 +48,9 @@ let tail = func(list) => reduce(
 ).tail;
 
 // Enumerates the provided list with optional start and step parameters for the
-// enumeration. Prodices a list of pairs with the numeration and the list item.
+// enumeration. Produces a list of pairs with the enumeration and the list item.
 //
-// enumerate{list=["a","b","c"]}.result == [[0, "a"], [1, "b"], [2, "c"]]
+// enumerate{list=["a","b","c"]} == [[0, "a"], [1, "b"], [2, "c"]]
 let enumerate = module{
     // Where to start the enumeration.
     start = 0,
@@ -104,6 +104,7 @@ let slice = module {
 };
 
 // zips two lists together.
+// The result list is only as long as the shortest list.
 //
 // zip{list1=[0,2,4],list2=[1,3,5]}.result == [[0, 1], [2, 3], [4, 5]]
 let zip = module{
