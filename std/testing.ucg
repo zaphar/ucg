@@ -7,7 +7,7 @@ let ok = module{
     // descriptive message to use in output.
     desc=todo_desc,
 } => ({ok=ok, desc=desc}) {
-    assert mod.desc != NULL;
+    (mod.desc != NULL) || fail "description can't be null";
 
     let ok = mod.test;
     let desc = "@" % (mod.desc);
@@ -20,7 +20,7 @@ let not_ok = module{
     // descriptive message to use in output.
     desc=todo_desc,
 } => ({ok=ok, desc=desc}) {
-    assert mod.desc != NULL;
+    (mod.desc != NULL) || fail "description can't be null";
 
     let ok = not mod.test;
     let desc = "@" % (mod.desc);
@@ -35,7 +35,7 @@ let equal = module{
     right=NULL,
     desc="",
 } => ({ok=ok, desc=desc}) {
-    assert mod.desc != NULL;
+    (mod.desc != NULL) || fail "description can't be null";
 
     let ok = mod.left == mod.right;
     let desc = select (mod.desc == ""), "@ == @" % (mod.left, mod.right), {
@@ -51,7 +51,7 @@ let not_equal = module{
     right=NULL,
     desc="",
 } => ({ok=ok, desc=desc}) {
-    assert mod.desc != NULL;
+    (mod.desc != NULL) || fail "description can't be null";
 
     let ok = mod.left != mod.right;
     let desc = select (mod.desc == ""), "@ != @" % (mod.left, mod.right), {

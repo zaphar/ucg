@@ -4,22 +4,22 @@ let asserts = import "std/testing.ucg";
 let list_to_join = [1, 2, 3];
 
 assert asserts.equal{
-    left=list.str_join{sep=",", list=list_to_join},
+    left=list.ops{list=list_to_join}.str_join(","),
     right="1,2,3"
 };
 
 assert asserts.equal{
-    left=list.len([0, 1, 2, 3]),
+    left=list.ops{list=[0, 1, 2, 3]}.len,
     right=4,
 };
 
 assert asserts.equal{
-    left = list.reverse([0, 1, 2, 3]),
+    left = list.ops{list=[0, 1, 2, 3]}.reverse().list,
     right = [3, 2, 1, 0],
 };
 
 assert asserts.equal{
-    left=list.enumerate{list=["foo", "bar"]},
+    left=list.ops{list=["foo", "bar"]}.enumerate().list,
     right=[[0, "foo"], [1, "bar"]],
 };
 
@@ -48,8 +48,13 @@ assert asserts.equal{
 };
 
 assert asserts.equal{
-    left=list.head([0,1,2,3,4]),
+    left=list.ops{list=[0,1,2,3,4]}.head(),
     right=[0],
+};
+
+assert asserts.equal{
+    left=list.ops{list=[0,1,2,3,4]}.tail().list,
+    right=[1,2,3,4],
 };
 
 assert asserts.equal{

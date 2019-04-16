@@ -36,6 +36,25 @@ let iter = module{
     let result = reduce(func (acc, field, value) =>  acc + [[field, value]], [], (mod.tpl));
 };
 
+// Wraps a tuple and provides a number of operations on it.
+//
+// * fields - function returns all the fields in the wrapped tuple as a list.
+//
+// * values - function returns all the values in the wrapped tuple as a list.
+//
+// * iter - function returns a list of pairs of [field, value].
+let ops = module{
+    tpl = NULL,
+} => ({fields=fields, values=values, iter=iter}) {
+    (mod.tpl != NULL) || fail "tpl must not be null";
+    
+    let super = import "std/tuples.ucg";
+    
+    let fields = func() => super.fields{tpl=mod.tpl};
+    let values = func() => super.values{tpl=mod.tpl};
+    let iter = func() => super.iter{tpl=mod.tpl};
+};
+
 // Strip all the null fields from a tuple.
 let strip_nulls = module{
     tpl = NULL,

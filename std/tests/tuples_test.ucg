@@ -7,12 +7,27 @@ assert t.equal{
 };
 
 assert t.equal{
+    left = tpl.ops{tpl={foo=1, bar=2}}.fields(),
+    right = ["foo", "bar"],
+};
+
+assert t.equal{
     left = tpl.values{tpl={foo=1, bar=2}},
     right = [1, 2],
 };
 
 assert t.equal{
+    left = tpl.ops{tpl={foo=1, bar=2}}.values(),
+    right = [1, 2],
+};
+
+assert t.equal{
     left = tpl.iter{tpl={foo=1, bar=2}},
+    right = [["foo", 1], ["bar", 2]],
+};
+
+assert t.equal{
+    left = tpl.ops{tpl={foo=1, bar=2}}.iter(),
     right = [["foo", 1], ["bar", 2]],
 };
 

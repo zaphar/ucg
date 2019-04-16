@@ -1,7 +1,29 @@
+// Wraps a string and provides operations for that string.
+//
+// * len - property representing the length of the string in characters.
+//
+// * str - property the wrapped string.
+//
+// * split_on - module that splits the string on a character.
+//   - `on` field represents the character to split on.
+//   - `str` field defaults to the wrapped string. you can override this
+//           if desired.
+//
+// * split_at - function splits the wrapped string at an character index.
+//
+// * substr - module that returns a substr of the wrapped string.
+//   - `start` field is the index at which the substr starts (defaults to 0)
+//   -  `end` field is the index at which the substr ends (defaults to end of string)
 let ops = module {
     str="",
-} => {
+} => ({len=len,
+       str=str,
+       split_on=split_on,
+       split_at=split_at,
+       substr=substr,
+      }) {
     let len = import "std/lists.ucg".len(mod.str);
+    let str = mod.str;
 
     let split_on = module{
         on=" ",
@@ -20,7 +42,7 @@ let ops = module {
 
         let result = accumulated.out + [accumulated.buf];
     };
-    
+
     let split_at = func(idx) => filter(
         func(name, val) => name != "counter",
         reduce(
@@ -43,13 +65,14 @@ let ops = module {
         start = 0,
         end = len,
     } => (result) {
+        let filepkg = import "std/strings.ucg";
         let reducer = func(acc, char) => acc{
             counter = acc.counter + 1,
             str = select ((acc.counter >= mod.start) && (acc.counter <= mod.end)), acc.str, {
                 true = acc.str + char,
             },
         };
-        let result = reduce(
-            reducer, {counter = 0, str = ""}, mod.str).str;
+        let result = filepkg.ops{str=reduce(
+            reducer, {counter = 0, str = ""}, mod.str).str};
     };
 };

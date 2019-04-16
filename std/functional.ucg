@@ -1,5 +1,5 @@
 // maybe is our monadic optional. It wraps a value that may or may not be the empty
-// type NULL. It exports three operations.
+// type NULL. It exports the following operations.
 //
 // * do - runs a user provided function of one argument on the value.
 //        Returns a maybe wrapped result.

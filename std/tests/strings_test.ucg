@@ -29,16 +29,16 @@ assert asserts.equal{
 };
 
 assert asserts.equal{
-    left = str_class.substr{start=1},
+    left = str_class.substr{start=1}.str,
     right = "oo bar",
 };
 
 assert asserts.equal{
-    left = str_class.substr{end=5},
+    left = str_class.substr{end=5}.str,
     right = "foo ba",
 };
 
 assert asserts.equal{
-    left = str_class.substr{end=8},
+    left = str_class.substr{end=8}.str,
     right = "foo bar",
 };
