@@ -398,7 +398,10 @@ impl<'a> FileBuilder<'a> {
                     Some(v) => v.clone(),
                     None => {
                         let mut b = self.clone_builder();
-                        b.eval_string(self.std.get(&def.path.fragment).unwrap())?;
+                        b.eval_input(
+                            OffsetStrIter::new(self.std.get(&def.path.fragment).unwrap())
+                                .with_src_file(&def.path.fragment),
+                        )?;
                         b.get_outputs_as_val()
                     }
                 };

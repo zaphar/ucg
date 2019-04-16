@@ -30,8 +30,8 @@ impl<'a> OffsetStrIter<'a> {
         }
     }
 
-    pub fn with_src_file(mut self, file: PathBuf) -> Self {
-        self.source_file = Some(file);
+    pub fn with_src_file<P: Into<PathBuf>>(mut self, file: P) -> Self {
+        self.source_file = Some(file.into());
         self
     }
 }
