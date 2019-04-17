@@ -65,7 +65,7 @@ let ops = module {
         start = 0,
         end = len,
     } => (result) {
-        let filepkg = import "std/strings.ucg";
+        let filepkg = mod.pkg();
         let reducer = func(acc, char) => acc{
             counter = acc.counter + 1,
             str = select ((acc.counter >= mod.start) && (acc.counter <= mod.end)), acc.str, {

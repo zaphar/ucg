@@ -16,7 +16,7 @@
 let maybe = module{
     val = NULL,
 } => ({do=do, is_null=is_null, or=or, unwrap=unwrap, expect=expect}) {
-    let maybe = import "std/functional.ucg".maybe;
+    let maybe = mod.pkg().maybe;
 
     let do = func (op) =>  select (mod.val != NULL), maybe{val=NULL}, {
         true = maybe{val=op(mod.val)},

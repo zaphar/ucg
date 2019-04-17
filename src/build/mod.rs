@@ -1071,7 +1071,7 @@ impl<'a> FileBuilder<'a> {
         Rc::new(Val::Tuple(fields))
     }
 
-    fn copy_from_base(
+    fn copy_fields_from_base(
         &self,
         src_fields: &Vec<(String, Rc<Val>)>,
         overrides: &Vec<(Token, Expression)>,
@@ -1166,9 +1166,29 @@ impl<'a> FileBuilder<'a> {
             // Push our base tuple on the stack so the copy can use
             // self to reference it.
             let child_scope = scope.spawn_child().set_curr_val(maybe_tpl.clone());
-            let mod_args = self.copy_from_base(src_fields, &def.fields, &child_scope)?;
+            let mut overrides = Vec::new();
+            if let Some(ref path) = mod_def.pos.file {
+                overrides.push((
+                    Token::new("pkg", TokenType::BAREWORD, def.pos.clone()),
+                    Expression::Func(FuncDef {
+                        scope: None,
+                        argdefs: Vec::new(),
+                        fields: Box::new(Expression::Import(ImportDef {
+                            pos: def.pos.clone(),
+                            path: Token::new(
+                                path.to_string_lossy().to_string(),
+                                TokenType::QUOTED,
+                                def.pos.clone(),
+                            ),
+                        })),
+                        pos: def.pos.clone(),
+                    }),
+                ));
+            }
+            overrides.extend(def.fields.iter().cloned());
+            let mod_args = self.copy_fields_from_base(src_fields, &overrides, &child_scope)?;
             // put our copied parameters tuple in our builder under the mod key.
-            let mod_key = PositionedItem::new_with_pos(String::from("mod"), Position::new(0, 0, 0));
+            let mod_key = PositionedItem::new_with_pos(String::from("mod"), def.pos.clone());
             match b.scope.build_output.entry(mod_key) {
                 Entry::Occupied(e) => {
                     return Err(error::BuildError::with_pos(
@@ -1215,7 +1235,7 @@ impl<'a> FileBuilder<'a> {
         let v = self.eval_value(&def.selector, scope)?;
         if let &Val::Tuple(ref src_fields) = v.as_ref() {
             let child_scope = scope.spawn_child().set_curr_val(v.clone());
-            return self.copy_from_base(&src_fields, &def.fields, &child_scope);
+            return self.copy_fields_from_base(&src_fields, &def.fields, &child_scope);
         }
         if let &Val::Module(ref mod_def) = v.as_ref() {
             return self.eval_module_copy(def, mod_def, scope);

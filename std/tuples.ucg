@@ -48,7 +48,7 @@ let ops = module{
 } => ({fields=fields, values=values, iter=iter}) {
     (mod.tpl != NULL) || fail "tpl must not be null";
     
-    let super = import "std/tuples.ucg";
+    let super = mod.pkg();
     
     let fields = func() => super.fields{tpl=mod.tpl};
     let values = func() => super.values{tpl=mod.tpl};
@@ -71,7 +71,7 @@ let has_fields = module{
     tpl = NULL,
     fields = [],
 } => (result) {
-    let lib = import "std/tuples.ucg";
+    let lib = mod.pkg();
     // First we check that mod.tpl is a tuple.
     lib.assert_tuple(mod.tpl);
 
@@ -86,7 +86,7 @@ let field_type = module{
     field = NULL,
     type = NULL,
 } => (result) {
-    let lib = import "std/tuples.ucg";
+    let lib = mod.pkg();
     // First we check that mod.tpl is a tuple.
     lib.assert_tuple(mod.tpl);
 

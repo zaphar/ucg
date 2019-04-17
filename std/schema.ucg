@@ -32,7 +32,7 @@ let any = module {
     // The set of allowed type shapes it can be.
     types=[],
 } => (result) {
-    let schema = import "std/schema.ucg";
+    let schema = mod.pkg();
 
     let reducer = func (acc, t) => acc{
         ok = acc.ok || (schema.shaped{val=acc.val, shape=t}),
@@ -66,7 +66,7 @@ let shaped = module {
     // shape it is compared with.
     partial = true,
 } => (result) {
-    let schema = import "std/schema.ucg";
+    let schema = mod.pkg();
 
     let simple_handler = func (val, shape) => val is schema.base_type_of(shape);
 

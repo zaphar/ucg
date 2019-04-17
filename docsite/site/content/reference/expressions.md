@@ -576,9 +576,9 @@ let embedded_with_params = top_mod{deep_value = "Some"};
 embedded_with_params.embedded.value == "Some";
 ```
 
-### Out Expressions
+### Return Expressions
 
-If there is an out expression then the module will only export the result of
+If there is a return expression then the module will only export the result of
 that expression. The out expression is computed after the last statement in the
 module has been evaluated.
 
@@ -610,6 +610,29 @@ One consequence of a module being able to import the same file they are located 
 is that modules can be called recursively. They are the only expression that is
 capable of recursion in UCG. Recursion can be done by importing the module's file
 inside the module's definition and using it as normal.
+
+There is a convenience function `mod.pkg` in the mod binding for a module. That imports the
+package/file that the module was declared in. This binding is only present if the module
+was declared in a file. Modules created as part of an eval will not have it.
+
+```
+let recursive = module {
+    counter=1,
+    stop=10,
+} => (result) {
+    // import our enclosing file again. Careful since calling this function
+    // means that if you instantiate this module in the same file it is
+    // declared in you will trigger an import cycle error.
+    let pkg = mod.pkg();
+
+    let result = select mod.counter != mod.stop, {
+        true = [mod.start] + pkg.recursive{counter=mod.counter+1},
+        false = [mod.start],
+    };
+};
+
+recursive{} == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+```
 
 Fail Expression
 ---------------
