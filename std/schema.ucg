@@ -101,9 +101,9 @@ let shaped = module {
         },
     };
 
-    let shape_tuple_handler = func (acc, name, value) => acc{
-        ok = select (name) in acc.val, false, {
-            true = schema.shaped{val=value, shape=acc.val.(name), partial=false},
+    let shape_tuple_handler = func (acc, field_name, value) => acc{
+        ok = select (field_name) in acc.val, false, {
+            true = schema.shaped{val=value, shape=acc.val.(field_name), partial=false},
         },
     };
 
