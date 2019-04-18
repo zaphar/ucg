@@ -132,11 +132,41 @@ assert t.ok{
 };
 
 assert t.not_ok{
+    test = schema.shaped{val={list=[1, "foo"]}, shape={list="foo"}},
+    desc="inner list with with non list shape does not match",
+};
+
+assert t.not_ok{
     test = schema.shaped{val={foo="bar"}, shaped=1.0},
     desc = "a tuple is not a float",
 };
 
 assert t.not_ok{
-    test = schema.any{val={foo="bar", quux="baz"}, types=[1.0, {foo="bar", qux="baz"}]},
-    desc = "any doesn't match against missing fields for tuples.",
+    test = schema.any{val={foo="bar", quux="baz"}, types=[1.0, {foo="bar"}]},
+    desc = "any doesn't match against missing fields for tuples for value tuple.",
+};
+
+assert t.ok{
+    test = schema.any{val={foo="bar", quux="baz"}, types=[1.0, {foo="bar"}], partial=true},
+    desc = "any can do partial matching against missing fields for tuples shapes.",
+};
+
+assert t.not_ok{
+    test = schema.any{val={foo="bar"}, types=[1.0, {foo="", quux=""}]},
+    desc = "any does match against missing fields for tuples shape tuple.",
+};
+
+assert t.not_ok{
+    test = schema.shaped{val={foo="bar", baz="quux"}, shape={bear=""}, partial=true},
+    desc = "even with partial all of the shape fields must be present.",
+};
+
+assert t.ok{
+    test = schema.all{val={foo="bar", baz="quux"}, types=[{foo=""}, {baz=""}]},
+    desc = "all enforces that all of the valid types are partial matches (success)",
+};
+
+assert t.not_ok{
+    test = schema.all{val={foo="bar", baz="quux"}, types=[{foo=""}, {baz=""}, {quux=""}]},
+    desc = "all enforces that all of the valid shapes must be partial matches (fail)",
 };

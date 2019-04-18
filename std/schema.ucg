@@ -23,12 +23,12 @@ let must = func (m, msg) => select m, fail msg, {
     true = m,
 };
 
-// Any does a boolean match against a set of allowed shapes for a type.
+// All does a boolean match against all of set of allowed shapes for a type.
 // This module uses the shape module below so the same rules for checking
 // the types against the source value apply for each example in the list.
 //
-// This module does not do partial matches for the shapes.
-let any = module {
+// This module does partial matches for the shapes.
+let all = module {
     // The source value to check.
     val=NULL,
     // The set of allowed type shapes it can be.
@@ -37,7 +37,30 @@ let any = module {
     let schema = mod.pkg();
 
     let reducer = func (acc, t) => acc{
-        ok = acc.ok || (schema.shaped{val=acc.val, shape=t, partial=false}),
+        ok = acc.ok && (schema.shaped{val=acc.val, shape=t, partial=true}),
+    };
+    let any = func (val, types) => reduce(reducer, {ok=true, val=val}, types);
+
+    let result = any(mod.val, mod.types).ok;
+};
+
+// Any does a boolean match against a set of allowed shapes for a type.
+// This module uses the shape module below so the same rules for checking
+// the types against the source value apply for each example in the list.
+//
+// This module does not do partial matches for the shapes by default.
+let any = module {
+    // The source value to check.
+    val=NULL,
+    // The set of allowed type shapes it can be.
+    types=[],
+    // Whether to do partial matches for the shapes
+    partial=false
+} => (result) {
+    let schema = mod.pkg();
+
+    let reducer = func (acc, t) => acc{
+        ok = acc.ok || (schema.shaped{val=acc.val, shape=t, partial=mod.partial}),
     };
     let any = func (val, types) => reduce(reducer, {ok=false, val=val}, types);
 
@@ -74,23 +97,37 @@ let shaped = module {
 
     let tuple_handler = func (acc, name, value) => acc{
         ok = select (name) in acc.shape, mod.partial, {
-            true = schema.shaped{val=value, shape=acc.shape.(name)},
+            true = schema.shaped{val=value, shape=acc.shape.(name), partial=mod.partial},
         },
     };
 
-    let list_handler = func(acc, value) => acc{
-        ok = false || schema.any{val=value, types=acc.shape},
+    let shape_tuple_handler = func (acc, name, value) => acc{
+        ok = select (name) in acc.val, false, {
+            true = schema.shaped{val=value, shape=acc.val.(name), partial=false},
+        },
     };
-    
+
+    let match_shape_fields = func(val, shape) => reduce(
+        shape_tuple_handler, {val=val, ok=false}, shape).ok;
+ 
+    let match_tuple_fields = func(val, shape) =>
+        reduce(tuple_handler, {shape=shape, ok=false}, val).ok;
+
+    let list_handler = func(acc, value) => acc{
+        ok = acc.ok && schema.any{val=value, types=acc.shape},
+    };
+
     let result =select schema.base_type_of(mod.val), false, {
         str = simple_handler(mod.val, mod.shape),
         int = simple_handler(mod.val, mod.shape),
         float = simple_handler(mod.val, mod.shape),
         bool = simple_handler(mod.val, mod.shape),
         null = simple_handler(mod.val, mod.shape), 
-        tuple = (mod.shape is "tuple") && reduce(tuple_handler, {shape=mod.shape, ok=false}, mod.val).ok, 
-        list = select mod.shape == [], true, {
-            false = reduce(list_handler, {shape=mod.shape, ok=false}, mod.val).ok,
+        tuple = (mod.shape is "tuple") &&
+                match_shape_fields(mod.val, mod.shape) &&
+                match_tuple_fields(mod.val, mod.shape), 
+        list = (mod.shape is "list") && select mod.shape == [], true, {
+            false = reduce(list_handler, {shape=mod.shape, ok=true}, mod.val).ok,
         },
         func = simple_handler(mod.val, mod.shape),
         module = simple_handler(mod.val, mod.shape),
