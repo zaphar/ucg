@@ -1,0 +1,111 @@
+let xml = import "std/xml.ucg";
+let list = import "std/lists.ucg";
+
+let t = import "std/testing.ucg";
+
+let simple_name = "simple";
+let simple_tag = xml.tag{name=simple_name};
+
+assert t.equal{
+    left = simple_tag.name,
+    right = simple_name,
+};
+
+assert t.equal{
+    left = simple_tag.attrs,
+    right = {},
+};
+
+assert t.equal{
+    left = simple_tag.children,
+    right = [],
+};
+
+assert t.ok{
+    test = not ("ns" in simple_tag),
+    desc = "@ has no ns field" % (simple_tag),
+};
+
+let myns = xml.ns("myns", NULL);
+let simple_tag_ns = xml.tag{name=simple_name, ns=myns};
+
+assert t.ok{
+    test = xml.validate_ns(myns),
+    desc = "@ is a valid namespace" % (myns),
+};
+
+assert t.equal{
+    left = simple_tag_ns.ns,
+    right = myns,
+};
+
+let cplxns = xml.ns(myns, "http://example.com/");
+let cplx_tag_ns = xml.tag{name=simple_name, ns=cplxns};
+
+assert t.ok{
+    test = xml.validate_ns(cplxns),
+    desc = "@ is a valid namespace" % (cplxns),
+};
+
+assert t.equal{
+    left = cplx_tag_ns.ns,
+    right = cplxns,
+};
+
+let invalidns = {prefix="foons", url=""};
+
+assert t.not_ok{
+    test = xml.validate_ns(invalidns),
+    desc = "@ is not a valid namespace" % (invalidns),
+};
+
+assert t.ok{
+    test = xml.validate_node("simple text"),
+    desc = "@ is a valid node" % ("simple text"),
+};
+
+assert t.ok{
+    test = xml.is_tag({name="simple"}),
+    desc = "@ is a valid tag" % ({name="simple"}),
+};
+
+assert t.ok{
+    test = xml.validate_node({name="simple"}),
+    desc = "@ is a valid node" % ({name="simple"}),
+};
+
+assert t.ok{
+    test = xml.validate_node(simple_tag),
+    desc = "@ is a valid tag" % (simple_tag),
+};
+
+assert t.ok{
+    test = xml.validate_node(cplx_tag_ns),
+    desc = "@ is a valid tag" % (cplx_tag_ns),
+};
+
+let doc = xml.doc(cplx_tag_ns);
+
+assert t.equal{
+    left = doc.root,
+    right = cplx_tag_ns,
+};
+
+let cplx_tag_children = xml.tag{name=simple_name, children=[simple_tag]};
+
+assert t.equal{
+    left = cplx_tag_children.children.0,
+    right = simple_tag,
+};
+
+assert t.equal{
+    left = list.ops{list=cplx_tag_children.children}.len,
+    right = 1,
+};
+
+let cplx_tag_attrs = xml.tag{name=simple_name, attrs={id="myid"}};
+
+assert t.equal{
+    left = cplx_tag_attrs.attrs.id,
+    right = "myid",
+};

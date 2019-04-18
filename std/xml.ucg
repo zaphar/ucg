@@ -1,0 +1,53 @@
+
+let schema = import "std/schema.ucg";
+
+// Validates that a namespace is the right shape for an xml tag or document.
+let validate_ns = func(ns) => schema.any{val=ns, types=["", {prefix="", uri=""}]};
+
+// Constructs an xml namespace for use in an xml tag or document root.
+// Use NULL for the uri argument to use just the prefix.
+let ns = func(prefix, uri) => select uri != NULL, {
+    true = {
+        prefix = prefix,
+        uri = uri,
+    },
+    false = prefix,
+};
+
+let tag = module{
+    name = NULL,
+    attrs = {},
+    children = [],
+    ns = NULL,
+} => (result) {
+    let schema = import "std/schema.ucg";
+    let pkg = mod.pkg();
+
+    (mod.name != NULL) || fail "XML Tag names must have a name";
+    let base = {
+        name = mod.name,
+        attrs = mod.attrs,
+        children = mod.children,
+    };
+
+    let result = select mod.ns == NULL, {
+        true = base,
+        false = select pkg.validate_ns(mod.ns), {
+           true = base{ns=mod.ns},
+           false = fail "XML Tag namespaces must be a string or tuple of {prefix=, uri=} but is @" % (mod.ns),
+        },
+    };
+};
+
+// returns true for a valid tag.
+let is_tag = func(t) => schema.shaped{val=t, shape={name=""}, partial=true};
+
+// validates that a node is either a valid tag or a text node.
+let validate_node = func(node) => schema.any{val=node, types=["", {name = ""}], partial=true};
+
+let doc = func(root) => select validate_node(root), {
+    true = {
+        root = root,
+    },
+    false = fail "The document root must be a valid xml tag but instead is @" % (root),
+};
