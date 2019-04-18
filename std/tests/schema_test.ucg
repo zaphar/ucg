@@ -135,3 +135,8 @@ assert t.not_ok{
     test = schema.shaped{val={foo="bar"}, shaped=1.0},
     desc = "a tuple is not a float",
 };
+
+assert t.not_ok{
+    test = schema.any{val={foo="bar", quux="baz"}, types=[1.0, {foo="bar", qux="baz"}]},
+    desc = "any doesn't match against missing fields for tuples.",
+};

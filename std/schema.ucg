@@ -26,6 +26,8 @@ let must = func (m, msg) => select m, fail msg, {
 // Any does a boolean match against a set of allowed shapes for a type.
 // This module uses the shape module below so the same rules for checking
 // the types against the source value apply for each example in the list.
+//
+// This module does not do partial matches for the shapes.
 let any = module {
     // The source value to check.
     val=NULL,
@@ -35,7 +37,7 @@ let any = module {
     let schema = mod.pkg();
 
     let reducer = func (acc, t) => acc{
-        ok = acc.ok || (schema.shaped{val=acc.val, shape=t}),
+        ok = acc.ok || (schema.shaped{val=acc.val, shape=t, partial=false}),
     };
     let any = func (val, types) => reduce(reducer, {ok=false, val=val}, types);
 
