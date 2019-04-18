@@ -852,7 +852,10 @@ impl<'a> FileBuilder<'a> {
                 scope.lookup_idx(right.pos(), &Val::Int(i.val))
             }
             _ => {
-                let val = self.eval_expr(right, &scope)?;
+                // We need to clear any curr_vals for the eval so we don't include them
+                // in the scope for dot lookups.
+                let eval_scope = scope.spawn_child();
+                let val = self.eval_expr(right, &eval_scope)?;
                 match val.as_ref() {
                     Val::Int(i) => scope.lookup_idx(right.pos(), &Val::Int(*i)),
                     Val::Str(ref s) => scope

@@ -61,3 +61,10 @@ assert t.not_ok{
     test = foo_check({bar="foo"}),
     desc = "we can check for absent foo string fields",
 };
+
+let test_for_field = func(name, tpl) => (name) in tpl;
+
+assert t.ok{
+    test = test_for_field("name", {name="foo"}),
+    desc = "bareword collisions with field names still works for `in` operator",
+};
