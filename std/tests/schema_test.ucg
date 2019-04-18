@@ -7,6 +7,16 @@ assert t.ok{
 };
 
 assert t.not_ok{
+    test = schema.any{val=1, types=[1.0, {foo="bar"}]},
+    desc = "1 is not a float or a tuple with a foo string field",
+};
+
+assert t.ok{
+    test = schema.any{val={foo="bar"}, types=[1.0, {foo=""}]},
+    desc = "1 is not a float or a tuple with a foo string field",
+};
+
+assert t.not_ok{
     test = schema.any{val=1, types=[1.0, ""]},
     desc = "1 is not a float or string",
 };
@@ -119,4 +129,9 @@ assert t.not_ok{
 assert t.ok{
     test = schema.shaped{val={list=[1, "foo"]}, shape={list=[]}},
     desc="inner list with valid types matches empty list shape",
+};
+
+assert t.not_ok{
+    test = schema.shaped{val={foo="bar"}, shaped=1.0},
+    desc = "a tuple is not a float",
 };
