@@ -68,3 +68,30 @@ assert {
     ok = no_default_test(false) == "I was false",
     desc = "no default successfully detects false",
 };
+
+let tpl_fields = {
+    test = "foo",
+};
+
+let no_default_select_result = select tpl_fields.test == "foo", {
+    true = true,
+    false = false,
+};
+
+assert {
+    ok = no_default_select_result,
+    desc = "no default successfully select true",
+};
+
+let nested_select_result_no_defaults = select true, {
+    true = true,
+    false = select false, {
+        true = fail "whoops! this should never have triggered.",
+        false = true,
+    },
+};
+
+assert {
+    ok = nested_select_result_no_defaults,
+    desc = "Nested select result parses and resturns true",
+};

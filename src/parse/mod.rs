@@ -467,13 +467,22 @@ fn select_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expres
             _ => must!(punct!(",")),
             (expr)
         ),
-        default => optional!(do_each!(
-            expr => trace_parse!(must!(expression)),
-            _ => punct!(","),
-            (expr)
-        )),
-        map => trace_parse!(must!(tuple)),
-        (val, default, map)
+        default_and_map => either!(
+            do_each!(
+                default => do_each!(
+                    expr => trace_parse!(expression),
+                    _ => punct!(","),
+                    (expr)
+                ),
+                map => trace_parse!(tuple),
+                (Some(default), map)
+            ),
+            do_each!(
+                map => trace_parse!(must!(tuple)),
+                (None, map)
+            )
+        ),
+        (val, default_and_map.0, default_and_map.1)
     );
     match parsed {
         Result::Abort(e) => Result::Abort(e),
