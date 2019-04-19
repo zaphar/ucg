@@ -52,7 +52,7 @@ enum ProcessingOpType {
 }
 
 impl FuncDef {
-    /// Expands a ucg function using the given arguments into a new Tuple.
+    /// Expands a ucg function using the given arguments into a new Val.
     pub fn eval(
         &self,
         parent_builder: &FileBuilder,
