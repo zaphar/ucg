@@ -45,6 +45,10 @@ let is_tag = func(t) => schema.shaped{val=t, shape={name=""}, partial=true};
 // validates that a node is either a valid tag or a text node.
 let validate_node = func(node) => schema.any{val=node, types=["", {name = ""}], partial=true};
 
+// Make an xml doc from a root node.
+//
+// The root node must be a valid xml node. Either a text or an
+// xml node.
 let doc = func(root) => select validate_node(root), {
     true = {
         root = root,
