@@ -18,12 +18,14 @@ let ops = module {
     str="",
 } => ({len=len,
        str=str,
+       chars=chars,
        split_on=split_on,
        split_at=split_at,
        substr=substr,
       }) {
     let len = import "std/lists.ucg".len(mod.str);
     let str = mod.str;
+    let chars = reduce(func(acc, char) => acc + [char], [], mod.str);
 
     let split_on = module{
         on=" ",

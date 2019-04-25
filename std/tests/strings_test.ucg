@@ -29,6 +29,11 @@ assert asserts.equal{
 };
 
 assert asserts.equal{
+    left = str_class.chars,
+    right = ["f", "o", "o", " ", "b", "a", "r"],
+};
+
+assert asserts.equal{
     left = str_class.substr{start=1}.str,
     right = "oo bar",
 };
