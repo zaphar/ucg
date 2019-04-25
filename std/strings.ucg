@@ -65,14 +65,14 @@ let ops = module {
         start = 0,
         end = len,
     } => (result) {
-        let filepkg = mod.pkg();
+        let pkg = mod.pkg();
         let reducer = func(acc, char) => acc{
             counter = acc.counter + 1,
             str = select ((acc.counter >= mod.start) && (acc.counter <= mod.end)), acc.str, {
                 true = acc.str + char,
             },
         };
-        let result = filepkg.ops{str=reduce(
+        let result = pkg.ops{str=reduce(
             reducer, {counter = 0, str = ""}, mod.str).str};
     };
 };

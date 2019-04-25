@@ -16,14 +16,14 @@
 let maybe = module{
     val = NULL,
 } => ({do=do, is_null=is_null, or=or, unwrap=unwrap, expect=expect}) {
-    let maybe = mod.pkg().maybe;
+    let this = mod.this;
 
-    let do = func (op) =>  select (mod.val != NULL), maybe{val=NULL}, {
-        true = maybe{val=op(mod.val)},
+    let do = func (op) =>  select (mod.val != NULL), this{val=NULL}, {
+        true = this{val=op(mod.val)},
     };
 
-    let or = func (op) => select (mod.val == NULL), maybe{val=mod.val}, {
-        true = maybe{val=op()},
+    let or = func (op) => select (mod.val == NULL), this{val=mod.val}, {
+        true = this{val=op()},
     };
 
     let is_null = func() => mod.val == NULL;

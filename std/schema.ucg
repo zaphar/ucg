@@ -92,18 +92,19 @@ let shaped = module {
     partial = true,
 } => (result) {
     let schema = mod.pkg();
+    let this = mod.this;
 
     let simple_handler = func (val, shape) => val is schema.base_type_of(shape);
 
     let tuple_handler = func (acc, name, value) => acc{
         ok = select (name) in acc.shape, mod.partial, {
-            true = schema.shaped{val=value, shape=acc.shape.(name), partial=mod.partial},
+            true = this{val=value, shape=acc.shape.(name), partial=mod.partial},
         },
     };
 
     let shape_tuple_handler = func (acc, field_name, value) => acc{
         ok = select (field_name) in acc.val, false, {
-            true = schema.shaped{val=value, shape=acc.val.(field_name), partial=false},
+            true = this{val=value, shape=acc.val.(field_name), partial=false},
         },
     };
 
@@ -117,7 +118,7 @@ let shaped = module {
         ok = acc.ok && schema.any{val=value, types=acc.shape},
     };
 
-    let result =select schema.base_type_of(mod.val), false, {
+    let result = select schema.base_type_of(mod.val), false, {
         str = simple_handler(mod.val, mod.shape),
         int = simple_handler(mod.val, mod.shape),
         float = simple_handler(mod.val, mod.shape),

@@ -169,14 +169,14 @@ let ops = module{
        reverse=reverse,
        list=list,
       }) {
-    let super = mod.pkg();
+    let pkg = mod.pkg();
     let list = mod.list;
-    let len = super.len(mod.list);
-    let str_join = func(sep) => super.str_join{list=mod.list, sep=sep};
+    let len = pkg.len(mod.list);
+    let str_join = func(sep) => pkg.str_join{list=mod.list, sep=sep};
     
-    let slice = func(start, end) => super.slice{start=start, end=end, list=mod.list};
-    let enumerate = func() => super.ops{list=super.enumerate{start=0, step=1, list=mod.list}};
-    let tail = func() => super.ops{list=super.tail(mod.list)};
-    let head = func() => super.head(mod.list);
-    let reverse = func() => super.ops{list=super.reverse(mod.list)};
+    let slice = func(start, end) => pkg.slice{start=start, end=end, list=mod.list};
+    let enumerate = func() => pkg.ops{list=pkg.enumerate{start=0, step=1, list=mod.list}};
+    let tail = func() => pkg.ops{list=pkg.tail(mod.list)};
+    let head = func() => pkg.head(mod.list);
+    let reverse = func() => mod.this{list=pkg.reverse(mod.list)};
 };

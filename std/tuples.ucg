@@ -48,11 +48,11 @@ let ops = module{
 } => ({fields=fields, values=values, iter=iter}) {
     (mod.tpl != NULL) || fail "tpl must not be null";
     
-    let super = mod.pkg();
+    let pkg = mod.pkg();
     
-    let fields = func() => super.fields{tpl=mod.tpl};
-    let values = func() => super.values{tpl=mod.tpl};
-    let iter = func() => super.iter{tpl=mod.tpl};
+    let fields = func() => pkg.fields{tpl=mod.tpl};
+    let values = func() => pkg.values{tpl=mod.tpl};
+    let iter = func() => pkg.iter{tpl=mod.tpl};
 };
 
 // Strip all the null fields from a tuple.
@@ -71,11 +71,11 @@ let has_fields = module{
     tpl = NULL,
     fields = [],
 } => (result) {
-    let lib = mod.pkg();
+    let pkg = mod.pkg();
     // First we check that mod.tpl is a tuple.
-    lib.assert_tuple(mod.tpl);
+    pkg.assert_tuple(mod.tpl);
 
-    let fs = lib.fields{tpl=mod.tpl};
+    let fs = pkg.fields{tpl=mod.tpl};
 
     let result = reduce(func (acc, f) => acc && (f in fs), true, mod.fields);
 };
@@ -86,9 +86,9 @@ let field_type = module{
     field = NULL,
     type = NULL,
 } => (result) {
-    let lib = mod.pkg();
+    let pkg = mod.pkg();
     // First we check that mod.tpl is a tuple.
-    lib.assert_tuple(mod.tpl);
+    pkg.assert_tuple(mod.tpl);
 
     // Next we assert that mod.field is a string.
     select mod.field is "str", NULL, {
@@ -101,7 +101,7 @@ let field_type = module{
     };
 
     // Get the list of field value pairs.
-    let it = lib.iter{tpl=mod.tpl};
+    let it = pkg.iter{tpl=mod.tpl};
 
     // The reducer function used to check the field's types if it exists. 
     let reducer = func (acc, l) => acc && (select l.0 == mod.field, NULL, {
@@ -110,5 +110,5 @@ let field_type = module{
     });
 
     // The computed answer true or false.
-    let result = lib.has_fields{tpl=mod.tpl, fields=[mod.field]} && reduce(reducer, true, it);
+    let result = pkg.has_fields{tpl=mod.tpl, fields=[mod.field]} && reduce(reducer, true, it);
 };
