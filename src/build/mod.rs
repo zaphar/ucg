@@ -1159,7 +1159,7 @@ impl<'a> FileBuilder<'a> {
         mod_def: &ModuleDef,
         scope: &Scope,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
-        let maybe_tpl = mod_def.clone().arg_tuple.unwrap().clone();
+        let maybe_tpl = mod_def.arg_tuple.as_ref().unwrap().clone();
         if let &Val::Tuple(ref src_fields) = maybe_tpl.as_ref() {
             // 1. First we create a builder.
             let mut b = self.clone_builder();
@@ -1188,6 +1188,10 @@ impl<'a> FileBuilder<'a> {
                     }),
                 ));
             }
+            overrides.push((
+                Token::new("this", TokenType::BAREWORD, def.pos.clone()),
+                Expression::Module(mod_def.clone()),
+            ));
             overrides.extend(def.fields.iter().cloned());
             let mod_args = self.copy_fields_from_base(src_fields, &overrides, &child_scope)?;
             // put our copied parameters tuple in our builder under the mod key.
@@ -1327,7 +1331,12 @@ impl<'a> FileBuilder<'a> {
         // First we rewrite the imports to be absolute paths.
         def.imports_to_absolute(root);
         // Then we create our tuple default.
-        def.arg_tuple = Some(self.eval_tuple(&def.arg_set, scope)?);
+        if def.arg_tuple.is_none() {
+            // NOTE: This is an ugly hack to enable recursive references to work
+            // in eval_module_copy. We should really fix out DataModel to properly
+            // handle this but for now this should work.
+            def.arg_tuple = Some(self.eval_tuple(&def.arg_set, scope)?);
+        }
         // Then we construct a new Val::Module
         Ok(Rc::new(Val::Module(def)))
     }

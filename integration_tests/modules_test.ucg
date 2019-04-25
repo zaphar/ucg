@@ -110,3 +110,15 @@ assert t.equal{
     left = export_module_tuple{foo="bar"},
     right = {quux = "bar"},
 };
+
+let recursive_module = module {start=1, end=10} => (result) {
+    let this = mod.this;
+    let result = select mod.start != mod.end, mod.start, {
+        true = this{start=mod.start + 1, end=mod.end},
+    };
+};
+
+assert t.equal{
+    left = recursive_module{},
+    right = 10,
+};

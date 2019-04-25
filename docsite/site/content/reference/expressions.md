@@ -604,35 +604,47 @@ let embedded_default_params = top_mod_out_expr{};
 embedded_default_params.value == "None";
 ```
 
-### Recursive Modules
+### Module builtin bindings
 
 One consequence of a module being able to import the same file they are located in
 is that modules can be called recursively. They are the only expression that is
 capable of recursion in UCG. Recursion can be done by importing the module's file
 inside the module's definition and using it as normal.
 
-There is a convenience function `mod.pkg` in the mod binding for a module. That imports the
-package/file that the module was declared in. This binding is only present if the module
-was declared in a file. Modules created as part of an eval will not have it.
+Modules have ia recursive reference to the current module `mod.this` that can
+be used for recursive modules.
 
 ```
 let recursive = module {
     counter=1,
     stop=10,
 } => (result) {
-    // import our enclosing file again. Careful since calling this function
-    // means that if you instantiate this module in the same file it is
-    // declared in you will trigger an import cycle error.
-    let pkg = mod.pkg();
-
     let result = select mod.counter != mod.stop, {
-        true = [mod.start] + pkg.recursive{counter=mod.counter+1},
+        true = [mod.start] + mod.this{counter=mod.counter+1},
         false = [mod.start],
     };
 };
 
 recursive{} == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 ```
+
+There is also a convenience function `mod.pkg` in the mod binding for a module.
+That imports the package/file the module was declared in. This binding is only
+present if the module was declared in a file. Modules created as part of an
+eval will not have it.
+
+```
+let self_importer = module {
+    item=NULL,
+} => () {
+    let pkg = mod.pkg();
+
+    let result = pkg.recursive{};
+};
+
+self_importer{} == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+```
+
 
 Fail Expression
 ---------------
