@@ -19,6 +19,11 @@ assert asserts.equal{
 };
 
 assert asserts.equal{
+    left = strings.ops{str="foo=>bar=>quux"}.split_on{on="=>"},
+    right = ["foo", "bar", "quux"],
+};
+
+assert asserts.equal{
     left = str_class.split_at(3),
     right = {left="foo", right=" bar"},
 };

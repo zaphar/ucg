@@ -5,9 +5,7 @@
 // * str - property the wrapped string.
 //
 // * split_on - module that splits the string on a character.
-//   - `on` field represents the character to split on.
-//   - `str` field defaults to the wrapped string. you can override this
-//           if desired.
+//   - `on` field represents the string to split on.
 //
 // * split_at - function splits the wrapped string at an character index.
 //
@@ -29,20 +27,52 @@ let ops = module {
 
     let split_on = module{
         on=" ",
+        buf = "",
+        out = [],
         str=mod.str,
     } => (result) {
-        let splitter = func(acc, char) => acc{
-            out = select char == mod.on, acc.out, {
-                true = acc.out + [acc.buf],
-            },
-            buf = select char != mod.on, "", {
-                true = acc.buf + char,
-            },
+        let pkg = mod.pkg();
+        let this = mod.this;
+
+        let recurse = module {
+            buf = "",
+            acc = [],
+            str = mod.str,
+            sep = NULL,
+        } => (result) {
+            (mod.sep != NULL) || fail "mod.sep can not be NULL";
+            
+            let pkg = mod.pkg();
+            let this = mod.this;
+
+            let check_str = pkg.ops{str=mod.str};
+            let split_str = pkg.ops{str=mod.sep};
+        
+            let maybe_prefix = check_str.substr{end=split_str.len - 1};
+            let maybe_suffix = check_str.substr{start=split_str.len};
+
+            let result = select maybe_prefix.len == 0, {
+                // terminal condition
+                true = mod.acc + [mod.buf],
+                //true = mod,
+                // recurse condition.
+                false = select maybe_prefix.str == mod.sep, {
+                    true = this{ // this is a match to our separator
+                        str=maybe_suffix.str,
+                        sep=mod.sep,
+                        acc=mod.acc + [mod.buf],
+                    },
+                    false = this{
+                        buf=mod.buf + check_str.chars.0,
+                        str=check_str.substr{start=1}.str,
+                        sep=mod.sep,
+                        acc=mod.acc,
+                    },
+                },
+            };
         };
 
-        let accumulated = reduce(splitter, {out=[], buf=""}, mod.str);
-
-        let result = accumulated.out + [accumulated.buf];
+        let result = recurse{sep=mod.on, str=mod.str};
     };
 
     let split_at = func(idx) => filter(
