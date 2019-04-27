@@ -1944,8 +1944,8 @@ impl<'a> FileBuilder<'a> {
             &Expression::Include(ref def) => self.eval_include(def),
             &Expression::Import(ref def) => self.eval_import(def),
             &Expression::Fail(ref def) => {
-                let err = self.eval_expr(&def.message, scope)?;
-                return if let Val::Str(ref s) = err.as_ref() {
+                let val = self.eval_expr(&def.message, scope)?;
+                return if let Val::Str(ref s) = val.as_ref() {
                     Err(error::BuildError::with_pos(
                         s.clone(),
                         error::ErrorType::UserDefined,
@@ -1963,6 +1963,13 @@ impl<'a> FileBuilder<'a> {
                     )
                     .to_boxed())
                 };
+            }
+            &Expression::Debug(ref def) => {
+                let val = self.eval_expr(&def.expr, scope);
+                if let Ok(ref val) = val {
+                    eprintln!("TRACE: {} at {}", val, def.pos);
+                }
+                val
             }
             &Expression::Not(ref def) => {
                 let val = self.eval_expr(&def.expr, scope)?;

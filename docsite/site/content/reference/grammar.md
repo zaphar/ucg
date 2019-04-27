@@ -57,6 +57,7 @@ mod_keyword: "mod" ;
 out_keyword: "out" ;
 assert_keyword: "assert" ;
 fail_keyword: "fail" ;
+trace_keyword: "TRACE" ;
 null_keyword: "NULL" ;
 in_keyword: "in" ;
 is_keyword: "in" ;
@@ -176,6 +177,12 @@ fail_expr: fail_keyword, (str | format_expr) ;
 not_expr: not_keyword, expr ;
 ```
 
+#### Not Expression
+
+```
+trace_expr: trace_keyword, expr ;
+```
+
 #### Non Operator Expression
 
 ```
@@ -185,6 +192,8 @@ non_operator_expr: literal
                    | funcdef
                    | module_def
                    | fail_expr
+                   | not_expr
+                   | trace_expr
                    | format_expr
                    | range_expr
                    | include_expr

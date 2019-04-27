@@ -84,6 +84,15 @@ impl<'a> From<&'a Position> for Position {
     }
 }
 
+impl std::fmt::Display for Position {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        if let Some(ref file) = self.file {
+            write!(f, "file: {}", file.to_string_lossy().to_string())?;
+        }
+        write!(f, "line: {} column: {}", self.line, self.column)
+    }
+}
+
 /// Defines the types of tokens in UCG syntax.
 #[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord, Hash)]
 pub enum TokenType {
@@ -626,6 +635,12 @@ pub struct NotDef {
     pub expr: Box<Expression>,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct DebugDef {
+    pub pos: Position,
+    pub expr: Box<Expression>,
+}
+
 /// Encodes a ucg expression. Expressions compute a value from.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
@@ -651,6 +666,8 @@ pub enum Expression {
 
     // Declarative failure expressions
     Fail(FailDef),
+    // Debugging assistance
+    Debug(DebugDef),
 }
 
 impl Expression {
@@ -672,6 +689,7 @@ impl Expression {
             &Expression::Import(ref def) => &def.pos,
             &Expression::Fail(ref def) => &def.pos,
             &Expression::Not(ref def) => &def.pos,
+            &Expression::Debug(ref def) => &def.pos,
         }
     }
 }
@@ -722,6 +740,9 @@ impl fmt::Display for Expression {
                 write!(w, "<Fail>")?;
             }
             &Expression::Not(ref def) => {
+                write!(w, "!{}", def.expr)?;
+            }
+            &Expression::Debug(ref def) => {
                 write!(w, "!{}", def.expr)?;
             }
         }

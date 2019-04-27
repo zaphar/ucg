@@ -129,6 +129,9 @@ impl<'a> AstWalker<'a> {
             Expression::Not(ref mut def) => {
                 self.walk_expression(def.expr.as_mut());
             }
+            Expression::Debug(ref mut def) => {
+                self.walk_expression(&mut def.expr);
+            }
         }
     }
 

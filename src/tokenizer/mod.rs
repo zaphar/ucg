@@ -286,6 +286,10 @@ make_fn!(nottok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "not", WS)
 );
 
+make_fn!(tracetok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::BAREWORD, "TRACE", WS)
+);
+
 make_fn!(failtok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "fail", WS)
 );
@@ -432,6 +436,7 @@ fn token<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Token> {
         selecttok,
         asserttok,
         failtok,
+        tracetok,
         functok,
         moduletok,
         importtok,

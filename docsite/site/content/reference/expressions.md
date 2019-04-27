@@ -660,4 +660,25 @@ fail "Oh No This was not what we wanted!";
 fail "Expected foo but got @" % ("bar");
 ```
 
+Trace Expression
+----------------
+
+UCG has a debugging expression that can be helpful to trace values while developing called the trace expression.
+
+Trace expression are any valid expression preceded by the `TRACE` keyword. Trace
+expression return the result of the expression unchanged but they also output a
+trace statement to stderr printing the result of the expression as well as the
+file, line and column where the expression was.
+
+```
+let mk_list = func(a, b) => TRACE [a, b];
+mk_list(1, 2);
+```
+
+This will output a line to stderr something like the below:
+
+    TRACE: [1, 2] at file: <file name> line: 1 column: 29
+
+This is helpful when developing shared modules or ucg libraries.
+
 Next: <a href="/reference/statements">Statements</a>

@@ -715,6 +715,19 @@ make_fn!(
 );
 
 make_fn!(
+    trace_expression<SliceIter<Token>, Expression>,
+    do_each!(
+        pos => pos,
+        _ => word!("TRACE"),
+        expr => must!(wrap_err!(expression, "Expected failure message")),
+        (Expression::Debug(DebugDef{
+            pos: pos,
+            expr: Box::new(expr),
+        }))
+    )
+);
+
+make_fn!(
     not_expression<SliceIter<Token>, Expression>,
     do_each!(
         pos => pos,
@@ -745,6 +758,7 @@ make_fn!(
         trace_parse!(func_op_expression),
         trace_parse!(func_expression),
         trace_parse!(import_expression),
+        trace_parse!(trace_expression),
         trace_parse!(not_expression),
         trace_parse!(fail_expression),
         trace_parse!(module_expression),
