@@ -443,7 +443,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "ucg"
-version = "0.5.8"
+version = "0.6.0"
 dependencies = [
  "abortable_parser 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "base64 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
