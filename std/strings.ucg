@@ -31,9 +31,6 @@ let ops = module {
         out = [],
         str=mod.str,
     } => (result) {
-        let pkg = mod.pkg();
-        let this = mod.this;
-
         let recurse = module {
             buf = "",
             acc = [],

@@ -7,10 +7,6 @@ build:
 
 test: unit integration stdlibtest 
 
-rustfiles := $(find . -type f -name '*.rs')
-stdlibfiles := $(find std -type f -name '*.ucg')
-
-
 unit:
 	cargo test
 
