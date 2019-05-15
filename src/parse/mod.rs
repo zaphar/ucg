@@ -854,7 +854,7 @@ fn statement(i: SliceIter<Token>) -> Result<SliceIter<Token>, Statement> {
 
 /// Parses a LocatedSpan into a list of Statements or an `error::Error`.
 pub fn parse<'a>(input: OffsetStrIter<'a>) -> std::result::Result<Vec<Statement>, String> {
-    match tokenize(input.clone()) {
+    match tokenize(input.clone(), true) {
         Ok(tokenized) => {
             let mut out = Vec::new();
             let mut i_ = SliceIter::new(&tokenized);

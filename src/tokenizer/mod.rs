@@ -452,7 +452,10 @@ fn token<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Token> {
 }
 
 /// Consumes an input OffsetStrIter and returns either a Vec<Token> or a error::Error.
-pub fn tokenize<'a>(input: OffsetStrIter<'a>) -> std::result::Result<Vec<Token>, String> {
+pub fn tokenize<'a>(
+    input: OffsetStrIter<'a>,
+    skip_comments: bool,
+) -> std::result::Result<Vec<Token>, String> {
     let mut out = Vec::new();
     let mut i = input.clone();
     loop {
@@ -486,7 +489,7 @@ pub fn tokenize<'a>(input: OffsetStrIter<'a>) -> std::result::Result<Vec<Token>,
             }
             Result::Complete(rest, tok) => {
                 i = rest;
-                if tok.typ == TokenType::COMMENT || tok.typ == TokenType::WS {
+                if (skip_comments && tok.typ == TokenType::COMMENT) || tok.typ == TokenType::WS {
                     // we skip comments and whitespace
                     continue;
                 }
