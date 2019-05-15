@@ -31,7 +31,10 @@ use abortable_parser;
 use crate::build::scope::Scope;
 use crate::build::Val;
 
+pub mod printer;
 pub mod walk;
+
+pub use walk::Walker;
 
 macro_rules! enum_type_equality {
     ( $slf:ident, $r:expr, $( $l:pat ),* ) => {
@@ -593,7 +596,7 @@ impl ModuleDef {
                 }
             }
         };
-        let walker = walk::AstWalker::new().with_expr_handler(&rewrite_import);
+        let mut walker = walk::AstWalker::new().with_expr_handler(&rewrite_import);
         for stmt in self.statements.iter_mut() {
             walker.walk_statement(stmt);
         }
