@@ -87,18 +87,42 @@ where
         String::from_utf8_lossy(&indent).to_string()
     }
 
+    fn is_bareword(s: &str) -> bool {
+        match s.chars().nth(0) {
+            Some(c) => {
+                if !(c.is_ascii_alphabetic() || c == '_') {
+                    return false;
+                }
+            }
+            None => return false,
+        };
+        for c in s.chars() {
+            if !c.is_ascii_alphanumeric() {
+                return false;
+            }
+        }
+        return true;
+    }
+
     fn render_list_def(&mut self, def: &ListDef) -> std::io::Result<()> {
-        write!(self.w, "[\n")?;
+        write!(self.w, "[")?;
         self.curr_indent += self.indent;
         // If the element list is just 1 we might be able to collapse the tuple.
         let indent = self.make_indent();
+        let has_fields = def.elems.len() > 0;
+        if has_fields {
+            write!(self.w, "\n")?;
+        }
         for e in def.elems.iter() {
             // TODO(jwall): Now print out the elements
             write!(self.w, "{}", indent)?;
             self.render_expr(e)?;
-            write!(self.w, "\n")?;
+            write!(self.w, ",\n")?;
         }
         self.curr_indent -= self.indent;
+        if has_fields {
+            write!(self.w, "{}", self.make_indent())?;
+        }
         self.w.write(&[']' as u8])?;
         Ok(())
     }
@@ -108,13 +132,24 @@ where
         // If the field list is just 1 we might be able to collapse the tuple.
         self.curr_indent += self.indent;
         let indent = self.make_indent();
+        let has_fields = def.len() > 0;
+        if has_fields {
+            write!(self.w, "\n")?;
+        }
         for &(ref t, ref expr) in def.iter() {
             write!(self.w, "{}", indent)?;
-            // TODO(jwall): Detect if there are strings and render as a quoted string.
-            write!(&mut self.w, "{} = ", t.fragment)?;
+            if Self::is_bareword(&t.fragment) {
+                write!(&mut self.w, "{} = ", t.fragment)?;
+            } else {
+                write!(self.w, "\"{}\" = ", Self::escape_quotes(&t.fragment))?;
+            }
             self.render_expr(expr)?;
             write!(&mut self.w, ",")?;
             write!(self.w, "\n")?;
+        }
+        self.curr_indent -= self.indent;
+        if has_fields {
+            write!(self.w, "{}", self.make_indent())?;
         }
         self.w.write(&['}' as u8])?;
         Ok(())
@@ -352,7 +387,7 @@ where
         Ok(())
     }
 
-    pub fn render(&mut self, stmts: Vec<&mut Statement>) {
+    pub fn render(&mut self, stmts: &Vec<Statement>) {
         for v in stmts {
             if let Err(e) = self.render_stmt(v) {
                 self.err = Some(e);
@@ -361,3 +396,6 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod test;
