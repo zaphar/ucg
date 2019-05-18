@@ -266,6 +266,28 @@ fn test_not_expr_printing() {
 }
 
 #[test]
+fn test_fail_expr_printing() {
+    let input = "fail \"AHHh\";";
+    let stmts = assert_parse(input);
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer);
+    printer.render(&stmts);
+    assert!(printer.err.is_none());
+    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+}
+
+#[test]
+fn test_trace_expr_printing() {
+    let input = "TRACE \"AHHh\";";
+    let stmts = assert_parse(input);
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer);
+    printer.render(&stmts);
+    assert!(printer.err.is_none());
+    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+}
+
+#[test]
 fn test_module_no_out_expr_printing() {
     let input = "let m = module {
   hostname = \"\",
