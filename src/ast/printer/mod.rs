@@ -248,21 +248,21 @@ where
                 self.render_expr(&_def.message)?;
             }
             Expression::Format(_def) => {
-                self.w
-                    .write(Self::escape_quotes(&_def.template).as_bytes())?;
+                write!(self.w, "\"{}\"", Self::escape_quotes(&_def.template))?;
                 write!(self.w, " % ")?;
                 match _def.args {
                     FormatArgs::Single(ref e) => {
                         self.render_expr(e)?;
                     }
                     FormatArgs::List(ref es) => {
-                        self.w.write("(".as_bytes())?;
+                        self.w.write("(\n".as_bytes())?;
                         self.curr_indent += self.indent;
                         let indent = self.make_indent();
+                        let mut prefix = "";
                         for e in es.iter() {
-                            self.w.write(indent.as_bytes())?;
+                            write!(self.w, "{}{}", prefix, indent)?;
                             self.render_expr(e)?;
-                            self.w.write("\n".as_bytes())?;
+                            prefix = ",\n";
                         }
                         self.curr_indent -= self.indent;
                         self.w.write(")".as_bytes())?;
