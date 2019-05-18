@@ -184,7 +184,7 @@ where
         Ok(())
     }
 
-    fn render_expr(&mut self, expr: &Expression) -> std::io::Result<()> {
+    pub fn render_expr(&mut self, expr: &Expression) -> std::io::Result<()> {
         match expr {
             Expression::Binary(_def) => {
                 let op = match _def.kind {
@@ -331,7 +331,7 @@ where
                     self.render_expr(e)?;
                     write!(self.w, ") ")?;
                 }
-                write!(self.w, "{{")?;
+                write!(self.w, "{{\n")?;
                 self.curr_indent += self.indent;
                 let indent = self.make_indent();
                 for stmt in _def.statements.iter() {
@@ -372,7 +372,7 @@ where
         Ok(())
     }
 
-    fn render_stmt(&mut self, stmt: &Statement) -> std::io::Result<()> {
+    pub fn render_stmt(&mut self, stmt: &Statement) -> std::io::Result<()> {
         // All statements start at the beginning of a line.
         match stmt {
             Statement::Let(def) => {

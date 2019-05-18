@@ -1,4 +1,4 @@
-let host_mod = module{
+let host_mod = TRACE module{
     hostname="",
     mem=2048,
     cpu=2,
