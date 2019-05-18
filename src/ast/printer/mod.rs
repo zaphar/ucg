@@ -271,8 +271,14 @@ where
             }
             Expression::Func(_def) => {
                 self.w.write("func (".as_bytes())?;
-                for n in _def.argdefs.iter() {
-                    write!(self.w, "{}, ", n.val)?;
+                if _def.argdefs.len() == 1 {
+                    write!(self.w, "{}", _def.argdefs.first().unwrap())?;
+                } else {
+                    let mut prefix = "";
+                    for n in _def.argdefs.iter() {
+                        write!(self.w, "{}{}", prefix, n.val)?;
+                        prefix = ", ";
+                    }
                 }
                 self.w.write(") => ".as_bytes())?;
                 self.render_expr(&_def.fields)?;
