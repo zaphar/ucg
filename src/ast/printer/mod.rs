@@ -29,6 +29,8 @@ where
     pub err: Option<std::io::Error>,
 }
 
+// TODO(jwall): At some point we probably want to be more aware of line length
+// in our formatting. But not at the moment.
 impl<W> AstPrinter<W>
 where
     W: Write,
@@ -107,14 +109,12 @@ where
     fn render_list_def(&mut self, def: &ListDef) -> std::io::Result<()> {
         write!(self.w, "[")?;
         self.curr_indent += self.indent;
-        // If the element list is just 1 we might be able to collapse the tuple.
         let indent = self.make_indent();
         let has_fields = def.elems.len() > 0;
         if has_fields {
             write!(self.w, "\n")?;
         }
         for e in def.elems.iter() {
-            // TODO(jwall): Now print out the elements
             write!(self.w, "{}", indent)?;
             self.render_expr(e)?;
             write!(self.w, ",\n")?;
@@ -216,13 +216,24 @@ where
                 self.w.write("(".as_bytes())?;
                 self.curr_indent += self.indent;
                 let indent = self.make_indent();
+                let has_args = _def.arglist.len() > 1;
+                if has_args {
+                    write!(self.w, "\n")?;
+                }
                 for e in _def.arglist.iter() {
-                    self.w.write(indent.as_bytes())?;
+                    if has_args {
+                        write!(self.w, "{}", indent)?;
+                    }
                     self.render_expr(e)?;
-                    self.w.write("\n".as_bytes())?;
+                    if has_args {
+                        self.w.write(",\n".as_bytes())?;
+                    }
                 }
                 self.curr_indent -= self.indent;
-                self.w.write("(".as_bytes())?;
+                if has_args {
+                    write!(self.w, "{}", self.make_indent())?;
+                }
+                self.w.write(")".as_bytes())?;
             }
             Expression::Copy(_def) => {
                 self.render_value(&_def.selector)?;

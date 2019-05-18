@@ -23,7 +23,18 @@ fn assert_parse(input: &str) -> Vec<Statement> {
 #[test]
 fn test_simple_value_printing() {
     let input = "1;";
-    let stmts = assert_parse("1;");
+    let stmts = assert_parse(input);
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(0, &mut buffer);
+    printer.render(&stmts);
+    assert!(printer.err.is_none());
+    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+}
+
+#[test]
+fn test_simple_selector_printing() {
+    let input = "foo.bar.quux;";
+    let stmts = assert_parse(input);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(0, &mut buffer);
     printer.render(&stmts);
@@ -158,6 +169,50 @@ fn test_special_quoted_field_tuple_printing() {
 #[test]
 fn test_let_statement_printing() {
     let input = "let tpl = {\n  \"foo bar\" = {\n    bar = 1,\n  },\n};";
+    let stmts = assert_parse(input);
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer);
+    printer.render(&stmts);
+    assert!(printer.err.is_none());
+    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+}
+
+#[test]
+fn test_call_expr_printing() {
+    let input = "call(\n  foo,\n  bar,\n);";
+    let stmts = assert_parse(input);
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer);
+    printer.render(&stmts);
+    assert!(printer.err.is_none());
+    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+}
+
+#[test]
+fn test_call_expr_one_arg_printing() {
+    let input = "call(foo);";
+    let stmts = assert_parse(input);
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer);
+    printer.render(&stmts);
+    assert!(printer.err.is_none());
+    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+}
+
+#[test]
+fn test_copy_expr_printing() {
+    let input = "copy{\n  foo = 1,\n  bar = 2,\n};";
+    let stmts = assert_parse(input);
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer);
+    printer.render(&stmts);
+    assert!(printer.err.is_none());
+    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+}
+
+#[test]
+fn test_copy_expr_one_arg_printing() {
+    let input = "copy{\n  foo = 1,\n};";
     let stmts = assert_parse(input);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
