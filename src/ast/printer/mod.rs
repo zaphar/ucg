@@ -389,7 +389,7 @@ where
                 //
             }
             Statement::Output(_, _tok, _expr) => {
-                write!(&mut self.w, "out {} = ", _tok.fragment)?;
+                write!(&mut self.w, "out {} ", _tok.fragment)?;
                 self.render_expr(&_expr)?;
                 //
             }

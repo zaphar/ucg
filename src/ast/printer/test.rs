@@ -220,3 +220,89 @@ fn test_copy_expr_one_arg_printing() {
     assert!(printer.err.is_none());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
+
+#[test]
+fn test_out_expr_printing() {
+    let input = "out json {\n  foo = 1,\n};";
+    let stmts = assert_parse(input);
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer);
+    printer.render(&stmts);
+    assert!(printer.err.is_none());
+    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+}
+
+#[test]
+fn test_select_expr_no_default_printing() {
+    let input = "select true, {\n  true = 1,\n  false = 2,\n};";
+    let stmts = assert_parse(input);
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer);
+    printer.render(&stmts);
+    assert!(printer.err.is_none());
+    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+}
+
+#[test]
+fn test_select_expr_with_default_printing() {
+    let input = "select true, 3, {\n  true = 1,\n  false = 2,\n};";
+    let stmts = assert_parse(input);
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer);
+    printer.render(&stmts);
+    assert!(printer.err.is_none());
+    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+}
+
+#[test]
+fn test_not_expr_printing() {
+    let input = "not true;";
+    let stmts = assert_parse(input);
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer);
+    printer.render(&stmts);
+    assert!(printer.err.is_none());
+    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+}
+
+#[test]
+fn test_module_no_out_expr_printing() {
+    let input = "let m = module {
+  hostname = \"\",
+  mem = 2048,
+  cpu = 2,
+} => {
+  let config = {
+    hostname = mod.hostname,
+    \"memory_size\" = mod.mem,
+    \"cpu_count\" = mod.cpu,
+  };
+};";
+    let stmts = assert_parse(input);
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer);
+    printer.render(&stmts);
+    assert!(printer.err.is_none());
+    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+}
+
+#[test]
+fn test_module_with_out_expr_printing() {
+    let input = "let m = module {
+  hostname = \"\",
+  mem = 2048,
+  cpu = 2,
+} => (config) {
+  let config = {
+    hostname = mod.hostname,
+    \"memory_size\" = mod.mem,
+    \"cpu_count\" = mod.cpu,
+  };
+};";
+    let stmts = assert_parse(input);
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer);
+    printer.render(&stmts);
+    assert!(printer.err.is_none());
+    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+}
