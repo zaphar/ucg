@@ -278,7 +278,7 @@ Import Expressions
 
 Import expressions bring in a ucg file and expose their bound values as a tuple
 in the current file. Import expressions are idempotent and cached so you can
-use them than once in a file safely. Import expressions start with the `import`
+use them more than once in a file safely. Import expressions start with the `import`
 keyword and are followed by a string containing the path of the file to import.
 
 ```
@@ -453,7 +453,7 @@ filter(string_reducer, 0, string) == "oo";
 ### Reduce expressions
 
 Reduce expressions start with the reduce keyword followed by a symbol
-referencing a func, an expression for the accumulator, and finally the tuple
+referencing a func, an expression for the accumulator, and finally the tuple,
 list, or string to process.
 
 **Tuples**
