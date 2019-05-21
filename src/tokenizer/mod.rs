@@ -23,6 +23,9 @@ use crate::ast::*;
 use crate::error::StackPrinter;
 use crate::iter::OffsetStrIter;
 
+pub type CommentGroup = Vec<Token>;
+pub type CommentMap = std::collections::HashMap<usize, CommentGroup>;
+
 fn is_symbol_char<'a>(i: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, u8> {
     let mut _i = i.clone();
     let c = match _i.next() {
@@ -452,12 +455,16 @@ fn token<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Token> {
 }
 
 /// Consumes an input OffsetStrIter and returns either a Vec<Token> or a error::Error.
+/// If a comment_map is passed in then it will store the comments indexed by their
+/// line number.
 pub fn tokenize<'a>(
     input: OffsetStrIter<'a>,
-    skip_comments: bool,
+    mut comment_map: Option<&mut CommentMap>,
 ) -> std::result::Result<Vec<Token>, String> {
     let mut out = Vec::new();
     let mut i = input.clone();
+    let mut comment_group = Vec::new();
+    let mut comment_was_last: Option<Token> = None;
     loop {
         if let Result::Complete(_, _) = eoi(i.clone()) {
             break;
@@ -489,12 +496,36 @@ pub fn tokenize<'a>(
             }
             Result::Complete(rest, tok) => {
                 i = rest;
-                if (skip_comments && tok.typ == TokenType::COMMENT) || tok.typ == TokenType::WS {
-                    // we skip comments and whitespace
-                    continue;
+                match (&mut comment_map, &tok.typ) {
+                    // variants with a comment_map
+                    (&mut Some(_), &TokenType::COMMENT) => {
+                        comment_group.push(tok.clone());
+                        comment_was_last = Some(tok.clone());
+                        continue;
+                    }
+                    (&mut Some(ref mut map), _) => {
+                        out.push(tok);
+                        if let Some(tok) = comment_was_last {
+                            map.insert(tok.pos.line, comment_group);
+                            comment_group = Vec::new();
+                        }
+                    }
+                    // variants without a comment_map
+                    (None, TokenType::WS) | (None, TokenType::COMMENT) => continue,
+                    (None, _) => {
+                        out.push(tok);
+                    }
                 }
-                out.push(tok);
+                comment_was_last = None;
             }
+        }
+    }
+    // if we had a comments at the end then we need to do a final
+    // insert into our map.
+    if let Some(ref mut map) = comment_map {
+        if let Some(ref tok) = comment_group.last() {
+            let line = tok.pos.line;
+            map.insert(line, comment_group);
         }
     }
     // ensure that we always have an END token to go off of.

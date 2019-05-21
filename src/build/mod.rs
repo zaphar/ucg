@@ -303,7 +303,7 @@ impl<'a> FileBuilder<'a> {
     }
 
     fn eval_input(&mut self, input: OffsetStrIter) -> Result<Rc<Val>, Box<dyn Error>> {
-        match parse(input.clone()) {
+        match parse(input.clone(), None) {
             Ok(stmts) => {
                 //panic!("Successfully parsed {}", input);
                 let mut out: Option<Rc<Val>> = None;

@@ -11,27 +11,30 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use std::borrow::BorrowMut;
 use std::io::Write;
 
 use crate::ast::*;
+use crate::parse::CommentMap;
 
 // TODO(jwall): We really need a way to preserve comments for these.
 // Perhaps for code formatting we actually want to work on the token stream instead?
 
-pub struct AstPrinter<W>
+pub struct AstPrinter<'a, W>
 where
     W: Write,
 {
     indent: usize,
     curr_indent: usize,
     w: W,
+    // Indexed by line that the comment was on.
+    // We use this to determine when to print a comment in our AstPrinter
+    comment_map: Option<&'a CommentMap>,
     pub err: Option<std::io::Error>,
 }
 
 // TODO(jwall): At some point we probably want to be more aware of line length
 // in our formatting. But not at the moment.
-impl<W> AstPrinter<W>
+impl<'a, W> AstPrinter<'a, W>
 where
     W: Write,
 {
@@ -39,45 +42,15 @@ where
         AstPrinter {
             indent: indent,
             curr_indent: 0,
+            comment_map: None,
             w: w,
             err: None,
         }
     }
 
-    pub fn visit_token(&mut self, t: &Token) -> std::io::Result<()> {
-        let w: &mut Write = self.w.borrow_mut();
-        // Do we care about line length?
-        match t.typ {
-            TokenType::BAREWORD | TokenType::BOOLEAN | TokenType::DIGIT => {
-                write!(w, "{}", t.fragment)?;
-            }
-            TokenType::EMPTY => {
-                write!(w, "NULL")?;
-            }
-            TokenType::PUNCT => {
-                // TODO(jwall): We need to identify the points at which we
-                // introduce new lines and new indentation scopes.
-            }
-            TokenType::COMMENT => {
-                // We need to track some state here probably.
-                // Do we leave comments untouched?
-            }
-            TokenType::PIPEQUOTE => {
-                // FIXME I think is supposed to be removed.
-            }
-            TokenType::QUOTED => {
-                w.write(&['"' as u8])?;
-                write!(w, "{}", Self::escape_quotes(&t.fragment))?;
-                w.write(&['"' as u8])?;
-            }
-            TokenType::WS => {
-                // TODO(jwall): Track some state around new lines here?
-            }
-            TokenType::END => {
-                // NOOP
-            }
-        };
-        Ok(())
+    pub fn with_comment_map(mut self, map: &'a CommentMap) -> Self {
+        self.comment_map = Some(map);
+        self
     }
 
     fn make_indent(&self) -> String {

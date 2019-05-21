@@ -28,6 +28,8 @@ use crate::error::StackPrinter;
 use crate::iter::OffsetStrIter;
 use crate::tokenizer::*;
 
+pub use crate::tokenizer::{CommentGroup, CommentMap};
+
 type ParseResult<'a, O> = Result<SliceIter<'a, Token>, O>;
 
 #[cfg(feature = "tracing")]
@@ -853,8 +855,11 @@ fn statement(i: SliceIter<Token>) -> Result<SliceIter<Token>, Statement> {
 //trace_macros!(false);
 
 /// Parses a LocatedSpan into a list of Statements or an `error::Error`.
-pub fn parse<'a>(input: OffsetStrIter<'a>) -> std::result::Result<Vec<Statement>, String> {
-    match tokenize(input.clone(), true) {
+pub fn parse<'a>(
+    input: OffsetStrIter<'a>,
+    comment_map: Option<&mut CommentMap>,
+) -> std::result::Result<Vec<Statement>, String> {
+    match tokenize(input.clone(), comment_map) {
         Ok(tokenized) => {
             let mut out = Vec::new();
             let mut i_ = SliceIter::new(&tokenized);

@@ -26,7 +26,7 @@ use ucglib::iter::OffsetStrIter;
 use ucglib::parse::*;
 
 fn do_parse(i: &str) {
-    parse(OffsetStrIter::new(i));
+    parse(OffsetStrIter::new(i), None);
 }
 
 fn parse_int(b: &mut Bencher) {
