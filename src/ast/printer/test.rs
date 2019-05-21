@@ -26,8 +26,7 @@ fn test_simple_value_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(0, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -37,8 +36,7 @@ fn test_simple_selector_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(0, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -48,8 +46,7 @@ fn test_simple_quoted_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(0, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -59,8 +56,7 @@ fn test_escaped_quoted_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(0, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -70,8 +66,7 @@ fn test_empty_tuple_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -81,8 +76,7 @@ fn test_empty_list_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -92,8 +86,7 @@ fn test_non_empty_tuple_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -103,8 +96,7 @@ fn test_nested_empty_tuple_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -114,8 +106,7 @@ fn test_list_nested_empty_tuple_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -125,8 +116,7 @@ fn test_nested_non_empty_tuple_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -136,8 +126,7 @@ fn test_nested_non_empty_list_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -147,8 +136,7 @@ fn test_simple_quoted_field_tuple_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(
         String::from_utf8(buffer).unwrap(),
         format!("{}\n", "{\n  foo = {\n    bar = 1,\n  },\n};")
@@ -161,8 +149,7 @@ fn test_special_quoted_field_tuple_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -172,8 +159,7 @@ fn test_let_statement_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -183,8 +169,7 @@ fn test_call_expr_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -194,8 +179,7 @@ fn test_call_expr_one_arg_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -205,8 +189,7 @@ fn test_copy_expr_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -216,8 +199,7 @@ fn test_copy_expr_one_arg_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -227,8 +209,7 @@ fn test_out_expr_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -238,8 +219,7 @@ fn test_select_expr_no_default_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -249,8 +229,7 @@ fn test_select_expr_with_default_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -260,8 +239,7 @@ fn test_not_expr_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -271,8 +249,7 @@ fn test_fail_expr_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -282,8 +259,7 @@ fn test_trace_expr_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -303,8 +279,7 @@ fn test_module_no_out_expr_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -324,8 +299,7 @@ fn test_module_with_out_expr_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -338,8 +312,7 @@ fn test_func_expr_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -351,8 +324,7 @@ fn test_func_expr_single_arg_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -364,8 +336,7 @@ fn test_format_expr_single_arg_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }
 
@@ -377,7 +348,6 @@ fn test_format_expr_list_arg_printing() {
     let stmts = assert_parse(input, None);
     let mut buffer: Vec<u8> = Vec::new();
     let mut printer = AstPrinter::new(2, &mut buffer);
-    printer.render(&stmts);
-    assert!(printer.err.is_none());
+    assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
 }

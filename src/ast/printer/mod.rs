@@ -23,13 +23,12 @@ pub struct AstPrinter<'a, W>
 where
     W: Write,
 {
-    indent: usize,
+    indent_size: usize,
     curr_indent: usize,
     w: W,
     // Indexed by line that the comment was on.
     // We use this to determine when to print a comment in our AstPrinter
     comment_map: Option<&'a CommentMap>,
-    pub err: Option<std::io::Error>,
 }
 
 // TODO(jwall): At some point we probably want to be more aware of line length
@@ -40,11 +39,10 @@ where
 {
     pub fn new(indent: usize, w: W) -> Self {
         AstPrinter {
-            indent: indent,
+            indent_size: indent,
             curr_indent: 0,
             comment_map: None,
             w: w,
-            err: None,
         }
     }
 
@@ -81,7 +79,7 @@ where
 
     fn render_list_def(&mut self, def: &ListDef) -> std::io::Result<()> {
         write!(self.w, "[")?;
-        self.curr_indent += self.indent;
+        self.curr_indent += self.indent_size;
         let indent = self.make_indent();
         let has_fields = def.elems.len() > 0;
         if has_fields {
@@ -92,7 +90,7 @@ where
             self.render_expr(e)?;
             write!(self.w, ",\n")?;
         }
-        self.curr_indent -= self.indent;
+        self.curr_indent -= self.indent_size;
         if has_fields {
             write!(self.w, "{}", self.make_indent())?;
         }
@@ -103,7 +101,7 @@ where
     fn render_tuple_def(&mut self, def: &Vec<(Token, Expression)>) -> std::io::Result<()> {
         self.w.write(&['{' as u8])?;
         // If the field list is just 1 we might be able to collapse the tuple.
-        self.curr_indent += self.indent;
+        self.curr_indent += self.indent_size;
         let indent = self.make_indent();
         let has_fields = def.len() > 0;
         if has_fields {
@@ -120,7 +118,7 @@ where
             write!(&mut self.w, ",")?;
             write!(self.w, "\n")?;
         }
-        self.curr_indent -= self.indent;
+        self.curr_indent -= self.indent_size;
         if has_fields {
             write!(self.w, "{}", self.make_indent())?;
         }
@@ -187,7 +185,7 @@ where
             Expression::Call(_def) => {
                 self.render_value(&_def.funcref)?;
                 self.w.write("(".as_bytes())?;
-                self.curr_indent += self.indent;
+                self.curr_indent += self.indent_size;
                 let indent = self.make_indent();
                 let has_args = _def.arglist.len() > 1;
                 if has_args {
@@ -202,7 +200,7 @@ where
                         self.w.write(",\n".as_bytes())?;
                     }
                 }
-                self.curr_indent -= self.indent;
+                self.curr_indent -= self.indent_size;
                 if has_args {
                     write!(self.w, "{}", self.make_indent())?;
                 }
@@ -229,7 +227,7 @@ where
                     }
                     FormatArgs::List(ref es) => {
                         self.w.write("(\n".as_bytes())?;
-                        self.curr_indent += self.indent;
+                        self.curr_indent += self.indent_size;
                         let indent = self.make_indent();
                         let mut prefix = "";
                         for e in es.iter() {
@@ -237,7 +235,7 @@ where
                             self.render_expr(e)?;
                             prefix = ",\n";
                         }
-                        self.curr_indent -= self.indent;
+                        self.curr_indent -= self.indent_size;
                         self.w.write(")".as_bytes())?;
                     }
                 }
@@ -311,13 +309,13 @@ where
                     write!(self.w, ") ")?;
                 }
                 write!(self.w, "{{\n")?;
-                self.curr_indent += self.indent;
+                self.curr_indent += self.indent_size;
                 let indent = self.make_indent();
                 for stmt in _def.statements.iter() {
                     write!(self.w, "{}", indent)?;
                     self.render_stmt(stmt)?;
                 }
-                self.curr_indent -= self.indent;
+                self.curr_indent -= self.indent_size;
                 write!(self.w, "}}")?;
             }
             Expression::Not(_def) => {
@@ -360,30 +358,25 @@ where
             }
             Statement::Expression(_expr) => {
                 self.render_expr(&_expr)?;
-                //
             }
             Statement::Assert(def) => {
                 write!(&mut self.w, "assert ")?;
                 self.render_expr(&def)?;
-                //
             }
             Statement::Output(_, _tok, _expr) => {
                 write!(&mut self.w, "out {} ", _tok.fragment)?;
                 self.render_expr(&_expr)?;
-                //
             }
         };
         write!(self.w, ";\n")?;
         Ok(())
     }
 
-    pub fn render(&mut self, stmts: &Vec<Statement>) {
+    pub fn render(&mut self, stmts: &Vec<Statement>) -> std::io::Result<()> {
         for v in stmts {
-            if let Err(e) = self.render_stmt(v) {
-                self.err = Some(e);
-                return;
-            }
+            self.render_stmt(v)?;
         }
+        Ok(())
     }
 }
 
