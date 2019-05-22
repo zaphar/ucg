@@ -86,10 +86,8 @@ where
     fn print_comment_group(&mut self, line: usize) -> std::io::Result<()> {
         if let Some(ref map) = self.comment_map {
             let empty: Vec<Token> = Vec::new();
-            //eprintln!("comment line candidate: {}", line);
             let cg = map.get(&line).unwrap_or(&empty);
             let indent = self.make_indent();
-            //eprintln!("comment_group: {:?}", cg);
             for c in cg.iter() {
                 write!(self.w, "{}// {}\n", indent, c.fragment.trim())?;
             }
@@ -134,6 +132,7 @@ where
             write!(self.w, "\n")?;
         }
         for e in def.elems.iter() {
+            self.render_comment_if_needed(e.pos().line)?;
             write!(self.w, "{}", indent)?;
             self.render_expr(e)?;
             write!(self.w, ",\n")?;
@@ -434,9 +433,6 @@ where
             self.render_stmt(v)?;
         }
         if let Some(last_comment_line) = self.comment_group_lines.first() {
-            //eprintln!("last_comment_line is: {}", last_comment_line);
-            //eprintln!("comment_map is: {:?}", self.comment_map);
-            //eprintln!("coment_group_lines is: {:?}", self.comment_group_lines);
             self.render_missed_comments(*last_comment_line + 1)?;
         }
         Ok(())
