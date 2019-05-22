@@ -402,3 +402,51 @@ fn test_statement_with_comment_printing_comments_at_end() {
         format!("{}\n", input.trim())
     );
 }
+
+#[test]
+fn test_tuple_expression_with_embedded_comment() {
+    let mut comment_map = BTreeMap::new();
+    let input = "{\n  foo = bar,\n  // a comment\n  bar = foo,\n};";
+    let stmts = assert_parse(input, Some(&mut comment_map));
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
+    assert!(printer.render(&stmts).is_ok());
+    assert_eq!(
+        String::from_utf8(buffer).unwrap(),
+        format!("{}\n", input.trim())
+    );
+}
+
+#[test]
+fn test_tuple_expression_with_embedded_comment_mid_field_expr() {
+    let mut comment_map = BTreeMap::new();
+    let input = "{\n  foo = bar,\n  bar =\n// a comment\n   foo\n};";
+    let stmts = assert_parse(input, Some(&mut comment_map));
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
+    assert!(printer.render(&stmts).is_ok());
+    assert_eq!(
+        String::from_utf8(buffer).unwrap(),
+        format!(
+            "{}\n",
+            "{\n  foo = bar,\n  // a comment\n  bar = foo,\n};".trim()
+        )
+    );
+}
+
+#[test]
+fn test_tuple_expression_with_embedded_comment_and_mid_field_expr() {
+    let mut comment_map = BTreeMap::new();
+    let input = "{\n  foo = bar,\n// a comment\n  bar =\n// another comment\n   foo\n};";
+    let stmts = assert_parse(input, Some(&mut comment_map));
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
+    assert!(printer.render(&stmts).is_ok());
+    assert_eq!(
+        String::from_utf8(buffer).unwrap(),
+        format!(
+            "{}\n",
+            "{\n  foo = bar,\n  // a comment\n  // another comment\n  bar = foo,\n};".trim()
+        )
+    );
+}
