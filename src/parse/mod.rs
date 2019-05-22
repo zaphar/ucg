@@ -793,21 +793,19 @@ make_fn!(
     )
 );
 
-fn tuple_to_let(tok: Token, expr: Expression) -> Statement {
-    Statement::Let(LetDef {
-        name: tok,
-        value: expr,
-    })
-}
-
 make_fn!(
     let_stmt_body<SliceIter<Token>, Statement>,
     do_each!(
+        pos => pos,
         name => wrap_err!(match_type!(BAREWORD), "Expected name for binding"),
         _ => punct!("="),
         val => wrap_err!(trace_parse!(expression), "Expected Expression"),
         _ => punct!(";"),
-        (tuple_to_let(name, val))
+        (Statement::Let(LetDef {
+            pos: pos,
+            name: name,
+            value: val,
+        }))
     )
 );
 
@@ -823,10 +821,11 @@ make_fn!(
 make_fn!(
     assert_statement<SliceIter<Token>, Statement>,
     do_each!(
+        pos => pos,
         _ => word!("assert"),
         expr => wrap_err!(must!(expression), "Expected Tuple {ok=<bool>, desc=<str>}"),
         _ => must!(punct!(";")),
-        (Statement::Assert(expr))
+        (Statement::Assert(pos, expr))
     )
 );
 

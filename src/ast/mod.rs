@@ -756,6 +756,7 @@ impl fmt::Display for Expression {
 /// Encodes a let statement in the UCG AST.
 #[derive(Debug, PartialEq, Clone)]
 pub struct LetDef {
+    pub pos: Position,
     pub name: Token,
     pub value: Expression,
 }
@@ -770,8 +771,19 @@ pub enum Statement {
     Let(LetDef),
 
     // Assert statement
-    Assert(Expression),
+    Assert(Position, Expression),
 
     // Identify an Expression for output.
     Output(Position, Token, Expression),
+}
+
+impl Statement {
+    fn pos(&self) -> &Position {
+        match self {
+            Statement::Expression(ref e) => e.pos(),
+            Statement::Let(ref def) => &def.pos,
+            Statement::Assert(ref pos, _) => pos,
+            Statement::Output(ref pos, _, _) => pos,
+        }
+    }
 }

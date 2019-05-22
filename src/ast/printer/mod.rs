@@ -29,6 +29,8 @@ where
     // Indexed by line that the comment was on.
     // We use this to determine when to print a comment in our AstPrinter
     comment_map: Option<&'a CommentMap>,
+    last_line: usize,
+    comment_group_lines: Vec<usize>,
 }
 
 // TODO(jwall): At some point we probably want to be more aware of line length
@@ -43,10 +45,14 @@ where
             curr_indent: 0,
             comment_map: None,
             w: w,
+            last_line: 0,
+            comment_group_lines: Vec::new(),
         }
     }
 
     pub fn with_comment_map(mut self, map: &'a CommentMap) -> Self {
+        self.comment_group_lines = map.keys().cloned().collect();
+        self.comment_group_lines.reverse();
         self.comment_map = Some(map);
         self
     }
@@ -75,6 +81,47 @@ where
             }
         }
         return true;
+    }
+
+    fn print_comment_group(&mut self, line: usize) -> std::io::Result<()> {
+        if let Some(ref map) = self.comment_map {
+            let empty: Vec<Token> = Vec::new();
+            //eprintln!("comment line candidate: {}", line);
+            let cg = map.get(&line).unwrap_or(&empty);
+            //eprintln!("comment_group: {:?}", cg);
+            for c in cg.iter() {
+                write!(self.w, "// {}\n", c.fragment.trim())?;
+            }
+            self.comment_group_lines.pop();
+        }
+        Ok(())
+    }
+
+    fn render_missed_comments(&mut self, line: usize) -> std::io::Result<()> {
+        loop {
+            if let Some(next_comment_line) = self.comment_group_lines.last() {
+                let next_comment_line = *next_comment_line;
+                if next_comment_line < line {
+                    self.print_comment_group(next_comment_line)?;
+                } else {
+                    break;
+                }
+                if next_comment_line < line - 1 {
+                    write!(self.w, "\n")?;
+                }
+                continue;
+            }
+            break;
+        }
+        Ok(())
+    }
+
+    fn render_comment_if_needed(&mut self, line: usize) -> std::io::Result<()> {
+        if line > self.last_line {
+            self.render_missed_comments(line)?;
+            self.last_line = line;
+        }
+        Ok(())
     }
 
     fn render_list_def(&mut self, def: &ListDef) -> std::io::Result<()> {
@@ -351,6 +398,8 @@ where
 
     pub fn render_stmt(&mut self, stmt: &Statement) -> std::io::Result<()> {
         // All statements start at the beginning of a line.
+        let line = stmt.pos().line;
+        self.render_comment_if_needed(line)?;
         match stmt {
             Statement::Let(def) => {
                 write!(&mut self.w, "let {} = ", def.name.fragment)?;
@@ -359,7 +408,7 @@ where
             Statement::Expression(_expr) => {
                 self.render_expr(&_expr)?;
             }
-            Statement::Assert(def) => {
+            Statement::Assert(_, def) => {
                 write!(&mut self.w, "assert ")?;
                 self.render_expr(&def)?;
             }
@@ -369,12 +418,19 @@ where
             }
         };
         write!(self.w, ";\n")?;
+        self.last_line = line;
         Ok(())
     }
 
     pub fn render(&mut self, stmts: &Vec<Statement>) -> std::io::Result<()> {
         for v in stmts {
             self.render_stmt(v)?;
+        }
+        if let Some(last_comment_line) = self.comment_group_lines.first() {
+            eprintln!("last_comment_line is: {}", last_comment_line);
+            eprintln!("comment_map is: {:?}", self.comment_map);
+            eprintln!("coment_group_lines is: {:?}", self.comment_group_lines);
+            self.render_missed_comments(*last_comment_line + 1)?;
         }
         Ok(())
     }

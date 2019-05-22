@@ -16,7 +16,7 @@ pub trait Walker {
             Statement::Expression(ref mut expr) => {
                 self.walk_expression(expr);
             }
-            Statement::Assert(ref mut expr) => {
+            Statement::Assert(_, ref mut expr) => {
                 self.walk_expression(expr);
             }
             Statement::Output(_, _, ref mut expr) => {

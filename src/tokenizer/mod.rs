@@ -24,7 +24,7 @@ use crate::error::StackPrinter;
 use crate::iter::OffsetStrIter;
 
 pub type CommentGroup = Vec<Token>;
-pub type CommentMap = std::collections::HashMap<usize, CommentGroup>;
+pub type CommentMap = std::collections::BTreeMap<usize, CommentGroup>;
 
 fn is_symbol_char<'a>(i: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, u8> {
     let mut _i = i.clone();
@@ -353,6 +353,12 @@ fn comment(input: OffsetStrIter) -> Result<OffsetStrIter, Token> {
                 )
             ) {
                 Result::Complete(rest, cmt) => {
+                    // Eat the new lines here before continuing
+                    let rest =
+                        match optional!(rest, either!(text_token!("\r\n"), text_token!("\n"))) {
+                            Result::Complete(next_rest, _) => next_rest,
+                            _ => rest,
+                        };
                     return Result::Complete(rest, make_tok!(CMT => cmt.to_string(), input));
                 }
                 // If we didn't find a new line then we just grab everything.
@@ -504,7 +510,9 @@ pub fn tokenize<'a>(
                         continue;
                     }
                     (&mut Some(ref mut map), _) => {
-                        out.push(tok);
+                        if tok.typ != TokenType::WS {
+                            out.push(tok);
+                        }
                         if let Some(tok) = comment_was_last {
                             map.insert(tok.pos.line, comment_group);
                             comment_group = Vec::new();

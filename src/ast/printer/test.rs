@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use std::collections::BTreeMap;
 
 use crate::ast::printer::*;
 use crate::iter::OffsetStrIter;
@@ -350,4 +351,54 @@ fn test_format_expr_list_arg_printing() {
     let mut printer = AstPrinter::new(2, &mut buffer);
     assert!(printer.render(&stmts).is_ok());
     assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+}
+
+#[test]
+fn test_statement_with_comment_printing() {
+    let mut comment_map = BTreeMap::new();
+    let input = "// add 1 + 1\n1 + 1;";
+    let stmts = assert_parse(input, Some(&mut comment_map));
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
+    assert!(printer.render(&stmts).is_ok());
+    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+}
+
+#[test]
+fn test_statement_with_comment_printing_groups() {
+    let mut comment_map = BTreeMap::new();
+    let input = "// add 1\n// and 1\n1 + 1;";
+    let stmts = assert_parse(input, Some(&mut comment_map));
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
+    assert!(printer.render(&stmts).is_ok());
+    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+}
+
+#[test]
+fn test_statement_with_comment_printing_multiple_groups() {
+    let mut comment_map = BTreeMap::new();
+    let input = "\n// group 1\n// more group 1\n\n// group 2\n// more group 2\n1 + 1;";
+    let stmts = assert_parse(input, Some(&mut comment_map));
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
+    assert!(printer.render(&stmts).is_ok());
+    assert_eq!(
+        String::from_utf8(buffer).unwrap(),
+        format!("{}\n", input.trim())
+    );
+}
+
+#[test]
+fn test_statement_with_comment_printing_comments_at_end() {
+    let mut comment_map = BTreeMap::new();
+    let input = "// group 1\n1 + 1;\n// group 2\n\n";
+    let stmts = assert_parse(input, Some(&mut comment_map));
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
+    assert!(printer.render(&stmts).is_ok());
+    assert_eq!(
+        String::from_utf8(buffer).unwrap(),
+        format!("{}\n", input.trim())
+    );
 }

@@ -511,7 +511,7 @@ impl<'a> FileBuilder<'a> {
     fn eval_stmt(&mut self, stmt: &Statement) -> Result<Rc<Val>, Box<dyn Error>> {
         let child_scope = self.scope.clone();
         match stmt {
-            &Statement::Assert(ref expr) => self.eval_assert(&expr, &child_scope),
+            &Statement::Assert(_, ref expr) => self.eval_assert(&expr, &child_scope),
             &Statement::Let(ref def) => self.eval_let(def),
             &Statement::Expression(ref expr) => self.eval_expr(expr, &child_scope),
             // Only one output can be used per file. Right now we enforce this by
