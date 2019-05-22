@@ -123,6 +123,15 @@ where
         Ok(())
     }
 
+    fn has_comment(&self, line: usize) -> bool {
+        if line > self.last_line {
+            if let Some(next_comment_line) = self.comment_group_lines.last() {
+                return *next_comment_line < line;
+            }
+        }
+        false
+    }
+
     fn render_list_def(&mut self, def: &ListDef) -> std::io::Result<()> {
         write!(self.w, "[")?;
         self.curr_indent += self.indent_size;
@@ -209,13 +218,14 @@ where
     }
 
     pub fn render_expr(&mut self, expr: &Expression) -> std::io::Result<()> {
+        self.render_comment_if_needed(expr.pos().line)?;
         match expr {
             Expression::Binary(_def) => {
                 let op = match _def.kind {
                     BinaryExprType::AND => " && ",
                     BinaryExprType::OR => " || ",
                     BinaryExprType::DOT => ".",
-                    BinaryExprType::Equal => " = ",
+                    BinaryExprType::Equal => " == ",
                     BinaryExprType::NotEqual => " != ",
                     BinaryExprType::GTEqual => " >= ",
                     BinaryExprType::LTEqual => " <= ",
@@ -231,8 +241,14 @@ where
                     BinaryExprType::REMatch => " ~ ",
                     BinaryExprType::NotREMatch => " !~ ",
                 };
+                let right_line = _def.right.pos().line;
                 self.render_expr(&_def.left)?;
                 self.w.write(op.as_bytes())?;
+                if self.has_comment(right_line) {
+                    // if we'll be rendering a comment then we should
+                    // add a new line here
+                    self.w.write("\n".as_bytes())?;
+                }
                 self.render_expr(&_def.right)?;
             }
             Expression::Call(_def) => {
@@ -245,6 +261,7 @@ where
                     write!(self.w, "\n")?;
                 }
                 for e in _def.arglist.iter() {
+                    self.render_comment_if_needed(e.pos().line)?;
                     if has_args {
                         write!(self.w, "{}", indent)?;
                     }

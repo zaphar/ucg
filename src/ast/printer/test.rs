@@ -464,3 +464,45 @@ fn test_list_expression_with_embedded_comment() {
         format!("{}\n", input.trim())
     );
 }
+
+#[test]
+fn test_binary_expression_with_embedded_comment() {
+    let mut comment_map = BTreeMap::new();
+    let input = "true == \n// false is not true\nfalse;";
+    let stmts = assert_parse(input, Some(&mut comment_map));
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
+    assert!(printer.render(&stmts).is_ok());
+    assert_eq!(
+        String::from_utf8(buffer).unwrap(),
+        format!("{}\n", input.trim())
+    );
+}
+
+#[test]
+fn test_empty_call_expression_with_comment() {
+    let mut comment_map = BTreeMap::new();
+    let input = "// a comment\nmyfunc();";
+    let stmts = assert_parse(input, Some(&mut comment_map));
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
+    assert!(printer.render(&stmts).is_ok());
+    assert_eq!(
+        String::from_utf8(buffer).unwrap(),
+        format!("{}\n", input.trim())
+    );
+}
+
+#[test]
+fn test_call_expression_with_embedded_comment_in_args() {
+    let mut comment_map = BTreeMap::new();
+    let input = "// a comment\nmyfunc(\n  arg1,\n  // another comment\n  arg2,\n);";
+    let stmts = assert_parse(input, Some(&mut comment_map));
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
+    assert!(printer.render(&stmts).is_ok());
+    assert_eq!(
+        String::from_utf8(buffer).unwrap(),
+        format!("{}\n", input.trim())
+    );
+}
