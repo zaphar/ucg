@@ -506,3 +506,59 @@ fn test_call_expression_with_embedded_comment_in_args() {
         format!("{}\n", input.trim())
     );
 }
+
+#[test]
+fn test_copy_expression_with_embedded_comment_in_args() {
+    let mut comment_map = BTreeMap::new();
+    let input = "// a comment\nmyfunc{\n  foo = arg1,\n  // another comment\n  bar = arg2,\n};";
+    let stmts = assert_parse(input, Some(&mut comment_map));
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
+    assert!(printer.render(&stmts).is_ok());
+    assert_eq!(
+        String::from_utf8(buffer).unwrap(),
+        format!("{}\n", input.trim())
+    );
+}
+
+#[test]
+fn test_trace_expression_with_embedded_comment() {
+    let mut comment_map = BTreeMap::new();
+    let input = "// a comment\nTRACE \n// another comment\nfoo;";
+    let stmts = assert_parse(input, Some(&mut comment_map));
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
+    assert!(printer.render(&stmts).is_ok());
+    assert_eq!(
+        String::from_utf8(buffer).unwrap(),
+        format!("{}\n", input.trim())
+    );
+}
+
+#[test]
+fn test_fail_expression_with_embedded_comment() {
+    let mut comment_map = BTreeMap::new();
+    let input = "// a comment\nfail \n// another comment\nfoo;";
+    let stmts = assert_parse(input, Some(&mut comment_map));
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
+    assert!(printer.render(&stmts).is_ok());
+    assert_eq!(
+        String::from_utf8(buffer).unwrap(),
+        format!("{}\n", input.trim())
+    );
+}
+
+#[test]
+fn test_format_expression_with_embedded_comment() {
+    let mut comment_map = BTreeMap::new();
+    let input = "// a comment\n\"@(item.bar)\" % \n// another comment\nfoo;";
+    let stmts = assert_parse(input, Some(&mut comment_map));
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
+    assert!(printer.render(&stmts).is_ok());
+    assert_eq!(
+        String::from_utf8(buffer).unwrap(),
+        format!("{}\n", input.trim())
+    );
+}

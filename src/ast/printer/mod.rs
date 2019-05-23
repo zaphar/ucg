@@ -282,10 +282,16 @@ where
             }
             Expression::Debug(_def) => {
                 self.w.write("TRACE ".as_bytes())?;
+                if self.has_comment(_def.expr.pos().line) {
+                    self.w.write("\n".as_bytes())?;
+                }
                 self.render_expr(&_def.expr)?;
             }
             Expression::Fail(_def) => {
                 self.w.write("fail ".as_bytes())?;
+                if self.has_comment(_def.message.pos().line) {
+                    self.w.write("\n".as_bytes())?;
+                }
                 self.render_expr(&_def.message)?;
             }
             Expression::Format(_def) => {
@@ -293,13 +299,24 @@ where
                 write!(self.w, " % ")?;
                 match _def.args {
                     FormatArgs::Single(ref e) => {
+                        if self.has_comment(e.pos().line) {
+                            self.w.write("\n".as_bytes())?;
+                        }
                         self.render_expr(e)?;
                     }
                     FormatArgs::List(ref es) => {
                         self.w.write("(\n".as_bytes())?;
                         self.curr_indent += self.indent_size;
                         let indent = self.make_indent();
-                        let mut prefix = "";
+                        let mut prefix = if es
+                            .first()
+                            .and_then(|e| Some(self.has_comment(e.pos().line)))
+                            .unwrap_or(false)
+                        {
+                            "\n"
+                        } else {
+                            ""
+                        };
                         for e in es.iter() {
                             write!(self.w, "{}{}", prefix, indent)?;
                             self.render_expr(e)?;
