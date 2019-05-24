@@ -44,6 +44,7 @@ SUBCOMMANDS:
     converters    list the available converters
     env           Describe the environment variables ucg uses.
     eval          Evaluate an expression with an optional ucg file as context.
+    fmt           Format ucg files automatically.
     help          Prints this message or the help of the given subcommand(s)
     importers     list the available importers for includes
     test          Check a list of ucg files for errors and run test assertions.
