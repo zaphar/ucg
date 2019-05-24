@@ -360,3 +360,19 @@ fn test_reduce_func_operator_expression_with_embedded_comment() {
     let output = print_to_buffer(input);
     assert_eq!(output, format!("{}\n", input.trim()));
 }
+
+#[test]
+fn test_map_func_operator_expression_with_embedded_comment() {
+    //let input = "// a comment\nfilter(foo, bar);";
+    let input = "// a comment\nmap(\n  // another comment\n  foo,\n  // one more\n  bar);";
+    let output = print_to_buffer(input);
+    assert_eq!(output, format!("{}\n", input.trim()));
+}
+
+#[test]
+fn test_grouped_expression_with_embedded_comment() {
+    //let input = "// a comment\nfilter(foo, bar);";
+    let input = "// a comment\n(\n  // a comment\n  foo\n);";
+    let output = print_to_buffer(input);
+    assert_eq!(output, format!("{}\n", input.trim()));
+}

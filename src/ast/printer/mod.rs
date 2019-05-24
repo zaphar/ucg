@@ -425,7 +425,15 @@ where
             },
             Expression::Grouped(ref expr, _) => {
                 write!(self.w, "(")?;
+                if self.has_comment(expr.pos().line) {
+                    self.curr_indent += self.indent_size;
+                    did_indent = true;
+                    write!(self.w, "\n")?;
+                }
                 self.render_expr(expr)?;
+                if did_indent {
+                    write!(self.w, "\n")?;
+                }
                 write!(self.w, ")")?;
             }
             Expression::Import(_def) => {
