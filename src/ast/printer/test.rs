@@ -21,125 +21,86 @@ fn assert_parse(input: &str, comment_map: Option<&mut CommentMap>) -> Vec<Statem
     parse(OffsetStrIter::new(input), comment_map).unwrap()
 }
 
+fn print_to_buffer(input: &str) -> String {
+    let mut comment_map = BTreeMap::new();
+    let stmts = assert_parse(input, Some(&mut comment_map));
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
+    assert!(printer.render(&stmts).is_ok());
+    String::from_utf8(buffer).unwrap()
+}
+
 #[test]
 fn test_simple_value_printing() {
     let input = "1;";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(0, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_simple_selector_printing() {
     let input = "foo.bar.quux;";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(0, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_simple_quoted_printing() {
     let input = "\"foo\";";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(0, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_escaped_quoted_printing() {
     let input = "\"f\\\\o\\\"o\";";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(0, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_empty_tuple_printing() {
     let input = "{};";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_empty_list_printing() {
     let input = "[];";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_non_empty_tuple_printing() {
     let input = "{\n  foo = 1,\n};";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_nested_empty_tuple_printing() {
     let input = "{\n  foo = {},\n};";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_list_nested_empty_tuple_printing() {
     let input = "[\n  {},\n];";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_nested_non_empty_tuple_printing() {
     let input = "{\n  foo = {\n    bar = 1,\n  },\n};";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_nested_non_empty_list_printing() {
     let input = "[\n  [\n    1,\n  ],\n];";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_simple_quoted_field_tuple_printing() {
     let input = "{\n  \"foo\" = {\n    bar = 1,\n  },\n};";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
     assert_eq!(
-        String::from_utf8(buffer).unwrap(),
+        print_to_buffer(input),
         format!("{}\n", "{\n  foo = {\n    bar = 1,\n  },\n};")
     );
 }
@@ -147,121 +108,73 @@ fn test_simple_quoted_field_tuple_printing() {
 #[test]
 fn test_special_quoted_field_tuple_printing() {
     let input = "{\n  \"foo bar\" = {\n    bar = 1,\n  },\n};";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_let_statement_printing() {
     let input = "let tpl = {\n  \"foo bar\" = {\n    bar = 1,\n  },\n};";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_call_expr_printing() {
     let input = "call(\n  foo,\n  bar,\n);";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_call_expr_one_arg_printing() {
     let input = "call(foo);";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_copy_expr_printing() {
     let input = "copy{\n  foo = 1,\n  bar = 2,\n};";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_copy_expr_one_arg_printing() {
     let input = "copy{\n  foo = 1,\n};";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_out_expr_printing() {
     let input = "out json {\n  foo = 1,\n};";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_select_expr_no_default_printing() {
     let input = "select true, {\n  true = 1,\n  false = 2,\n};";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_select_expr_with_default_printing() {
     let input = "select true, 3, {\n  true = 1,\n  false = 2,\n};";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_not_expr_printing() {
     let input = "not true;";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_fail_expr_printing() {
     let input = "fail \"AHHh\";";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_trace_expr_printing() {
     let input = "TRACE \"AHHh\";";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
@@ -277,11 +190,7 @@ fn test_module_no_out_expr_printing() {
     \"cpu_count\" = mod.cpu,
   };
 };";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
@@ -297,11 +206,7 @@ fn test_module_with_out_expr_printing() {
     \"cpu_count\" = mod.cpu,
   };
 };";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
@@ -310,11 +215,7 @@ fn test_func_expr_printing() {
   foo = foo,
   bar = bar,
 };";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
@@ -322,11 +223,7 @@ fn test_func_expr_single_arg_printing() {
     let input = "let f = func (foo) => {
   foo = foo,
 };";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
@@ -334,11 +231,7 @@ fn test_format_expr_single_arg_printing() {
     let input = "\"what? @{item.foo}\" % {
   foo = 1,
 };";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
@@ -346,219 +239,124 @@ fn test_format_expr_list_arg_printing() {
     let input = "\"what? @ @\" % (
   1,
   2);";
-    let stmts = assert_parse(input, None);
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_statement_with_comment_printing() {
-    let mut comment_map = BTreeMap::new();
     let input = "// add 1 + 1\n1 + 1;";
-    let stmts = assert_parse(input, Some(&mut comment_map));
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_statement_with_comment_printing_groups() {
-    let mut comment_map = BTreeMap::new();
     let input = "// add 1\n// and 1\n1 + 1;";
-    let stmts = assert_parse(input, Some(&mut comment_map));
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(String::from_utf8(buffer).unwrap(), format!("{}\n", input));
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_statement_with_comment_printing_multiple_groups() {
-    let mut comment_map = BTreeMap::new();
     let input = "\n// group 1\n// more group 1\n\n// group 2\n// more group 2\n1 + 1;";
-    let stmts = assert_parse(input, Some(&mut comment_map));
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(
-        String::from_utf8(buffer).unwrap(),
-        format!("{}\n", input.trim())
-    );
+    assert_eq!(print_to_buffer(input), format!("{}\n", input.trim()));
 }
 
 #[test]
 fn test_statement_with_comment_printing_comments_at_end() {
-    let mut comment_map = BTreeMap::new();
     let input = "// group 1\n1 + 1;\n// group 2\n\n";
-    let stmts = assert_parse(input, Some(&mut comment_map));
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(
-        String::from_utf8(buffer).unwrap(),
-        format!("{}\n", input.trim())
-    );
+    assert_eq!(print_to_buffer(input), format!("{}\n", input.trim()));
 }
 
 #[test]
 fn test_tuple_expression_with_embedded_comment() {
-    let mut comment_map = BTreeMap::new();
     let input = "{\n  foo = bar,\n  // a comment\n  bar = foo,\n};";
-    let stmts = assert_parse(input, Some(&mut comment_map));
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(
-        String::from_utf8(buffer).unwrap(),
-        format!("{}\n", input.trim())
-    );
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_tuple_expression_with_embedded_comment_mid_field_expr() {
-    let mut comment_map = BTreeMap::new();
     let input = "{\n  foo = bar,\n  bar =\n// a comment\n   foo\n};";
-    let stmts = assert_parse(input, Some(&mut comment_map));
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
-    assert!(printer.render(&stmts).is_ok());
     assert_eq!(
-        String::from_utf8(buffer).unwrap(),
-        format!(
-            "{}\n",
-            "{\n  foo = bar,\n  // a comment\n  bar = foo,\n};".trim()
-        )
+        print_to_buffer(input),
+        "{\n  foo = bar,\n  // a comment\n  bar = foo,\n};\n"
     );
 }
 
 #[test]
 fn test_tuple_expression_with_embedded_comment_and_mid_field_expr() {
-    let mut comment_map = BTreeMap::new();
     let input = "{\n  foo = bar,\n// a comment\n  bar =\n// another comment\n   foo\n};";
-    let stmts = assert_parse(input, Some(&mut comment_map));
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
-    assert!(printer.render(&stmts).is_ok());
     assert_eq!(
-        String::from_utf8(buffer).unwrap(),
-        format!(
-            "{}\n",
-            "{\n  foo = bar,\n  // a comment\n  // another comment\n  bar = foo,\n};".trim()
-        )
+        print_to_buffer(input),
+        "{\n  foo = bar,\n  // a comment\n  // another comment\n  bar = foo,\n};\n"
     );
 }
 
 #[test]
 fn test_list_expression_with_embedded_comment() {
-    let mut comment_map = BTreeMap::new();
     let input = "[\n  bar,\n  // a comment\n  foo,\n];";
-    let stmts = assert_parse(input, Some(&mut comment_map));
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(
-        String::from_utf8(buffer).unwrap(),
-        format!("{}\n", input.trim())
-    );
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_binary_expression_with_embedded_comment() {
-    let mut comment_map = BTreeMap::new();
     let input = "true == \n// false is not true\nfalse;";
-    let stmts = assert_parse(input, Some(&mut comment_map));
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(
-        String::from_utf8(buffer).unwrap(),
-        format!("{}\n", input.trim())
-    );
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_empty_call_expression_with_comment() {
-    let mut comment_map = BTreeMap::new();
     let input = "// a comment\nmyfunc();";
-    let stmts = assert_parse(input, Some(&mut comment_map));
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(
-        String::from_utf8(buffer).unwrap(),
-        format!("{}\n", input.trim())
-    );
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_call_expression_with_embedded_comment_in_args() {
-    let mut comment_map = BTreeMap::new();
     let input = "// a comment\nmyfunc(\n  arg1,\n  // another comment\n  arg2,\n);";
-    let stmts = assert_parse(input, Some(&mut comment_map));
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(
-        String::from_utf8(buffer).unwrap(),
-        format!("{}\n", input.trim())
-    );
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_copy_expression_with_embedded_comment_in_args() {
-    let mut comment_map = BTreeMap::new();
     let input = "// a comment\nmyfunc{\n  foo = arg1,\n  // another comment\n  bar = arg2,\n};";
-    let stmts = assert_parse(input, Some(&mut comment_map));
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(
-        String::from_utf8(buffer).unwrap(),
-        format!("{}\n", input.trim())
-    );
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_trace_expression_with_embedded_comment() {
-    let mut comment_map = BTreeMap::new();
     let input = "// a comment\nTRACE \n// another comment\nfoo;";
-    let stmts = assert_parse(input, Some(&mut comment_map));
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(
-        String::from_utf8(buffer).unwrap(),
-        format!("{}\n", input.trim())
-    );
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_fail_expression_with_embedded_comment() {
-    let mut comment_map = BTreeMap::new();
     let input = "// a comment\nfail \n// another comment\nfoo;";
-    let stmts = assert_parse(input, Some(&mut comment_map));
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(
-        String::from_utf8(buffer).unwrap(),
-        format!("{}\n", input.trim())
-    );
+    assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_format_expression_with_embedded_comment() {
-    let mut comment_map = BTreeMap::new();
     let input = "// a comment\n\"@(item.bar)\" % \n// another comment\nfoo;";
-    let stmts = assert_parse(input, Some(&mut comment_map));
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut printer = AstPrinter::new(2, &mut buffer).with_comment_map(&comment_map);
-    assert!(printer.render(&stmts).is_ok());
-    assert_eq!(
-        String::from_utf8(buffer).unwrap(),
-        format!("{}\n", input.trim())
-    );
+    let output = print_to_buffer(input);
+    assert_eq!(output, format!("{}\n", input.trim()));
+}
+
+#[test]
+fn test_filter_func_operator_expression_with_embedded_comment() {
+    //let input = "// a comment\nfilter(foo, bar);";
+    let input = "// a comment\nfilter(\n  // another comment\n  foo,\n  // one more\n  bar);";
+    let output = print_to_buffer(input);
+    assert_eq!(output, format!("{}\n", input.trim()));
+}
+
+#[test]
+fn test_reduce_func_operator_expression_with_embedded_comment() {
+    //let input = "// a comment\nfilter(foo, bar);";
+    let input = "// a comment\nreduce(
+  // another comment
+  myfunc,
+  // one more
+  acc,
+  // and the last
+  target);";
+    let output = print_to_buffer(input);
+    assert_eq!(output, format!("{}\n", input.trim()));
 }

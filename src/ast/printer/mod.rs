@@ -218,7 +218,13 @@ where
     }
 
     pub fn render_expr(&mut self, expr: &Expression) -> std::io::Result<()> {
+        let had_comment = self.has_comment(expr.pos().line);
         self.render_comment_if_needed(expr.pos().line)?;
+        let indent = self.make_indent();
+        if had_comment {
+            write!(self.w, "{}", indent)?;
+        }
+        let mut did_indent = false;
         match expr {
             Expression::Binary(_def) => {
                 let op = match _def.kind {
@@ -344,24 +350,75 @@ where
             Expression::FuncOp(_def) => match _def {
                 FuncOpDef::Filter(_def) => {
                     write!(self.w, "filter(")?;
+                    if self.has_comment(_def.func.pos().line) {
+                        self.curr_indent += self.indent_size;
+                        did_indent = true;
+                        write!(self.w, "\n")?;
+                    }
                     self.render_expr(&_def.func)?;
-                    write!(self.w, ", ")?;
+                    if self.has_comment(_def.target.pos().line) {
+                        write!(self.w, ",")?;
+                        if !did_indent {
+                            self.curr_indent += self.indent_size;
+                        }
+                        did_indent = true;
+                        self.w.write("\n".as_bytes())?;
+                    } else {
+                        write!(self.w, ", ")?;
+                    }
                     self.render_expr(&_def.target)?;
                     write!(self.w, ")")?;
                 }
                 FuncOpDef::Reduce(_def) => {
                     write!(self.w, "reduce(")?;
+                    if self.has_comment(_def.func.pos().line) {
+                        self.curr_indent += self.indent_size;
+                        did_indent = true;
+                        write!(self.w, "\n")?;
+                    }
                     self.render_expr(&_def.func)?;
-                    write!(self.w, ", ")?;
+                    if self.has_comment(_def.acc.pos().line) {
+                        write!(self.w, ",")?;
+                        if !did_indent {
+                            self.curr_indent += self.indent_size;
+                        }
+                        did_indent = true;
+                        self.w.write("\n".as_bytes())?;
+                    } else {
+                        write!(self.w, ", ")?;
+                    }
                     self.render_expr(&_def.acc)?;
-                    write!(self.w, ", ")?;
+                    if self.has_comment(_def.target.pos().line) {
+                        write!(self.w, ",")?;
+                        if !did_indent {
+                            self.curr_indent += self.indent_size;
+                        }
+                        did_indent = true;
+                        self.w.write("\n".as_bytes())?;
+                    } else {
+                        write!(self.w, ", ")?;
+                    }
                     self.render_expr(&_def.target)?;
                     write!(self.w, ")")?;
                 }
                 FuncOpDef::Map(_def) => {
                     write!(self.w, "map(")?;
+                    if self.has_comment(_def.func.pos().line) {
+                        self.curr_indent += self.indent_size;
+                        did_indent = true;
+                        write!(self.w, "\n")?;
+                    }
                     self.render_expr(&_def.func)?;
-                    write!(self.w, ", ")?;
+                    if self.has_comment(_def.target.pos().line) {
+                        write!(self.w, ",")?;
+                        if !did_indent {
+                            self.curr_indent += self.indent_size;
+                        }
+                        did_indent = true;
+                        self.w.write("\n".as_bytes())?;
+                    } else {
+                        write!(self.w, ", ")?;
+                    }
                     self.render_expr(&_def.target)?;
                     write!(self.w, ")")?;
                 }
@@ -433,6 +490,9 @@ where
                 self.render_value(_def)?;
             }
         };
+        if did_indent {
+            self.curr_indent -= self.indent_size;
+        }
         Ok(())
     }
 
