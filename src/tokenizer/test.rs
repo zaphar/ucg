@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use super::*;
 
 use abortable_parser::{Offsetable, Result, SliceIter};
@@ -89,7 +91,7 @@ fn test_string_with_escaping() {
 #[test]
 fn test_tokenize_bareword_with_dash() {
     let input = OffsetStrIter::new("foo-bar ");
-    let result = tokenize(input.clone());
+    let result = tokenize(input.clone(), None);
     assert!(result.is_ok(), format!("result {:?} is not ok", result));
     if let Ok(toks) = result {
         assert_eq!(toks.len(), 2);
@@ -157,7 +159,24 @@ fn test_tokenize_one_of_each() {
         "map out filter assert let import func select as => [ ] { } ; = % / * \
          + - . ( ) , 1 . foo \"bar\" // comment\n ; true false == < > <= >= !=",
     );
-    let result = tokenize(input.clone());
+    let result = tokenize(input.clone(), None);
+    assert!(result.is_ok(), format!("result {:?} is not ok", result));
+    let v = result.unwrap();
+    for (i, t) in v.iter().enumerate() {
+        println!("{}: {:?}", i, t);
+    }
+    assert_eq!(v.len(), 39);
+    assert_eq!(v[38].typ, TokenType::END);
+}
+
+#[test]
+fn test_tokenize_one_of_each_comment_map_path() {
+    let input = OffsetStrIter::new(
+        "map out filter assert let import func select as => [ ] { } ; = % / * \
+         + - . ( ) , 1 . foo \"bar\" // comment\n ; true false == < > <= >= !=",
+    );
+    let mut comment_map = BTreeMap::new();
+    let result = tokenize(input.clone(), Some(&mut comment_map));
     assert!(result.is_ok(), format!("result {:?} is not ok", result));
     let v = result.unwrap();
     for (i, t) in v.iter().enumerate() {
@@ -170,7 +189,7 @@ fn test_tokenize_one_of_each() {
 #[test]
 fn test_parse_has_end() {
     let input = OffsetStrIter::new("foo");
-    let result = tokenize(input.clone());
+    let result = tokenize(input.clone(), None);
     assert!(result.is_ok());
     let v = result.unwrap();
     assert_eq!(v.len(), 2);
@@ -326,4 +345,25 @@ fn test_match_type() {
         Result::Complete(_, tok) => assert_eq!(tok, input[0]),
         res => assert!(false, format!("Fail: {:?}", res)),
     }
+}
+
+#[test]
+fn test_tokenize_builds_comment_map() {
+    let input = OffsetStrIter::new("// comment 1\n\n//comment 2");
+    let mut comment_map = BTreeMap::new();
+    let result = tokenize(input.clone(), Some(&mut comment_map));
+    assert!(result.is_ok(), format!("result {:?} is not ok", result));
+
+    assert_eq!(comment_map.len(), 2);
+}
+
+#[test]
+fn test_tokenize_builds_comment_map_groups() {
+    let input = OffsetStrIter::new("// first part\n// comment 1\n\n//comment 2");
+    let mut comment_map = BTreeMap::new();
+    let result = tokenize(input.clone(), Some(&mut comment_map));
+    assert!(result.is_ok(), format!("result {:?} is not ok", result));
+
+    assert_eq!(comment_map.len(), 2);
+    assert_eq!(comment_map[&2].len(), 2);
 }

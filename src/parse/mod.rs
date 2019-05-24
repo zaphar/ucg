@@ -28,6 +28,8 @@ use crate::error::StackPrinter;
 use crate::iter::OffsetStrIter;
 use crate::tokenizer::*;
 
+pub use crate::tokenizer::{CommentGroup, CommentMap};
+
 type ParseResult<'a, O> = Result<SliceIter<'a, Token>, O>;
 
 #[cfg(feature = "tracing")]
@@ -791,21 +793,19 @@ make_fn!(
     )
 );
 
-fn tuple_to_let(tok: Token, expr: Expression) -> Statement {
-    Statement::Let(LetDef {
-        name: tok,
-        value: expr,
-    })
-}
-
 make_fn!(
     let_stmt_body<SliceIter<Token>, Statement>,
     do_each!(
+        pos => pos,
         name => wrap_err!(match_type!(BAREWORD), "Expected name for binding"),
         _ => punct!("="),
         val => wrap_err!(trace_parse!(expression), "Expected Expression"),
         _ => punct!(";"),
-        (tuple_to_let(name, val))
+        (Statement::Let(LetDef {
+            pos: pos,
+            name: name,
+            value: val,
+        }))
     )
 );
 
@@ -821,10 +821,11 @@ make_fn!(
 make_fn!(
     assert_statement<SliceIter<Token>, Statement>,
     do_each!(
+        pos => pos,
         _ => word!("assert"),
         expr => wrap_err!(must!(expression), "Expected Tuple {ok=<bool>, desc=<str>}"),
         _ => must!(punct!(";")),
-        (Statement::Assert(expr))
+        (Statement::Assert(pos, expr))
     )
 );
 
@@ -853,8 +854,11 @@ fn statement(i: SliceIter<Token>) -> Result<SliceIter<Token>, Statement> {
 //trace_macros!(false);
 
 /// Parses a LocatedSpan into a list of Statements or an `error::Error`.
-pub fn parse<'a>(input: OffsetStrIter<'a>) -> std::result::Result<Vec<Statement>, String> {
-    match tokenize(input.clone()) {
+pub fn parse<'a>(
+    input: OffsetStrIter<'a>,
+    comment_map: Option<&mut CommentMap>,
+) -> std::result::Result<Vec<Statement>, String> {
+    match tokenize(input.clone(), comment_map) {
         Ok(tokenized) => {
             let mut out = Vec::new();
             let mut i_ = SliceIter::new(&tokenized);

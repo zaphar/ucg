@@ -1,36 +1,13 @@
 use crate::ast::*;
 
-pub struct AstWalker<'a> {
-    handle_value: Option<&'a Fn(&mut Value)>,
-    handle_expression: Option<&'a Fn(&mut Expression)>,
-    handle_statment: Option<&'a Fn(&mut Statement)>,
-}
-
-impl<'a> AstWalker<'a> {
-    pub fn new() -> Self {
-        AstWalker {
-            handle_value: None,
-            handle_expression: None,
-            handle_statment: None,
+pub trait Walker {
+    fn walk_statement_list(&mut self, stmts: Vec<&mut Statement>) {
+        for v in stmts {
+            self.walk_statement(v);
         }
     }
 
-    pub fn with_value_handler(mut self, h: &'a Fn(&mut Value)) -> Self {
-        self.handle_value = Some(h);
-        self
-    }
-
-    pub fn with_expr_handler(mut self, h: &'a Fn(&mut Expression)) -> Self {
-        self.handle_expression = Some(h);
-        self
-    }
-
-    pub fn with_stmt_handler(mut self, h: &'a Fn(&mut Statement)) -> Self {
-        self.handle_statment = Some(h);
-        self
-    }
-
-    pub fn walk_statement(&self, stmt: &mut Statement) {
+    fn walk_statement(&mut self, stmt: &mut Statement) {
         self.visit_statement(stmt);
         match stmt {
             Statement::Let(ref mut def) => {
@@ -39,7 +16,7 @@ impl<'a> AstWalker<'a> {
             Statement::Expression(ref mut expr) => {
                 self.walk_expression(expr);
             }
-            Statement::Assert(ref mut expr) => {
+            Statement::Assert(_, ref mut expr) => {
                 self.walk_expression(expr);
             }
             Statement::Output(_, _, ref mut expr) => {
@@ -48,13 +25,13 @@ impl<'a> AstWalker<'a> {
         }
     }
 
-    fn walk_fieldset(&self, fs: &mut FieldList) {
+    fn walk_fieldset(&mut self, fs: &mut FieldList) {
         for &mut (_, ref mut expr) in fs.iter_mut() {
             self.walk_expression(expr);
         }
     }
 
-    pub fn walk_expression(&self, expr: &mut Expression) {
+    fn walk_expression(&mut self, expr: &mut Expression) {
         self.visit_expression(expr);
         match expr {
             Expression::Call(ref mut def) => {
@@ -135,19 +112,59 @@ impl<'a> AstWalker<'a> {
         }
     }
 
-    fn visit_value(&self, val: &mut Value) {
+    fn visit_value(&mut self, val: &mut Value);
+
+    fn visit_expression(&mut self, expr: &mut Expression);
+
+    fn visit_statement(&mut self, stmt: &mut Statement);
+}
+
+// TODO this would be better implemented as a Trait I think.
+pub struct AstWalker<'a> {
+    handle_value: Option<&'a Fn(&mut Value)>,
+    handle_expression: Option<&'a Fn(&mut Expression)>,
+    handle_statment: Option<&'a Fn(&mut Statement)>,
+}
+
+impl<'a> AstWalker<'a> {
+    pub fn new() -> Self {
+        AstWalker {
+            handle_value: None,
+            handle_expression: None,
+            handle_statment: None,
+        }
+    }
+
+    pub fn with_value_handler(mut self, h: &'a Fn(&mut Value)) -> Self {
+        self.handle_value = Some(h);
+        self
+    }
+
+    pub fn with_expr_handler(mut self, h: &'a Fn(&mut Expression)) -> Self {
+        self.handle_expression = Some(h);
+        self
+    }
+
+    pub fn with_stmt_handler(mut self, h: &'a Fn(&mut Statement)) -> Self {
+        self.handle_statment = Some(h);
+        self
+    }
+}
+
+impl<'a> Walker for AstWalker<'a> {
+    fn visit_value(&mut self, val: &mut Value) {
         if let Some(h) = self.handle_value {
             h(val);
         }
     }
 
-    fn visit_expression(&self, expr: &mut Expression) {
+    fn visit_expression(&mut self, expr: &mut Expression) {
         if let Some(h) = self.handle_expression {
             h(expr);
         }
     }
 
-    fn visit_statement(&self, stmt: &mut Statement) {
+    fn visit_statement(&mut self, stmt: &mut Statement) {
         if let Some(h) = self.handle_statment {
             h(stmt);
         }

@@ -23,6 +23,9 @@ use crate::ast::*;
 use crate::error::StackPrinter;
 use crate::iter::OffsetStrIter;
 
+pub type CommentGroup = Vec<Token>;
+pub type CommentMap = std::collections::BTreeMap<usize, CommentGroup>;
+
 fn is_symbol_char<'a>(i: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, u8> {
     let mut _i = i.clone();
     let c = match _i.next() {
@@ -350,6 +353,12 @@ fn comment(input: OffsetStrIter) -> Result<OffsetStrIter, Token> {
                 )
             ) {
                 Result::Complete(rest, cmt) => {
+                    // Eat the new lines here before continuing
+                    let rest =
+                        match optional!(rest, either!(text_token!("\r\n"), text_token!("\n"))) {
+                            Result::Complete(next_rest, _) => next_rest,
+                            _ => rest,
+                        };
                     return Result::Complete(rest, make_tok!(CMT => cmt.to_string(), input));
                 }
                 // If we didn't find a new line then we just grab everything.
@@ -452,9 +461,16 @@ fn token<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Token> {
 }
 
 /// Consumes an input OffsetStrIter and returns either a Vec<Token> or a error::Error.
-pub fn tokenize<'a>(input: OffsetStrIter<'a>) -> std::result::Result<Vec<Token>, String> {
+/// If a comment_map is passed in then it will store the comments indexed by their
+/// line number.
+pub fn tokenize<'a>(
+    input: OffsetStrIter<'a>,
+    mut comment_map: Option<&mut CommentMap>,
+) -> std::result::Result<Vec<Token>, String> {
     let mut out = Vec::new();
     let mut i = input.clone();
+    let mut comment_group = Vec::new();
+    let mut comment_was_last: Option<Token> = None;
     loop {
         if let Result::Complete(_, _) = eoi(i.clone()) {
             break;
@@ -486,12 +502,38 @@ pub fn tokenize<'a>(input: OffsetStrIter<'a>) -> std::result::Result<Vec<Token>,
             }
             Result::Complete(rest, tok) => {
                 i = rest;
-                if tok.typ == TokenType::COMMENT || tok.typ == TokenType::WS {
-                    // we skip comments and whitespace
-                    continue;
+                match (&mut comment_map, &tok.typ) {
+                    // variants with a comment_map
+                    (&mut Some(_), &TokenType::COMMENT) => {
+                        comment_group.push(tok.clone());
+                        comment_was_last = Some(tok.clone());
+                        continue;
+                    }
+                    (&mut Some(ref mut map), _) => {
+                        if tok.typ != TokenType::WS {
+                            out.push(tok);
+                        }
+                        if let Some(tok) = comment_was_last {
+                            map.insert(tok.pos.line, comment_group);
+                            comment_group = Vec::new();
+                        }
+                    }
+                    // variants without a comment_map
+                    (None, TokenType::WS) | (None, TokenType::COMMENT) => continue,
+                    (None, _) => {
+                        out.push(tok);
+                    }
                 }
-                out.push(tok);
+                comment_was_last = None;
             }
+        }
+    }
+    // if we had a comments at the end then we need to do a final
+    // insert into our map.
+    if let Some(ref mut map) = comment_map {
+        if let Some(ref tok) = comment_group.last() {
+            let line = tok.pos.line;
+            map.insert(line, comment_group);
         }
     }
     // ensure that we always have an END token to go off of.

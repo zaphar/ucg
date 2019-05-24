@@ -31,7 +31,10 @@ use abortable_parser;
 use crate::build::scope::Scope;
 use crate::build::Val;
 
+pub mod printer;
 pub mod walk;
+
+pub use walk::Walker;
 
 macro_rules! enum_type_equality {
     ( $slf:ident, $r:expr, $( $l:pat ),* ) => {
@@ -593,7 +596,7 @@ impl ModuleDef {
                 }
             }
         };
-        let walker = walk::AstWalker::new().with_expr_handler(&rewrite_import);
+        let mut walker = walk::AstWalker::new().with_expr_handler(&rewrite_import);
         for stmt in self.statements.iter_mut() {
             walker.walk_statement(stmt);
         }
@@ -753,6 +756,7 @@ impl fmt::Display for Expression {
 /// Encodes a let statement in the UCG AST.
 #[derive(Debug, PartialEq, Clone)]
 pub struct LetDef {
+    pub pos: Position,
     pub name: Token,
     pub value: Expression,
 }
@@ -767,8 +771,19 @@ pub enum Statement {
     Let(LetDef),
 
     // Assert statement
-    Assert(Expression),
+    Assert(Position, Expression),
 
     // Identify an Expression for output.
     Output(Position, Token, Expression),
+}
+
+impl Statement {
+    fn pos(&self) -> &Position {
+        match self {
+            Statement::Expression(ref e) => e.pos(),
+            Statement::Let(ref def) => &def.pos,
+            Statement::Assert(ref pos, _) => pos,
+            Statement::Output(ref pos, _, _) => pos,
+        }
+    }
 }

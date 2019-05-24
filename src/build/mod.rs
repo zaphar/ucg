@@ -303,7 +303,7 @@ impl<'a> FileBuilder<'a> {
     }
 
     fn eval_input(&mut self, input: OffsetStrIter) -> Result<Rc<Val>, Box<dyn Error>> {
-        match parse(input.clone()) {
+        match parse(input.clone(), None) {
             Ok(stmts) => {
                 //panic!("Successfully parsed {}", input);
                 let mut out: Option<Rc<Val>> = None;
@@ -511,7 +511,7 @@ impl<'a> FileBuilder<'a> {
     fn eval_stmt(&mut self, stmt: &Statement) -> Result<Rc<Val>, Box<dyn Error>> {
         let child_scope = self.scope.clone();
         match stmt {
-            &Statement::Assert(ref expr) => self.eval_assert(&expr, &child_scope),
+            &Statement::Assert(_, ref expr) => self.eval_assert(&expr, &child_scope),
             &Statement::Let(ref def) => self.eval_let(def),
             &Statement::Expression(ref expr) => self.eval_expr(expr, &child_scope),
             // Only one output can be used per file. Right now we enforce this by
@@ -1654,11 +1654,17 @@ impl<'a> FileBuilder<'a> {
             // we are not in validate_mode so build_asserts are noops.
             return Ok(Rc::new(Val::Empty));
         }
+        let mut buffer: Vec<u8> = Vec::new();
+        {
+            let mut printer = crate::ast::printer::AstPrinter::new(2, &mut buffer);
+            let _ = printer.render_expr(expr);
+        }
+        let expr_pretty = String::from_utf8(buffer).unwrap();
         let ok = match self.eval_expr(expr, scope) {
             Ok(v) => v,
             Err(e) => {
                 // failure!
-                let msg = format!("CompileError: {}\n", e);
+                let msg = format!("CompileError: {}\nfor expression:\n{}\n", e, expr_pretty);
                 self.record_assert_result(&msg, false);
                 return Ok(Rc::new(Val::Empty));
             }
@@ -1965,9 +1971,16 @@ impl<'a> FileBuilder<'a> {
                 };
             }
             &Expression::Debug(ref def) => {
+                let mut buffer: Vec<u8> = Vec::new();
+                {
+                    let mut printer = crate::ast::printer::AstPrinter::new(2, &mut buffer);
+                    let _ = printer.render_expr(&def.expr);
+                }
+                let expr_pretty = String::from_utf8(buffer).unwrap();
+
                 let val = self.eval_expr(&def.expr, scope);
                 if let Ok(ref val) = val {
-                    eprintln!("TRACE: {} at {}", val, def.pos);
+                    eprintln!("TRACE: {} = {} at {}", expr_pretty, val, def.pos);
                 }
                 val
             }

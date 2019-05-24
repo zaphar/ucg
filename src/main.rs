@@ -17,9 +17,11 @@ extern crate dirs;
 extern crate ucglib;
 
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs::File;
 use std::io;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process;
 use std::rc::Rc;
@@ -29,6 +31,8 @@ use ucglib::build::assets::{Cache, MemoryCache};
 use ucglib::build::Val;
 use ucglib::convert::traits;
 use ucglib::convert::{ConverterRegistry, ImporterRegistry};
+use ucglib::iter::OffsetStrIter;
+use ucglib::parse::parse;
 
 fn do_flags<'a, 'b>() -> clap::App<'a, 'b> {
     clap_app!(
@@ -52,6 +56,12 @@ fn do_flags<'a, 'b>() -> clap::App<'a, 'b> {
              (about: "Check a list of ucg files for errors and run test assertions.")
              (@arg recurse: -r "Whether we should recurse or not.")
              (@arg INPUT: ... "Input ucg files or directories to run test assertions for. If not provided it will scan the current directory for files with _test.ucg")
+            )
+            (@subcommand fmt =>
+             (about: "Format ucg files automatically.")
+             (@arg recurse: -r "Whether we should recurse or not.")
+             (@arg indent: -i --indent "How many spaces to indent by. Defaults to 4")
+             (@arg INPUT: ... "Input ucg files or directories to format")
             )
             (@subcommand converters =>
              (about: "list the available converters")
@@ -346,6 +356,60 @@ fn build_command(
     }
 }
 
+fn fmt_file(p: &Path, indent: usize) -> std::result::Result<(), Box<dyn Error>> {
+    let mut f = File::open(p)?;
+    let mut contents = String::new();
+    f.read_to_string(&mut contents)?;
+    let mut comment_map = BTreeMap::new();
+    let stmts = parse(OffsetStrIter::new(&contents), Some(&mut comment_map))?;
+    let mut printer = ucglib::ast::printer::AstPrinter::new(indent, std::io::stdout())
+        .with_comment_map(&comment_map);
+    printer.render(&stmts)?;
+    Ok(())
+}
+
+fn fmt_dir(p: &Path, recurse: bool, indent: usize) -> std::result::Result<(), Box<dyn Error>> {
+    // TODO(jwall): We should handle this error more gracefully
+    // for the user here.
+    let dir_iter = std::fs::read_dir(p)?.peekable();
+    for entry in dir_iter {
+        let next_item = entry.unwrap();
+        let path = next_item.path();
+        if path.is_dir() && recurse {
+            fmt_dir(&path, recurse, indent)?;
+        } else {
+            fmt_file(&path, indent)?;
+        }
+    }
+    Ok(())
+}
+
+fn fmt_command(matches: &clap::ArgMatches) -> std::result::Result<(), Box<dyn Error>> {
+    let files = matches.values_of("INPUT");
+    let recurse = matches.is_present("recurse");
+    let indent = match matches.value_of("indent") {
+        Some(s) => s.parse::<usize>()?,
+        None => 4,
+    };
+
+    let mut paths = Vec::new();
+    if files.is_none() {
+        paths.push(std::env::current_dir()?);
+    } else {
+        for f in files.unwrap() {
+            paths.push(PathBuf::from(f));
+        }
+    }
+    for p in paths {
+        if p.is_dir() {
+            fmt_dir(&p, recurse, indent)?;
+        } else {
+            fmt_file(&p, indent)?;
+        }
+    }
+    Ok(())
+}
+
 fn test_command(
     matches: &clap::ArgMatches,
     import_paths: &Vec<PathBuf>,
@@ -482,6 +546,10 @@ fn main() {
         importers_command(&registry)
     } else if let Some(_) = app_matches.subcommand_matches("env") {
         env_help()
+    } else if let Some(matches) = app_matches.subcommand_matches("fmt") {
+        if let Err(e) = fmt_command(matches) {
+            eprintln!("{}", e);
+        }
     } else {
         app.print_help().unwrap();
         println!("");
