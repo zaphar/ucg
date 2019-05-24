@@ -76,7 +76,7 @@ where
             None => return false,
         };
         for c in s.chars() {
-            if !c.is_ascii_alphanumeric() {
+            if !(c.is_ascii_alphabetic() || c == '_') {
                 return false;
             }
         }
@@ -89,7 +89,15 @@ where
             let cg = map.get(&line).unwrap_or(&empty);
             let indent = self.make_indent();
             for c in cg.iter() {
-                write!(self.w, "{}// {}\n", indent, c.fragment.trim())?;
+                let first_char = match c.fragment.chars().nth(0) {
+                    Some(c) => c,
+                    None => '\0',
+                };
+                if !first_char.is_whitespace() {
+                    write!(self.w, "{}// {}\n", indent, c.fragment.trim_end())?;
+                } else {
+                    write!(self.w, "{}//{}\n", indent, c.fragment.trim_end())?;
+                }
             }
             self.comment_group_lines.pop();
         }
@@ -100,7 +108,7 @@ where
         loop {
             if let Some(next_comment_line) = self.comment_group_lines.last() {
                 let next_comment_line = *next_comment_line;
-                if next_comment_line < line {
+                if next_comment_line <= line {
                     self.print_comment_group(next_comment_line)?;
                 } else {
                     break;
@@ -116,18 +124,14 @@ where
     }
 
     fn render_comment_if_needed(&mut self, line: usize) -> std::io::Result<()> {
-        if line > self.last_line {
-            self.render_missed_comments(line)?;
-            self.last_line = line;
-        }
+        self.render_missed_comments(line)?;
+        self.last_line = line;
         Ok(())
     }
 
     fn has_comment(&self, line: usize) -> bool {
-        if line > self.last_line {
-            if let Some(next_comment_line) = self.comment_group_lines.last() {
-                return *next_comment_line < line;
-            }
+        if let Some(next_comment_line) = self.comment_group_lines.last() {
+            return *next_comment_line < line;
         }
         false
     }
@@ -549,7 +553,7 @@ where
                 self.render_expr(&_expr)?;
             }
         };
-        write!(self.w, ";\n")?;
+        write!(self.w, ";\n\n")?;
         self.last_line = line;
         Ok(())
     }
