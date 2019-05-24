@@ -437,6 +437,9 @@ where
                 write!(self.w, ")")?;
             }
             Expression::Import(_def) => {
+                if self.has_comment(_def.path.pos.line) {
+                    self.render_missed_comments(_def.path.pos.line)?;
+                }
                 write!(
                     self.w,
                     "import \"{}\"",
@@ -444,6 +447,9 @@ where
                 )?;
             }
             Expression::Include(_def) => {
+                if self.has_comment(_def.path.pos.line) {
+                    self.render_missed_comments(_def.path.pos.line)?;
+                }
                 write!(
                     self.w,
                     "include {} \"{}\"",
