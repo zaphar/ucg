@@ -477,10 +477,19 @@ where
                 write!(self.w, "}}")?;
             }
             Expression::Not(_def) => {
+                if self.has_comment(_def.pos.line) {
+                    self.render_missed_comments(_def.pos.line)?;
+                }
                 write!(self.w, "not ")?;
                 self.render_expr(&_def.expr)?;
             }
             Expression::Range(_def) => {
+                // We print all of the comments we missed before the end of this
+                // expression before the entire range expression.
+                let end_line = _def.end.pos().line;
+                if self.has_comment(end_line) {
+                    self.render_missed_comments(end_line)?;
+                }
                 self.render_expr(&_def.start)?;
                 write!(self.w, ":")?;
                 if let Some(ref e) = _def.step {
@@ -490,7 +499,16 @@ where
                 self.render_expr(&_def.end)?;
             }
             Expression::Select(_def) => {
-                //
+                let val_line = _def.val.pos().line;
+                if self.has_comment(val_line) {
+                    self.render_missed_comments(val_line)?;
+                }
+                if let Some(ref e) = _def.default {
+                    let default_line = e.pos().line;
+                    if self.has_comment(default_line) {
+                        self.render_missed_comments(default_line)?;
+                    }
+                }
                 write!(self.w, "select ")?;
                 self.render_expr(&_def.val)?;
                 write!(self.w, ", ")?;
