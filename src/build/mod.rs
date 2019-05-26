@@ -302,7 +302,7 @@ impl<'a> FileBuilder<'a> {
         Ok(())
     }
 
-    fn eval_input(&mut self, input: OffsetStrIter) -> Result<Rc<Val>, Box<dyn Error>> {
+    pub fn eval_input(&mut self, input: OffsetStrIter) -> Result<Rc<Val>, Box<dyn Error>> {
         match parse(input.clone(), None) {
             Ok(stmts) => {
                 //panic!("Successfully parsed {}", input);

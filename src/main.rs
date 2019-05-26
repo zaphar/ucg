@@ -14,6 +14,7 @@
 #[macro_use]
 extern crate clap;
 extern crate dirs;
+extern crate rustyline;
 extern crate ucglib;
 
 use std::cell::RefCell;
@@ -46,6 +47,9 @@ fn do_flags<'a, 'b>() -> clap::App<'a, 'b> {
              (@arg expr: --expr -e +takes_value +required "Expression to evaluate.")
              (@arg target: --format +takes_value "Output type. (flags, json, env, exec) defaults to json.")
              (@arg INPUT: "ucg file to use as context for the expression.")
+            )
+            (@subcommand repl =>
+                (about: "Start the ucg repl for interactive evaluation.")
             )
             (@subcommand build =>
              (about: "Build a list of ucg files.")
@@ -509,6 +513,78 @@ fn env_help() {
     );
 }
 
+fn do_repl(
+    import_paths: &Vec<PathBuf>,
+    cache: Rc<RefCell<Cache>>,
+) -> std::result::Result<(), Box<dyn Error>> {
+    let config = rustyline::Config::builder();
+    let mut editor = rustyline::Editor::<()>::with_config(
+        config
+            .history_ignore_space(true)
+            .history_ignore_dups(false)
+            .build(),
+    );
+    let path_home = dirs::home_dir().unwrap_or(std::env::temp_dir());
+    let config_home = std::env::var("XDG_CACHE_HOME")
+        .unwrap_or_else(|_| format!("{}/.cache", path_home.to_string_lossy()));
+    let mut config_home = PathBuf::from(config_home);
+    config_home.push("ucg");
+    config_home.push("line_hist");
+    if editor.load_history(&config_home).is_err() {
+        eprintln!(
+            "No history file {} Continuing without history.",
+            config_home.to_string_lossy()
+        );
+        // introduce a scope so the file will get automatically closed after
+        {
+            let base_dir = config_home.parent().unwrap();
+            if !base_dir.exists() {
+                if let Err(e) = std::fs::create_dir_all(base_dir) {
+                    eprintln!("{}", e);
+                }
+            }
+            if let Err(e) = std::fs::File::create(&config_home) {
+                eprintln!("{}", e);
+            }
+        }
+    }
+    let mut builder = build::FileBuilder::new(std::env::current_dir()?, import_paths, cache);
+    // loop
+    let mut lines = ucglib::io::StatementAccumulator::new();
+    loop {
+        // print prompt
+        lines.push(editor.readline("ucg> ")?);
+        // check to see if that line is a statement
+        loop {
+            // read a statement
+            if let Some(stmt) = lines.get_statement() {
+                // if it is then
+                // eval statement
+                match builder.eval_string(&stmt) {
+                    // print the result
+                    Err(e) => eprintln!("{}", e),
+                    Ok(v) => {
+                        println!("{}", v);
+                        editor.history_mut().add(stmt);
+                        editor.save_history(&config_home)?;
+                    }
+                }
+                // start loop over at prompt.
+                break;
+            }
+            // if not then keep accumulating lines without a prompt
+            lines.push(editor.readline(">>   ")?);
+        }
+    }
+}
+
+fn repl(import_paths: &Vec<PathBuf>, cache: Rc<RefCell<Cache>>) {
+    if let Err(e) = do_repl(import_paths, cache) {
+        eprintln!("{}", e);
+        process::exit(1);
+    }
+}
+
 fn main() {
     let mut app = do_flags();
     let app_matches = app.clone().get_matches();
@@ -546,6 +622,8 @@ fn main() {
         importers_command(&registry)
     } else if let Some(_) = app_matches.subcommand_matches("env") {
         env_help()
+    } else if let Some(_) = app_matches.subcommand_matches("repl") {
+        repl(&import_paths, cache)
     } else if let Some(matches) = app_matches.subcommand_matches("fmt") {
         if let Err(e) = fmt_command(matches) {
             eprintln!("{}", e);

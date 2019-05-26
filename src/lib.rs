@@ -38,6 +38,7 @@ pub mod tokenizer;
 pub mod build;
 pub mod convert;
 pub mod error;
+pub mod io;
 pub mod iter;
 pub mod parse;
 
