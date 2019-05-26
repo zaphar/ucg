@@ -47,6 +47,7 @@ SUBCOMMANDS:
     fmt           Format ucg files automatically.
     help          Prints this message or the help of the given subcommand(s)
     importers     list the available importers for includes
+    repl          Start the ucg repl for interactive evaluation.
     test          Check a list of ucg files for errors and run test assertions.
 ```
 
@@ -65,6 +66,19 @@ FLAGS:
 
 ARGS:
     <INPUT>...    Input ucg files or directories to build. If not provided then build the contents of the current directory.
+```
+
+## Run the repl
+
+```sh
+$> ucg repl
+ucg> 1 + 1;
+2
+ucg> {foo = 1 + 1};
+{
+        foo = 2,
+}
+ucg> 
 ```
 
 ## Testing
