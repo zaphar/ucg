@@ -11,6 +11,7 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
+use super::assets;
 use super::assets::MemoryCache;
 use super::{FileBuilder, SelectDef, Val};
 use crate::ast::*;
@@ -19,7 +20,10 @@ use std;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-fn test_expr_to_val(mut cases: Vec<(Expression, Val)>, b: FileBuilder) {
+fn test_expr_to_val<'a, C: assets::Cache>(
+    mut cases: Vec<(Expression, Val)>,
+    b: FileBuilder<'a, C>,
+) {
     for tpl in cases.drain(0..) {
         assert_eq!(
             b.eval_expr(&tpl.0, &b.scope.spawn_child()).unwrap(),

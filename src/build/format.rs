@@ -19,6 +19,7 @@ use std::error::Error;
 use std::str::Chars;
 
 use crate::ast::*;
+use crate::build::assets;
 use crate::build::{FileBuilder, Val};
 use crate::error;
 
@@ -85,13 +86,19 @@ impl<V: Into<String> + Clone> FormatRenderer for SimpleFormatter<V> {
     }
 }
 
-pub struct ExpressionFormatter<'a> {
+pub struct ExpressionFormatter<'a, C>
+where
+    C: assets::Cache,
+{
     tmpl: String,
-    builder: RefCell<FileBuilder<'a>>,
+    builder: RefCell<FileBuilder<'a, C>>,
 }
 
-impl<'a> ExpressionFormatter<'a> {
-    pub fn new<S: Into<String>>(tmpl: S, builder: FileBuilder<'a>) -> Self {
+impl<'a, C> ExpressionFormatter<'a, C>
+where
+    C: assets::Cache,
+{
+    pub fn new<S: Into<String>>(tmpl: S, builder: FileBuilder<'a, C>) -> Self {
         ExpressionFormatter {
             tmpl: tmpl.into(),
             builder: RefCell::new(builder),
@@ -100,7 +107,7 @@ impl<'a> ExpressionFormatter<'a> {
 
     fn consume_expr(
         &self,
-        builder: &mut FileBuilder,
+        builder: &mut FileBuilder<'a, C>,
         iter: &mut Chars,
         pos: &Position,
     ) -> Result<Val, Box<dyn Error>> {
@@ -176,7 +183,10 @@ impl<'a> ExpressionFormatter<'a> {
     }
 }
 
-impl<'a> FormatRenderer for ExpressionFormatter<'a> {
+impl<'a, C> FormatRenderer for ExpressionFormatter<'a, C>
+where
+    C: assets::Cache,
+{
     fn render(&self, pos: &Position) -> Result<String, Box<dyn Error>> {
         let mut buf = String::new();
         let mut should_escape = false;

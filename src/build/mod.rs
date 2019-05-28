@@ -53,11 +53,14 @@ enum ProcessingOpType {
 
 impl FuncDef {
     /// Expands a ucg function using the given arguments into a new Val.
-    pub fn eval(
+    pub fn eval<C>(
         &self,
-        parent_builder: &FileBuilder,
+        parent_builder: &FileBuilder<C>,
         mut args: Vec<Rc<Val>>,
-    ) -> Result<Rc<Val>, Box<dyn Error>> {
+    ) -> Result<Rc<Val>, Box<dyn Error>>
+    where
+        C: assets::Cache,
+    {
         // Error conditions. If the args don't match the length and types of the argdefs then this is
         // func call error.
         if args.len() > self.argdefs.len() {
@@ -98,7 +101,10 @@ pub struct AssertCollector {
 }
 
 /// Builder handles building ucg code for a single file.
-pub struct FileBuilder<'a> {
+pub struct FileBuilder<'a, C>
+where
+    C: assets::Cache,
+{
     working_dir: PathBuf,
     std: Rc<HashMap<String, &'static str>>,
     import_path: &'a Vec<PathBuf>,
@@ -117,7 +123,7 @@ pub struct FileBuilder<'a> {
     // are keyed by the canonicalized import path. This acts as a cache
     // so multiple imports of the same file don't have to be parsed
     // multiple times.
-    assets: Rc<RefCell<assets::Cache>>,
+    assets: Rc<RefCell<C>>,
     pub is_module: bool,
     pub last: Option<Rc<Val>>,
     pub out_lock: Option<(String, Rc<Val>)>,
@@ -141,12 +147,15 @@ macro_rules! eval_binary_expr {
     };
 }
 
-impl<'a> FileBuilder<'a> {
+impl<'a, C> FileBuilder<'a, C>
+where
+    C: assets::Cache,
+{
     /// Constructs a new Builder.
     pub fn new<P: Into<PathBuf>>(
         working_dir: P,
         import_paths: &'a Vec<PathBuf>,
-        cache: Rc<RefCell<assets::Cache>>,
+        cache: Rc<RefCell<C>>,
     ) -> Self {
         let env_vars: Vec<(String, String)> = env::vars().collect();
         let scope = scope::Scope::new(Rc::new(Val::Env(env_vars)));
