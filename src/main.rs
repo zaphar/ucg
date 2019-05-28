@@ -551,9 +551,11 @@ fn do_repl(
     let mut builder = build::FileBuilder::new(std::env::current_dir()?, import_paths, cache);
     // loop
     let mut lines = ucglib::io::StatementAccumulator::new();
+    println!("Welcome to the UCG repl. Ctrl-D to exit");
+    println!("");
     loop {
         // print prompt
-        lines.push(editor.readline("ucg> ")?);
+        lines.push(editor.readline(&format!("{}> ", lines.next_line()))?);
         // check to see if that line is a statement
         loop {
             // read a statement
@@ -573,7 +575,7 @@ fn do_repl(
                 break;
             }
             // if not then keep accumulating lines without a prompt
-            lines.push(editor.readline(">>   ")?);
+            lines.push(editor.readline(&format!("{}> ", lines.next_line()))?);
         }
     }
 }

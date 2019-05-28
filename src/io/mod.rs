@@ -24,6 +24,10 @@ impl StatementAccumulator {
         Self { acc: Vec::new() }
     }
 
+    pub fn next_line(&self) -> usize {
+        self.acc.len() + 1
+    }
+
     /// Tells you if the latest line ends in the statement terminator.
     ///
     /// Returns None if it wasn't a terminated statement and leaves the
