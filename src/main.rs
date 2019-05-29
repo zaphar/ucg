@@ -499,16 +499,8 @@ fn importers_command(registry: &ImporterRegistry) {
 }
 
 fn env_help() {
-    println!("Universal Configuration Grammar compiler.");
-    println!("");
-    println!("ENVIRONMENT VARIABLES:");
-    println!("");
     println!(
-        "
-    UCG_IMPORT_PATH=\"{}\"
-      A list of paths to search for imports from. Uses the same syntax
-      as your platforms $PATH environment variable.
-",
+        include_str!("help/env.txt"),
         std::env::var("UCG_IMPORT_PATH").unwrap_or(String::new())
     );
 }
