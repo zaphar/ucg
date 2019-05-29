@@ -162,7 +162,6 @@ fn test_assert_just_keyword_compile_failures() {
             Regex::new(r"line: 1, column: 1").unwrap(),
             Regex::new(r"Expected Tuple \{ok=<bool>, desc=<str>\}: at <eval> line: 1, column: 8")
                 .unwrap(),
-            Regex::new(r"Expected Expression: at <eval> line: 1, column: 8").unwrap(),
         ],
     );
 }
@@ -251,8 +250,6 @@ fn test_binary_operator_missing_operand_compile_failure() {
     assert_build_failure(
         "1 +",
         vec![
-            Regex::new(r"Abort while parsing operator expression: at <eval> line: 1, column: 1")
-                .unwrap(),
             Regex::new(r"Missing operand for binary expression: at <eval> line: 1, column: 4")
                 .unwrap(),
         ],
@@ -385,7 +382,7 @@ fn test_incomplete_tuple_key_value_missing_value_compile_failure() {
     assert_build_failure(
         "{foo=",
         vec![
-            Regex::new(r"Expected Expression").unwrap(),
+            Regex::new(r"Not a Bareword").unwrap(),
             Regex::new(r"at <eval> line: 1, column: 6").unwrap(),
         ],
     )
@@ -485,7 +482,7 @@ fn test_let_missing_expression_compile_failure() {
     assert_build_failure(
         "let foo =",
         vec![
-            Regex::new(r"Expected Expression").unwrap(),
+            Regex::new(r"Expected Expression to bind").unwrap(),
             Regex::new(r"at <eval> line: 1, column: 10").unwrap(),
         ],
     )

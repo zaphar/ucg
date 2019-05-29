@@ -400,39 +400,19 @@ pub fn parse_precedence(i: SliceIter<Element>) -> Result<SliceIter<Element>, Exp
 pub fn op_expression<'a>(i: SliceIter<'a, Token>) -> Result<SliceIter<Token>, Expression> {
     let preparse = parse_operand_list(i.clone());
     match preparse {
-        Result::Fail(e) => {
-            let err = Error::caused_by(
-                "Failed while parsing operator expression",
-                Box::new(e),
-                Box::new(i),
-            );
-            Result::Fail(err)
-        }
-        Result::Abort(e) => {
-            let err = Error::caused_by(
-                "Abort while parsing operator expression",
-                Box::new(e),
-                Box::new(i),
-            );
-            Result::Abort(err)
-        }
+        Result::Fail(e) => Result::Fail(e),
+        Result::Abort(e) => Result::Abort(e),
         Result::Incomplete(i) => Result::Incomplete(i),
         Result::Complete(rest, oplist) => {
             let i_ = SliceIter::new(&oplist);
             let parse_result = parse_precedence(i_);
             match parse_result {
-                Result::Fail(_e) => {
-                    let err = Error::new(
-                        "Failed while parsing operator expression",
-                        Box::new(rest.clone()),
-                    );
+                Result::Fail(e) => {
+                    let err = Error::new(e.get_msg(), Box::new(rest.clone()));
                     Result::Fail(err)
                 }
                 Result::Abort(e) => {
-                    let err = Error::new(
-                        format!("Abort while parsing operator expression\n{}", e),
-                        Box::new(rest.clone()),
-                    );
+                    let err = Error::new(e.get_msg(), Box::new(rest.clone()));
                     Result::Abort(err)
                 }
                 Result::Incomplete(_) => Result::Incomplete(i.clone()),

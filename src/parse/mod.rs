@@ -775,7 +775,7 @@ fn expression(input: SliceIter<Token>) -> ParseResult<Expression> {
     let _input = input.clone();
     match trace_parse!(_input, op_expression) {
         Result::Incomplete(i) => Result::Incomplete(i),
-        Result::Fail(_) => trace_parse!(input, wrap_err!(non_op_expression, "Expected Expression")),
+        Result::Fail(_) => trace_parse!(input, non_op_expression),
         Result::Abort(e) => Result::Abort(e),
         Result::Complete(rest, expr) => Result::Complete(rest, expr),
     }
@@ -799,7 +799,7 @@ make_fn!(
         pos => pos,
         name => wrap_err!(match_type!(BAREWORD), "Expected name for binding"),
         _ => punct!("="),
-        val => wrap_err!(trace_parse!(expression), "Expected Expression"),
+        val => trace_parse!(wrap_err!(expression, "Expected Expression to bind")),
         _ => punct!(";"),
         (Statement::Let(LetDef {
             pos: pos,
