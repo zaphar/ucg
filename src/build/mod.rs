@@ -466,7 +466,6 @@ where
             .duration_since(std::time::SystemTime::UNIX_EPOCH)?
             .as_secs();
         {
-            eprintln!("{} modkey...", modkey);
             // 2. check mod time against previous stored mod time for file.
             if !self.assets.borrow().check_mod_key(&normalized, modkey)? {
                 // 3. if different then evict from the cache
