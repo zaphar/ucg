@@ -24,7 +24,7 @@ use abortable_parser::{Error, Peekable, Result};
 
 use self::precedence::op_expression;
 use crate::ast::*;
-use crate::error::StackPrinter;
+use crate::error::BuildError;
 use crate::iter::OffsetStrIter;
 use crate::tokenizer::*;
 
@@ -857,7 +857,7 @@ fn statement(i: SliceIter<Token>) -> Result<SliceIter<Token>, Statement> {
 pub fn parse<'a>(
     input: OffsetStrIter<'a>,
     comment_map: Option<&mut CommentMap>,
-) -> std::result::Result<Vec<Statement>, String> {
+) -> std::result::Result<Vec<Statement>, BuildError> {
     match tokenize(input.clone(), comment_map) {
         Ok(tokenized) => {
             let mut out = Vec::new();
@@ -871,20 +871,17 @@ pub fn parse<'a>(
                 }
                 match statement(i.clone()) {
                     Result::Abort(e) => {
-                        let ctx_err = StackPrinter { err: e };
-                        return Err(format!("{}", ctx_err));
+                        return Err(BuildError::from(e));
                     }
                     Result::Fail(e) => {
-                        let ctx_err = StackPrinter { err: e };
-                        return Err(format!("{}", ctx_err));
+                        return Err(BuildError::from(e));
                     }
                     Result::Incomplete(_ei) => {
                         let err = abortable_parser::Error::new(
                             "Unexpected end of parse input",
                             Box::new(i.clone()),
                         );
-                        let ctx_err = StackPrinter { err: err };
-                        return Err(format!("{}", ctx_err));
+                        return Err(BuildError::from(err));
                     }
                     Result::Complete(rest, stmt) => {
                         out.push(stmt);

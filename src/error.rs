@@ -145,48 +145,28 @@ impl error::Error for BuildError {
     }
 }
 
-#[derive(Debug)]
-pub struct StackPrinter<C: FilePositioned> {
-    pub err: abortable_parser::Error<C>,
-}
-
-impl<C: FilePositioned> StackPrinter<C> {
-    pub fn render(&self, w: &mut fmt::Formatter) -> fmt::Result {
-        let mut curr_err = Some(&self.err);
-        let mut tabstop = "";
-        loop {
-            match curr_err {
-                // our exit condition;
-                None => break,
-                Some(err) => {
-                    let context = err.get_context();
-                    let file = match context.file() {
-                        Some(ref pb) => pb.to_string_lossy().to_string(),
-                        None => "<eval>".to_string(),
-                    };
-                    writeln!(
-                        w,
-                        "{}{}: at {} line: {}, column: {}",
-                        tabstop,
-                        err.get_msg(),
-                        file,
-                        context.line(),
-                        context.column(),
-                    )?;
-                    tabstop = "\t";
-                    curr_err = err.get_cause();
-                    if curr_err.is_some() {
-                        writeln!(w, "Caused by:")?;
-                    }
-                }
-            }
-        }
-        Ok(())
+impl<'a, C> std::convert::From<abortable_parser::Error<C>> for BuildError
+where
+    C: FilePositioned + 'a,
+    C: abortable_parser::Offsetable + Debug,
+{
+    fn from(e: abortable_parser::Error<C>) -> BuildError {
+        BuildError::from(&e)
     }
 }
 
-impl<C: FilePositioned> fmt::Display for StackPrinter<C> {
-    fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
-        self.render(w)
+impl<'a, C> std::convert::From<&'a abortable_parser::Error<C>> for BuildError
+where
+    C: FilePositioned + 'a,
+    C: abortable_parser::Offsetable + Debug,
+{
+    fn from(e: &'a abortable_parser::Error<C>) -> BuildError {
+        let ctx = e.get_context();
+        let position = Position::new(ctx.line(), ctx.column(), ctx.get_offset());
+        let err = BuildError::with_pos(e.get_msg(), ErrorType::ParseError, position);
+        match e.get_cause() {
+            None => err,
+            Some(cause) => err.wrap_cause(Box::new(BuildError::from(cause))),
+        }
     }
 }

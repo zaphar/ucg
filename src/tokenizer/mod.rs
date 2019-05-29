@@ -20,7 +20,7 @@ use abortable_parser::iter::SliceIter;
 use abortable_parser::{Error, Result};
 
 use crate::ast::*;
-use crate::error::StackPrinter;
+use crate::error::BuildError;
 use crate::iter::OffsetStrIter;
 
 pub type CommentGroup = Vec<Token>;
@@ -466,7 +466,7 @@ fn token<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Token> {
 pub fn tokenize<'a>(
     input: OffsetStrIter<'a>,
     mut comment_map: Option<&mut CommentMap>,
-) -> std::result::Result<Vec<Token>, String> {
+) -> std::result::Result<Vec<Token>, BuildError> {
     let mut out = Vec::new();
     let mut i = input.clone();
     let mut comment_group = Vec::new();
@@ -477,28 +477,15 @@ pub fn tokenize<'a>(
         }
         match token(i.clone()) {
             Result::Abort(e) => {
-                let err = abortable_parser::Error::caused_by(
-                    "Invalid Token encountered",
-                    Box::new(e),
-                    Box::new(i.clone()),
-                );
-                let ctx_err = StackPrinter { err: err };
-                return Err(format!("{}", ctx_err));
+                return Err(BuildError::from(e));
             }
             Result::Fail(e) => {
-                let err = abortable_parser::Error::caused_by(
-                    "Invalid Token encountered",
-                    Box::new(e),
-                    Box::new(i.clone()),
-                );
-                let ctx_err = StackPrinter { err: err };
-                return Err(format!("{}", ctx_err));
+                return Err(BuildError::from(e));
             }
             Result::Incomplete(_offset) => {
                 let err =
                     abortable_parser::Error::new("Invalid Token encountered", Box::new(i.clone()));
-                let ctx_err = StackPrinter { err: err };
-                return Err(format!("{}", ctx_err));
+                return Err(BuildError::from(err));
             }
             Result::Complete(rest, tok) => {
                 i = rest;

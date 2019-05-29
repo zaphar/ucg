@@ -328,16 +328,7 @@ where
                     Some(val) => Ok(val),
                 }
             }
-            Err(err) => {
-                let cause = Box::new(simple_error::SimpleError::new(err));
-                Err(error::BuildError::with_pos(
-                    "Unable to parse input",
-                    error::ErrorType::ParseError,
-                    (&input).into(),
-                )
-                .wrap_cause(cause)
-                .to_boxed())
-            }
+            Err(err) => Err(Box::new(err)),
         }
     }
 

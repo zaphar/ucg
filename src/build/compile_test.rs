@@ -159,8 +159,7 @@ fn test_assert_just_keyword_compile_failures() {
     assert_build_failure(
         "assert ",
         vec![
-            Regex::new(r"line: 1, column: 1").unwrap(),
-            Regex::new(r"Expected Tuple \{ok=<bool>, desc=<str>\}: at <eval> line: 1, column: 8")
+            Regex::new(r"Expected Tuple \{ok=<bool>, desc=<str>\} at <eval> line: 1, column: 8")
                 .unwrap(),
         ],
     );
@@ -171,10 +170,9 @@ fn test_assert_partial_tuple_compile_failures() {
     assert_build_failure(
         "assert {",
         vec![
-            Regex::new(r"line: 1, column: 1").unwrap(),
-            Regex::new(r"Expected Tuple \{ok=<bool>, desc=<str>\}: at <eval> line: 1, column: 8")
+            Regex::new(r"Expected Tuple \{ok=<bool>, desc=<str>\} at <eval> line: 1, column: 8")
                 .unwrap(),
-            Regex::new(r"Expected \(\}\) but got \(\): at <eval> line: 1, column: 9").unwrap(),
+            Regex::new(r"Expected \(\}\) but got \(\) at <eval> line: 1, column: 9").unwrap(),
         ],
     );
 }
@@ -227,10 +225,7 @@ fn test_assert_partial_tuple_bad_desc_compile_failures() {
 fn test_import_missing_path_compile_failure() {
     assert_build_failure(
         "import ;",
-        vec![
-            Regex::new(r"Expected import path: at <eval> line: 1, column: 8").unwrap(),
-            Regex::new(r"Not a String: at <eval> line: 1, column: 8").unwrap(),
-        ],
+        vec![Regex::new(r"Expected import path at <eval> line: 1, column: 8").unwrap()],
     )
 }
 
@@ -238,10 +233,7 @@ fn test_import_missing_path_compile_failure() {
 fn test_import_path_not_a_string_compile_failure() {
     assert_build_failure(
         "import 1;",
-        vec![
-            Regex::new(r"Expected import path: at <eval> line: 1, column: 8").unwrap(),
-            Regex::new(r"Not a String: at <eval> line: 1, column: 8").unwrap(),
-        ],
+        vec![Regex::new(r"Expected import path at <eval> line: 1, column: 8").unwrap()],
     )
 }
 
@@ -250,7 +242,7 @@ fn test_binary_operator_missing_operand_compile_failure() {
     assert_build_failure(
         "1 +",
         vec![
-            Regex::new(r"Missing operand for binary expression: at <eval> line: 1, column: 4")
+            Regex::new(r"Missing operand for binary expression at <eval> line: 1, column: 4")
                 .unwrap(),
         ],
     )
@@ -427,7 +419,6 @@ fn test_out_missing_type_compile_failure() {
         "out",
         vec![
             Regex::new(r"Expected converter name").unwrap(),
-            Regex::new(r"Not a Bareword").unwrap(),
             Regex::new(r"at <eval> line: 1, column: 4").unwrap(),
         ],
     )

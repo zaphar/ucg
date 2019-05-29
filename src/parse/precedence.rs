@@ -260,11 +260,7 @@ fn parse_operand_list<'a>(i: SliceIter<'a, Token>) -> ParseResult<'a, Vec<Elemen
                     // if we have successfully parsed an element and an operator then
                     // failing to parse a second expression is an abort since we know
                     // for sure now that the next expression is supposed to be there.
-                    let err = Error::caused_by(
-                        "Missing operand for binary expression",
-                        Box::new(e),
-                        Box::new(_i),
-                    );
+                    let err = Error::new("Missing operand for binary expression", Box::new(_i));
                     return Result::Abort(err);
                 }
                 return Result::Fail(e);
