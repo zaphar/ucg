@@ -295,6 +295,10 @@ where
         self.scope.lookup_sym(&key, true)
     }
 
+    pub fn scope_mut(&mut self) -> &mut Scope {
+        &mut self.scope
+    }
+
     /// Puts the builder in validation mode.
     ///
     /// Among other things this means that assertions will be evaluated and their results

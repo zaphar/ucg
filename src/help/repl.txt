@@ -1,0 +1,18 @@
+UCG repl help
+
+The UCG repl allows you to enter ucg statements interactively. You can import
+files create named bindings and see the result of UCG expressions.
+
+The repl understands some non-ucg command as well. Any command that starts with
+a '#' character is treated as a ucg repl command and is not parsed as a ucg
+statement. Repl commands are invalid inside a ucg statement and will result
+in a ucg parse error.
+
+Currently supported commands are:
+
+* #help
+  - prints out this help text
+
+* #del <name>
+  - deletes a previously created named binding
+  

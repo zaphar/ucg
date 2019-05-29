@@ -513,6 +513,10 @@ fn env_help() {
     );
 }
 
+fn print_repl_help() {
+    println!(include_str!("help/repl.txt"));
+}
+
 fn do_repl<C: Cache>(
     import_paths: &Vec<PathBuf>,
     cache: Rc<RefCell<C>>,
@@ -552,10 +556,41 @@ fn do_repl<C: Cache>(
     // loop
     let mut lines = ucglib::io::StatementAccumulator::new();
     println!("Welcome to the UCG repl. Ctrl-D to exit");
+    println!("Type '#help' for help.");
     println!("");
     loop {
         // print prompt
-        lines.push(editor.readline(&format!("{}> ", lines.next_line()))?);
+        let line = editor.readline(&format!("{}> ", lines.next_line()))?;
+        // TODO check for a repl command.
+        // repl commands are only valid while not accumulating a statement;
+        let trimmed = line.trim();
+        if trimmed.starts_with("#") {
+            // handle the various commands.
+            if trimmed.starts_with("#help") {
+                print_repl_help();
+            } else if trimmed.starts_with("#del") {
+                // remove a named binding from the builder output.
+                let args: Vec<&str> = trimmed.split(" ").skip(1).collect();
+                if args.len() != 1 {
+                    // print usage of the #del command
+                    eprintln!("The '#del' command expects a single argument specifying \nthe binding to delete.");
+                } else {
+                    let key = ucglib::ast::PositionedItem {
+                        pos: ucglib::ast::Position::new(0, 0, 0),
+                        val: args[0].to_string(),
+                    };
+                    if let None = builder.scope_mut().build_output.remove(&key) {
+                        eprintln!("No such binding {}", key.val);
+                    }
+                }
+            } else {
+                eprintln!("Invalid repl command...");
+                eprintln!("");
+                print_repl_help();
+            }
+            continue;
+        }
+        lines.push(line);
         // check to see if that line is a statement
         loop {
             // read a statement
