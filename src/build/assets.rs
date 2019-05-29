@@ -34,17 +34,21 @@ pub type Result<T> = result::Result<T, io::Error>;
 pub trait Cache {
     fn has_path(&self, path: &PathBuf) -> Result<bool>;
     fn get(&self, path: &PathBuf) -> Result<Option<Rc<Val>>>;
-    fn stash(&mut self, path: PathBuf, asset: Rc<Val>) -> Result<()>;
+    fn stash(&mut self, path: PathBuf, asset: Rc<Val>, modkey: u64) -> Result<()>;
+    fn evict(&mut self, path: &PathBuf) -> Result<()>;
+    fn check_mod_key(&self, path: &PathBuf, modkey: u64) -> Result<bool>;
 }
 
 pub struct MemoryCache {
     map: HashMap<PathBuf, Rc<Val>>,
+    mod_key_map: HashMap<PathBuf, u64>,
 }
 
 impl MemoryCache {
     pub fn new() -> Self {
         MemoryCache {
             map: HashMap::new(),
+            mod_key_map: HashMap::new(),
         }
     }
 }
@@ -58,8 +62,23 @@ impl Cache for MemoryCache {
         Ok(self.map.get(path).map(|v| v.clone()))
     }
 
-    fn stash(&mut self, path: PathBuf, asset: Rc<Val>) -> Result<()> {
-        self.map.insert(path, asset);
+    fn stash(&mut self, path: PathBuf, asset: Rc<Val>, modkey: u64) -> Result<()> {
+        self.map.insert(path.clone(), asset);
+        self.mod_key_map.insert(path, modkey);
         Ok(())
+    }
+
+    fn evict(&mut self, path: &PathBuf) -> Result<()> {
+        self.map.remove(path);
+        self.mod_key_map.remove(path);
+        Ok(())
+    }
+
+    fn check_mod_key(&self, path: &PathBuf, modkey: u64) -> Result<bool> {
+        Ok(self
+            .mod_key_map
+            .get(path)
+            .map(|v| *v == modkey)
+            .unwrap_or(true))
     }
 }

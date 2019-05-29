@@ -415,7 +415,9 @@ where
                     }
                 };
                 let mut mut_assets_cache = self.assets.borrow_mut();
-                mut_assets_cache.stash(path, result.clone())?;
+                // standard library assets are not real files so the
+                // mod key is always 0.
+                mut_assets_cache.stash(path, result.clone(), 0)?;
                 return Ok(result);
             } else {
                 return Err(error::BuildError::with_pos(
@@ -453,8 +455,24 @@ where
             )
             .to_boxed());
         }
-        // Introduce a scope so the above borrow is dropped before we modify
-        // the cache below.
+        // 1. calculate mod time for file.
+        let lib_meta = std::fs::metadata(&normalized)?;
+        let modkey = lib_meta
+            .modified()?
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)?
+            .as_secs();
+        {
+            eprintln!("{} modkey...", modkey);
+            // 2. check mod time against previous stored mod time for file.
+            if !self.assets.borrow().check_mod_key(&normalized, modkey)? {
+                // 3. if different then evict from the cache
+                eprintln!(
+                    "{} has changed evicting from cache...",
+                    normalized.to_string_lossy().to_string()
+                );
+                self.assets.borrow_mut().evict(&normalized)?;
+            }
+        }
         // Only parse the file once on import.
         let maybe_asset = self.assets.borrow().get(&normalized)?;
         let result = match maybe_asset {
@@ -480,7 +498,7 @@ where
             }
         };
         let mut mut_assets_cache = self.assets.borrow_mut();
-        mut_assets_cache.stash(normalized.clone(), result.clone())?;
+        mut_assets_cache.stash(normalized.clone(), result.clone(), modkey)?;
         return Ok(result);
     }
 
