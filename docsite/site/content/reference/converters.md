@@ -32,7 +32,7 @@ rules for each type.
 * Boolean values are translated to "true" and "false" repsectively.
 * Integers and Floats are rendered as numbers.
 * Tuples are rendered as `--field value` pairs for each field.
-  * Nested tuples concatenate the field names to create the field.
+  * Nested tuples are ignored.
   * Nested Lists generate a new `--field listitem` pair for each item in the list.
   * For fields that are just one character in length use a single `-`. Use double
     dashes `--` for fields that are longer than one character.
@@ -48,10 +48,8 @@ let flags = {
         "some/dir",
         "some/other/dir",
     ],
-    log = {
-        debug = true,
-        format = "json",
-    },
+    "log.debug" = true,
+    "log.format" = "json",
 }
 ```
 

@@ -55,20 +55,20 @@ impl FlagConverter {
         // first of all we need to make sure that each &Val is only a primitive type.
         for v in def.iter() {
             let vref = v.as_ref();
-            if vref.is_list() || vref.is_tuple() || vref.is_func() {
+            if vref.is_list() || vref.is_tuple() || vref.is_func() || vref.is_module() {
                 eprintln!(
                     "Skipping non primitive val in list for flag {}{}",
                     pfx, name
                 );
             } else {
                 self.write_flag_name(pfx, name, w)?;
-                self.write(pfx, vref, w)?;
+                self.write_simple_value(vref, w)?;
             }
         }
         return Ok(());
     }
 
-    fn write(&self, pfx: &str, v: &Val, w: &mut Write) -> ConvertResult {
+    fn write_simple_value(&self, v: &Val, w: &mut Write) -> ConvertResult {
         match v {
             &Val::Empty => {
                 // Empty is a noop.
@@ -86,41 +86,31 @@ impl FlagConverter {
             &Val::Str(ref s) => {
                 write!(w, "'{}' ", s)?;
             }
-            &Val::List(ref _def) => {
-                eprintln!("Skipping List...");
+            &Val::List(_) | &Val::Tuple(_) | &Val::Func(_) | &Val::Env(_) | &Val::Module(_) => {
+                // This is ignored
+                eprintln!("Skipping {}...", v.type_name());
             }
-            &Val::Tuple(ref flds) => {
-                for &(ref name, ref val) in flds.iter() {
-                    if let &Val::Empty = val.as_ref() {
-                        self.write_flag_name(pfx, name, w)?;
-                        continue;
-                    }
-                    match val.as_ref() {
-                        &Val::Tuple(_) => {
-                            let new_pfx = format!("{}{}{}", pfx, name, self.sep);
-                            self.write(&new_pfx, val, w)?;
-                        }
-                        &Val::List(ref def) => {
-                            self.write_list_flag(pfx, name, def, w)?;
-                        }
-                        _ => {
-                            self.write_flag_name(pfx, name, w)?;
-                            self.write(pfx, &val, w)?;
-                        }
-                    }
+        }
+        Ok(())
+    }
+
+    fn write(&self, pfx: &str, flds: &Vec<(String, Rc<Val>)>, w: &mut Write) -> ConvertResult {
+        for &(ref name, ref val) in flds.iter() {
+            if let &Val::Empty = val.as_ref() {
+                self.write_flag_name(pfx, name, w)?;
+                continue;
+            }
+            match val.as_ref() {
+                &Val::Tuple(_) | &Val::Module(_) | &Val::Func(_) | &Val::Env(_) => {
+                    eprintln!("Skipping {} in flag output tuple.", val.type_name());
                 }
-            }
-            &Val::Func(ref _def) => {
-                // This is ignored
-                eprintln!("Skipping macro...");
-            }
-            &Val::Env(ref _fs) => {
-                // This is ignored
-                eprintln!("Skipping env...");
-            }
-            &Val::Module(ref _def) => {
-                // This is ignored
-                eprintln!("Skipping module...");
+                &Val::List(ref def) => {
+                    self.write_list_flag(pfx, name, def, w)?;
+                }
+                &Val::Boolean(_) | &Val::Empty | &Val::Float(_) | &Val::Int(_) | &Val::Str(_) => {
+                    self.write_flag_name(pfx, name, w)?;
+                    self.write_simple_value(val, w)?;
+                }
             }
         }
         Ok(())
@@ -129,13 +119,14 @@ impl FlagConverter {
 
 impl Converter for FlagConverter {
     fn convert(&self, v: Rc<Val>, mut w: &mut Write) -> ConvertResult {
-        if !v.is_tuple() {
+        if let &Val::Tuple(ref flds) = v.as_ref() {
+            self.write("", flds, &mut w)
+        } else {
             return Err(Box::new(BuildError::new(
                 "Flag outputs must be a tuple",
                 ErrorType::ConvertError,
             )));
         }
-        self.write("", &v, &mut w)
     }
 
     fn file_ext(&self) -> String {

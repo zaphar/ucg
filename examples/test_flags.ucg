@@ -6,10 +6,8 @@ let args = {
         "some/dir",
         "some/other/dir",
     ],
-    log = {
-        debug = true,
-        format = "json",
-    },
+    "log.debug" = true,
+    "log.format" = "json",
 };
 
 out flags args;
