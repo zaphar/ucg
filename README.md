@@ -19,8 +19,7 @@ preferred format.
 ## The Usual Warnings
 
 This is still very much an experiment and the language and api can be expected
-to change and mutate. It also probably has bugs and isn't yet the most user
-friendly language and compiler to use. You have been warned.
+to change and mutate. You have been warned.
 
 ## Usage
 
