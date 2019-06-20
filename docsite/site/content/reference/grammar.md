@@ -55,6 +55,7 @@ filter_keyword: "filter" ;
 module_keyword: "module" ;
 mod_keyword: "mod" ;
 out_keyword: "out" ;
+convert_keyword: "convert" ;
 assert_keyword: "assert" ;
 fail_keyword: "fail" ;
 trace_keyword: "TRACE" ;
@@ -230,11 +231,13 @@ expr: binary_expr | non_operator_expr ;
 ```
 let_statement: let_keyword, bareword, equal, expr ;
 out_statement: out_keyword, bareword, str ;
+convert_statement: convert_keyword, bareword, str ;
 assert_statement: assert_keyword, pipe, { statement }, pipe ;
 simple_statement: expr ;
 
 statement: ( let_statement
              | out_statement
+             | convert_statement
              | assert_statement
              | simple_statement ), semicolon ;
 ```

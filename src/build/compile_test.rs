@@ -19,11 +19,13 @@ use regex::Regex;
 
 use super::assets::MemoryCache;
 use super::FileBuilder;
+use crate::convert::ConverterRegistry;
 
 fn assert_build(input: &str) {
     let i_paths = Vec::new();
     let cache = MemoryCache::new();
-    let mut b = FileBuilder::new("<Eval>", &i_paths, Rc::new(RefCell::new(cache)));
+    let registry = ConverterRegistry::make_registry();
+    let mut b = FileBuilder::new("<Eval>", &i_paths, Rc::new(RefCell::new(cache)), &registry);
     b.enable_validate_mode();
     b.eval_string(input).unwrap();
     if !b.assert_collector.success {
@@ -34,7 +36,8 @@ fn assert_build(input: &str) {
 fn assert_build_failure(input: &str, expect: Vec<Regex>) {
     let i_paths = Vec::new();
     let cache = MemoryCache::new();
-    let mut b = FileBuilder::new("<Eval>", &i_paths, Rc::new(RefCell::new(cache)));
+    let registry = ConverterRegistry::make_registry();
+    let mut b = FileBuilder::new("<Eval>", &i_paths, Rc::new(RefCell::new(cache)), &registry);
     b.enable_validate_mode();
     let err = b.eval_string(input);
     match err {

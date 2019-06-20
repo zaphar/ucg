@@ -15,6 +15,7 @@ use super::assets;
 use super::assets::MemoryCache;
 use super::{FileBuilder, SelectDef, Val};
 use crate::ast::*;
+use crate::convert::ConverterRegistry;
 
 use std;
 use std::cell::RefCell;
@@ -37,7 +38,8 @@ fn test_expr_to_val<'a, C: assets::Cache>(
 fn test_eval_div_expr_fail() {
     let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
+    let registry = ConverterRegistry::make_registry();
+    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache, &registry);
     test_expr_to_val(
         vec![(
             Expression::Binary(BinaryOpDef {
@@ -63,7 +65,8 @@ fn test_eval_div_expr_fail() {
 fn test_eval_mul_expr_fail() {
     let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
+    let registry = ConverterRegistry::make_registry();
+    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache, &registry);
     test_expr_to_val(
         vec![(
             Expression::Binary(BinaryOpDef {
@@ -89,7 +92,8 @@ fn test_eval_mul_expr_fail() {
 fn test_eval_subtract_expr_fail() {
     let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
+    let registry = ConverterRegistry::make_registry();
+    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache, &registry);
     test_expr_to_val(
         vec![(
             Expression::Binary(BinaryOpDef {
@@ -114,7 +118,8 @@ fn test_eval_subtract_expr_fail() {
 fn test_eval_add_expr_fail() {
     let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
+    let registry = ConverterRegistry::make_registry();
+    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache, &registry);
     test_expr_to_val(
         vec![(
             Expression::Binary(BinaryOpDef {
@@ -139,7 +144,8 @@ fn test_eval_add_expr_fail() {
 fn test_eval_simple_lookup_error() {
     let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
+    let registry = ConverterRegistry::make_registry();
+    let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache, &registry);
     b.scope
         .build_output
         .entry(value_node!("var1".to_string(), Position::new(1, 0, 0)))
@@ -157,7 +163,8 @@ fn test_eval_simple_lookup_error() {
 fn test_expr_copy_no_such_tuple() {
     let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
+    let registry = ConverterRegistry::make_registry();
+    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache, &registry);
     test_expr_to_val(
         vec![(
             Expression::Copy(CopyDef {
@@ -179,7 +186,8 @@ fn test_expr_copy_no_such_tuple() {
 fn test_select_expr_not_a_string() {
     let i_paths = Vec::new();
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
+    let registry = ConverterRegistry::make_registry();
+    let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache, &registry);
     b.scope
         .build_output
         .entry(value_node!("foo".to_string(), Position::new(1, 0, 0)))

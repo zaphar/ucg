@@ -197,6 +197,7 @@ mod exec_test {
     use crate::build::assets::MemoryCache;
     use crate::build::FileBuilder;
     use crate::convert::traits::Converter;
+    use crate::convert::ConverterRegistry;
 
     use std;
     use std::cell::RefCell;
@@ -206,7 +207,8 @@ mod exec_test {
     fn convert_just_command_test() {
         let i_paths = Vec::new();
         let cache = Rc::new(RefCell::new(MemoryCache::new()));
-        let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
+        let registry = ConverterRegistry::make_registry();
+        let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache, &registry);
         let conv = ExecConverter::new();
         b.eval_string(
             "let script = {
@@ -228,7 +230,8 @@ mod exec_test {
     fn convert_command_with_env_test() {
         let i_paths = Vec::new();
         let cache = Rc::new(RefCell::new(MemoryCache::new()));
-        let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
+        let registry = ConverterRegistry::make_registry();
+        let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache, &registry);
         let conv = ExecConverter::new();
         b.eval_string(
             "let script = {
@@ -257,7 +260,8 @@ mod exec_test {
     fn convert_command_with_arg_test() {
         let i_paths = Vec::new();
         let cache = Rc::new(RefCell::new(MemoryCache::new()));
-        let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache);
+        let registry = ConverterRegistry::make_registry();
+        let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, cache, &registry);
         let conv = ExecConverter::new();
         b.eval_string(
             "let script = {

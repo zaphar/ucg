@@ -22,6 +22,9 @@ pub trait Walker {
             Statement::Output(_, _, ref mut expr) => {
                 self.walk_expression(expr);
             }
+            Statement::Print(_, _, ref mut expr) => {
+                self.walk_expression(expr);
+            }
         }
     }
 

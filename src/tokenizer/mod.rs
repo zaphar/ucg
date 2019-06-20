@@ -325,6 +325,10 @@ make_fn!(outtok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "out", WS)
 );
 
+make_fn!(converttok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::BAREWORD, "convert", WS)
+);
+
 make_fn!(astok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "as", WS)
 );
@@ -442,6 +446,7 @@ fn token<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Token> {
         nottok,
         lettok,
         outtok,
+        converttok,
         selecttok,
         asserttok,
         failtok,

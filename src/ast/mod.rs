@@ -775,6 +775,9 @@ pub enum Statement {
 
     // Identify an Expression for output.
     Output(Position, Token, Expression),
+
+    // Print the expression to stdout.
+    Print(Position, Token, Expression),
 }
 
 impl Statement {
@@ -784,6 +787,7 @@ impl Statement {
             Statement::Let(ref def) => &def.pos,
             Statement::Assert(ref pos, _) => pos,
             Statement::Output(ref pos, _, _) => pos,
+            Statement::Print(ref pos, _, _) => pos,
         }
     }
 }

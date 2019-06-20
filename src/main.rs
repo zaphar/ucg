@@ -99,12 +99,14 @@ fn build_file<'a, C: Cache>(
     strict: bool,
     import_paths: &'a Vec<PathBuf>,
     cache: Rc<RefCell<C>>,
+    registry: &'a ConverterRegistry,
 ) -> Result<build::FileBuilder<'a, C>, Box<dyn Error>> {
     let mut file_path_buf = PathBuf::from(file);
     if file_path_buf.is_relative() {
         file_path_buf = std::env::current_dir()?.join(file_path_buf);
     }
-    let mut builder = build::FileBuilder::new(std::env::current_dir()?, import_paths, cache);
+    let mut builder =
+        build::FileBuilder::new(std::env::current_dir()?, import_paths, cache, registry);
     builder.set_strict(strict);
     if validate {
         builder.enable_validate_mode();
@@ -121,9 +123,10 @@ fn do_validate<C: Cache>(
     strict: bool,
     import_paths: &Vec<PathBuf>,
     cache: Rc<RefCell<C>>,
+    registry: &ConverterRegistry,
 ) -> bool {
     println!("Validating {}", file);
-    match build_file(file, true, strict, import_paths, cache) {
+    match build_file(file, true, strict, import_paths, cache, registry) {
         Ok(b) => {
             if b.assert_collector.success {
                 println!("File {} Pass\n", file);
@@ -148,7 +151,7 @@ fn do_compile<C: Cache>(
     registry: &ConverterRegistry,
 ) -> bool {
     println!("Building {}", file);
-    let builder = match build_file(file, false, strict, import_paths, cache.clone()) {
+    let builder = match build_file(file, false, strict, import_paths, cache.clone(), registry) {
         Ok(builder) => builder,
         Err(err) => {
             eprintln!("{}", err);
@@ -214,7 +217,13 @@ fn visit_ucg_files<C: Cache>(
                 }
             } else {
                 if validate && path_as_string.ends_with("_test.ucg") {
-                    if !do_validate(&path_as_string, strict, import_paths, cache.clone()) {
+                    if !do_validate(
+                        &path_as_string,
+                        strict,
+                        import_paths,
+                        cache.clone(),
+                        registry,
+                    ) {
                         result = false;
                         summary.push_str(format!("{} - FAIL\n", path_as_string).as_str())
                     } else {
@@ -234,7 +243,7 @@ fn visit_ucg_files<C: Cache>(
             }
         }
     } else if validate && our_path.ends_with("_test.ucg") {
-        if !do_validate(&our_path, strict, import_paths, cache) {
+        if !do_validate(&our_path, strict, import_paths, cache, registry) {
             result = false;
             summary.push_str(format!("{} - FAIL\n", our_path).as_str());
         } else {
@@ -262,8 +271,12 @@ fn inspect_command<C: Cache>(
     let file = matches.value_of("INPUT").unwrap_or("std/functional.ucg");
     let sym = matches.value_of("expr");
     let target = matches.value_of("target").unwrap_or("json");
-    let mut builder =
-        build::FileBuilder::new(std::env::current_dir().unwrap(), import_paths, cache);
+    let mut builder = build::FileBuilder::new(
+        std::env::current_dir().unwrap(),
+        import_paths,
+        cache,
+        registry,
+    );
     builder.set_strict(strict);
     match registry.get_converter(target) {
         Some(converter) => {
@@ -512,6 +525,7 @@ fn print_repl_help() {
 fn do_repl<C: Cache>(
     import_paths: &Vec<PathBuf>,
     cache: Rc<RefCell<C>>,
+    registry: &ConverterRegistry,
 ) -> std::result::Result<(), Box<dyn Error>> {
     let config = rustyline::Config::builder();
     let mut editor = rustyline::Editor::<()>::with_config(
@@ -544,7 +558,8 @@ fn do_repl<C: Cache>(
             }
         }
     }
-    let mut builder = build::FileBuilder::new(std::env::current_dir()?, import_paths, cache);
+    let mut builder =
+        build::FileBuilder::new(std::env::current_dir()?, import_paths, cache, registry);
     // loop
     let mut lines = ucglib::io::StatementAccumulator::new();
     println!("Welcome to the UCG repl. Ctrl-D to exit");
@@ -607,8 +622,12 @@ fn do_repl<C: Cache>(
     }
 }
 
-fn repl<C: Cache>(import_paths: &Vec<PathBuf>, cache: Rc<RefCell<C>>) {
-    if let Err(e) = do_repl(import_paths, cache) {
+fn repl<C: Cache>(
+    import_paths: &Vec<PathBuf>,
+    cache: Rc<RefCell<C>>,
+    registry: &ConverterRegistry,
+) {
+    if let Err(e) = do_repl(import_paths, cache, registry) {
         eprintln!("{}", e);
         process::exit(1);
     }
@@ -652,7 +671,7 @@ fn main() {
     } else if let Some(_) = app_matches.subcommand_matches("env") {
         env_help()
     } else if let Some(_) = app_matches.subcommand_matches("repl") {
-        repl(&import_paths, cache)
+        repl(&import_paths, cache, &registry)
     } else if let Some(matches) = app_matches.subcommand_matches("fmt") {
         if let Err(e) = fmt_command(matches) {
             eprintln!("{}", e);

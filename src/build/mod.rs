@@ -32,6 +32,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use crate::ast::*;
 use crate::build::format::{ExpressionFormatter, FormatRenderer, SimpleFormatter};
 use crate::build::scope::{find_in_fieldlist, Scope, ValueMap};
+use crate::convert::ConverterRegistry;
 use crate::convert::ImporterRegistry;
 use crate::error;
 use crate::iter::OffsetStrIter;
@@ -112,6 +113,7 @@ where
     pub assert_collector: AssertCollector,
     scope: Scope,
     import_registry: ImporterRegistry,
+    converter_registry: &'a ConverterRegistry,
     // NOTE(jwall): We use interior mutability here because we need
     // our asset cache to be shared by multiple different sub-builders.
     // We use Rc to handle the reference counting for us and we use
@@ -156,6 +158,7 @@ where
         working_dir: P,
         import_paths: &'a Vec<PathBuf>,
         cache: Rc<RefCell<C>>,
+        converter_registry: &'a ConverterRegistry,
     ) -> Self {
         let env_vars: Vec<(String, String)> = env::vars().collect();
         let scope = scope::Scope::new(Rc::new(Val::Env(env_vars)));
@@ -173,6 +176,7 @@ where
             },
             scope: scope,
             import_registry: ImporterRegistry::make_registry(),
+            converter_registry: converter_registry,
             assets: cache,
             out_lock: None,
             is_module: false,
@@ -195,6 +199,7 @@ where
             assets: self.assets.clone(),
             // This is admittedly a little wasteful but we can live with it for now.
             import_registry: ImporterRegistry::make_registry(),
+            converter_registry: self.converter_registry,
             scope: self.scope.spawn_clean(),
             out_lock: None,
             is_module: false,
@@ -365,6 +370,8 @@ where
             normalized.push(&path);
             // First see if the normalized file exists or not.
             if !normalized.exists() && use_import_path {
+                // TODO(jwall): Support importing from a zip file in this
+                // import_path?
                 // If it does not then look for it in the list of import_paths
                 for mut p in self.import_path.iter().cloned() {
                     p.push(&path);
@@ -425,7 +432,6 @@ where
         }
         let sep = format!("{}", std::path::MAIN_SEPARATOR);
         let raw_path = def.path.fragment.replace("/", &sep);
-        // Try a relative path first.
         let normalized = match self.find_file(&raw_path, true) {
             Ok(p) => p,
             Err(e) => {
@@ -542,6 +548,31 @@ where
                     let val = self.eval_expr(expr, &child_scope)?;
                     self.out_lock = Some((typ.fragment.to_string(), val.clone()));
                     Ok(val)
+                } else {
+                    Err(error::BuildError::with_pos(
+                        format!("You can only have one output per file."),
+                        error::ErrorType::Unsupported,
+                        pos.clone(),
+                    )
+                    .to_boxed())
+                }
+            }
+            &Statement::Print(ref pos, ref typ, ref expr) => {
+                if let None = self.out_lock {
+                    let val = self.eval_expr(expr, &child_scope)?;
+                    match self.converter_registry.get_converter(&typ.fragment) {
+                        Some(c) => {
+                            let mut buf = Vec::new();
+                            c.convert(val.clone(), &mut buf)?;
+                            Ok(Rc::new(Val::Str(String::from_utf8(buf)?)))
+                        }
+                        None => Err(error::BuildError::with_pos(
+                            format!("Invalid Converter specified for print {}", typ.fragment),
+                            error::ErrorType::Unsupported,
+                            pos.clone(),
+                        )
+                        .to_boxed()),
+                    }
                 } else {
                     Err(error::BuildError::with_pos(
                         format!("You can only have one output per file."),

@@ -681,4 +681,29 @@ This will output a line to stderr something like the below:
 
 This is helpful when developing shared modules or ucg libraries.
 
+Convert Expressions
+-------------------
+
+UCG has convert expressions which will turn any UCG value into a string using the specified conversion format.
+This expression is similar to the out expression except instead of writing to a file it writes to a string.
+
+It's useful for previewing the result of converting a ucg value in the repl or for composing multiple conversion
+formats together into a single composite ucg value.
+
+You can experiment with conversion in the repl:
+
+```
+> convert json {foo="bar"};
+'{
+  "foo": "bar"
+}'
+> 
+```
+
+Or store a converted value into a UCG string:
+
+```
+let converted = convert json {foo="bar"};
+```
+
 Next: <a href="/reference/statements">Statements</a>

@@ -841,6 +841,18 @@ make_fn!(
     )
 );
 
+make_fn!(
+    print_statement<SliceIter<Token>, Statement>,
+    do_each!(
+        pos => pos,
+        _ => word!("convert"),
+        typ => wrap_err!(must!(match_type!(BAREWORD)), "Expected converter name"),
+        expr => wrap_err!(must!(expression), "Expected Expression to print"),
+        _ => must!(punct!(";")),
+        (Statement::Print(pos, typ.clone(), expr.clone()))
+    )
+);
+
 //trace_macros!(true);
 fn statement(i: SliceIter<Token>) -> Result<SliceIter<Token>, Statement> {
     return either!(
@@ -848,6 +860,7 @@ fn statement(i: SliceIter<Token>) -> Result<SliceIter<Token>, Statement> {
         trace_parse!(assert_statement),
         trace_parse!(let_statement),
         trace_parse!(out_statement),
+        trace_parse!(print_statement),
         trace_parse!(expression_statement)
     );
 }
