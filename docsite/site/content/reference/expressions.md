@@ -694,9 +694,9 @@ You can experiment with conversion in the repl:
 
 ```
 > convert json {foo="bar"};
-'{
-  "foo": "bar"
-}'
+"{
+  \"foo\": \"bar\"
+}"
 > 
 ```
 

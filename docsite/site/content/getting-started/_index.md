@@ -70,6 +70,27 @@ cat sample.yaml
 
 UCG will generate the yaml file with the same name as the file containing the out statement.
 
+The UCG repl
+------------
+
+UCG has a built in repl where you can explore the language interactively. It supports the full
+set of UCG expressions and statements. As well as some repl directives that are not part of the
+UCG language proper.
+
+```sh
+ucg repl
+Welcome to the UCG repl. Ctrl-D to exit
+Type '#help' for help.
+
+1> let foo = "bar";
+"bar"
+1> out json {foo="bar"};
+{
+        foo = "bar",
+}
+1>
+```
+
 The UCG command line
 -----------
 
