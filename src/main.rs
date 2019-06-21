@@ -90,7 +90,9 @@ fn run_converter(c: &traits::Converter, v: Rc<Val>, f: Option<&str>) -> traits::
         }
         None => Box::new(io::stdout()),
     };
-    c.convert(v, file.as_mut())
+    let result = c.convert(v, file.as_mut());
+    file.flush()?;
+    result
 }
 
 fn build_file<'a, C: Cache>(
@@ -143,6 +145,30 @@ fn do_validate<C: Cache>(
     return true;
 }
 
+fn process_output(
+    output: &Option<(String, Rc<Val>)>,
+    file: Option<&str>,
+    registry: &ConverterRegistry,
+) -> bool {
+    let (typ, val) = match output {
+        Some((ref typ, ref val)) => (typ, val.clone()),
+        None => {
+            return false;
+        }
+    };
+    match registry.get_converter(typ) {
+        Some(converter) => {
+            run_converter(converter, val, file).unwrap();
+            eprintln!("\nConversion successful");
+            return true;
+        }
+        None => {
+            eprintln!("No such converter {}", typ);
+            return false;
+        }
+    }
+}
+
 fn do_compile<C: Cache>(
     file: &str,
     strict: bool,
@@ -158,24 +184,10 @@ fn do_compile<C: Cache>(
             return false;
         }
     };
-    let (typ, val) = match builder.out_lock {
-        Some((ref typ, ref val)) => (typ, val.clone()),
-        None => {
-            eprintln!("Build results in no artifacts.");
-            return false;
-        }
-    };
-    match registry.get_converter(typ) {
-        Some(converter) => {
-            run_converter(converter, val, Some(file)).unwrap();
-            eprintln!("Build successful");
-            return true;
-        }
-        None => {
-            eprintln!("No such converter {}", typ);
-            return false;
-        }
+    if builder.out_lock.is_none() {
+        eprintln!("Build results in no artifacts.");
     }
+    process_output(&builder.out_lock, Some(file), registry)
 }
 
 fn visit_ucg_files<C: Cache>(
@@ -608,9 +620,14 @@ fn do_repl<C: Cache>(
                     // print the result
                     Err(e) => eprintln!("{}", e),
                     Ok(v) => {
-                        println!("{}", v);
-                        editor.history_mut().add(stmt);
-                        editor.save_history(&config_home)?;
+                        if builder.out_lock.is_some() {
+                            process_output(&builder.out_lock, None, registry);
+                            builder.out_lock = None;
+                        } else {
+                            println!("{}", v);
+                            editor.history_mut().add(stmt);
+                            editor.save_history(&config_home)?;
+                        }
                     }
                 }
                 // start loop over at prompt.
