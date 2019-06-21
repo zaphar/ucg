@@ -23,7 +23,7 @@ let connstr_mapper = func (item) => {
     str = item.conn_string
 };
 
-let db_conns = map connstr_mapper.str [db_conn1, db_conn2];
+let db_conns = map(connstr_mapper, [db_conn1, db_conn2]);
 
 let cplx_list = [
     {foo = 1},
