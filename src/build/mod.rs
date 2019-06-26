@@ -39,6 +39,7 @@ use crate::iter::OffsetStrIter;
 use crate::parse::parse;
 
 pub mod assets;
+pub mod bytecode;
 pub mod format;
 pub mod ir;
 pub mod scope;
