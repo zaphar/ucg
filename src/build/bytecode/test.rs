@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::Op::{Add, Bind, Div, Mul, Sub, Sym, Val};
+use super::Composite::{List, Tuple};
+use super::Op::{Add, Bind, Cp, Div, Element, InitList, InitTuple, Mul, Sub, Sym, Val, FIELD};
 use super::Primitive::{Float, Int, Str};
-use super::Value::P;
+use super::Value::{C, P};
 use super::VM;
 
 #[test]
@@ -78,5 +79,75 @@ fn test_bind_op() {
         let (name, result) = case.1;
         let v = vm.get_binding(&name).unwrap();
         assert_eq!(&result, v);
+    }
+}
+
+#[test]
+fn test_list_ops() {
+    let mut cases = vec![
+        (vec![InitList], C(List(Vec::new()))),
+        (
+            vec![InitList, Val(Int(1)), Element],
+            C(List(vec![P(Int(1))])),
+        ),
+        (
+            vec![InitList, Val(Int(2)), Element, Val(Int(1)), Element],
+            C(List(vec![P(Int(2)), P(Int(1))])),
+        ),
+    ];
+    let mut vm = VM::new();
+    for mut case in cases.drain(0..) {
+        vm.run(case.0.drain(0..)).unwrap();
+        assert_eq!(vm.pop().unwrap(), case.1);
+    }
+}
+
+#[test]
+fn test_tuple_ops() {
+    let mut cases = vec![
+        (vec![InitTuple], C(Tuple(Vec::new()))),
+        (
+            vec![InitTuple, Val(Str("foo".to_owned())), Val(Int(1)), FIELD],
+            C(Tuple(vec![("foo".to_owned(), P(Int(1)))])),
+        ),
+        (
+            vec![
+                InitTuple,
+                Sym("bar".to_owned()),
+                Val(Str("quux".to_owned())),
+                FIELD,
+                Val(Str("foo".to_owned())),
+                Val(Int(1)),
+                FIELD,
+            ],
+            C(Tuple(vec![
+                ("bar".to_owned(), P(Str("quux".to_owned()))),
+                ("foo".to_owned(), P(Int(1))),
+            ])),
+        ),
+        (
+            vec![
+                InitTuple,
+                Sym("bar".to_owned()),
+                Val(Str("quux".to_owned())),
+                FIELD,
+                Val(Str("foo".to_owned())),
+                Val(Int(1)),
+                FIELD,
+                Cp,
+                Val(Str("foo".to_owned())),
+                Val(Int(2)),
+                FIELD,
+            ],
+            C(Tuple(vec![
+                ("bar".to_owned(), P(Str("quux".to_owned()))),
+                ("foo".to_owned(), P(Int(2))),
+            ])),
+        ),
+    ];
+    let mut vm = VM::new();
+    for mut case in cases.drain(0..) {
+        vm.run(case.0.drain(0..)).unwrap();
+        assert_eq!(vm.pop().unwrap(), case.1);
     }
 }

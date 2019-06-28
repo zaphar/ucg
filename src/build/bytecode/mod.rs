@@ -11,12 +11,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use std::collections::BTreeMap;
+use std::collections::hash_map::Entry;
+use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
 use crate::build::ir::Val;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Primitive {
     // Primitive Types
     Int(i64),
@@ -26,14 +27,14 @@ pub enum Primitive {
     Empty,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Composite {
-    List(Vec<Val>),
-    Tuple(Vec<(String, Val)>),
-    Thunk(Frame),
+    List(Vec<Value>),
+    Tuple(Vec<(String, Value)>),
+    //Thunk(Frame),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Value {
     // Binding names.
     S(String),
@@ -43,7 +44,7 @@ pub enum Value {
     C(Composite),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Op {
     // Stack and Name manipulation.
     Bind, // Bind a Val to a name in the heap
@@ -81,7 +82,7 @@ pub struct Heap {}
 pub struct Error {}
 
 /// The type of Frame environment this is
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum FrameType {
     Lib,
     Func,
@@ -209,10 +210,8 @@ impl VM {
                     // get composite tuple from stack
                     let tpl = self.pop()?;
                     if let Value::C(Composite::Tuple(mut flds)) = tpl {
-                        // FIXME(jwall): We need to reuse the field merging logic
-                        // from the ast walker version.
                         // add name and value to tuple
-                        flds.push((name, self.to_val(val)?));
+                        self.merge_field_into_tuple(&mut flds, name, val)?;
                         // place composite tuple back on stack
                         self.composite_push(Composite::Tuple(flds))?;
                     } else {
@@ -223,10 +222,10 @@ impl VM {
                     // get element from stack.
                     let val = self.pop()?;
                     // get next value. It should be a Composite list.
-                    let lst = self.pop()?;
-                    if let Value::C(Composite::List(mut elems)) = lst {
+                    let tpl = self.pop()?;
+                    if let Value::C(Composite::List(mut elems)) = tpl {
                         // add value to list
-                        elems.push(self.to_val(val)?);
+                        elems.push(val);
                         // Add that value to the list and put list back on stack.
                         self.composite_push(Composite::List(elems))?;
                     } else {
@@ -234,14 +233,13 @@ impl VM {
                     };
                 }
                 Op::Cp => {
+                    // TODO Use Cow pointers for this?
                     // get next value. It should be a Composite Tuple.
                     if let Value::C(Composite::Tuple(flds)) = self.pop()? {
                         // Make a copy of the original
                         let original = Composite::Tuple(flds.clone());
-                        // FIXME(jwall): We need to reuse the field merging logic
-                        // from the ast walker version.
                         let copy = Composite::Tuple(flds);
-                        // Put the original on the Stack as well as the original
+                        // Put the original on the Stack as well as the copy
                         self.composite_push(original)?;
                         self.composite_push(copy)?;
                     } else {
@@ -267,6 +265,22 @@ impl VM {
         Ok(())
     }
 
+    fn merge_field_into_tuple(
+        &self,
+        src_fields: &mut Vec<(String, Value)>,
+        name: String,
+        value: Value,
+    ) -> Result<(), Error> {
+        for fld in src_fields.iter_mut() {
+            if fld.0 == name {
+                fld.1 = value;
+                return Ok(());
+            }
+        }
+        src_fields.push((name, value));
+        Ok(())
+    }
+
     fn push_stack(&mut self, typ: FrameType) {
         self.stack.push(Frame {
             names: BTreeMap::new(),
@@ -279,7 +293,7 @@ impl VM {
         self.stack.pop()
     }
 
-    fn to_val(&self, p: Value) -> Result<Val, Error> {
+    fn to_val(p: Value) -> Result<Val, Error> {
         Ok(match p {
             Value::P(Primitive::Int(i)) => Val::Int(i),
             Value::P(Primitive::Float(f)) => Val::Float(f),
@@ -287,18 +301,24 @@ impl VM {
             Value::P(Primitive::Bool(b)) => Val::Boolean(b),
             Value::P(Primitive::Empty) => Val::Empty,
             Value::C(Composite::List(mut elems)) => {
-                Val::List(elems.drain(0..).map(|v| Rc::new(v)).collect())
+                let mut mapped = Vec::with_capacity(elems.len());
+                for val in elems.drain(0..) {
+                    mapped.push(Rc::new(Self::to_val(val)?));
+                }
+                Val::List(mapped)
             }
-            Value::C(Composite::Tuple(mut flds)) => Val::Tuple(
-                flds.drain(0..)
-                    .map(|(name, val)| (name, Rc::new(val)))
-                    .collect(),
-            ),
+            Value::C(Composite::Tuple(mut flds)) => {
+                let mut mapped = Vec::with_capacity(flds.len());
+                for (name, val) in flds.drain(0..) {
+                    mapped.push((name, Rc::new(Self::to_val(val)?)));
+                }
+                Val::Tuple(mapped)
+            }
             Value::S(_) => return Err(Error {}),
-            Value::C(Composite::Thunk(_)) => {
-                // TODO(jwall): This is either a function or a Module
-                Val::Empty
-            }
+            //Value::C(Composite::Thunk(_)) => {
+            //    // TODO(jwall): This is either a function or a Module
+            //    Val::Empty
+            //}
         })
     }
 
