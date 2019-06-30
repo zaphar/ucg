@@ -32,6 +32,8 @@ pub enum Composite {
     Tuple(Vec<(String, Value)>),
 }
 
+use Composite::{List, Tuple};
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Value {
     // Binding names.
@@ -109,9 +111,9 @@ impl VM {
                 Op::Div => self.op_div()?,
                 Op::Bind => self.op_bind()?,
                 // Add a Composite list value to the stack
-                Op::InitList => self.composite_push(Composite::List(Vec::new()))?,
+                Op::InitList => self.composite_push(List(Vec::new()))?,
                 // Add a composite tuple value to the stack
-                Op::InitTuple => self.composite_push(Composite::Tuple(Vec::new()))?,
+                Op::InitTuple => self.composite_push(Tuple(Vec::new()))?,
                 Op::FIELD => self.op_field()?,
                 Op::Element => self.op_element()?,
                 Op::Cp => self.op_copy()?,
@@ -197,11 +199,11 @@ impl VM {
         };
         // get composite tuple from stack
         let tpl = self.pop()?;
-        if let Value::C(Composite::Tuple(mut flds)) = tpl {
+        if let Value::C(Tuple(mut flds)) = tpl {
             // add name and value to tuple
             self.merge_field_into_tuple(&mut flds, name, val)?;
             // place composite tuple back on stack
-            self.composite_push(Composite::Tuple(flds))?;
+            self.composite_push(Tuple(flds))?;
         } else {
             return Err(Error {});
         };
@@ -213,11 +215,11 @@ impl VM {
         let val = self.pop()?;
         // get next value. It should be a Composite list.
         let tpl = self.pop()?;
-        if let Value::C(Composite::List(mut elems)) = tpl {
+        if let Value::C(List(mut elems)) = tpl {
             // add value to list
             elems.push(val);
             // Add that value to the list and put list back on stack.
-            self.composite_push(Composite::List(elems))?;
+            self.composite_push(List(elems))?;
         } else {
             return Err(Error {});
         };
@@ -227,10 +229,10 @@ impl VM {
     fn op_copy(&mut self) -> Result<(), Error> {
         // TODO Use Cow pointers for this?
         // get next value. It should be a Composite Tuple.
-        if let Value::C(Composite::Tuple(flds)) = self.pop()? {
+        if let Value::C(Tuple(flds)) = self.pop()? {
             // Make a copy of the original
-            let original = Composite::Tuple(flds.clone());
-            let copy = Composite::Tuple(flds);
+            let original = Tuple(flds.clone());
+            let copy = Tuple(flds);
             // Put the original on the Stack as well as the copy
             self.composite_push(original)?;
             self.composite_push(copy)?;
