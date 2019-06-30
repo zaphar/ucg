@@ -93,6 +93,18 @@ fn test_list_ops() {
             vec![InitList, Val(Int(2)), Element, Val(Int(1)), Element],
             C(List(vec![P(Int(2)), P(Int(1))])),
         ),
+        (
+            vec![
+                InitList,
+                Val(Int(1)),
+                Element,
+                Val(Int(1)),
+                Val(Int(1)),
+                Add,
+                Element,
+            ],
+            C(List(vec![P(Int(1)), P(Int(2))])),
+        ),
     ];
     for case in cases.drain(0..) {
         let mut vm = VM::new(case.0);
@@ -129,6 +141,27 @@ fn test_tuple_ops() {
                 InitTuple,
                 Sym("bar".to_owned()),
                 Val(Str("quux".to_owned())),
+                FIELD,
+                Val(Str("foo".to_owned())),
+                Val(Int(1)),
+                FIELD,
+                Cp,
+                Val(Str("foo".to_owned())),
+                Val(Int(2)),
+                FIELD,
+            ],
+            C(Tuple(vec![
+                ("bar".to_owned(), P(Str("quux".to_owned()))),
+                ("foo".to_owned(), P(Int(2))),
+            ])),
+        ),
+        (
+            vec![
+                InitTuple,
+                Sym("bar".to_owned()),
+                Val(Str("ux".to_owned())),
+                Val(Str("qu".to_owned())),
+                Add,
                 FIELD,
                 Val(Str("foo".to_owned())),
                 Val(Int(1)),
