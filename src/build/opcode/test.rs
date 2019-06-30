@@ -56,10 +56,9 @@ fn test_math_ops() {
             P(Int(4)),
         ),
     ];
-    let mut vm = VM::new();
-
-    for mut case in cases.drain(0..) {
-        vm.run(case.0.drain(0..)).unwrap();
+    for case in cases.drain(0..) {
+        let mut vm = VM::new(case.0);
+        vm.run().unwrap();
         assert_eq!(vm.pop().unwrap(), case.1);
     }
 }
@@ -73,11 +72,11 @@ fn test_bind_op() {
         ("foo", P(Int(2))),
     )];
 
-    let mut vm = VM::new();
-    for mut case in cases.drain(0..) {
-        vm.run(case.0.drain(0..)).unwrap();
+    for case in cases.drain(0..) {
+        let mut vm = VM::new(case.0);
+        vm.run().unwrap();
         let (name, result) = case.1;
-        let v = vm.get_binding(&name).unwrap();
+        let v = vm.get_binding(name).unwrap();
         assert_eq!(&result, v);
     }
 }
@@ -95,9 +94,9 @@ fn test_list_ops() {
             C(List(vec![P(Int(2)), P(Int(1))])),
         ),
     ];
-    let mut vm = VM::new();
-    for mut case in cases.drain(0..) {
-        vm.run(case.0.drain(0..)).unwrap();
+    for case in cases.drain(0..) {
+        let mut vm = VM::new(case.0);
+        vm.run().unwrap();
         assert_eq!(vm.pop().unwrap(), case.1);
     }
 }
@@ -145,9 +144,9 @@ fn test_tuple_ops() {
             ])),
         ),
     ];
-    let mut vm = VM::new();
-    for mut case in cases.drain(0..) {
-        vm.run(case.0.drain(0..)).unwrap();
+    for case in cases.drain(0..) {
+        let mut vm = VM::new(case.0);
+        vm.run().unwrap();
         assert_eq!(vm.pop().unwrap(), case.1);
     }
 }
