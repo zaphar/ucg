@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use super::scope::Stack;
 use super::Composite::{List, Tuple};
 use super::Op::{
-    Add, Bind, Cp, Div, Element, Equal, Field, InitList, InitThunk, InitTuple, Jump, JumpIfTrue,
-    Mul, Noop, Sub, Sym, Val,
+    Add, Bind, Cp, DeRef, Div, Element, Equal, FCall, Field, Func, InitList, InitThunk, InitTuple,
+    Jump, JumpIfTrue, Module, Mul, Noop, Return, Sub, Sym, Val,
 };
 use super::Primitive::{Bool, Float, Int, Str};
 use super::Value::{C, P, T};
@@ -60,7 +61,7 @@ fn test_math_ops() {
         ),
     ];
     for case in cases.drain(0..) {
-        let mut vm = VM::new(case.0);
+        let mut vm = VM::new(&case.0);
         vm.run().unwrap();
         assert_eq!(vm.pop().unwrap(), case.1);
     }
@@ -76,7 +77,7 @@ fn test_bind_op() {
     )];
 
     for case in cases.drain(0..) {
-        let mut vm = VM::new(case.0);
+        let mut vm = VM::new(&case.0);
         vm.run().unwrap();
         let (name, result) = case.1;
         let v = vm.get_binding(name).unwrap();
@@ -110,7 +111,7 @@ fn test_list_ops() {
         ),
     ];
     for case in cases.drain(0..) {
-        let mut vm = VM::new(case.0);
+        let mut vm = VM::new(&case.0);
         vm.run().unwrap();
         assert_eq!(vm.pop().unwrap(), case.1);
     }
@@ -148,7 +149,6 @@ fn test_tuple_ops() {
                 Val(Str("foo".to_owned())),
                 Val(Int(1)),
                 Field,
-                Cp,
                 Val(Str("foo".to_owned())),
                 Val(Int(2)),
                 Field,
@@ -169,7 +169,6 @@ fn test_tuple_ops() {
                 Val(Str("foo".to_owned())),
                 Val(Int(1)),
                 Field,
-                Cp,
                 Val(Str("foo".to_owned())),
                 Val(Int(2)),
                 Field,
@@ -179,9 +178,31 @@ fn test_tuple_ops() {
                 ("foo".to_owned(), P(Int(2))),
             ])),
         ),
+        (
+            vec![
+                InitTuple, // Override tuple
+                Val(Str("foo".to_owned())),
+                Val(Int(2)),
+                Field,
+                InitTuple, // Target tuple
+                Sym("bar".to_owned()),
+                Val(Str("ux".to_owned())),
+                Val(Str("qu".to_owned())),
+                Add,
+                Field,
+                Val(Str("foo".to_owned())),
+                Val(Int(1)),
+                Field,
+                Cp, // Do the tuple copy operation
+            ],
+            C(Tuple(vec![
+                ("bar".to_owned(), P(Str("quux".to_owned()))),
+                ("foo".to_owned(), P(Int(2))),
+            ])),
+        ),
     ];
     for case in cases.drain(0..) {
-        let mut vm = VM::new(case.0);
+        let mut vm = VM::new(&case.0);
         vm.run().unwrap();
         assert_eq!(vm.pop().unwrap(), case.1);
     }
@@ -194,7 +215,7 @@ fn test_jump_ops() {
         (vec![Jump(1), Val(Int(1)), Noop, Val(Int(1))], P(Int(1))),
     ];
     for case in cases.drain(0..) {
-        let mut vm = VM::new(case.0);
+        let mut vm = VM::new(&case.0);
         vm.run().unwrap();
         assert_eq!(vm.pop().unwrap(), case.1);
     }
@@ -284,7 +305,7 @@ fn test_equality_ops() {
         ),
     ];
     for case in cases.drain(0..) {
-        let mut vm = VM::new(case.0);
+        let mut vm = VM::new(&case.0);
         vm.run().unwrap();
         assert_eq!(vm.pop().unwrap(), case.1);
     }
@@ -336,8 +357,141 @@ fn test_conditional_jump_ops() {
         ),
     ];
     for case in cases.drain(0..) {
-        let mut vm = VM::new(case.0);
+        let mut vm = VM::new(&case.0);
         vm.run().unwrap();
         assert_eq!(vm.pop().unwrap(), case.1);
     }
+}
+
+#[test]
+fn test_function_definition_and_call() {
+    let mut cases = vec![
+        (
+            vec![
+                Sym("f".to_owned()),     // 0
+                InitList,                // 1
+                Sym("arg".to_owned()),   // 2
+                Element,                 // 3
+                Func(6),                 // 4
+                DeRef("arg".to_owned()), // 5
+                Return,                  // 6
+                Bind,                    // 7
+                Val(Int(1)),             // 8
+                DeRef("f".to_owned()),   // 9
+                FCall,                   // 10
+            ],
+            P(Int(1)),
+        ),
+        (
+            vec![
+                Sym("closed".to_owned()),   // 0
+                Val(Int(1)),                // 1
+                Bind,                       // 2
+                Sym("f".to_owned()),        // 3
+                InitList,                   // 4
+                Sym("arg".to_owned()),      // 5
+                Element,                    // 6
+                Func(11),                   // 7
+                DeRef("arg".to_owned()),    // 8
+                DeRef("closed".to_owned()), // 9
+                Add,                        // 10
+                Return,                     // 11
+                Bind,                       // 12
+                Val(Int(1)),                // 13
+                DeRef("f".to_owned()),      // 14
+                FCall,                      // 16
+            ],
+            P(Int(2)),
+        ),
+    ];
+    for case in cases.drain(0..) {
+        let mut vm = VM::new(&case.0);
+        vm.run().unwrap();
+        assert_eq!(vm.pop().unwrap(), case.1);
+    }
+}
+
+#[test]
+fn test_module_call() {
+    let mut cases = vec![
+        (
+            vec![
+                InitTuple,               // 0 // override tuple
+                Sym("one".to_owned()),   // 1
+                Val(Int(11)),            // 2
+                Field,                   // 3
+                Sym("m".to_owned()),     // 4 // binding name for module
+                InitTuple,               // 5 // Module tuple bindings
+                Sym("one".to_owned()),   // 6
+                Val(Int(1)),             // 7
+                Field,                   // 8
+                Sym("two".to_owned()),   // 9
+                Val(Int(2)),             // 10
+                Field,                   // 11
+                Module(17),              // 12 // Module definition
+                Bind,                    // 13
+                Sym("foo".to_owned()),   // 14
+                DeRef("mod".to_owned()), // 15
+                Bind,                    // 16 // bind mod tuple to foo
+                Return,                  // 17 // end the module
+                Bind,                    // 18 // bind module to the binding name
+                DeRef("m".to_owned()),   // 19
+                Cp,                      // 20
+            ],
+            C(Tuple(vec![(
+                "foo".to_owned(),
+                C(Tuple(vec![
+                    ("one".to_owned(), P(Int(11))),
+                    ("two".to_owned(), P(Int(2))),
+                ])),
+            )])),
+        ),
+        (
+            vec![
+                InitTuple,               // 0 // override tuple
+                Sym("one".to_owned()),   // 1
+                Val(Int(11)),            // 2
+                Field,                   // 3
+                Sym("m".to_owned()),     // 4 // binding name for module
+                InitTuple,               // 5 // Module tuple bindings
+                Sym("one".to_owned()),   // 6
+                Val(Int(1)),             // 7
+                Field,                   // 8
+                Sym("two".to_owned()),   // 9
+                Val(Int(2)),             // 10
+                Field,                   // 11
+                InitThunk(2),            // 12 // Module Return expression
+                Val(Int(1)),             // 13
+                Return,                  // 14
+                Module(20),              // 15 // Module definition
+                Bind,                    // 16
+                Sym("foo".to_owned()),   // 17
+                DeRef("mod".to_owned()), // 18
+                Bind,                    // 19 // bind mod tuple to foo
+                Return,                  // 20 // end the module
+                Bind,                    // 21 // bind module to the binding name
+                DeRef("m".to_owned()),   // 22
+                Cp,                      // 23
+            ],
+            P(Int(1)),
+        ),
+    ];
+    for case in cases.drain(0..) {
+        let mut vm = VM::new(&case.0);
+        vm.run().unwrap();
+        assert_eq!(vm.pop().unwrap(), case.1);
+    }
+}
+
+#[test]
+fn test_scope_stacks() {
+    let mut stack = Stack::new();
+    stack.add("one".to_owned(), P(Int(1)));
+    let mut val = stack.get("one").unwrap();
+    assert_eq!(val, &P(Int(1)));
+    stack.push();
+    assert!(stack.get("one").is_none());
+    stack.to_open();
+    val = stack.get("one").unwrap();
+    assert_eq!(val, &P(Int(1)));
 }

@@ -14,13 +14,14 @@
 
 use super::{Error, Op};
 
-pub struct OpPointer {
-    ops: Vec<Op>,
+#[derive(Clone)]
+pub struct OpPointer<'a> {
+    pub ops: &'a Vec<Op>,
     pub ptr: Option<usize>,
 }
 
-impl OpPointer {
-    pub fn new(ops: Vec<Op>) -> Self {
+impl<'a> OpPointer<'a> {
+    pub fn new(ops: &'a Vec<Op>) -> Self {
         // If we load an empty program what happens?
         Self {
             ops: ops,
@@ -55,5 +56,12 @@ impl OpPointer {
             return self.ops.get(i);
         }
         None
+    }
+
+    pub fn snapshot(&self) -> Self {
+        Self {
+            ops: self.ops,
+            ptr: None,
+        }
     }
 }

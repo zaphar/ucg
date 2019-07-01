@@ -11,10 +11,11 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use std::collections::BTreeMap;
-
 pub mod pointer;
+pub mod scope;
+
 use pointer::OpPointer;
+use scope::Stack;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Primitive {
@@ -37,6 +38,20 @@ pub enum Composite {
 use Composite::{List, Tuple};
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct Func {
+    ptr: usize,
+    bindings: Vec<String>,
+    snapshot: Stack,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Module {
+    ptr: usize,
+    result_ptr: Option<usize>,
+    flds: Vec<(String, Value)>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum Value {
     // Binding names.
     S(String),
@@ -46,8 +61,12 @@ pub enum Value {
     C(Composite),
     // Program Pointer
     T(usize),
+    // Function
+    F(Func),
+    // Module
+    M(Module),
 }
-use Value::{C, P, S, T};
+use Value::{C, F, M, P, S, T};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Op {
@@ -69,48 +88,64 @@ pub enum Op {
     Val(Primitive),
     // A bareword for use in bindings or lookups
     Sym(String),
+    // Reference a binding on the heap
+    DeRef(String),
     // Complex Type ops
     InitTuple,
     Field,
     InitList,
     Element,
-    // Operations
+    // Copy Operation
     Cp,
     // Control Flow
     Bang,
     Jump(usize),
     JumpIfTrue(usize),
+    // TODO(jwall): Short circuiting operations
+    // - And(usize)
+    // - Or(usize)
+    // Spacer operation, Does nothing.
     Noop,
     // Pending Computation
     InitThunk(usize),
+    Module(usize),
+    Func(usize),
     Return,
     // - Call
+    FCall,
     // Runtime hooks
-    // - Map
-    // - Filter
-    // - Reduce
-    // - Import
-    // - Out
-    // - Assert
-    // - Print
+    // - Map,
+    // - Filter,
+    // - Reduce,
+    // - Import,
+    // - Out,
+    // - Assert,
+    // - Print,
 }
 
 #[derive(Debug)]
 pub struct Error {}
 
-pub struct VM {
+pub struct VM<'a> {
     stack: Vec<Value>,
-    // TODO(jwall): We may want to preserve order on these.
-    symbols: BTreeMap<String, Value>,
-    ops: OpPointer,
+    symbols: Stack,
+    ops: OpPointer<'a>,
 }
 
-impl VM {
-    pub fn new(ops: Vec<Op>) -> Self {
+impl<'a> VM<'a> {
+    pub fn new(ops: &'a Vec<Op>) -> Self {
         Self {
             stack: Vec::new(),
-            symbols: BTreeMap::new(),
+            symbols: Stack::new(),
             ops: OpPointer::new(ops),
+        }
+    }
+
+    pub fn to_scoped(&self, symbols: Stack) -> Self {
+        Self {
+            stack: Vec::new(),
+            symbols: symbols,
+            ops: self.ops.clone(),
         }
     }
 
@@ -120,6 +155,7 @@ impl VM {
             match self.ops.op().unwrap() {
                 Op::Val(p) => self.push(P(p.clone()))?,
                 Op::Sym(s) => self.push(S(s.clone()))?,
+                Op::DeRef(s) => self.op_deref(s.clone())?,
                 Op::Add => self.op_add()?,
                 Op::Sub => self.op_sub()?,
                 Op::Mul => self.op_mul()?,
@@ -137,22 +173,29 @@ impl VM {
                 Op::Field => self.op_field()?,
                 Op::Element => self.op_element()?,
                 Op::Cp => self.op_copy()?,
+                // TODO(jwall): Should this whould take a user provided message?
                 Op::Bang => return Err(Error {}),
                 Op::InitThunk(jp) => self.op_thunk(idx, *jp)?,
                 Op::Noop => {
                     // Do nothing
                 }
-                Op::Return => {
-                    // TODO(jwall): This means we return back to the start of the frame.
-                }
                 Op::Jump(jp) => self.op_jump(*jp)?,
                 Op::JumpIfTrue(jp) => self.op_jump_if_true(*jp)?,
+                Op::Module(mptr) => self.op_module(idx, *mptr)?,
+                Op::Func(jptr) => self.op_func(idx, *jptr)?,
+                Op::FCall => self.op_fcall()?,
+                Op::Return => return Ok(()),
                 Op::Pop => {
                     self.pop()?;
                 }
             };
         }
         Ok(())
+    }
+
+    fn op_deref(&mut self, name: String) -> Result<(), Error> {
+        let val = dbg!(self.get_binding(&name)?.clone());
+        self.push(val)
     }
 
     fn op_jump(&mut self, jp: usize) -> Result<(), Error> {
@@ -169,8 +212,85 @@ impl VM {
         Ok(())
     }
 
+    fn op_module(&mut self, idx: usize, jptr: usize) -> Result<(), Error> {
+        let (result_ptr, flds) = match self.pop()? {
+            C(Tuple(flds)) => (None, flds),
+            T(ptr) => {
+                if let C(Tuple(flds)) = self.pop()? {
+                    (Some(ptr), flds)
+                } else {
+                    return dbg!(Err(Error {}));
+                }
+            }
+            _ => {
+                return dbg!(Err(Error {}));
+            }
+        };
+        self.push(M(Module {
+            ptr: dbg!(idx),
+            result_ptr: result_ptr,
+            flds: dbg!(flds),
+        }))?;
+        self.ops.jump(dbg!(jptr))
+    }
+
+    fn op_func(&mut self, idx: usize, jptr: usize) -> Result<(), Error> {
+        // get arity from stack
+        let mut scope_snapshot = self.symbols.snapshot();
+        scope_snapshot.push();
+        scope_snapshot.to_open();
+        eprintln!("Defining a new function");
+        let mut bindings = Vec::new();
+        // get imported symbols from stack
+        if let C(List(elems)) = self.pop()? {
+            for e in elems {
+                if let S(sym) = e {
+                    bindings.push(sym);
+                } else {
+                    return dbg!(Err(Error {}));
+                }
+            }
+        } else {
+            return dbg!(Err(Error {}));
+        }
+        eprintln!("Pushing function definition on stack");
+        self.push(dbg!(F(Func {
+            ptr: idx, // where the function starts.
+            bindings: bindings,
+            snapshot: scope_snapshot,
+        })))?;
+        eprintln!("Jumping to {} past the function body", jptr);
+        self.ops.jump(jptr)
+    }
+
+    fn op_fcall(&mut self) -> Result<(), Error> {
+        let f = self.pop()?;
+        if let F(Func {
+            ptr,
+            bindings,
+            snapshot,
+        }) = f
+        {
+            // TODO(jwall): This is wasteful. We can do better.
+            let mut vm = self.to_scoped(snapshot);
+            // use the captured scope snapshot for the function.
+            for nm in bindings {
+                // now put each argument on our scope stack as a binding.
+                let val = self.pop()?;
+                vm.binding_push(nm, val)?;
+            }
+            // proceed to the function body
+            vm.ops.jump(ptr)?;
+            vm.run()?;
+            self.push(vm.pop()?)?;
+        } else {
+            return dbg!(Err(Error {}));
+        }
+        Ok(())
+    }
+
     fn op_thunk(&mut self, idx: usize, jp: usize) -> Result<(), Error> {
-        self.push(T(idx))?;
+        self.push(dbg!(T(idx)))?;
         self.op_jump(jp)
     }
 
@@ -279,9 +399,9 @@ impl VM {
 
     fn op_bind(&mut self) -> Result<(), Error> {
         // pop val off stack.
-        let val = self.pop()?;
+        let val = dbg!(self.pop())?;
         // pop name off stack.
-        let name = self.pop()?;
+        let name = dbg!(self.pop())?;
         if let S(name) = name {
             self.binding_push(name, val)?;
         } else {
@@ -331,17 +451,57 @@ impl VM {
 
     fn op_copy(&mut self) -> Result<(), Error> {
         // TODO Use Cow pointers for this?
-        // get next value. It should be a Composite Tuple.
-        if let C(Tuple(flds)) = self.pop()? {
-            // Make a copy of the original
-            let original = Tuple(flds.clone());
-            let copy = Tuple(flds);
-            // Put the original on the Stack as well as the copy
-            self.push(C(original))?;
-            self.push(C(copy))?;
-        } else {
-            return Err(Error {});
-        };
+        // get next value. It should be a Module.
+        let tgt = self.pop()?;
+        match tgt {
+            C(Tuple(mut flds)) => {
+                let overrides = self.pop()?;
+                if let C(Tuple(oflds)) = overrides {
+                    for (name, val) in oflds {
+                        self.merge_field_into_tuple(&mut flds, name, val)?;
+                    }
+                } else {
+                    return dbg!(Err(Error {}));
+                }
+                // Put the copy on the Stack
+                self.push(C(Tuple(flds)))?;
+            }
+            M(Module {
+                ptr,
+                result_ptr,
+                mut flds,
+            }) => {
+                let overrides = dbg!(self.pop()?);
+                if let C(Tuple(oflds)) = overrides {
+                    for (name, val) in oflds {
+                        self.merge_field_into_tuple(&mut flds, name, val)?;
+                    }
+                } else {
+                    return dbg!(Err(Error {}));
+                }
+                let mut vm = VM::new(self.ops.ops);
+                vm.push(S("mod".to_owned()))?;
+                vm.push(C(Tuple(flds)))?;
+                vm.ops.jump(ptr)?;
+                vm.run()?;
+                let mut flds = Vec::new();
+                if let Some(ptr) = dbg!(result_ptr) {
+                    vm.ops.jump(ptr)?;
+                    vm.run()?;
+                    self.push(vm.pop()?)?;
+                } else {
+                    for sym in vm.symbols.symbol_list() {
+                        if sym != "mod" {
+                            flds.push((sym.clone(), vm.symbols.get(sym).unwrap().clone()));
+                        }
+                    }
+                    self.push(dbg!(C(Tuple(flds))))?;
+                }
+            }
+            _ => {
+                return Err(Error {});
+            }
+        }
         Ok(())
     }
 
@@ -368,7 +528,7 @@ impl VM {
 
     fn binding_push(&mut self, name: String, val: Value) -> Result<(), Error> {
         // FIXME(jwall): Error if the symbol already exists.
-        self.symbols.insert(name, val);
+        self.symbols.add(name, val);
         Ok(())
     }
 
