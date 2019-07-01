@@ -62,13 +62,18 @@ pub enum Op {
     Sym(String),
     // Complex Type ops
     InitTuple,
-    FIELD,
+    Field,
     InitList,
     Element,
     // Operations
     Cp,
-    // record
-    InitThunk,
+    // Control Flow
+    Select,
+    Bang,
+    Jump(usize),
+    Noop,
+    // Pending Computation
+    InitThunk(usize),
     Return,
     // - Call
     // Runtime hooks
@@ -86,6 +91,7 @@ pub struct Error {}
 
 pub struct VM {
     stack: Vec<Value>,
+    // TODO(jwall): We may want to preserve order on these.
     symbols: BTreeMap<String, Value>,
     ops: OpPointer,
 }
@@ -114,13 +120,19 @@ impl VM {
                 Op::InitList => self.composite_push(List(Vec::new()))?,
                 // Add a composite tuple value to the stack
                 Op::InitTuple => self.composite_push(Tuple(Vec::new()))?,
-                Op::FIELD => self.op_field()?,
+                Op::Field => self.op_field()?,
                 Op::Element => self.op_element()?,
                 Op::Cp => self.op_copy()?,
-                Op::InitThunk => self.op_thunk(idx)?,
+                Op::Select => self.op_select()?,
+                Op::Bang => return Err(Error {}),
+                Op::InitThunk(jp) => self.op_thunk(idx, *jp)?,
+                Op::Noop => {
+                    // Do nothing
+                }
                 Op::Return => {
                     // TODO(jwall): This means we return back to the start of the frame.
                 }
+                Op::Jump(jp) => self.ops.jump(self.ops.ptr.map(|v| v + jp).unwrap_or(*jp))?,
                 Op::Pop => {
                     self.pop()?;
                 }
@@ -129,9 +141,20 @@ impl VM {
         Ok(())
     }
 
-    fn op_thunk(&mut self, idx: usize) -> Result<(), Error> {
-        // TODO(jwall): Record the position in the op codes.
+    fn op_thunk(&mut self, idx: usize, jp: usize) -> Result<(), Error> {
         self.push(Value::T(idx))?;
+        self.ops.jump(self.ops.ptr.map(|v| v + jp).unwrap_or(jp))?;
+        // TODO(jwall): Skip over the rest until we reach the return?
+        Ok(())
+    }
+
+    fn op_select(&mut self) -> Result<(), Error> {
+        // first get our compare value from the stack
+        let search_field = self.pop()?;
+        // next get our default value from the stack
+        let default_field = self.pop()?;
+        // finally get our fields from the stack
+        let fields = self.pop()?;
         Ok(())
     }
 

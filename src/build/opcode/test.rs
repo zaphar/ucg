@@ -13,9 +13,12 @@
 // limitations under the License.
 
 use super::Composite::{List, Tuple};
-use super::Op::{Add, Bind, Cp, Div, Element, InitList, InitTuple, Mul, Sub, Sym, Val, FIELD};
+use super::Op::{
+    Add, Bind, Cp, Div, Element, Field, InitList, InitThunk, InitTuple, Jump, Mul, Noop, Sub, Sym,
+    Val,
+};
 use super::Primitive::{Float, Int, Str};
-use super::Value::{C, P};
+use super::Value::{C, P, T};
 use super::VM;
 
 #[test]
@@ -118,7 +121,7 @@ fn test_tuple_ops() {
     let mut cases = vec![
         (vec![InitTuple], C(Tuple(Vec::new()))),
         (
-            vec![InitTuple, Val(Str("foo".to_owned())), Val(Int(1)), FIELD],
+            vec![InitTuple, Val(Str("foo".to_owned())), Val(Int(1)), Field],
             C(Tuple(vec![("foo".to_owned(), P(Int(1)))])),
         ),
         (
@@ -126,10 +129,10 @@ fn test_tuple_ops() {
                 InitTuple,
                 Sym("bar".to_owned()),
                 Val(Str("quux".to_owned())),
-                FIELD,
+                Field,
                 Val(Str("foo".to_owned())),
                 Val(Int(1)),
-                FIELD,
+                Field,
             ],
             C(Tuple(vec![
                 ("bar".to_owned(), P(Str("quux".to_owned()))),
@@ -141,14 +144,14 @@ fn test_tuple_ops() {
                 InitTuple,
                 Sym("bar".to_owned()),
                 Val(Str("quux".to_owned())),
-                FIELD,
+                Field,
                 Val(Str("foo".to_owned())),
                 Val(Int(1)),
-                FIELD,
+                Field,
                 Cp,
                 Val(Str("foo".to_owned())),
                 Val(Int(2)),
-                FIELD,
+                Field,
             ],
             C(Tuple(vec![
                 ("bar".to_owned(), P(Str("quux".to_owned()))),
@@ -162,20 +165,33 @@ fn test_tuple_ops() {
                 Val(Str("ux".to_owned())),
                 Val(Str("qu".to_owned())),
                 Add,
-                FIELD,
+                Field,
                 Val(Str("foo".to_owned())),
                 Val(Int(1)),
-                FIELD,
+                Field,
                 Cp,
                 Val(Str("foo".to_owned())),
                 Val(Int(2)),
-                FIELD,
+                Field,
             ],
             C(Tuple(vec![
                 ("bar".to_owned(), P(Str("quux".to_owned()))),
                 ("foo".to_owned(), P(Int(2))),
             ])),
         ),
+    ];
+    for case in cases.drain(0..) {
+        let mut vm = VM::new(case.0);
+        vm.run().unwrap();
+        assert_eq!(vm.pop().unwrap(), case.1);
+    }
+}
+
+#[test]
+fn test_jump_ops() {
+    let mut cases = vec![
+        (vec![InitThunk(1), Val(Int(1)), Noop], T(0)),
+        (vec![Jump(1), Val(Int(1)), Noop, Val(Int(1))], P(Int(1))),
     ];
     for case in cases.drain(0..) {
         let mut vm = VM::new(case.0);
