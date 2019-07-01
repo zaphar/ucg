@@ -26,7 +26,7 @@ pub enum Primitive {
     Empty,
 }
 
-use Primitive::{Bool, Empty, Float, Int, Str};
+use Primitive::{Bool, Float, Int, Str};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Composite {
@@ -118,8 +118,8 @@ impl VM {
         while self.ops.next().is_some() {
             let idx = self.ops.ptr.unwrap();
             match self.ops.op().unwrap() {
-                Op::Val(p) => self.primitive_push(p.clone())?,
-                Op::Sym(s) => self.push(Value::S(s.clone()))?,
+                Op::Val(p) => self.push(P(p.clone()))?,
+                Op::Sym(s) => self.push(S(s.clone()))?,
                 Op::Add => self.op_add()?,
                 Op::Sub => self.op_sub()?,
                 Op::Mul => self.op_mul()?,
@@ -131,16 +131,15 @@ impl VM {
                 Op::GtEq => self.op_gteq()?,
                 Op::LtEq => self.op_lteq()?,
                 // Add a Composite list value to the stack
-                Op::InitList => self.composite_push(List(Vec::new()))?,
+                Op::InitList => self.push(C(List(Vec::new())))?,
                 // Add a composite tuple value to the stack
-                Op::InitTuple => self.composite_push(Tuple(Vec::new()))?,
+                Op::InitTuple => self.push(C(Tuple(Vec::new())))?,
                 Op::Field => self.op_field()?,
                 Op::Element => self.op_element()?,
                 Op::Cp => self.op_copy()?,
                 Op::Bang => return Err(Error {}),
                 Op::InitThunk(jp) => self.op_thunk(idx, *jp)?,
                 Op::Noop => {
-                    self.stack.last();
                     // Do nothing
                 }
                 Op::Return => {
@@ -155,6 +154,7 @@ impl VM {
         }
         Ok(())
     }
+
     fn op_jump(&mut self, jp: usize) -> Result<(), Error> {
         self.ops.jump(self.ops.ptr.map(|v| v + jp).unwrap_or(jp))?;
         Ok(())
@@ -170,14 +170,14 @@ impl VM {
     }
 
     fn op_thunk(&mut self, idx: usize, jp: usize) -> Result<(), Error> {
-        self.push(Value::T(idx))?;
+        self.push(T(idx))?;
         self.op_jump(jp)
     }
 
     fn op_equal(&mut self) -> Result<(), Error> {
         let left = self.pop()?;
         let right = self.pop()?;
-        self.push(Value::P(Bool(left == right)))?;
+        self.push(P(Bool(left == right)))?;
         Ok(())
     }
 
@@ -186,10 +186,10 @@ impl VM {
         let right = self.pop()?;
         match (left, right) {
             (P(Int(i)), P(Int(ii))) => {
-                self.push(Value::P(Bool(i > ii)))?;
+                self.push(P(Bool(i > ii)))?;
             }
             (P(Float(f)), P(Float(ff))) => {
-                self.push(Value::P(Bool(f > ff)))?;
+                self.push(P(Bool(f > ff)))?;
             }
             _ => return Err(Error {}),
         }
@@ -201,10 +201,10 @@ impl VM {
         let right = self.pop()?;
         match (left, right) {
             (P(Int(i)), P(Int(ii))) => {
-                self.push(Value::P(Bool(i < ii)))?;
+                self.push(P(Bool(i < ii)))?;
             }
             (P(Float(f)), P(Float(ff))) => {
-                self.push(Value::P(Bool(f < ff)))?;
+                self.push(P(Bool(f < ff)))?;
             }
             _ => return Err(Error {}),
         }
@@ -216,10 +216,10 @@ impl VM {
         let right = self.pop()?;
         match (left, right) {
             (P(Int(i)), P(Int(ii))) => {
-                self.push(Value::P(Bool(i <= ii)))?;
+                self.push(P(Bool(i <= ii)))?;
             }
             (P(Float(f)), P(Float(ff))) => {
-                self.push(Value::P(Bool(f <= ff)))?;
+                self.push(P(Bool(f <= ff)))?;
             }
             _ => return Err(Error {}),
         }
@@ -231,10 +231,10 @@ impl VM {
         let right = self.pop()?;
         match (left, right) {
             (P(Int(i)), P(Int(ii))) => {
-                self.push(Value::P(Bool(i >= ii)))?;
+                self.push(P(Bool(i >= ii)))?;
             }
             (P(Float(f)), P(Float(ff))) => {
-                self.push(Value::P(Bool(f >= ff)))?;
+                self.push(P(Bool(f >= ff)))?;
             }
             _ => return Err(Error {}),
         }
@@ -246,7 +246,7 @@ impl VM {
         let left = self.pop()?;
         let right = self.pop()?;
         // Then pushes the result onto the stack.
-        self.primitive_push(self.add(left, right)?)?;
+        self.push(P(self.add(left, right)?))?;
         Ok(())
     }
 
@@ -255,7 +255,7 @@ impl VM {
         let left = self.pop()?;
         let right = self.pop()?;
         // Then pushes the result onto the stack.
-        self.primitive_push(self.sub(left, right)?)?;
+        self.push(P(self.sub(left, right)?))?;
         Ok(())
     }
 
@@ -264,7 +264,7 @@ impl VM {
         let left = self.pop()?;
         let right = self.pop()?;
         // Then pushes the result onto the stack.
-        self.primitive_push(self.mul(left, right)?)?;
+        self.push(P(self.mul(left, right)?))?;
         Ok(())
     }
 
@@ -273,19 +273,16 @@ impl VM {
         let left = self.pop()?;
         let right = self.pop()?;
         // Then pushes the result onto the stack.
-        self.primitive_push(self.div(left, right)?)?;
+        self.push(P(self.div(left, right)?))?;
         Ok(())
     }
 
     fn op_bind(&mut self) -> Result<(), Error> {
-        // TODO(jwall): Okay this should actually
-        // point to a location in the library op code
-        // instead of storing in the heap.
         // pop val off stack.
         let val = self.pop()?;
         // pop name off stack.
         let name = self.pop()?;
-        if let Value::S(name) = name {
+        if let S(name) = name {
             self.binding_push(name, val)?;
         } else {
             return Err(Error {});
@@ -298,18 +295,18 @@ impl VM {
         // get value from stack
         let val = self.pop()?;
         // get name from stack.
-        let name = if let Value::S(s) | Value::P(Primitive::Str(s)) = self.pop()? {
+        let name = if let S(s) | P(Str(s)) = self.pop()? {
             s
         } else {
             return Err(Error {});
         };
         // get composite tuple from stack
         let tpl = self.pop()?;
-        if let Value::C(Tuple(mut flds)) = tpl {
+        if let C(Tuple(mut flds)) = tpl {
             // add name and value to tuple
             self.merge_field_into_tuple(&mut flds, name, val)?;
             // place composite tuple back on stack
-            self.composite_push(Tuple(flds))?;
+            self.push(C(Tuple(flds)))?;
         } else {
             return Err(Error {});
         };
@@ -321,11 +318,11 @@ impl VM {
         let val = self.pop()?;
         // get next value. It should be a Composite list.
         let tpl = self.pop()?;
-        if let Value::C(List(mut elems)) = tpl {
+        if let C(List(mut elems)) = tpl {
             // add value to list
             elems.push(val);
             // Add that value to the list and put list back on stack.
-            self.composite_push(List(elems))?;
+            self.push(C(List(elems)))?;
         } else {
             return Err(Error {});
         };
@@ -335,13 +332,13 @@ impl VM {
     fn op_copy(&mut self) -> Result<(), Error> {
         // TODO Use Cow pointers for this?
         // get next value. It should be a Composite Tuple.
-        if let Value::C(Tuple(flds)) = self.pop()? {
+        if let C(Tuple(flds)) = self.pop()? {
             // Make a copy of the original
             let original = Tuple(flds.clone());
             let copy = Tuple(flds);
             // Put the original on the Stack as well as the copy
-            self.composite_push(original)?;
-            self.composite_push(copy)?;
+            self.push(C(original))?;
+            self.push(C(copy))?;
         } else {
             return Err(Error {});
         };
@@ -369,16 +366,6 @@ impl VM {
         Ok(())
     }
 
-    fn primitive_push(&mut self, p: Primitive) -> Result<(), Error> {
-        self.stack.push(Value::P(p));
-        Ok(())
-    }
-
-    fn composite_push(&mut self, c: Composite) -> Result<(), Error> {
-        self.stack.push(Value::C(c));
-        Ok(())
-    }
-
     fn binding_push(&mut self, name: String, val: Value) -> Result<(), Error> {
         // FIXME(jwall): Error if the symbol already exists.
         self.symbols.insert(name, val);
@@ -401,45 +388,37 @@ impl VM {
 
     fn mul(&self, left: Value, right: Value) -> Result<Primitive, Error> {
         Ok(match (left, right) {
-            (Value::P(Primitive::Int(i)), Value::P(Primitive::Int(ii))) => Primitive::Int(i * ii),
-            (Value::P(Primitive::Float(f)), Value::P(Primitive::Float(ff))) => {
-                Primitive::Float(f * ff)
-            }
+            (P(Int(i)), P(Int(ii))) => Int(i * ii),
+            (P(Float(f)), P(Float(ff))) => Float(f * ff),
             _ => return Err(Error {}),
         })
     }
 
     fn div(&self, left: Value, right: Value) -> Result<Primitive, Error> {
         Ok(match (left, right) {
-            (Value::P(Primitive::Int(i)), Value::P(Primitive::Int(ii))) => Primitive::Int(i / ii),
-            (Value::P(Primitive::Float(f)), Value::P(Primitive::Float(ff))) => {
-                Primitive::Float(f / ff)
-            }
+            (P(Int(i)), P(Int(ii))) => Int(i / ii),
+            (P(Float(f)), P(Float(ff))) => Float(f / ff),
             _ => return Err(Error {}),
         })
     }
 
     fn sub(&self, left: Value, right: Value) -> Result<Primitive, Error> {
         Ok(match (left, right) {
-            (Value::P(Primitive::Int(i)), Value::P(Primitive::Int(ii))) => Primitive::Int(i - ii),
-            (Value::P(Primitive::Float(f)), Value::P(Primitive::Float(ff))) => {
-                Primitive::Float(f - ff)
-            }
+            (P(Int(i)), Value::P(Int(ii))) => Int(i - ii),
+            (P(Float(f)), Value::P(Float(ff))) => Float(f - ff),
             _ => return Err(Error {}),
         })
     }
 
     fn add(&self, left: Value, right: Value) -> Result<Primitive, Error> {
         Ok(match (left, right) {
-            (Value::P(Primitive::Int(i)), Value::P(Primitive::Int(ii))) => Primitive::Int(i + ii),
-            (Value::P(Primitive::Float(f)), Value::P(Primitive::Float(ff))) => {
-                Primitive::Float(f + ff)
-            }
-            (Value::P(Primitive::Str(s)), Value::P(Primitive::Str(ss))) => {
+            (P(Int(i)), Value::P(Int(ii))) => Int(i + ii),
+            (P(Float(f)), Value::P(Float(ff))) => Float(f + ff),
+            (P(Str(s)), Value::P(Str(ss))) => {
                 let mut ns = String::new();
                 ns.push_str(&s);
                 ns.push_str(&ss);
-                Primitive::Str(ns)
+                Str(ns)
             }
             _ => return Err(Error {}),
         })
