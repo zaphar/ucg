@@ -79,6 +79,7 @@ pub enum Op {
     // Control Flow
     Bang,
     Jump(usize),
+    JumpIfTrue(usize),
     Noop,
     // Pending Computation
     InitThunk(usize),
@@ -139,12 +140,14 @@ impl VM {
                 Op::Bang => return Err(Error {}),
                 Op::InitThunk(jp) => self.op_thunk(idx, *jp)?,
                 Op::Noop => {
+                    self.stack.last();
                     // Do nothing
                 }
                 Op::Return => {
                     // TODO(jwall): This means we return back to the start of the frame.
                 }
-                Op::Jump(jp) => self.ops.jump(self.ops.ptr.map(|v| v + jp).unwrap_or(*jp))?,
+                Op::Jump(jp) => self.op_jump(*jp)?,
+                Op::JumpIfTrue(jp) => self.op_jump_if_true(*jp)?,
                 Op::Pop => {
                     self.pop()?;
                 }
@@ -152,12 +155,23 @@ impl VM {
         }
         Ok(())
     }
+    fn op_jump(&mut self, jp: usize) -> Result<(), Error> {
+        self.ops.jump(self.ops.ptr.map(|v| v + jp).unwrap_or(jp))?;
+        Ok(())
+    }
+
+    fn op_jump_if_true(&mut self, jp: usize) -> Result<(), Error> {
+        if let P(Bool(cond)) = self.pop()? {
+            if cond {
+                self.op_jump(jp)?;
+            }
+        }
+        Ok(())
+    }
 
     fn op_thunk(&mut self, idx: usize, jp: usize) -> Result<(), Error> {
         self.push(Value::T(idx))?;
-        self.ops.jump(self.ops.ptr.map(|v| v + jp).unwrap_or(jp))?;
-        // TODO(jwall): Skip over the rest until we reach the return?
-        Ok(())
+        self.op_jump(jp)
     }
 
     fn op_equal(&mut self) -> Result<(), Error> {

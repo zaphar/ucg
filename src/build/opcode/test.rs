@@ -289,3 +289,55 @@ fn test_equality_ops() {
         assert_eq!(vm.pop().unwrap(), case.1);
     }
 }
+
+#[test]
+fn test_conditional_jump_ops() {
+    let mut cases = vec![
+        (
+            vec![
+                Val(Bool(false)),
+                JumpIfTrue(2),
+                Val(Bool(true)),
+                JumpIfTrue(2),
+                Val(Int(1)),
+                Jump(1),
+                Val(Int(2)),
+                Noop,
+            ],
+            P(Int(2)),
+        ),
+        (
+            vec![
+                Val(Bool(true)),
+                JumpIfTrue(2),
+                Val(Bool(false)),
+                JumpIfTrue(2),
+                Val(Int(1)),
+                Jump(1),
+                Val(Int(2)),
+                Noop,
+            ],
+            P(Int(1)),
+        ),
+        (
+            vec![
+                Val(Int(1)),
+                Val(Int(1)),
+                Equal,
+                JumpIfTrue(2),
+                Val(Bool(false)),
+                JumpIfTrue(2),
+                Val(Int(1)),
+                Jump(1),
+                Val(Int(2)),
+                Noop,
+            ],
+            P(Int(1)),
+        ),
+    ];
+    for case in cases.drain(0..) {
+        let mut vm = VM::new(case.0);
+        vm.run().unwrap();
+        assert_eq!(vm.pop().unwrap(), case.1);
+    }
+}
