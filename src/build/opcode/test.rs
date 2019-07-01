@@ -14,10 +14,10 @@
 
 use super::Composite::{List, Tuple};
 use super::Op::{
-    Add, Bind, Cp, Div, Element, Field, InitList, InitThunk, InitTuple, Jump, Mul, Noop, Sub, Sym,
-    Val,
+    Add, Bind, Cp, Div, Element, Equal, Field, InitList, InitThunk, InitTuple, Jump, JumpIfTrue,
+    Mul, Noop, Sub, Sym, Val,
 };
-use super::Primitive::{Float, Int, Str};
+use super::Primitive::{Bool, Float, Int, Str};
 use super::Value::{C, P, T};
 use super::VM;
 
@@ -192,6 +192,96 @@ fn test_jump_ops() {
     let mut cases = vec![
         (vec![InitThunk(1), Val(Int(1)), Noop], T(0)),
         (vec![Jump(1), Val(Int(1)), Noop, Val(Int(1))], P(Int(1))),
+    ];
+    for case in cases.drain(0..) {
+        let mut vm = VM::new(case.0);
+        vm.run().unwrap();
+        assert_eq!(vm.pop().unwrap(), case.1);
+    }
+}
+
+#[test]
+fn test_equality_ops() {
+    let mut cases = vec![
+        (
+            vec![
+                Val(Str("foo".to_owned())),
+                Val(Str("foo".to_owned())),
+                Equal,
+            ],
+            P(Bool(true)),
+        ),
+        (
+            vec![
+                Val(Str("bar".to_owned())),
+                Val(Str("foo".to_owned())),
+                Equal,
+            ],
+            P(Bool(false)),
+        ),
+        (vec![Val(Int(1)), Val(Int(1)), Equal], P(Bool(true))),
+        (vec![Val(Int(1)), Val(Int(2)), Equal], P(Bool(false))),
+        (vec![Val(Bool(true)), Val(Bool(true)), Equal], P(Bool(true))),
+        (
+            vec![Val(Bool(false)), Val(Bool(false)), Equal],
+            P(Bool(true)),
+        ),
+        (
+            vec![Val(Bool(true)), Val(Bool(false)), Equal],
+            P(Bool(false)),
+        ),
+        (
+            vec![
+                InitTuple,
+                Val(Str("foo".to_owned())),
+                Val(Int(1)),
+                Field,
+                InitTuple,
+                Val(Str("foo".to_owned())),
+                Val(Int(1)),
+                Field,
+                Equal,
+            ],
+            P(Bool(true)),
+        ),
+        (
+            vec![
+                InitTuple,
+                Val(Str("foo".to_owned())),
+                Val(Int(1)),
+                Field,
+                InitTuple,
+                Val(Str("bar".to_owned())),
+                Val(Int(1)),
+                Field,
+                Equal,
+            ],
+            P(Bool(false)),
+        ),
+        (
+            vec![
+                InitList,
+                Val(Str("foo".to_owned())),
+                Element,
+                InitList,
+                Val(Str("foo".to_owned())),
+                Element,
+                Equal,
+            ],
+            P(Bool(true)),
+        ),
+        (
+            vec![
+                InitList,
+                Val(Str("foo".to_owned())),
+                Element,
+                InitList,
+                Val(Str("bar".to_owned())),
+                Element,
+                Equal,
+            ],
+            P(Bool(false)),
+        ),
     ];
     for case in cases.drain(0..) {
         let mut vm = VM::new(case.0);

@@ -26,6 +26,8 @@ pub enum Primitive {
     Empty,
 }
 
+use Primitive::{Bool, Empty, Float, Int, Str};
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Composite {
     List(Vec<Value>),
@@ -45,6 +47,7 @@ pub enum Value {
     // Program Pointer
     T(usize),
 }
+use Value::{C, P, S, T};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Op {
@@ -56,6 +59,12 @@ pub enum Op {
     Sub,
     Div,
     Mul,
+    // Comparison Ops
+    Equal,
+    Gt,
+    Lt,
+    GtEq,
+    LtEq,
     // Primitive Types ops
     Val(Primitive),
     // A bareword for use in bindings or lookups
@@ -68,7 +77,6 @@ pub enum Op {
     // Operations
     Cp,
     // Control Flow
-    Select,
     Bang,
     Jump(usize),
     Noop,
@@ -116,6 +124,11 @@ impl VM {
                 Op::Mul => self.op_mul()?,
                 Op::Div => self.op_div()?,
                 Op::Bind => self.op_bind()?,
+                Op::Equal => self.op_equal()?,
+                Op::Gt => self.op_gt()?,
+                Op::Lt => self.op_lt()?,
+                Op::GtEq => self.op_gteq()?,
+                Op::LtEq => self.op_lteq()?,
                 // Add a Composite list value to the stack
                 Op::InitList => self.composite_push(List(Vec::new()))?,
                 // Add a composite tuple value to the stack
@@ -123,7 +136,6 @@ impl VM {
                 Op::Field => self.op_field()?,
                 Op::Element => self.op_element()?,
                 Op::Cp => self.op_copy()?,
-                Op::Select => self.op_select()?,
                 Op::Bang => return Err(Error {}),
                 Op::InitThunk(jp) => self.op_thunk(idx, *jp)?,
                 Op::Noop => {
@@ -148,13 +160,70 @@ impl VM {
         Ok(())
     }
 
-    fn op_select(&mut self) -> Result<(), Error> {
-        // first get our compare value from the stack
-        let search_field = self.pop()?;
-        // next get our default value from the stack
-        let default_field = self.pop()?;
-        // finally get our fields from the stack
-        let fields = self.pop()?;
+    fn op_equal(&mut self) -> Result<(), Error> {
+        let left = self.pop()?;
+        let right = self.pop()?;
+        self.push(Value::P(Bool(left == right)))?;
+        Ok(())
+    }
+
+    fn op_gt(&mut self) -> Result<(), Error> {
+        let left = self.pop()?;
+        let right = self.pop()?;
+        match (left, right) {
+            (P(Int(i)), P(Int(ii))) => {
+                self.push(Value::P(Bool(i > ii)))?;
+            }
+            (P(Float(f)), P(Float(ff))) => {
+                self.push(Value::P(Bool(f > ff)))?;
+            }
+            _ => return Err(Error {}),
+        }
+        Ok(())
+    }
+
+    fn op_lt(&mut self) -> Result<(), Error> {
+        let left = self.pop()?;
+        let right = self.pop()?;
+        match (left, right) {
+            (P(Int(i)), P(Int(ii))) => {
+                self.push(Value::P(Bool(i < ii)))?;
+            }
+            (P(Float(f)), P(Float(ff))) => {
+                self.push(Value::P(Bool(f < ff)))?;
+            }
+            _ => return Err(Error {}),
+        }
+        Ok(())
+    }
+
+    fn op_lteq(&mut self) -> Result<(), Error> {
+        let left = self.pop()?;
+        let right = self.pop()?;
+        match (left, right) {
+            (P(Int(i)), P(Int(ii))) => {
+                self.push(Value::P(Bool(i <= ii)))?;
+            }
+            (P(Float(f)), P(Float(ff))) => {
+                self.push(Value::P(Bool(f <= ff)))?;
+            }
+            _ => return Err(Error {}),
+        }
+        Ok(())
+    }
+
+    fn op_gteq(&mut self) -> Result<(), Error> {
+        let left = self.pop()?;
+        let right = self.pop()?;
+        match (left, right) {
+            (P(Int(i)), P(Int(ii))) => {
+                self.push(Value::P(Bool(i >= ii)))?;
+            }
+            (P(Float(f)), P(Float(ff))) => {
+                self.push(Value::P(Bool(f >= ff)))?;
+            }
+            _ => return Err(Error {}),
+        }
         Ok(())
     }
 
