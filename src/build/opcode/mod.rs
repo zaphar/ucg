@@ -101,6 +101,7 @@ pub enum Op {
     Bang,
     Jump(usize),
     JumpIfTrue(usize),
+    JumpIfFalse(usize),
     // FIXME(jwall): Short circuiting operations
     // - And(usize)
     // - Or(usize)
@@ -181,6 +182,7 @@ impl<'a> VM<'a> {
                 }
                 Op::Jump(jp) => self.op_jump(*jp)?,
                 Op::JumpIfTrue(jp) => self.op_jump_if_true(*jp)?,
+                Op::JumpIfFalse(jp) => self.op_jump_if_false(*jp)?,
                 Op::Module(mptr) => self.op_module(idx, *mptr)?,
                 Op::Func(jptr) => self.op_func(idx, *jptr)?,
                 Op::FCall => self.op_fcall()?,
@@ -206,6 +208,15 @@ impl<'a> VM<'a> {
     fn op_jump_if_true(&mut self, jp: usize) -> Result<(), Error> {
         if let P(Bool(cond)) = self.pop()? {
             if cond {
+                self.op_jump(jp)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn op_jump_if_false(&mut self, jp: usize) -> Result<(), Error> {
+        if let P(Bool(cond)) = self.pop()? {
+            if !cond {
                 self.op_jump(jp)?;
             }
         }

@@ -16,7 +16,7 @@ use super::scope::Stack;
 use super::Composite::{List, Tuple};
 use super::Op::{
     Add, Bind, Cp, DeRef, Div, Element, Equal, FCall, Field, Func, InitList, InitThunk, InitTuple,
-    Jump, JumpIfTrue, Module, Mul, Noop, Return, Sub, Sym, Val,
+    Jump, JumpIfFalse, JumpIfTrue, Module, Mul, Noop, Return, Sub, Sym, Val,
 };
 use super::Primitive::{Bool, Float, Int, Str};
 use super::Value::{C, P, T};
@@ -346,6 +346,21 @@ fn test_conditional_jump_ops() {
                 Val(Int(1)),
                 Equal,
                 JumpIfTrue(2),
+                Val(Bool(false)),
+                JumpIfTrue(2),
+                Val(Int(1)),
+                Jump(1),
+                Val(Int(2)),
+                Noop,
+            ],
+            P(Int(1)),
+        ),
+        (
+            vec![
+                Val(Int(1)),
+                Val(Int(2)),
+                Equal,
+                JumpIfFalse(2),
                 Val(Bool(false)),
                 JumpIfTrue(2),
                 Val(Int(1)),
