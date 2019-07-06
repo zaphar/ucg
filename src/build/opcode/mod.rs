@@ -101,7 +101,7 @@ pub enum Op {
     Bang,
     Jump(usize),
     JumpIfTrue(usize),
-    // TODO(jwall): Short circuiting operations
+    // FIXME(jwall): Short circuiting operations
     // - And(usize)
     // - Or(usize)
     // Spacer operation, Does nothing.
@@ -173,7 +173,7 @@ impl<'a> VM<'a> {
                 Op::Field => self.op_field()?,
                 Op::Element => self.op_element()?,
                 Op::Cp => self.op_copy()?,
-                // TODO(jwall): Should this whould take a user provided message?
+                //TODO(jwall): Should this whould take a user provided message?
                 Op::Bang => return Err(Error {}),
                 Op::InitThunk(jp) => self.op_thunk(idx, *jp)?,
                 Op::Noop => {
@@ -527,7 +527,9 @@ impl<'a> VM<'a> {
     }
 
     fn binding_push(&mut self, name: String, val: Value) -> Result<(), Error> {
-        // FIXME(jwall): Error if the symbol already exists.
+        if self.symbols.is_bound(&name) {
+            return Err(Error {});
+        }
         self.symbols.add(name, val);
         Ok(())
     }

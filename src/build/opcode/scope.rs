@@ -106,6 +106,10 @@ impl Stack {
         }
     }
 
+    pub fn is_bound(&self, name: &str) -> bool {
+        self.curr.get(name).is_some()
+    }
+
     pub fn push(&mut self) {
         let mut nb = Bindings::new();
         std::mem::swap(&mut nb, &mut self.curr);
