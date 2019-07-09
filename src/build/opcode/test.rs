@@ -22,49 +22,58 @@ use super::Primitive::{Bool, Float, Int, Str};
 use super::Value::{C, P, T};
 use super::VM;
 
+macro_rules! assert_cases {
+    (__impl__ $cases:expr) => {
+        for case in $cases.drain(0..) {
+            let mut vm = VM::new(&case.0);
+            vm.run().unwrap();
+            assert_eq!(vm.pop().unwrap(), case.1);
+        }
+    };
+
+    (($input:expr, $result:expr), $($tok:tt)*) => {
+        assert_cases!(__impl__ vec![($input, $result), $($tok)*])
+    };
+
+    ($($input:expr => $result:expr, )* ) => {
+        assert_cases!(
+            $(($input, $result),)*
+        )
+    }
+}
+
 #[test]
 fn test_math_ops() {
-    let mut cases = vec![
+    assert_cases!(
         // 1+1;
-        (vec![Val(Int(1)), Val(Int(1)), Add], P(Int(2))),
+        vec![Val(Int(1)), Val(Int(1)), Add] => P(Int(2)),
         // 1-1;
-        (vec![Val(Int(1)), Val(Int(1)), Sub], P(Int(0))),
+        vec![Val(Int(1)), Val(Int(1)), Sub] => P(Int(0)),
         // 2*2;
-        (vec![Val(Int(2)), Val(Int(2)), Mul], P(Int(4))),
+        vec![Val(Int(2)), Val(Int(2)), Mul] => P(Int(4)),
         // 6/3;
-        (vec![Val(Int(2)), Val(Int(6)), Div], P(Int(3))),
+        vec![Val(Int(2)), Val(Int(6)), Div] => P(Int(3)),
         // 1.0+1.0;
-        (vec![Val(Float(1.0)), Val(Float(1.0)), Add], P(Float(2.0))),
+        vec![Val(Float(1.0)), Val(Float(1.0)), Add] => P(Float(2.0)),
         // 1.0-1.0;
-        (vec![Val(Float(1.0)), Val(Float(1.0)), Sub], P(Float(0.0))),
+        vec![Val(Float(1.0)), Val(Float(1.0)), Sub] => P(Float(0.0)),
         // 2.0*2.0;
-        (vec![Val(Float(2.0)), Val(Float(2.0)), Mul], P(Float(4.0))),
+       vec![Val(Float(2.0)), Val(Float(2.0)), Mul] => P(Float(4.0)),
         // 6.0/3.0;
-        (vec![Val(Float(2.0)), Val(Float(6.0)), Div], P(Float(3.0))),
+        vec![Val(Float(2.0)), Val(Float(6.0)), Div] => P(Float(3.0)),
         // string concatenation
-        (
-            vec![Val(Str("bar".to_owned())), Val(Str("foo".to_owned())), Add],
-            P(Str("foobar".to_owned())),
-        ),
+        vec![Val(Str("bar".to_owned())), Val(Str("foo".to_owned())), Add] => P(Str("foobar".to_owned())),
         // Composite operations
-        (
-            vec![
-                Val(Int(1)),
-                Val(Int(1)),
-                Add, // 1 + 1
-                Val(Int(1)),
-                Add, // 2 + 1
-                Val(Int(1)),
-                Add, // 3 + 1
-            ],
-            P(Int(4)),
-        ),
-    ];
-    for case in cases.drain(0..) {
-        let mut vm = VM::new(&case.0);
-        vm.run().unwrap();
-        assert_eq!(vm.pop().unwrap(), case.1);
-    }
+        vec![
+            Val(Int(1)),
+            Val(Int(1)),
+            Add, // 1 + 1
+            Val(Int(1)),
+            Add, // 2 + 1
+            Val(Int(1)),
+            Add, // 3 + 1
+        ] => P(Int(4)),
+    );
 }
 
 #[test]
@@ -87,415 +96,308 @@ fn test_bind_op() {
 
 #[test]
 fn test_list_ops() {
-    let mut cases = vec![
-        (vec![InitList], C(List(Vec::new()))),
-        (
-            vec![InitList, Val(Int(1)), Element],
-            C(List(vec![P(Int(1))])),
-        ),
-        (
-            vec![InitList, Val(Int(2)), Element, Val(Int(1)), Element],
-            C(List(vec![P(Int(2)), P(Int(1))])),
-        ),
-        (
-            vec![
-                InitList,
-                Val(Int(1)),
-                Element,
-                Val(Int(1)),
-                Val(Int(1)),
-                Add,
-                Element,
-            ],
-            C(List(vec![P(Int(1)), P(Int(2))])),
-        ),
-    ];
-    for case in cases.drain(0..) {
-        let mut vm = VM::new(&case.0);
-        vm.run().unwrap();
-        assert_eq!(vm.pop().unwrap(), case.1);
-    }
+    assert_cases!(
+        vec![InitList] => C(List(Vec::new())),
+        vec![InitList, Val(Int(1)), Element] => C(List(vec![P(Int(1))])),
+        vec![InitList, Val(Int(2)), Element, Val(Int(1)), Element] => C(List(vec![P(Int(2)), P(Int(1))])),
+        vec![
+            InitList,
+            Val(Int(1)),
+            Element,
+            Val(Int(1)),
+            Val(Int(1)),
+            Add,
+            Element,
+        ] => C(List(vec![P(Int(1)), P(Int(2))])),
+    );
 }
 
 #[test]
 fn test_tuple_ops() {
-    let mut cases = vec![
-        (vec![InitTuple], C(Tuple(Vec::new()))),
-        (
-            vec![InitTuple, Val(Str("foo".to_owned())), Val(Int(1)), Field],
-            C(Tuple(vec![("foo".to_owned(), P(Int(1)))])),
-        ),
-        (
-            vec![
-                InitTuple,
-                Sym("bar".to_owned()),
-                Val(Str("quux".to_owned())),
-                Field,
-                Val(Str("foo".to_owned())),
-                Val(Int(1)),
-                Field,
-            ],
-            C(Tuple(vec![
-                ("bar".to_owned(), P(Str("quux".to_owned()))),
-                ("foo".to_owned(), P(Int(1))),
-            ])),
-        ),
-        (
-            vec![
-                InitTuple,
-                Sym("bar".to_owned()),
-                Val(Str("quux".to_owned())),
-                Field,
-                Val(Str("foo".to_owned())),
-                Val(Int(1)),
-                Field,
-                Val(Str("foo".to_owned())),
-                Val(Int(2)),
-                Field,
-            ],
-            C(Tuple(vec![
-                ("bar".to_owned(), P(Str("quux".to_owned()))),
-                ("foo".to_owned(), P(Int(2))),
-            ])),
-        ),
-        (
-            vec![
-                InitTuple,
-                Sym("bar".to_owned()),
-                Val(Str("ux".to_owned())),
-                Val(Str("qu".to_owned())),
-                Add,
-                Field,
-                Val(Str("foo".to_owned())),
-                Val(Int(1)),
-                Field,
-                Val(Str("foo".to_owned())),
-                Val(Int(2)),
-                Field,
-            ],
-            C(Tuple(vec![
-                ("bar".to_owned(), P(Str("quux".to_owned()))),
-                ("foo".to_owned(), P(Int(2))),
-            ])),
-        ),
-        (
-            vec![
-                InitTuple, // Override tuple
-                Val(Str("foo".to_owned())),
-                Val(Int(2)),
-                Field,
-                InitTuple, // Target tuple
-                Sym("bar".to_owned()),
-                Val(Str("ux".to_owned())),
-                Val(Str("qu".to_owned())),
-                Add,
-                Field,
-                Val(Str("foo".to_owned())),
-                Val(Int(1)),
-                Field,
-                Cp, // Do the tuple copy operation
-            ],
-            C(Tuple(vec![
-                ("bar".to_owned(), P(Str("quux".to_owned()))),
-                ("foo".to_owned(), P(Int(2))),
-            ])),
-        ),
-    ];
-    for case in cases.drain(0..) {
-        let mut vm = VM::new(&case.0);
-        vm.run().unwrap();
-        assert_eq!(vm.pop().unwrap(), case.1);
-    }
+    assert_cases!(
+        vec![InitTuple] => C(Tuple(Vec::new())),
+        vec![InitTuple, Val(Str("foo".to_owned())), Val(Int(1)), Field] => C(Tuple(vec![("foo".to_owned(), P(Int(1)))])),
+        vec![
+            InitTuple,
+            Sym("bar".to_owned()),
+            Val(Str("quux".to_owned())),
+            Field,
+            Val(Str("foo".to_owned())),
+            Val(Int(1)),
+            Field,
+        ] => C(Tuple(vec![
+            ("bar".to_owned(), P(Str("quux".to_owned()))),
+            ("foo".to_owned(), P(Int(1))),
+        ])),
+        vec![
+            InitTuple,
+            Sym("bar".to_owned()),
+            Val(Str("quux".to_owned())),
+            Field,
+            Val(Str("foo".to_owned())),
+            Val(Int(1)),
+            Field,
+            Val(Str("foo".to_owned())),
+            Val(Int(2)),
+            Field,
+        ] => C(Tuple(vec![
+            ("bar".to_owned(), P(Str("quux".to_owned()))),
+            ("foo".to_owned(), P(Int(2))),
+        ])),
+        vec![
+            InitTuple,
+            Sym("bar".to_owned()),
+            Val(Str("ux".to_owned())),
+            Val(Str("qu".to_owned())),
+            Add,
+            Field,
+            Val(Str("foo".to_owned())),
+            Val(Int(1)),
+            Field,
+            Val(Str("foo".to_owned())),
+            Val(Int(2)),
+            Field,
+        ] => C(Tuple(vec![
+            ("bar".to_owned(), P(Str("quux".to_owned()))),
+            ("foo".to_owned(), P(Int(2))),
+        ])),
+        vec![
+            InitTuple, // Override tuple
+            Val(Str("foo".to_owned())),
+            Val(Int(2)),
+            Field,
+            InitTuple, // Target tuple
+            Sym("bar".to_owned()),
+            Val(Str("ux".to_owned())),
+            Val(Str("qu".to_owned())),
+            Add,
+            Field,
+            Val(Str("foo".to_owned())),
+            Val(Int(1)),
+            Field,
+            Cp, // Do the tuple copy operation
+        ] => C(Tuple(vec![
+            ("bar".to_owned(), P(Str("quux".to_owned()))),
+            ("foo".to_owned(), P(Int(2))),
+        ])),
+    );
 }
 
 #[test]
 fn test_jump_ops() {
-    let mut cases = vec![
-        (vec![InitThunk(1), Val(Int(1)), Noop], T(0)),
-        (vec![Jump(1), Val(Int(1)), Noop, Val(Int(1))], P(Int(1))),
-    ];
-    for case in cases.drain(0..) {
-        let mut vm = VM::new(&case.0);
-        vm.run().unwrap();
-        assert_eq!(vm.pop().unwrap(), case.1);
-    }
+    assert_cases!(
+        vec![InitThunk(1), Val(Int(1)), Noop] => T(0),
+        vec![Jump(1), Val(Int(1)), Noop, Val(Int(1))] => P(Int(1)),
+    );
 }
 
 #[test]
 fn test_equality_ops() {
-    let mut cases = vec![
-        (
-            vec![
-                Val(Str("foo".to_owned())),
-                Val(Str("foo".to_owned())),
-                Equal,
-            ],
-            P(Bool(true)),
-        ),
-        (
-            vec![
-                Val(Str("bar".to_owned())),
-                Val(Str("foo".to_owned())),
-                Equal,
-            ],
-            P(Bool(false)),
-        ),
-        (vec![Val(Int(1)), Val(Int(1)), Equal], P(Bool(true))),
-        (vec![Val(Int(1)), Val(Int(2)), Equal], P(Bool(false))),
-        (vec![Val(Bool(true)), Val(Bool(true)), Equal], P(Bool(true))),
-        (
-            vec![Val(Bool(false)), Val(Bool(false)), Equal],
-            P(Bool(true)),
-        ),
-        (
-            vec![Val(Bool(true)), Val(Bool(false)), Equal],
-            P(Bool(false)),
-        ),
-        (
-            vec![
-                InitTuple,
-                Val(Str("foo".to_owned())),
-                Val(Int(1)),
-                Field,
-                InitTuple,
-                Val(Str("foo".to_owned())),
-                Val(Int(1)),
-                Field,
-                Equal,
-            ],
-            P(Bool(true)),
-        ),
-        (
-            vec![
-                InitTuple,
-                Val(Str("foo".to_owned())),
-                Val(Int(1)),
-                Field,
-                InitTuple,
-                Val(Str("bar".to_owned())),
-                Val(Int(1)),
-                Field,
-                Equal,
-            ],
-            P(Bool(false)),
-        ),
-        (
-            vec![
-                InitList,
-                Val(Str("foo".to_owned())),
-                Element,
-                InitList,
-                Val(Str("foo".to_owned())),
-                Element,
-                Equal,
-            ],
-            P(Bool(true)),
-        ),
-        (
-            vec![
-                InitList,
-                Val(Str("foo".to_owned())),
-                Element,
-                InitList,
-                Val(Str("bar".to_owned())),
-                Element,
-                Equal,
-            ],
-            P(Bool(false)),
-        ),
+    assert_cases![
+        vec![
+            Val(Str("foo".to_owned())),
+            Val(Str("foo".to_owned())),
+            Equal,
+        ] => P(Bool(true)),
+        vec![
+            Val(Str("bar".to_owned())),
+            Val(Str("foo".to_owned())),
+            Equal,
+        ] => P(Bool(false)),
+        vec![Val(Int(1)), Val(Int(1)), Equal] => P(Bool(true)),
+        vec![Val(Int(1)), Val(Int(2)), Equal] => P(Bool(false)),
+        vec![Val(Bool(true)), Val(Bool(true)), Equal] => P(Bool(true)),
+        vec![Val(Bool(false)), Val(Bool(false)), Equal] => P(Bool(true)),
+        vec![Val(Bool(true)), Val(Bool(false)), Equal] => P(Bool(false)),
+        vec![
+            InitTuple,
+            Val(Str("foo".to_owned())),
+            Val(Int(1)),
+            Field,
+            InitTuple,
+            Val(Str("foo".to_owned())),
+            Val(Int(1)),
+            Field,
+            Equal,
+        ] => P(Bool(true)),
+        vec![
+            InitTuple,
+            Val(Str("foo".to_owned())),
+            Val(Int(1)),
+            Field,
+            InitTuple,
+            Val(Str("bar".to_owned())),
+            Val(Int(1)),
+            Field,
+            Equal,
+        ] => P(Bool(false)),
+        vec![
+            InitList,
+            Val(Str("foo".to_owned())),
+            Element,
+            InitList,
+            Val(Str("foo".to_owned())),
+            Element,
+            Equal,
+        ] => P(Bool(true)),
+        vec![
+            InitList,
+            Val(Str("foo".to_owned())),
+            Element,
+            InitList,
+            Val(Str("bar".to_owned())),
+            Element,
+            Equal,
+        ] => P(Bool(false)),
     ];
-    for case in cases.drain(0..) {
-        let mut vm = VM::new(&case.0);
-        vm.run().unwrap();
-        assert_eq!(vm.pop().unwrap(), case.1);
-    }
 }
 
 #[test]
 fn test_conditional_jump_ops() {
-    let mut cases = vec![
-        (
-            vec![
-                Val(Bool(false)),
-                JumpIfTrue(2),
-                Val(Bool(true)),
-                JumpIfTrue(2),
-                Val(Int(1)),
-                Jump(1),
-                Val(Int(2)),
-                Noop,
-            ],
-            P(Int(2)),
-        ),
-        (
-            vec![
-                Val(Bool(true)),
-                JumpIfTrue(2),
-                Val(Bool(false)),
-                JumpIfTrue(2),
-                Val(Int(1)),
-                Jump(1),
-                Val(Int(2)),
-                Noop,
-            ],
-            P(Int(1)),
-        ),
-        (
-            vec![
-                Val(Int(1)),
-                Val(Int(1)),
-                Equal,
-                JumpIfTrue(2),
-                Val(Bool(false)),
-                JumpIfTrue(2),
-                Val(Int(1)),
-                Jump(1),
-                Val(Int(2)),
-                Noop,
-            ],
-            P(Int(1)),
-        ),
-        (
-            vec![
-                Val(Int(1)),
-                Val(Int(2)),
-                Equal,
-                JumpIfFalse(2),
-                Val(Bool(false)),
-                JumpIfTrue(2),
-                Val(Int(1)),
-                Jump(1),
-                Val(Int(2)),
-                Noop,
-            ],
-            P(Int(1)),
-        ),
+    assert_cases![
+        vec![
+            Val(Bool(false)),
+            JumpIfTrue(2),
+            Val(Bool(true)),
+            JumpIfTrue(2),
+            Val(Int(1)),
+            Jump(1),
+            Val(Int(2)),
+            Noop,
+        ] => P(Int(2)),
+        vec![
+            Val(Bool(true)),
+            JumpIfTrue(2),
+            Val(Bool(false)),
+            JumpIfTrue(2),
+            Val(Int(1)),
+            Jump(1),
+            Val(Int(2)),
+            Noop,
+        ] => P(Int(1)),
+        vec![
+            Val(Int(1)),
+            Val(Int(1)),
+            Equal,
+            JumpIfTrue(2),
+            Val(Bool(false)),
+            JumpIfTrue(2),
+            Val(Int(1)),
+            Jump(1),
+            Val(Int(2)),
+            Noop,
+        ] => P(Int(1)),
+        vec![
+            Val(Int(1)),
+            Val(Int(2)),
+            Equal,
+            JumpIfFalse(2),
+            Val(Bool(false)),
+            JumpIfTrue(2),
+            Val(Int(1)),
+            Jump(1),
+            Val(Int(2)),
+            Noop,
+        ] => P(Int(1)),
     ];
-    for case in cases.drain(0..) {
-        let mut vm = VM::new(&case.0);
-        vm.run().unwrap();
-        assert_eq!(vm.pop().unwrap(), case.1);
-    }
 }
 
 #[test]
 fn test_function_definition_and_call() {
-    let mut cases = vec![
-        (
-            vec![
-                Sym("f".to_owned()),     // 0
-                InitList,                // 1
-                Sym("arg".to_owned()),   // 2
-                Element,                 // 3
-                Func(6),                 // 4
-                DeRef("arg".to_owned()), // 5
-                Return,                  // 6
-                Bind,                    // 7
-                Val(Int(1)),             // 8
-                DeRef("f".to_owned()),   // 9
-                FCall,                   // 10
-            ],
-            P(Int(1)),
-        ),
-        (
-            vec![
-                Sym("closed".to_owned()),   // 0
-                Val(Int(1)),                // 1
-                Bind,                       // 2
-                Sym("f".to_owned()),        // 3
-                InitList,                   // 4
-                Sym("arg".to_owned()),      // 5
-                Element,                    // 6
-                Func(11),                   // 7
-                DeRef("arg".to_owned()),    // 8
-                DeRef("closed".to_owned()), // 9
-                Add,                        // 10
-                Return,                     // 11
-                Bind,                       // 12
-                Val(Int(1)),                // 13
-                DeRef("f".to_owned()),      // 14
-                FCall,                      // 16
-            ],
-            P(Int(2)),
-        ),
+    assert_cases![
+        vec![
+            Sym("f".to_owned()),     // 0
+            InitList,                // 1
+            Sym("arg".to_owned()),   // 2
+            Element,                 // 3
+            Func(6),                 // 4
+            DeRef("arg".to_owned()), // 5
+            Return,                  // 6
+            Bind,                    // 7
+            Val(Int(1)),             // 8
+            DeRef("f".to_owned()),   // 9
+            FCall,                   // 10
+        ] => P(Int(1)),
+        vec![
+            Sym("closed".to_owned()),   // 0
+            Val(Int(1)),                // 1
+            Bind,                       // 2
+            Sym("f".to_owned()),        // 3
+            InitList,                   // 4
+            Sym("arg".to_owned()),      // 5
+            Element,                    // 6
+            Func(11),                   // 7
+            DeRef("arg".to_owned()),    // 8
+            DeRef("closed".to_owned()), // 9
+            Add,                        // 10
+            Return,                     // 11
+            Bind,                       // 12
+            Val(Int(1)),                // 13
+            DeRef("f".to_owned()),      // 14
+            FCall,                      // 16
+        ] => P(Int(2)),
     ];
-    for case in cases.drain(0..) {
-        let mut vm = VM::new(&case.0);
-        vm.run().unwrap();
-        assert_eq!(vm.pop().unwrap(), case.1);
-    }
 }
 
 #[test]
 fn test_module_call() {
-    let mut cases = vec![
-        (
-            vec![
-                InitTuple,               // 0 // override tuple
-                Sym("one".to_owned()),   // 1
-                Val(Int(11)),            // 2
-                Field,                   // 3
-                Sym("m".to_owned()),     // 4 // binding name for module
-                InitTuple,               // 5 // Module tuple bindings
-                Sym("one".to_owned()),   // 6
-                Val(Int(1)),             // 7
-                Field,                   // 8
-                Sym("two".to_owned()),   // 9
-                Val(Int(2)),             // 10
-                Field,                   // 11
-                Module(17),              // 12 // Module definition
-                Bind,                    // 13
-                Sym("foo".to_owned()),   // 14
-                DeRef("mod".to_owned()), // 15
-                Bind,                    // 16 // bind mod tuple to foo
-                Return,                  // 17 // end the module
-                Bind,                    // 18 // bind module to the binding name
-                DeRef("m".to_owned()),   // 19
-                Cp,                      // 20
-            ],
-            C(Tuple(vec![(
-                "foo".to_owned(),
-                C(Tuple(vec![
-                    ("one".to_owned(), P(Int(11))),
-                    ("two".to_owned(), P(Int(2))),
-                ])),
-            )])),
-        ),
-        (
-            vec![
-                InitTuple,               // 0 // override tuple
-                Sym("one".to_owned()),   // 1
-                Val(Int(11)),            // 2
-                Field,                   // 3
-                Sym("m".to_owned()),     // 4 // binding name for module
-                InitTuple,               // 5 // Module tuple bindings
-                Sym("one".to_owned()),   // 6
-                Val(Int(1)),             // 7
-                Field,                   // 8
-                Sym("two".to_owned()),   // 9
-                Val(Int(2)),             // 10
-                Field,                   // 11
-                InitThunk(2),            // 12 // Module Return expression
-                Val(Int(1)),             // 13
-                Return,                  // 14
-                Module(20),              // 15 // Module definition
-                Bind,                    // 16
-                Sym("foo".to_owned()),   // 17
-                DeRef("mod".to_owned()), // 18
-                Bind,                    // 19 // bind mod tuple to foo
-                Return,                  // 20 // end the module
-                Bind,                    // 21 // bind module to the binding name
-                DeRef("m".to_owned()),   // 22
-                Cp,                      // 23
-            ],
-            P(Int(1)),
-        ),
+    assert_cases![
+        vec![
+            InitTuple,               // 0 // override tuple
+            Sym("one".to_owned()),   // 1
+            Val(Int(11)),            // 2
+            Field,                   // 3
+            Sym("m".to_owned()),     // 4 // binding name for module
+            InitTuple,               // 5 // Module tuple bindings
+            Sym("one".to_owned()),   // 6
+            Val(Int(1)),             // 7
+            Field,                   // 8
+            Sym("two".to_owned()),   // 9
+            Val(Int(2)),             // 10
+            Field,                   // 11
+            Module(17),              // 12 // Module definition
+            Bind,                    // 13
+            Sym("foo".to_owned()),   // 14
+            DeRef("mod".to_owned()), // 15
+            Bind,                    // 16 // bind mod tuple to foo
+            Return,                  // 17 // end the module
+            Bind,                    // 18 // bind module to the binding name
+            DeRef("m".to_owned()),   // 19
+            Cp,                      // 20
+        ] => C(Tuple(vec![(
+            "foo".to_owned(),
+            C(Tuple(vec![
+                ("one".to_owned(), P(Int(11))),
+                ("two".to_owned(), P(Int(2))),
+            ])),
+        )])),
+        vec![
+            InitTuple,               // 0 // override tuple
+            Sym("one".to_owned()),   // 1
+            Val(Int(11)),            // 2
+            Field,                   // 3
+            Sym("m".to_owned()),     // 4 // binding name for module
+            InitTuple,               // 5 // Module tuple bindings
+            Sym("one".to_owned()),   // 6
+            Val(Int(1)),             // 7
+            Field,                   // 8
+            Sym("two".to_owned()),   // 9
+            Val(Int(2)),             // 10
+            Field,                   // 11
+            InitThunk(2),            // 12 // Module Return expression
+            Val(Int(1)),             // 13
+            Return,                  // 14
+            Module(20),              // 15 // Module definition
+            Bind,                    // 16
+            Sym("foo".to_owned()),   // 17
+            DeRef("mod".to_owned()), // 18
+            Bind,                    // 19 // bind mod tuple to foo
+            Return,                  // 20 // end the module
+            Bind,                    // 21 // bind module to the binding name
+            DeRef("m".to_owned()),   // 22
+            Cp,                      // 23
+        ] => P(Int(1)),
     ];
-    for case in cases.drain(0..) {
-        let mut vm = VM::new(&case.0);
-        vm.run().unwrap();
-        assert_eq!(vm.pop().unwrap(), case.1);
-    }
 }
 
 #[test]
