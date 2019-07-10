@@ -102,7 +102,7 @@ pub enum Op {
     Jump(i32),
     JumpIfTrue(i32),
     JumpIfFalse(i32),
-    JumpIfNotEqual(i32),
+    SelectJump(i32),
     // FIXME(jwall): Short circuiting operations
     // - And(usize)
     // - Or(usize)
@@ -184,7 +184,7 @@ impl<'a> VM<'a> {
                 Op::Jump(jp) => self.op_jump(*jp)?,
                 Op::JumpIfTrue(jp) => self.op_jump_if_true(*jp)?,
                 Op::JumpIfFalse(jp) => self.op_jump_if_false(*jp)?,
-                Op::JumpIfNotEqual(jp) => self.op_jump_if_not_equal(*jp)?,
+                Op::SelectJump(jp) => self.op_select_jump(*jp)?,
                 Op::Module(mptr) => self.op_module(idx, *mptr)?,
                 Op::Func(jptr) => self.op_func(idx, *jptr)?,
                 Op::FCall => self.op_fcall()?,
@@ -230,7 +230,7 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    fn op_jump_if_not_equal(&mut self, jp: i32) -> Result<(), Error> {
+    fn op_select_jump(&mut self, jp: i32) -> Result<(), Error> {
         // pop field value off
         let field_name = dbg!(self.pop())?;
         // pop search value off

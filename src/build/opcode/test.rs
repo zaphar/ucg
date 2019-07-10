@@ -16,8 +16,7 @@ use super::scope::Stack;
 use super::Composite::{List, Tuple};
 use super::Op::{
     Add, Bang, Bind, Cp, DeRef, Div, Element, Equal, FCall, Field, Func, InitList, InitThunk,
-    InitTuple, Jump, JumpIfFalse, JumpIfNotEqual, JumpIfTrue, Module, Mul, Noop, Return, Sub, Sym,
-    Val,
+    InitTuple, Jump, JumpIfFalse, JumpIfTrue, Module, Mul, Noop, Return, SelectJump, Sub, Sym, Val,
 };
 use super::Primitive::{Bool, Float, Int, Str};
 use super::Value::{C, P};
@@ -406,11 +405,11 @@ fn test_select_short_circuit() {
         vec![
             Sym("field".to_owned()),              // 0 // search field
             Sym("not_field".to_owned()),          // 1 // first field to compare
-            JumpIfNotEqual(2),                    // 2
+            SelectJump(2),                        // 2
             Val(Str("not our value".to_owned())), // 3 // expression for first field
             Jump(4),                              // 4
             Sym("field".to_owned()),              // 5 // second field to compare
-            JumpIfNotEqual(2),                    // 6
+            SelectJump(2),                        // 6
             Val(Int(1)),                          // 7 // expression for second field
             Jump(1),                              // 8
             Bang,                                 // 9 // default case
