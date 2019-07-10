@@ -99,15 +99,17 @@ pub enum Op {
     Cp,
     // Control Flow
     Bang,
-    Jump(usize),
-    JumpIfTrue(usize),
-    JumpIfFalse(usize),
+    Jump(i32),
+    JumpIfTrue(i32),
+    JumpIfFalse(i32),
+    JumpIfNotEqual(i32),
     // FIXME(jwall): Short circuiting operations
     // - And(usize)
     // - Or(usize)
     // Spacer operation, Does nothing.
     Noop,
     // Pending Computation
+    // TODO(jwall): This is unnecessary. Remove it.
     InitThunk(usize),
     Module(usize),
     Func(usize),
@@ -153,8 +155,8 @@ impl<'a> VM<'a> {
     pub fn run(&mut self) -> Result<(), Error> {
         while self.ops.next().is_some() {
             let idx = self.ops.ptr.unwrap();
-            match self.ops.op().unwrap() {
-                Op::Val(p) => self.push(P(p.clone()))?,
+            match dbg!(self.ops.op()).unwrap() {
+                Op::Val(p) => self.push(dbg!(P(p.clone())))?,
                 Op::Sym(s) => self.push(S(s.clone()))?,
                 Op::DeRef(s) => self.op_deref(s.clone())?,
                 Op::Add => self.op_add()?,
@@ -174,15 +176,17 @@ impl<'a> VM<'a> {
                 Op::Field => self.op_field()?,
                 Op::Element => self.op_element()?,
                 Op::Cp => self.op_copy()?,
-                //TODO(jwall): Should this whould take a user provided message?
-                Op::Bang => return Err(Error {}),
-                Op::InitThunk(jp) => self.op_thunk(idx, *jp)?,
+                //TODO(jwall): Should this take a user provided message?
+                Op::Bang => return dbg!(Err(Error {})),
+                // TODO(jwall): Remove this
+                Op::InitThunk(jp) => self.op_thunk(idx, *jp as i32)?,
                 Op::Noop => {
                     // Do nothing
                 }
                 Op::Jump(jp) => self.op_jump(*jp)?,
                 Op::JumpIfTrue(jp) => self.op_jump_if_true(*jp)?,
                 Op::JumpIfFalse(jp) => self.op_jump_if_false(*jp)?,
+                Op::JumpIfNotEqual(jp) => self.op_jump_if_not_equal(*jp)?,
                 Op::Module(mptr) => self.op_module(idx, *mptr)?,
                 Op::Func(jptr) => self.op_func(idx, *jptr)?,
                 Op::FCall => self.op_fcall()?,
@@ -200,12 +204,17 @@ impl<'a> VM<'a> {
         self.push(val)
     }
 
-    fn op_jump(&mut self, jp: usize) -> Result<(), Error> {
-        self.ops.jump(self.ops.ptr.map(|v| v + jp).unwrap_or(jp))?;
+    fn op_jump(&mut self, jp: i32) -> Result<(), Error> {
+        self.ops.jump(
+            self.ops
+                .ptr
+                .map(|v| (v as i32 + jp) as usize)
+                .unwrap_or(jp as usize),
+        )?;
         Ok(())
     }
 
-    fn op_jump_if_true(&mut self, jp: usize) -> Result<(), Error> {
+    fn op_jump_if_true(&mut self, jp: i32) -> Result<(), Error> {
         if let P(Bool(cond)) = self.pop()? {
             if cond {
                 self.op_jump(jp)?;
@@ -214,12 +223,27 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    fn op_jump_if_false(&mut self, jp: usize) -> Result<(), Error> {
+    fn op_jump_if_false(&mut self, jp: i32) -> Result<(), Error> {
         if let P(Bool(cond)) = self.pop()? {
             if !cond {
                 self.op_jump(jp)?;
             }
         }
+        Ok(())
+    }
+
+    fn op_jump_if_not_equal(&mut self, jp: i32) -> Result<(), Error> {
+        // pop field value off
+        let field_name = dbg!(self.pop())?;
+        // pop search value off
+        let search = dbg!(self.pop())?;
+        // compare them.
+        if dbg!(field_name != search) {
+            self.op_jump(dbg!(jp))?;
+            self.push(dbg!(search))?;
+        }
+        dbg!(self.ops.ptr.unwrap());
+        // if they aren't equal then push search value back on and jump
         Ok(())
     }
 
@@ -300,7 +324,7 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    fn op_thunk(&mut self, idx: usize, jp: usize) -> Result<(), Error> {
+    fn op_thunk(&mut self, idx: usize, jp: i32) -> Result<(), Error> {
         self.push(dbg!(T(idx)))?;
         self.op_jump(jp)
     }

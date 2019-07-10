@@ -15,8 +15,9 @@
 use super::scope::Stack;
 use super::Composite::{List, Tuple};
 use super::Op::{
-    Add, Bind, Cp, DeRef, Div, Element, Equal, FCall, Field, Func, InitList, InitThunk, InitTuple,
-    Jump, JumpIfFalse, JumpIfTrue, Module, Mul, Noop, Return, Sub, Sym, Val,
+    Add, Bang, Bind, Cp, DeRef, Div, Element, Equal, FCall, Field, Func, InitList, InitThunk,
+    InitTuple, Jump, JumpIfFalse, JumpIfNotEqual, JumpIfTrue, Module, Mul, Noop, Return, Sub, Sym,
+    Val,
 };
 use super::Primitive::{Bool, Float, Int, Str};
 use super::Value::{C, P, T};
@@ -27,7 +28,7 @@ macro_rules! assert_cases {
         for case in $cases.drain(0..) {
             let mut vm = VM::new(&case.0);
             vm.run().unwrap();
-            assert_eq!(vm.pop().unwrap(), case.1);
+            assert_eq!(dbg!(vm.pop()).unwrap(), case.1);
         }
     };
 
@@ -186,7 +187,6 @@ fn test_tuple_ops() {
 #[test]
 fn test_jump_ops() {
     assert_cases!(
-        vec![InitThunk(1), Val(Int(1)), Noop] => T(0),
         vec![Jump(1), Val(Int(1)), Noop, Val(Int(1))] => P(Int(1)),
     );
 }
@@ -396,6 +396,24 @@ fn test_module_call() {
             Bind,                    // 21 // bind module to the binding name
             DeRef("m".to_owned()),   // 22
             Cp,                      // 23
+        ] => P(Int(1)),
+    ];
+}
+
+#[test]
+fn test_select_short_circuit() {
+    assert_cases![
+        vec![
+            Sym("field".to_owned()),              // 0 // search field
+            Sym("not_field".to_owned()),          // 1 // first field to compare
+            JumpIfNotEqual(2),                    // 2
+            Val(Str("not our value".to_owned())), // 3
+            Jump(4),                              // 4
+            Sym("field".to_owned()),              // 5 // second field to compare
+            JumpIfNotEqual(2),                    // 6
+            Val(Int(1)),                          // 7
+            Jump(1),                              // 8
+            Bang,                                 // 9
         ] => P(Int(1)),
     ];
 }
