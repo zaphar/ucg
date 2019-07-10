@@ -14,7 +14,7 @@
 
 use super::{Error, Op};
 
-#[derive(Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct OpPointer<'a> {
     pub ops: &'a Vec<Op>,
     pub ptr: Option<usize>,
