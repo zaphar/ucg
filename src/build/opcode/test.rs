@@ -20,7 +20,7 @@ use super::Op::{
     Val,
 };
 use super::Primitive::{Bool, Float, Int, Str};
-use super::Value::{C, P, T};
+use super::Value::{C, P};
 use super::VM;
 
 macro_rules! assert_cases {
@@ -407,13 +407,13 @@ fn test_select_short_circuit() {
             Sym("field".to_owned()),              // 0 // search field
             Sym("not_field".to_owned()),          // 1 // first field to compare
             JumpIfNotEqual(2),                    // 2
-            Val(Str("not our value".to_owned())), // 3
+            Val(Str("not our value".to_owned())), // 3 // expression for first field
             Jump(4),                              // 4
             Sym("field".to_owned()),              // 5 // second field to compare
             JumpIfNotEqual(2),                    // 6
-            Val(Int(1)),                          // 7
+            Val(Int(1)),                          // 7 // expression for second field
             Jump(1),                              // 8
-            Bang,                                 // 9
+            Bang,                                 // 9 // default case
         ] => P(Int(1)),
     ];
 }

@@ -109,8 +109,7 @@ pub enum Op {
     // Spacer operation, Does nothing.
     Noop,
     // Pending Computation
-    // TODO(jwall): This is unnecessary. Remove it.
-    InitThunk(usize),
+    InitThunk(i32), // Basically just used for module return expressions
     Module(usize),
     Func(usize),
     Return,
@@ -178,8 +177,7 @@ impl<'a> VM<'a> {
                 Op::Cp => self.op_copy()?,
                 //TODO(jwall): Should this take a user provided message?
                 Op::Bang => return dbg!(Err(Error {})),
-                // TODO(jwall): Remove this
-                Op::InitThunk(jp) => self.op_thunk(idx, *jp as i32)?,
+                Op::InitThunk(jp) => self.op_thunk(idx, *jp)?,
                 Op::Noop => {
                     // Do nothing
                 }
