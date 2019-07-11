@@ -14,6 +14,8 @@
 pub mod pointer;
 pub mod scope;
 
+use std::rc::Rc;
+
 use pointer::OpPointer;
 use scope::Stack;
 
@@ -30,43 +32,41 @@ pub enum Primitive {
 use Primitive::{Bool, Float, Int, Str};
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Composite<'a> {
-    List(Vec<Value<'a>>),
-    Tuple(Vec<(String, Value<'a>)>),
+pub enum Composite {
+    List(Vec<Value>),
+    Tuple(Vec<(String, Value)>),
 }
 
 use Composite::{List, Tuple};
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Func<'a> {
-    // TODO(jwall): Embed the OpsPointer?
-    ptr: OpPointer<'a>,
+pub struct Func {
+    ptr: OpPointer,
     bindings: Vec<String>,
     snapshot: Stack,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Module<'a> {
-    // TODO(jwall): Embed the OpsPointer?
-    ptr: OpPointer<'a>,
+pub struct Module {
+    ptr: OpPointer,
     result_ptr: Option<usize>,
-    flds: Vec<(String, Value<'a>)>,
+    flds: Vec<(String, Value)>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Value<'a> {
+pub enum Value {
     // Binding names.
     S(String),
     // Primitive Types
     P(Primitive),
     // Composite Types.
-    C(Composite<'a>),
+    C(Composite),
     // Program Pointer
     T(usize),
     // Function
-    F(Func<'a>),
+    F(Func),
     // Module
-    M(Module<'a>),
+    M(Module),
 }
 use Value::{C, F, M, P, S, T};
 
@@ -130,18 +130,18 @@ pub enum Op {
 #[derive(Debug)]
 pub struct Error {}
 
-pub struct VM<'a> {
-    stack: Vec<Value<'a>>,
+pub struct VM {
+    stack: Vec<Value>,
     symbols: Stack,
-    ops: OpPointer<'a>,
+    ops: OpPointer,
 }
 
-impl<'a> VM<'a> {
-    pub fn new(ops: &'a Vec<Op>) -> Self {
+impl<'a> VM {
+    pub fn new(ops: Rc<Vec<Op>>) -> Self {
         Self::with_pointer(OpPointer::new(ops))
     }
 
-    pub fn with_pointer(ops: OpPointer<'a>) -> Self {
+    pub fn with_pointer(ops: OpPointer) -> Self {
         Self {
             stack: Vec::new(),
             symbols: Stack::new(),
@@ -157,10 +157,15 @@ impl<'a> VM<'a> {
         }
     }
 
-    pub fn run(&'a mut self) -> Result<(), Error> {
-        while self.ops.next().is_some() {
-            let idx = self.ops.ptr.unwrap();
-            match dbg!(self.ops.op()).unwrap() {
+    pub fn run(&mut self) -> Result<(), Error> {
+        loop {
+            let op = if let Some(op) = dbg!(self.ops.next()) {
+                op.clone()
+            } else {
+                break;
+            };
+            let idx = self.ops.idx()?;
+            match op {
                 Op::Val(p) => self.push(dbg!(P(p.clone())))?,
                 Op::Sym(s) => self.push(S(s.clone()))?,
                 Op::DeRef(s) => self.op_deref(s.clone())?,
@@ -183,16 +188,16 @@ impl<'a> VM<'a> {
                 Op::Cp => self.op_copy()?,
                 //TODO(jwall): Should this take a user provided message?
                 Op::Bang => return dbg!(Err(Error {})),
-                Op::InitThunk(jp) => self.op_thunk(idx, *jp)?,
+                Op::InitThunk(jp) => self.op_thunk(idx, jp)?,
                 Op::Noop => {
                     // Do nothing
                 }
-                Op::Jump(jp) => self.op_jump(*jp)?,
-                Op::JumpIfTrue(jp) => self.op_jump_if_true(*jp)?,
-                Op::JumpIfFalse(jp) => self.op_jump_if_false(*jp)?,
-                Op::SelectJump(jp) => self.op_select_jump(*jp)?,
-                Op::Module(mptr) => self.op_module(idx, *mptr)?,
-                Op::Func(jptr) => self.op_func(idx, *jptr)?,
+                Op::Jump(jp) => self.op_jump(jp)?,
+                Op::JumpIfTrue(jp) => self.op_jump_if_true(jp)?,
+                Op::JumpIfFalse(jp) => self.op_jump_if_false(jp)?,
+                Op::SelectJump(jp) => self.op_select_jump(jp)?,
+                Op::Module(mptr) => self.op_module(idx, mptr)?,
+                Op::Func(jptr) => self.op_func(idx, jptr)?,
                 Op::FCall => self.op_fcall()?,
                 Op::Return => return Ok(()),
                 Op::Pop => {
@@ -203,12 +208,12 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    fn op_deref(&'a mut self, name: String) -> Result<(), Error> {
+    fn op_deref(&mut self, name: String) -> Result<(), Error> {
         let val = dbg!(self.get_binding(&name)?.clone());
         self.push(val)
     }
 
-    fn op_jump(&'a mut self, jp: i32) -> Result<(), Error> {
+    fn op_jump(&mut self, jp: i32) -> Result<(), Error> {
         self.ops.jump(
             self.ops
                 .ptr
@@ -218,7 +223,7 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    fn op_jump_if_true(&'a mut self, jp: i32) -> Result<(), Error> {
+    fn op_jump_if_true(&mut self, jp: i32) -> Result<(), Error> {
         if let P(Bool(cond)) = self.pop()? {
             if cond {
                 self.op_jump(jp)?;
@@ -227,7 +232,7 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    fn op_jump_if_false(&'a mut self, jp: i32) -> Result<(), Error> {
+    fn op_jump_if_false(&mut self, jp: i32) -> Result<(), Error> {
         if let P(Bool(cond)) = self.pop()? {
             if !cond {
                 self.op_jump(jp)?;
@@ -275,7 +280,7 @@ impl<'a> VM<'a> {
         self.ops.jump(dbg!(jptr))
     }
 
-    fn op_func(&'a mut self, idx: usize, jptr: usize) -> Result<(), Error> {
+    fn op_func(&mut self, idx: usize, jptr: usize) -> Result<(), Error> {
         // get arity from stack
         let mut scope_snapshot = self.symbols.snapshot();
         scope_snapshot.push();
@@ -306,7 +311,7 @@ impl<'a> VM<'a> {
         self.ops.jump(jptr)
     }
 
-    fn op_fcall(&'a mut self) -> Result<(), Error> {
+    fn op_fcall(&mut self) -> Result<(), Error> {
         let f = self.pop()?;
         if let F(Func {
             ptr,
@@ -330,19 +335,19 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    fn op_thunk(&'a mut self, idx: usize, jp: i32) -> Result<(), Error> {
+    fn op_thunk(&mut self, idx: usize, jp: i32) -> Result<(), Error> {
         self.push(dbg!(T(idx)))?;
         self.op_jump(jp)
     }
 
-    fn op_equal(&'a mut self) -> Result<(), Error> {
+    fn op_equal(&mut self) -> Result<(), Error> {
         let left = self.pop()?;
         let right = self.pop()?;
         self.push(P(Bool(left == right)))?;
         Ok(())
     }
 
-    fn op_gt(&'a mut self) -> Result<(), Error> {
+    fn op_gt(&mut self) -> Result<(), Error> {
         let left = self.pop()?;
         let right = self.pop()?;
         match (left, right) {
@@ -357,7 +362,7 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    fn op_lt(&'a mut self) -> Result<(), Error> {
+    fn op_lt(&mut self) -> Result<(), Error> {
         let left = self.pop()?;
         let right = self.pop()?;
         match (left, right) {
@@ -372,7 +377,7 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    fn op_lteq(&'a mut self) -> Result<(), Error> {
+    fn op_lteq(&mut self) -> Result<(), Error> {
         let left = self.pop()?;
         let right = self.pop()?;
         match (left, right) {
@@ -387,7 +392,7 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    fn op_gteq(&'a mut self) -> Result<(), Error> {
+    fn op_gteq(&mut self) -> Result<(), Error> {
         let left = self.pop()?;
         let right = self.pop()?;
         match (left, right) {
@@ -402,7 +407,7 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    fn op_add(&'a mut self) -> Result<(), Error> {
+    fn op_add(&mut self) -> Result<(), Error> {
         // Adds the previous two items in the stack.
         let left = self.pop()?;
         let right = self.pop()?;
@@ -411,7 +416,7 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    fn op_sub(&'a mut self) -> Result<(), Error> {
+    fn op_sub(&mut self) -> Result<(), Error> {
         // Subtracts the previous two items in the stack.
         let left = self.pop()?;
         let right = self.pop()?;
@@ -420,7 +425,7 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    fn op_mul(&'a mut self) -> Result<(), Error> {
+    fn op_mul(&mut self) -> Result<(), Error> {
         // Multiplies the previous two items in the stack.
         let left = self.pop()?;
         let right = self.pop()?;
@@ -429,7 +434,7 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    fn op_div(&'a mut self) -> Result<(), Error> {
+    fn op_div(&mut self) -> Result<(), Error> {
         // Divides the previous two items in the stack.
         let left = self.pop()?;
         let right = self.pop()?;
@@ -438,7 +443,7 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    fn op_bind(&'a mut self) -> Result<(), Error> {
+    fn op_bind(&mut self) -> Result<(), Error> {
         // pop val off stack.
         let val = dbg!(self.pop())?;
         // pop name off stack.
@@ -451,7 +456,7 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    fn op_field(&'a mut self) -> Result<(), Error> {
+    fn op_field(&mut self) -> Result<(), Error> {
         // Add a Composite field value to a tuple on the stack
         // get value from stack
         let val = self.pop()?;
@@ -474,7 +479,7 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    fn op_element(&'a mut self) -> Result<(), Error> {
+    fn op_element(&mut self) -> Result<(), Error> {
         // get element from stack.
         let val = self.pop()?;
         // get next value. It should be a Composite list.
@@ -490,7 +495,7 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    fn op_copy(&'a mut self) -> Result<(), Error> {
+    fn op_copy(&mut self) -> Result<(), Error> {
         // TODO Use Cow pointers for this?
         // get next value. It should be a Module.
         let tgt = self.pop()?;
@@ -546,10 +551,10 @@ impl<'a> VM<'a> {
     }
 
     fn merge_field_into_tuple(
-        &'a self,
-        src_fields: &'a mut Vec<(String, Value<'a>)>,
+        &self,
+        src_fields: &'a mut Vec<(String, Value)>,
         name: String,
-        value: Value<'a>,
+        value: Value,
     ) -> Result<(), Error> {
         for fld in src_fields.iter_mut() {
             if fld.0 == name {
@@ -561,12 +566,12 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    fn push(&'a mut self, p: Value<'a>) -> Result<(), Error> {
+    fn push(&mut self, p: Value) -> Result<(), Error> {
         self.stack.push(p);
         Ok(())
     }
 
-    fn binding_push(&'a mut self, name: String, val: Value) -> Result<(), Error> {
+    fn binding_push(&mut self, name: String, val: Value) -> Result<(), Error> {
         if self.symbols.is_bound(&name) {
             return Err(Error {});
         }
@@ -574,21 +579,21 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
-    pub fn get_binding(&'a mut self, name: &str) -> Result<&'a Value, Error> {
+    pub fn get_binding(&'a self, name: &str) -> Result<&Value, Error> {
         match self.symbols.get(name) {
             Some(v) => Ok(v),
             None => Err(Error {}),
         }
     }
 
-    fn pop(&'a mut self) -> Result<Value, Error> {
+    fn pop(&mut self) -> Result<Value, Error> {
         match self.stack.pop() {
             Some(v) => Ok(v),
             None => Err(Error {}),
         }
     }
 
-    fn mul(&'a self, left: Value, right: Value) -> Result<Primitive, Error> {
+    fn mul(&self, left: Value, right: Value) -> Result<Primitive, Error> {
         Ok(match (left, right) {
             (P(Int(i)), P(Int(ii))) => Int(i * ii),
             (P(Float(f)), P(Float(ff))) => Float(f * ff),
@@ -596,7 +601,7 @@ impl<'a> VM<'a> {
         })
     }
 
-    fn div(&'a self, left: Value, right: Value) -> Result<Primitive, Error> {
+    fn div(&self, left: Value, right: Value) -> Result<Primitive, Error> {
         Ok(match (left, right) {
             (P(Int(i)), P(Int(ii))) => Int(i / ii),
             (P(Float(f)), P(Float(ff))) => Float(f / ff),
@@ -604,7 +609,7 @@ impl<'a> VM<'a> {
         })
     }
 
-    fn sub(&'a self, left: Value, right: Value) -> Result<Primitive, Error> {
+    fn sub(&self, left: Value, right: Value) -> Result<Primitive, Error> {
         Ok(match (left, right) {
             (P(Int(i)), Value::P(Int(ii))) => Int(i - ii),
             (P(Float(f)), Value::P(Float(ff))) => Float(f - ff),
@@ -612,7 +617,7 @@ impl<'a> VM<'a> {
         })
     }
 
-    fn add(&'a self, left: Value, right: Value) -> Result<Primitive, Error> {
+    fn add(&self, left: Value, right: Value) -> Result<Primitive, Error> {
         Ok(match (left, right) {
             (P(Int(i)), Value::P(Int(ii))) => Int(i + ii),
             (P(Float(f)), Value::P(Float(ff))) => Float(f + ff),

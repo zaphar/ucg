@@ -11,17 +11,18 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use std::rc::Rc;
 
 use super::{Error, Op};
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct OpPointer<'a> {
-    pub ops: &'a Vec<Op>,
+pub struct OpPointer {
+    pub ops: Rc<Vec<Op>>,
     pub ptr: Option<usize>,
 }
 
-impl<'a> OpPointer<'a> {
-    pub fn new(ops: &'a Vec<Op>) -> Self {
+impl OpPointer {
+    pub fn new(ops: Rc<Vec<Op>>) -> Self {
         // If we load an empty program what happens?
         Self {
             ops: ops,
@@ -29,7 +30,7 @@ impl<'a> OpPointer<'a> {
         }
     }
 
-    pub fn next(&mut self) -> Option<usize> {
+    pub fn next(&mut self) -> Option<&Op> {
         if let Some(i) = self.ptr {
             let nxt = i + 1;
             if nxt < self.ops.len() {
@@ -40,7 +41,7 @@ impl<'a> OpPointer<'a> {
         } else if self.ops.len() != 0 {
             self.ptr = Some(0);
         }
-        self.ptr
+        self.op()
     }
 
     pub fn jump(&mut self, ptr: usize) -> Result<(), Error> {
@@ -58,9 +59,16 @@ impl<'a> OpPointer<'a> {
         None
     }
 
+    pub fn idx(&self) -> Result<usize, Error> {
+        match self.ptr {
+            Some(ptr) => Ok(ptr),
+            None => dbg!(Err(Error {})),
+        }
+    }
+
     pub fn snapshot(&self) -> Self {
         Self {
-            ops: self.ops,
+            ops: self.ops.clone(),
             ptr: None,
         }
     }
