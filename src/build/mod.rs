@@ -223,12 +223,11 @@ where
             }
             Err(e) => {
                 let err = simple_error::SimpleError::new(
-                    format!(
+                    &format!(
                         "Error building file: {}\n{}",
                         file.to_string_lossy(),
                         e.as_ref()
-                    )
-                    .as_ref(),
+                    ),
                 );
                 Err(Box::new(err))
             }

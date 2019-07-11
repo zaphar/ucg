@@ -566,8 +566,9 @@ where
         for v in stmts {
             self.render_stmt(v)?;
         }
-        if let Some(last_comment_line) = self.comment_group_lines.first() {
-            self.render_missed_comments(*last_comment_line + 1)?;
+        let comment_line = self.comment_group_lines.first().cloned();
+        if let Some(last_comment_line) = comment_line {
+            self.render_missed_comments(last_comment_line + 1)?;
         }
         Ok(())
     }
