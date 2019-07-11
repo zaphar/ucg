@@ -424,7 +424,7 @@ fn test_select_short_circuit() {
             Jump(4),                              // 4
             Sym("als not field".to_owned()),      // 5 // second field to compare
             SelectJump(2),                        // 6
-            Val(Int(1)),                          // 7 // expression for second field
+            Val(Int(2)),                          // 7 // expression for second field
             Jump(1),                              // 8
             Pop,                                  // 9 // pop the search field off
             Val(Int(1)),                          // 10 // default case
