@@ -109,6 +109,7 @@ pub enum Op {
     // - And(usize)
     // - Or(usize)
     // Spacer operation, Does nothing.
+    Index, // indexing operation
     Noop,
     // Pending Computation
     InitThunk(i32), // Basically just used for module return expressions
@@ -167,7 +168,7 @@ impl<'a> VM {
             let idx = self.ops.idx()?;
             match op {
                 Op::Val(p) => self.push(dbg!(P(p.clone())))?,
-                Op::Sym(s) => self.push(S(s.clone()))?,
+                Op::Sym(s) => self.push(dbg!(S(s.clone())))?,
                 Op::DeRef(s) => self.op_deref(s.clone())?,
                 Op::Add => self.op_add()?,
                 Op::Sub => self.op_sub()?,
@@ -185,6 +186,7 @@ impl<'a> VM {
                 Op::InitTuple => self.push(C(Tuple(Vec::new())))?,
                 Op::Field => self.op_field()?,
                 Op::Element => self.op_element()?,
+                Op::Index => self.op_index()?,
                 Op::Cp => self.op_copy()?,
                 //TODO(jwall): Should this take a user provided message?
                 Op::Bang => return dbg!(Err(Error {})),
@@ -495,19 +497,73 @@ impl<'a> VM {
         Ok(())
     }
 
+    fn find_in_list(&self, index: Value, elems: Vec<Value>) -> Result<Value, Error> {
+        let idx = match index {
+            P(Int(i)) => i,
+            _ => return dbg!(Err(Error {})),
+        };
+        match elems.get(idx as usize) {
+            Some(v) => Ok(v.clone()),
+            None => Err(Error {}),
+        }
+    }
+
+    fn find_in_flds(&self, index: Value, flds: Vec<(String, Value)>) -> Result<Value, Error> {
+        let idx = match index {
+            S(p) => p,
+            P(Str(p)) => p,
+            _ => return dbg!(Err(Error {})),
+        };
+        for f in flds.iter() {
+            if idx == f.0 {
+                return Ok(f.1.clone());
+            }
+        }
+        Err(Error {})
+    }
+
+    fn find_in_value(&self, index: Value, target: Value) -> Result<Value, Error> {
+        match target {
+            C(Tuple(flds)) => self.find_in_flds(index, flds),
+            C(List(elements)) => self.find_in_list(index, elements),
+            _ => return Err(Error {}),
+        }
+    }
+
+    fn op_index(&mut self) -> Result<(), Error> {
+        let path = if let C(List(elems)) = self.pop()? {
+            elems
+        } else {
+            return dbg!(Err(Error {}));
+        };
+        match self.pop()? {
+            P(_) | S(_) | T(_) | F(_) | M(_) => return dbg!(Err(Error {})),
+            val => {
+                let mut out = val;
+                for p in path {
+                    let tgt = self.find_in_value(p, out)?;
+                    out = tgt;
+                }
+                self.push(out)?;
+            }
+        };
+        Ok(())
+    }
+
     fn op_copy(&mut self) -> Result<(), Error> {
         // TODO Use Cow pointers for this?
-        // get next value. It should be a Module.
-        let tgt = self.pop()?;
+        // get next value. It should be a Module or Tuple.
+        let tgt = dbg!(self.pop())?;
+        // This value should always be a tuple
+        let overrides = if let C(Tuple(oflds)) = self.pop()? {
+            oflds
+        } else {
+            return dbg!(Err(Error {}));
+        };
         match tgt {
             C(Tuple(mut flds)) => {
-                let overrides = self.pop()?;
-                if let C(Tuple(oflds)) = overrides {
-                    for (name, val) in oflds {
-                        self.merge_field_into_tuple(&mut flds, name, val)?;
-                    }
-                } else {
-                    return dbg!(Err(Error {}));
+                for (name, val) in overrides {
+                    dbg!(self.merge_field_into_tuple(&mut flds, name, val))?;
                 }
                 // Put the copy on the Stack
                 self.push(C(Tuple(flds)))?;
@@ -517,17 +573,19 @@ impl<'a> VM {
                 result_ptr,
                 mut flds,
             }) => {
-                let overrides = dbg!(self.pop()?);
-                if let C(Tuple(oflds)) = overrides {
-                    for (name, val) in oflds {
-                        self.merge_field_into_tuple(&mut flds, name, val)?;
-                    }
-                } else {
-                    return dbg!(Err(Error {}));
+                //let this = M(Module {
+                //    ptr: ptr.clone(),
+                //    result_ptr: result_ptr.clone(),
+                //    flds: flds.clone(),
+                //});
+                for (name, val) in overrides {
+                    self.merge_field_into_tuple(&mut flds, name, val)?;
                 }
+                // FIXME(jwall): We need to populate the pkg key for modules.
+                //self.merge_field_into_tuple(&mut flds, "this".to_owned(), this)?;
                 let mut vm = Self::with_pointer(ptr);
                 vm.push(S("mod".to_owned()))?;
-                vm.push(C(Tuple(flds)))?;
+                vm.push(C(Tuple(dbg!(flds))))?;
                 vm.run()?;
                 let mut flds = Vec::new();
                 if let Some(ptr) = dbg!(result_ptr) {

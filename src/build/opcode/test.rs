@@ -16,11 +16,11 @@ use std::rc::Rc;
 use super::scope::Stack;
 use super::Composite::{List, Tuple};
 use super::Op::{
-    Add, Bang, Bind, Cp, DeRef, Div, Element, Equal, FCall, Field, Func, InitList, InitThunk,
-    InitTuple, Jump, JumpIfFalse, JumpIfTrue, Module, Mul, Noop, Pop, Return, SelectJump, Sub, Sym,
-    Val,
+    Add, Bang, Bind, Cp, DeRef, Div, Element, Equal, FCall, Field, Func, Index, InitList,
+    InitThunk, InitTuple, Jump, JumpIfFalse, JumpIfTrue, Module, Mul, Noop, Pop, Return,
+    SelectJump, Sub, Sym, Val,
 };
-use super::Primitive::{Bool, Float, Int, Str};
+use super::Primitive::{Bool, Empty, Float, Int, Str};
 use super::Value::{C, P};
 use super::VM;
 
@@ -356,22 +356,24 @@ fn test_module_call() {
             Sym("two".to_owned()),   // 9
             Val(Int(2)),             // 10
             Field,                   // 11
-            Module(17),              // 12 // Module definition
-            Bind,                    // 13
+            Module(17),              // 12 // Module body definition
+            Bind,                    // 13 // bind the mod tuple
             Sym("foo".to_owned()),   // 14
             DeRef("mod".to_owned()), // 15
             Bind,                    // 16 // bind mod tuple to foo
             Return,                  // 17 // end the module
             Bind,                    // 18 // bind module to the binding name
             DeRef("m".to_owned()),   // 19
-            Cp,                      // 20
-        ] => C(Tuple(vec![(
-            "foo".to_owned(),
-            C(Tuple(vec![
-                ("one".to_owned(), P(Int(11))),
-                ("two".to_owned(), P(Int(2))),
-            ])),
-        )])),
+            Cp,                      // 20 // Call the module
+        ] => C(Tuple(vec![
+            (
+                "foo".to_owned(),
+                C(Tuple(vec![
+                    ("one".to_owned(), P(Int(11))),
+                    ("two".to_owned(), P(Int(2))),
+                ]))
+            ),
+        ])),
         vec![
             InitTuple,               // 0 // override tuple
             Sym("one".to_owned()),   // 1
@@ -430,6 +432,54 @@ fn test_select_short_circuit() {
             Pop,                                  // 9 // pop the search field off
             Val(Int(1)),                          // 10 // default case
         ] => P(Int(1)),
+    ];
+}
+
+#[test]
+fn test_index_operation() {
+    assert_cases![
+        vec![
+            InitTuple,
+            Sym("foo".to_owned()),
+            InitTuple,
+            Sym("bar".to_owned()),
+            Val(Int(1)),
+            Field,
+            Field,
+            InitList,
+            Val(Str("foo".to_owned())),
+            Element,
+            Val(Str("bar".to_owned())),
+            Element,
+            Index,
+        ] => P(Int(1)),
+        vec![
+            InitList,
+            Val(Str("foo".to_owned())),
+            Element,
+            Val(Str("bar".to_owned())),
+            Element,
+            InitList,
+            Val(Int(0)),
+            Element,
+            Index,
+        ] => P(Str("foo".to_owned())),
+        vec![
+            InitTuple,
+            Sym("field".to_owned()),
+            InitList,
+            Val(Str("foo".to_owned())),
+            Element,
+            Val(Str("bar".to_owned())),
+            Element,
+            Field,
+            InitList,
+            Val(Str("field".to_owned())),
+            Element,
+            Val(Int(0)),
+            Element,
+            Index,
+        ] => P(Str("foo".to_owned())),
     ];
 }
 
