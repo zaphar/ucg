@@ -20,7 +20,7 @@ use super::Op::{
     InitThunk, InitTuple, Jump, JumpIfFalse, JumpIfTrue, Module, Mul, Noop, Pop, Return,
     SelectJump, Sub, Sym, Val,
 };
-use super::Primitive::{Bool, Empty, Float, Int, Str};
+use super::Primitive::{Bool, Float, Int, Str};
 use super::Value::{C, P};
 use super::VM;
 
