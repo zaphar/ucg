@@ -102,6 +102,31 @@ pub struct AssertCollector {
     pub failures: String,
 }
 
+impl AssertCollector {
+    pub fn new() -> Self {
+        Self {
+            counter: 0,
+            success: true,
+            summary: String::new(),
+            failures: String::new(),
+        }
+    }
+    
+    fn record_assert_result(&mut self, msg: &str, is_success: bool) {
+        if !is_success {
+            let msg = format!("{} - NOT OK: {}\n", self.counter, msg);
+            self.summary.push_str(&msg);
+            self.failures.push_str(&msg);
+            self.success = false;
+        } else {
+            let msg = format!("{} - OK: {}\n", self.counter, msg);
+            self.summary.push_str(&msg);
+        }
+        self.counter += 1;
+    }
+
+}
+
 /// Builder handles building ucg code for a single file.
 pub struct FileBuilder<'a, C>
 where
@@ -169,12 +194,7 @@ where
             std: Rc::new(stdlib::get_libs()),
             import_path: import_paths,
             validate_mode: false,
-            assert_collector: AssertCollector {
-                counter: 0,
-                success: true,
-                summary: String::new(),
-                failures: String::new(),
-            },
+            assert_collector: AssertCollector::new(),
             scope: scope,
             import_registry: ImporterRegistry::make_registry(),
             converter_registry: converter_registry,
@@ -1686,19 +1706,6 @@ where
         };
     }
 
-    fn record_assert_result(&mut self, msg: &str, is_success: bool) {
-        if !is_success {
-            let msg = format!("{} - NOT OK: {}\n", self.assert_collector.counter, msg);
-            self.assert_collector.summary.push_str(&msg);
-            self.assert_collector.failures.push_str(&msg);
-            self.assert_collector.success = false;
-        } else {
-            let msg = format!("{} - OK: {}\n", self.assert_collector.counter, msg);
-            self.assert_collector.summary.push_str(&msg);
-        }
-        self.assert_collector.counter += 1;
-    }
-
     fn eval_assert(&mut self, expr: &Expression, scope: &Scope) -> Result<Rc<Val>, Box<dyn Error>> {
         if !self.validate_mode {
             // we are not in validate_mode so build_asserts are noops.
@@ -1715,7 +1722,7 @@ where
             Err(e) => {
                 // failure!
                 let msg = format!("CompileError: {}\nfor expression:\n{}\n", e, expr_pretty);
-                self.record_assert_result(&msg, false);
+                self.assert_collector.record_assert_result(&msg, false);
                 return Ok(Rc::new(Val::Empty));
             }
         };
@@ -1730,7 +1737,7 @@ where
                                     "TYPE FAIL - Expected Boolean field ok in tuple {}, line: {}, column: {}",
                                     ok.as_ref(), expr.pos().line, expr.pos().column
                                 );
-                            self.record_assert_result(&msg, false);
+                            self.assert_collector.record_assert_result(&msg, false);
                             return Ok(Rc::new(Val::Empty));
                         }
                     },
@@ -1739,7 +1746,7 @@ where
                             "TYPE FAIL - Expected Boolean field ok in tuple {}, line: {}, column: {}",
                             ok.as_ref(), expr.pos().line, expr.pos().column
                         );
-                        self.record_assert_result(&msg, false);
+                        self.assert_collector.record_assert_result(&msg, false);
                         return Ok(Rc::new(Val::Empty));
                     }
                 };
@@ -1751,7 +1758,7 @@ where
                                     "TYPE FAIL - Expected String field desc in tuple {} line: {}, column: {}",
                                     ok, expr.pos().line, expr.pos().column
                                 );
-                            self.record_assert_result(&msg, false);
+                            self.assert_collector.record_assert_result(&msg, false);
                             return Ok(Rc::new(Val::Empty));
                         }
                     },
@@ -1760,11 +1767,11 @@ where
                             "TYPE FAIL - Expected String field desc in tuple {} line: {}, column: {}\n",
                             ok, expr.pos().line, expr.pos().column
                         );
-                        self.record_assert_result(&msg, false);
+                        self.assert_collector.record_assert_result(&msg, false);
                         return Ok(Rc::new(Val::Empty));
                     }
                 };
-                self.record_assert_result(&desc, ok_field);
+                self.assert_collector.record_assert_result(&desc, ok_field);
             }
             &Val::Empty
             | &Val::Boolean(_)
@@ -1780,7 +1787,7 @@ where
                     "TYPE FAIL - Expected tuple with ok and desc fields got {} at line: {} column: {}\n",
                     ok, expr.pos().line, expr.pos().column
                 );
-                self.record_assert_result(&msg, false);
+                self.assert_collector.record_assert_result(&msg, false);
                 return Ok(Rc::new(Val::Empty));
             }
         }

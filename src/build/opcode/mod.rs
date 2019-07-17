@@ -11,7 +11,11 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use std::rc::Rc;
+
+mod cache;
 pub mod pointer;
+mod runtime;
 pub mod scope;
 mod vm;
 
@@ -32,8 +36,8 @@ pub enum Primitive {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Composite {
-    List(Vec<Value>),
-    Tuple(Vec<(String, Value)>),
+    List(Vec<Rc<Value>>),
+    Tuple(Vec<(String, Rc<Value>)>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -47,7 +51,7 @@ pub struct Func {
 pub struct Module {
     ptr: OpPointer,
     result_ptr: Option<usize>,
-    flds: Vec<(String, Value)>,
+    flds: Vec<(String, Rc<Value>)>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -64,6 +68,18 @@ pub enum Value {
     F(Func),
     // Module
     M(Module),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Hook {
+    Map,
+    Include,
+    Filter,
+    Reduce,
+    Import,
+    Out,
+    Assert,
+    Convert,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -115,13 +131,7 @@ pub enum Op {
     // Calls
     FCall,
     // Runtime hooks
-    // - Map,
-    // - Filter,
-    // - Reduce,
-    // - Import,
-    // - Out,
-    // - Assert,
-    // - Convert,
+    Runtime(Hook),
 }
 
 #[derive(Debug)]

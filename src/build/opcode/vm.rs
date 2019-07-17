@@ -1,30 +1,34 @@
 // Copyright 2019 Jeremy Wall
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use std::cell::RefCell;
 use std::rc::Rc;
 
-use super::{Value, Op, Primitive, Error};
-use super::scope::{Stack};
 use super::pointer::OpPointer;
+use super::runtime;
+use super::scope::Stack;
+use super::{Error, Op, Primitive, Value};
 
-use super::Value::{C, F, M, T, S, P};
-use super::Primitive::{Int, Str, Float, Bool};
 use super::Composite::{List, Tuple};
+use super::Hook;
+use super::Primitive::{Bool, Float, Int, Str};
+use super::Value::{C, F, M, P, S, T};
 use super::{Func, Module};
 
 pub struct VM {
-    stack: Vec<Value>,
+    stack: Vec<Rc<Value>>,
     symbols: Stack,
+    runtime: Rc<RefCell<runtime::Builtins>>,
     ops: OpPointer,
 }
 
@@ -37,6 +41,7 @@ impl<'a> VM {
         Self {
             stack: Vec::new(),
             symbols: Stack::new(),
+            runtime: Rc::new(RefCell::new(runtime::Builtins::new())),
             ops: ops,
         }
     }
@@ -45,8 +50,19 @@ impl<'a> VM {
         Self {
             stack: Vec::new(),
             symbols: symbols,
+            runtime: self.runtime.clone(),
             ops: self.ops.clone(),
         }
+    }
+
+    pub fn symbols_to_tuple(&self, include_mod: bool) -> Value {
+        let mut flds = Vec::new();
+        for sym in self.symbols.symbol_list() {
+            if include_mod || sym != "mod" {
+                flds.push((sym.clone(), self.symbols.get(sym).unwrap().clone()));
+            }
+        }
+        return C(Tuple(flds));
     }
 
     pub fn run(&mut self) -> Result<(), Error> {
@@ -58,8 +74,8 @@ impl<'a> VM {
             };
             let idx = self.ops.idx()?;
             match op {
-                Op::Val(p) => self.push(dbg!(P(p.clone())))?,
-                Op::Sym(s) => self.push(dbg!(S(s.clone())))?,
+                Op::Val(p) => self.push(Rc::new(dbg!(P(p.clone()))))?,
+                Op::Sym(s) => self.push(Rc::new(dbg!(S(s.clone()))))?,
                 Op::DeRef(s) => self.op_deref(s.clone())?,
                 Op::Add => self.op_add()?,
                 Op::Sub => self.op_sub()?,
@@ -72,9 +88,9 @@ impl<'a> VM {
                 Op::GtEq => self.op_gteq()?,
                 Op::LtEq => self.op_lteq()?,
                 // Add a Composite list value to the stack
-                Op::InitList => self.push(C(List(Vec::new())))?,
+                Op::InitList => self.push(Rc::new(C(List(Vec::new()))))?,
                 // Add a composite tuple value to the stack
-                Op::InitTuple => self.push(C(Tuple(Vec::new())))?,
+                Op::InitTuple => self.push(Rc::new(C(Tuple(Vec::new()))))?,
                 Op::Field => self.op_field()?,
                 Op::Element => self.op_element()?,
                 Op::Index => self.op_index()?,
@@ -96,6 +112,7 @@ impl<'a> VM {
                 Op::Pop => {
                     self.pop()?;
                 }
+                Op::Runtime(h) => self.op_runtime(h)?,
             };
         }
         Ok(())
@@ -117,7 +134,8 @@ impl<'a> VM {
     }
 
     fn op_jump_if_true(&mut self, jp: i32) -> Result<(), Error> {
-        if let P(Bool(cond)) = self.pop()? {
+        let cond = self.pop()?;
+        if let &P(Bool(cond)) = cond.as_ref() {
             if cond {
                 self.op_jump(jp)?;
             }
@@ -126,7 +144,8 @@ impl<'a> VM {
     }
 
     fn op_jump_if_false(&mut self, jp: i32) -> Result<(), Error> {
-        if let P(Bool(cond)) = self.pop()? {
+        let cond = self.pop()?;
+        if let &P(Bool(cond)) = cond.as_ref() {
             if !cond {
                 self.op_jump(jp)?;
             }
@@ -150,11 +169,13 @@ impl<'a> VM {
     }
 
     fn op_module(&'a mut self, idx: usize, jptr: usize) -> Result<(), Error> {
-        let (result_ptr, flds) = match self.pop()? {
-            C(Tuple(flds)) => (None, flds),
-            T(ptr) => {
-                if let C(Tuple(flds)) = self.pop()? {
-                    (Some(ptr), flds)
+        let mod_val = self.pop()?;
+        let (result_ptr, flds) = match mod_val.as_ref() {
+            &C(Tuple(ref flds)) => (None, flds.clone()),
+            &T(ptr) => {
+                let tpl_val = self.pop()?;
+                if let &C(Tuple(ref flds)) = tpl_val.as_ref() {
+                    (Some(ptr), flds.clone())
                 } else {
                     return dbg!(Err(Error {}));
                 }
@@ -165,11 +186,11 @@ impl<'a> VM {
         };
         let mut ops = self.ops.clone();
         ops.jump(idx)?;
-        self.push(M(Module {
+        self.push(Rc::new(M(Module {
             ptr: dbg!(ops),
             result_ptr: result_ptr,
             flds: dbg!(flds),
-        }))?;
+        })))?;
         self.ops.jump(dbg!(jptr))
     }
 
@@ -181,10 +202,11 @@ impl<'a> VM {
         eprintln!("Defining a new function");
         let mut bindings = Vec::new();
         // get imported symbols from stack
-        if let C(List(elems)) = self.pop()? {
+        let list_val = self.pop()?;
+        if let &C(List(ref elems)) = list_val.as_ref() {
             for e in elems {
-                if let S(sym) = e {
-                    bindings.push(sym);
+                if let &S(ref sym) = e.as_ref() {
+                    bindings.push(sym.clone());
                 } else {
                     return dbg!(Err(Error {}));
                 }
@@ -195,29 +217,29 @@ impl<'a> VM {
         eprintln!("Pushing function definition on stack");
         let mut ops = self.ops.clone();
         ops.jump(idx)?;
-        self.push(dbg!(F(Func {
+        self.push(Rc::new(dbg!(F(Func {
             ptr: ops, // where the function starts.
             bindings: bindings,
             snapshot: scope_snapshot,
-        })))?;
+        }))))?;
         eprintln!("Jumping to {} past the function body", jptr);
         self.ops.jump(jptr)
     }
 
     fn op_fcall(&mut self) -> Result<(), Error> {
         let f = self.pop()?;
-        if let F(Func {
-            ptr,
-            bindings,
-            snapshot,
-        }) = f
+        if let &F(Func {
+            ref ptr,
+            ref bindings,
+            ref snapshot,
+        }) = f.as_ref()
         {
             // use the captured scope snapshot for the function.
-            let mut vm = Self::with_pointer(ptr).to_scoped(snapshot);
-            for nm in bindings {
+            let mut vm = Self::with_pointer(ptr.clone()).to_scoped(snapshot.clone());
+            for nm in bindings.iter() {
                 // now put each argument on our scope stack as a binding.
                 let val = self.pop()?;
-                vm.binding_push(nm, val)?;
+                vm.binding_push(nm.clone(), val)?;
             }
             // proceed to the function body
             vm.run()?;
@@ -229,26 +251,26 @@ impl<'a> VM {
     }
 
     fn op_thunk(&mut self, idx: usize, jp: i32) -> Result<(), Error> {
-        self.push(dbg!(T(idx)))?;
+        self.push(Rc::new(dbg!(T(idx))))?;
         self.op_jump(jp)
     }
 
     fn op_equal(&mut self) -> Result<(), Error> {
         let left = self.pop()?;
         let right = self.pop()?;
-        self.push(P(Bool(left == right)))?;
+        self.push(Rc::new(P(Bool(left == right))))?;
         Ok(())
     }
 
     fn op_gt(&mut self) -> Result<(), Error> {
         let left = self.pop()?;
         let right = self.pop()?;
-        match (left, right) {
-            (P(Int(i)), P(Int(ii))) => {
-                self.push(P(Bool(i > ii)))?;
+        match (left.as_ref(), right.as_ref()) {
+            (&P(Int(i)), &P(Int(ii))) => {
+                self.push(Rc::new(P(Bool(i > ii))))?;
             }
-            (P(Float(f)), P(Float(ff))) => {
-                self.push(P(Bool(f > ff)))?;
+            (&P(Float(f)), &P(Float(ff))) => {
+                self.push(Rc::new(P(Bool(f > ff))))?;
             }
             _ => return Err(Error {}),
         }
@@ -258,12 +280,12 @@ impl<'a> VM {
     fn op_lt(&mut self) -> Result<(), Error> {
         let left = self.pop()?;
         let right = self.pop()?;
-        match (left, right) {
-            (P(Int(i)), P(Int(ii))) => {
-                self.push(P(Bool(i < ii)))?;
+        match (left.as_ref(), right.as_ref()) {
+            (&P(Int(i)), &P(Int(ii))) => {
+                self.push(Rc::new(P(Bool(i < ii))))?;
             }
-            (P(Float(f)), P(Float(ff))) => {
-                self.push(P(Bool(f < ff)))?;
+            (&P(Float(f)), &P(Float(ff))) => {
+                self.push(Rc::new(P(Bool(f < ff))))?;
             }
             _ => return Err(Error {}),
         }
@@ -273,12 +295,12 @@ impl<'a> VM {
     fn op_lteq(&mut self) -> Result<(), Error> {
         let left = self.pop()?;
         let right = self.pop()?;
-        match (left, right) {
-            (P(Int(i)), P(Int(ii))) => {
-                self.push(P(Bool(i <= ii)))?;
+        match (left.as_ref(), right.as_ref()) {
+            (&P(Int(i)), &P(Int(ii))) => {
+                self.push(Rc::new(P(Bool(i <= ii))))?;
             }
-            (P(Float(f)), P(Float(ff))) => {
-                self.push(P(Bool(f <= ff)))?;
+            (&P(Float(f)), &P(Float(ff))) => {
+                self.push(Rc::new(P(Bool(f <= ff))))?;
             }
             _ => return Err(Error {}),
         }
@@ -288,12 +310,12 @@ impl<'a> VM {
     fn op_gteq(&mut self) -> Result<(), Error> {
         let left = self.pop()?;
         let right = self.pop()?;
-        match (left, right) {
-            (P(Int(i)), P(Int(ii))) => {
-                self.push(P(Bool(i >= ii)))?;
+        match (left.as_ref(), right.as_ref()) {
+            (&P(Int(i)), &P(Int(ii))) => {
+                self.push(Rc::new(P(Bool(i >= ii))))?;
             }
-            (P(Float(f)), P(Float(ff))) => {
-                self.push(P(Bool(f >= ff)))?;
+            (&P(Float(f)), &P(Float(ff))) => {
+                self.push(Rc::new(P(Bool(f >= ff))))?;
             }
             _ => return Err(Error {}),
         }
@@ -305,7 +327,7 @@ impl<'a> VM {
         let left = self.pop()?;
         let right = self.pop()?;
         // Then pushes the result onto the stack.
-        self.push(P(self.add(left, right)?))?;
+        self.push(Rc::new(P(self.add(&left, &right)?)))?;
         Ok(())
     }
 
@@ -314,7 +336,7 @@ impl<'a> VM {
         let left = self.pop()?;
         let right = self.pop()?;
         // Then pushes the result onto the stack.
-        self.push(P(self.sub(left, right)?))?;
+        self.push(Rc::new(P(self.sub(&left, &right)?)))?;
         Ok(())
     }
 
@@ -323,7 +345,7 @@ impl<'a> VM {
         let left = self.pop()?;
         let right = self.pop()?;
         // Then pushes the result onto the stack.
-        self.push(P(self.mul(left, right)?))?;
+        self.push(Rc::new(P(self.mul(&left, &right)?)))?;
         Ok(())
     }
 
@@ -332,7 +354,7 @@ impl<'a> VM {
         let left = self.pop()?;
         let right = self.pop()?;
         // Then pushes the result onto the stack.
-        self.push(P(self.div(left, right)?))?;
+        self.push(Rc::new(P(self.div(&left, &right)?)))?;
         Ok(())
     }
 
@@ -341,8 +363,8 @@ impl<'a> VM {
         let val = dbg!(self.pop())?;
         // pop name off stack.
         let name = dbg!(self.pop())?;
-        if let S(name) = name {
-            self.binding_push(name, val)?;
+        if let &S(ref name) = name.as_ref() {
+            self.binding_push(name.clone(), val)?;
         } else {
             return Err(Error {});
         }
@@ -354,18 +376,22 @@ impl<'a> VM {
         // get value from stack
         let val = self.pop()?;
         // get name from stack.
-        let name = if let S(s) | P(Str(s)) = self.pop()? {
+        let name_val = self.pop()?;
+        let name = if let &S(ref s) | &P(Str(ref s)) = name_val.as_ref() {
             s
         } else {
             return Err(Error {});
         };
         // get composite tuple from stack
         let tpl = self.pop()?;
-        if let C(Tuple(mut flds)) = tpl {
+        if let &C(Tuple(ref flds)) = tpl.as_ref() {
             // add name and value to tuple
-            self.merge_field_into_tuple(&mut flds, name, val)?;
+            // TODO(jwall): This is probably memory inefficient and we should
+            // optimize it a bit.
+            let mut flds = flds.clone();
+            self.merge_field_into_tuple(&mut flds, name.clone(), val)?;
             // place composite tuple back on stack
-            self.push(C(Tuple(flds)))?;
+            self.push(Rc::new(C(Tuple(flds))))?;
         } else {
             return Err(Error {});
         };
@@ -377,20 +403,23 @@ impl<'a> VM {
         let val = self.pop()?;
         // get next value. It should be a Composite list.
         let tpl = self.pop()?;
-        if let C(List(mut elems)) = tpl {
+        if let &C(List(ref elems)) = tpl.as_ref() {
             // add value to list
+            // TODO(jwall): This is probably memory inefficient and we should
+            // optimize it a bit.
+            let mut elems = elems.clone();
             elems.push(val);
             // Add that value to the list and put list back on stack.
-            self.push(C(List(elems)))?;
+            self.push(Rc::new(C(List(elems))))?;
         } else {
             return Err(Error {});
         };
         Ok(())
     }
 
-    fn find_in_list(&self, index: Value, elems: Vec<Value>) -> Result<Value, Error> {
+    fn find_in_list(&self, index: &Value, elems: &Vec<Rc<Value>>) -> Result<Rc<Value>, Error> {
         let idx = match index {
-            P(Int(i)) => i,
+            P(Int(i)) => i.clone(),
             _ => return dbg!(Err(Error {})),
         };
         match elems.get(idx as usize) {
@@ -399,21 +428,21 @@ impl<'a> VM {
         }
     }
 
-    fn find_in_flds(&self, index: Value, flds: Vec<(String, Value)>) -> Result<Value, Error> {
+    fn find_in_flds(&self, index: &Value, flds: &Vec<(String, Rc<Value>)>) -> Result<Rc<Value>, Error> {
         let idx = match index {
             S(p) => p,
             P(Str(p)) => p,
             _ => return dbg!(Err(Error {})),
         };
         for f in flds.iter() {
-            if idx == f.0 {
+            if idx == &f.0 {
                 return Ok(f.1.clone());
             }
         }
         Err(Error {})
     }
 
-    fn find_in_value(&self, index: Value, target: Value) -> Result<Value, Error> {
+    fn find_in_value(&self, index: &Value, target: &Value) -> Result<Rc<Value>, Error> {
         match target {
             C(Tuple(flds)) => self.find_in_flds(index, flds),
             C(List(elements)) => self.find_in_list(index, elements),
@@ -422,17 +451,19 @@ impl<'a> VM {
     }
 
     fn op_index(&mut self) -> Result<(), Error> {
-        let path = if let C(List(elems)) = self.pop()? {
-            elems
+        let path_val = self.pop()?;
+        let path = if let &C(List(ref elems)) = path_val.as_ref() {
+            elems.clone()
         } else {
             return dbg!(Err(Error {}));
         };
-        match self.pop()? {
-            P(_) | S(_) | T(_) | F(_) | M(_) => return dbg!(Err(Error {})),
-            val => {
-                let mut out = val;
+        let target_val = self.pop()?;
+        match target_val.as_ref() {
+            &P(_) | &S(_) | &T(_) | &F(_) | &M(_) => return dbg!(Err(Error {})),
+            _ => {
+                let mut out = target_val.clone();
                 for p in path {
-                    let tgt = self.find_in_value(p, out)?;
+                    let tgt = self.find_in_value(&p, &out)?;
                     out = tgt;
                 }
                 self.push(out)?;
@@ -446,50 +477,47 @@ impl<'a> VM {
         // get next value. It should be a Module or Tuple.
         let tgt = dbg!(self.pop())?;
         // This value should always be a tuple
-        let overrides = if let C(Tuple(oflds)) = self.pop()? {
-            oflds
+        let override_val = self.pop()?;
+        let overrides = if let &C(Tuple(ref oflds)) = override_val.as_ref() {
+            oflds.clone()
         } else {
             return dbg!(Err(Error {}));
         };
-        match tgt {
-            C(Tuple(mut flds)) => {
+        match tgt.as_ref() {
+            &C(Tuple(ref flds)) => {
+                let mut flds = flds.clone();
                 for (name, val) in overrides {
                     dbg!(self.merge_field_into_tuple(&mut flds, name, val))?;
                 }
                 // Put the copy on the Stack
-                self.push(C(Tuple(flds)))?;
+                self.push(Rc::new(C(Tuple(flds))))?;
             }
-            M(Module {
-                ptr,
-                result_ptr,
-                mut flds,
+            &M(Module {
+                ref ptr,
+                ref result_ptr,
+                ref flds,
             }) => {
                 //let this = M(Module {
                 //    ptr: ptr.clone(),
                 //    result_ptr: result_ptr.clone(),
                 //    flds: flds.clone(),
                 //});
+                let mut flds = flds.clone();
                 for (name, val) in overrides {
                     self.merge_field_into_tuple(&mut flds, name, val)?;
                 }
                 // FIXME(jwall): We need to populate the pkg key for modules.
                 //self.merge_field_into_tuple(&mut flds, "this".to_owned(), this)?;
-                let mut vm = Self::with_pointer(ptr);
-                vm.push(S("mod".to_owned()))?;
-                vm.push(C(Tuple(dbg!(flds))))?;
+                let mut vm = Self::with_pointer(ptr.clone());
+                vm.push(Rc::new(S("mod".to_owned())))?;
+                vm.push(Rc::new(C(Tuple(dbg!(flds)))))?;
                 vm.run()?;
-                let mut flds = Vec::new();
                 if let Some(ptr) = dbg!(result_ptr) {
-                    vm.ops.jump(ptr)?;
+                    vm.ops.jump(ptr.clone())?;
                     vm.run()?;
                     self.push(vm.pop()?)?;
                 } else {
-                    for sym in vm.symbols.symbol_list() {
-                        if sym != "mod" {
-                            flds.push((sym.clone(), vm.symbols.get(sym).unwrap().clone()));
-                        }
-                    }
-                    self.push(dbg!(C(Tuple(flds))))?;
+                    self.push(dbg!(Rc::new(vm.symbols_to_tuple(false))))?;
                 }
             }
             _ => {
@@ -501,9 +529,9 @@ impl<'a> VM {
 
     fn merge_field_into_tuple(
         &self,
-        src_fields: &'a mut Vec<(String, Value)>,
+        src_fields: &'a mut Vec<(String, Rc<Value>)>,
         name: String,
-        value: Value,
+        value: Rc<Value>,
     ) -> Result<(), Error> {
         for fld in src_fields.iter_mut() {
             if fld.0 == name {
@@ -515,12 +543,12 @@ impl<'a> VM {
         Ok(())
     }
 
-    fn push(&mut self, p: Value) -> Result<(), Error> {
+    fn push(&mut self, p: Rc<Value>) -> Result<(), Error> {
         self.stack.push(p);
         Ok(())
     }
 
-    fn binding_push(&mut self, name: String, val: Value) -> Result<(), Error> {
+    fn binding_push(&mut self, name: String, val: Rc<Value>) -> Result<(), Error> {
         if self.symbols.is_bound(&name) {
             return Err(Error {});
         }
@@ -528,21 +556,21 @@ impl<'a> VM {
         Ok(())
     }
 
-    pub fn get_binding(&'a self, name: &str) -> Result<&Value, Error> {
+    pub fn get_binding(&'a self, name: &str) -> Result<Rc<Value>, Error> {
         match self.symbols.get(name) {
             Some(v) => Ok(v),
             None => Err(Error {}),
         }
     }
 
-    pub fn pop(&mut self) -> Result<Value, Error> {
+    pub fn pop(&mut self) -> Result<Rc<Value>, Error> {
         match self.stack.pop() {
             Some(v) => Ok(v),
             None => Err(Error {}),
         }
     }
 
-    fn mul(&self, left: Value, right: Value) -> Result<Primitive, Error> {
+    fn mul(&self, left: &Value, right: &Value) -> Result<Primitive, Error> {
         Ok(match (left, right) {
             (P(Int(i)), P(Int(ii))) => Int(i * ii),
             (P(Float(f)), P(Float(ff))) => Float(f * ff),
@@ -550,7 +578,7 @@ impl<'a> VM {
         })
     }
 
-    fn div(&self, left: Value, right: Value) -> Result<Primitive, Error> {
+    fn div(&self, left: &Value, right: &Value) -> Result<Primitive, Error> {
         Ok(match (left, right) {
             (P(Int(i)), P(Int(ii))) => Int(i / ii),
             (P(Float(f)), P(Float(ff))) => Float(f / ff),
@@ -558,7 +586,7 @@ impl<'a> VM {
         })
     }
 
-    fn sub(&self, left: Value, right: Value) -> Result<Primitive, Error> {
+    fn sub(&self, left: &Value, right: &Value) -> Result<Primitive, Error> {
         Ok(match (left, right) {
             (P(Int(i)), Value::P(Int(ii))) => Int(i - ii),
             (P(Float(f)), Value::P(Float(ff))) => Float(f - ff),
@@ -566,7 +594,7 @@ impl<'a> VM {
         })
     }
 
-    fn add(&self, left: Value, right: Value) -> Result<Primitive, Error> {
+    fn add(&self, left: &Value, right: &Value) -> Result<Primitive, Error> {
         Ok(match (left, right) {
             (P(Int(i)), Value::P(Int(ii))) => Int(i + ii),
             (P(Float(f)), Value::P(Float(ff))) => Float(f + ff),
@@ -578,5 +606,9 @@ impl<'a> VM {
             }
             _ => return Err(Error {}),
         })
+    }
+
+    fn op_runtime(&mut self, h: Hook) -> Result<(), Error> {
+        self.runtime.borrow_mut().handle(h, &mut self.stack)
     }
 }

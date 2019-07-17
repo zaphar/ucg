@@ -29,7 +29,7 @@ macro_rules! assert_cases {
         for case in $cases.drain(0..) {
             let mut vm = VM::new(Rc::new(case.0));
             vm.run().unwrap();
-            assert_eq!(dbg!(vm.pop()).unwrap(), case.1);
+            assert_eq!(dbg!(vm.pop()).unwrap(), Rc::new(case.1));
         }
     };
 
@@ -92,7 +92,7 @@ fn test_bind_op() {
         vm.run().unwrap();
         let (name, result) = case.1;
         let v = vm.get_binding(name).unwrap();
-        assert_eq!(&result, v);
+        assert_eq!(&result, v.as_ref());
     }
 }
 
@@ -100,8 +100,8 @@ fn test_bind_op() {
 fn test_list_ops() {
     assert_cases!(
         vec![InitList] => C(List(Vec::new())),
-        vec![InitList, Val(Int(1)), Element] => C(List(vec![P(Int(1))])),
-        vec![InitList, Val(Int(2)), Element, Val(Int(1)), Element] => C(List(vec![P(Int(2)), P(Int(1))])),
+        vec![InitList, Val(Int(1)), Element] => C(List(vec![Rc::new(P(Int(1)))])),
+        vec![InitList, Val(Int(2)), Element, Val(Int(1)), Element] => C(List(vec![Rc::new(P(Int(2))), Rc::new(P(Int(1)))])),
         vec![
             InitList,
             Val(Int(1)),
@@ -110,7 +110,7 @@ fn test_list_ops() {
             Val(Int(1)),
             Add,
             Element,
-        ] => C(List(vec![P(Int(1)), P(Int(2))])),
+        ] => C(List(vec![Rc::new(P(Int(1))), Rc::new(P(Int(2)))])),
     );
 }
 
@@ -118,7 +118,14 @@ fn test_list_ops() {
 fn test_tuple_ops() {
     assert_cases!(
         vec![InitTuple] => C(Tuple(Vec::new())),
-        vec![InitTuple, Val(Str("foo".to_owned())), Val(Int(1)), Field] => C(Tuple(vec![("foo".to_owned(), P(Int(1)))])),
+        vec![
+            InitTuple,
+            Val(Str("foo".to_owned())),
+            Val(Int(1)),
+            Field,
+        ] => C(Tuple(vec![
+            ("foo".to_owned(), Rc::new(P(Int(1)))),
+        ])),
         vec![
             InitTuple,
             Sym("bar".to_owned()),
@@ -128,8 +135,8 @@ fn test_tuple_ops() {
             Val(Int(1)),
             Field,
         ] => C(Tuple(vec![
-            ("bar".to_owned(), P(Str("quux".to_owned()))),
-            ("foo".to_owned(), P(Int(1))),
+            ("bar".to_owned(), Rc::new(P(Str("quux".to_owned())))),
+            ("foo".to_owned(), Rc::new(P(Int(1)))),
         ])),
         vec![
             InitTuple,
@@ -143,8 +150,8 @@ fn test_tuple_ops() {
             Val(Int(2)),
             Field,
         ] => C(Tuple(vec![
-            ("bar".to_owned(), P(Str("quux".to_owned()))),
-            ("foo".to_owned(), P(Int(2))),
+            ("bar".to_owned(), Rc::new(P(Str("quux".to_owned())))),
+            ("foo".to_owned(), Rc::new(P(Int(2)))),
         ])),
         vec![
             InitTuple,
@@ -160,8 +167,8 @@ fn test_tuple_ops() {
             Val(Int(2)),
             Field,
         ] => C(Tuple(vec![
-            ("bar".to_owned(), P(Str("quux".to_owned()))),
-            ("foo".to_owned(), P(Int(2))),
+            ("bar".to_owned(), Rc::new(P(Str("quux".to_owned())))),
+            ("foo".to_owned(), Rc::new(P(Int(2)))),
         ])),
         vec![
             InitTuple, // Override tuple
@@ -179,8 +186,8 @@ fn test_tuple_ops() {
             Field,
             Cp, // Do the tuple copy operation
         ] => C(Tuple(vec![
-            ("bar".to_owned(), P(Str("quux".to_owned()))),
-            ("foo".to_owned(), P(Int(2))),
+            ("bar".to_owned(), Rc::new(P(Str("quux".to_owned())))),
+            ("foo".to_owned(), Rc::new(P(Int(2)))),
         ])),
     );
 }
@@ -368,10 +375,10 @@ fn test_module_call() {
         ] => C(Tuple(vec![
             (
                 "foo".to_owned(),
-                C(Tuple(vec![
-                    ("one".to_owned(), P(Int(11))),
-                    ("two".to_owned(), P(Int(2))),
-                ]))
+                Rc::new(C(Tuple(vec![
+                    ("one".to_owned(), Rc::new(P(Int(11)))),
+                    ("two".to_owned(), Rc::new(P(Int(2)))),
+                ])))
             ),
         ])),
         vec![
@@ -486,12 +493,12 @@ fn test_index_operation() {
 #[test]
 fn test_scope_stacks() {
     let mut stack = Stack::new();
-    stack.add("one".to_owned(), P(Int(1)));
+    stack.add("one".to_owned(), Rc::new(P(Int(1))));
     let mut val = stack.get("one").unwrap();
-    assert_eq!(val, &P(Int(1)));
+    assert_eq!(val.as_ref(), &P(Int(1)));
     stack.push();
     assert!(stack.get("one").is_none());
     stack.to_open();
     val = stack.get("one").unwrap();
-    assert_eq!(val, &P(Int(1)));
+    assert_eq!(val.as_ref(), &P(Int(1)));
 }

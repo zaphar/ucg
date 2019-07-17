@@ -13,13 +13,14 @@
 // limitations under the License.
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter::FromIterator;
+use std::rc::Rc;
 
 use super::{Error, Value};
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Bindings {
-    Sealed(BTreeMap<String, Value>),
-    Open(BTreeMap<String, Value>),
+    Sealed(BTreeMap<String, Rc<Value>>),
+    Open(BTreeMap<String, Rc<Value>>),
 }
 use Bindings::{Open, Sealed};
 
@@ -42,14 +43,14 @@ impl Bindings {
         }
     }
 
-    pub fn get(&self, name: &str) -> Option<&Value> {
+    pub fn get(&self, name: &str) -> Option<Rc<Value>> {
         match self {
-            Open(flds) => flds.get(name),
-            Sealed(flds) => flds.get(name),
+            Open(flds) => flds.get(name).cloned(),
+            Sealed(flds) => flds.get(name).cloned(),
         }
     }
 
-    pub fn add(&mut self, name: String, val: Value) {
+    pub fn add(&mut self, name: String, val: Rc<Value>) {
         match self {
             Sealed(flds) => flds.insert(name, val),
             Open(flds) => flds.insert(name, val),
@@ -78,26 +79,17 @@ impl Stack {
         }
     }
 
-    pub fn get(&self, name: &str) -> Option<&Value> {
+    pub fn get(&self, name: &str) -> Option<Rc<Value>> {
         match &self.curr {
-            Sealed(flds) => flds.get(name),
+            Sealed(flds) => flds.get(name).cloned(),
             Open(flds) => {
                 if let Some(v) = flds.get(name) {
-                    return Some(v);
+                    return Some(v.clone());
                 } else {
                     for b in self.prev.iter() {
                         match b {
-                            Sealed(bflds) => {
-                                if let Some(v) = bflds.get(name) {
-                                    return Some(v);
-                                }
-                                return None;
-                            }
-                            Open(bflds) => {
-                                if let Some(v) = bflds.get(name) {
-                                    return Some(v);
-                                }
-                            }
+                            Sealed(bflds) => return bflds.get(name).cloned(),
+                            Open(bflds) => return bflds.get(name).cloned(),
                         }
                     }
                 }
@@ -132,7 +124,7 @@ impl Stack {
         }
     }
 
-    pub fn add(&mut self, name: String, val: Value) {
+    pub fn add(&mut self, name: String, val: Rc<Value>) {
         self.curr.add(name, val);
     }
 
