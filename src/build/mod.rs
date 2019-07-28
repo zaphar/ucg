@@ -111,7 +111,7 @@ impl AssertCollector {
             failures: String::new(),
         }
     }
-    
+
     fn record_assert_result(&mut self, msg: &str, is_success: bool) {
         if !is_success {
             let msg = format!("{} - NOT OK: {}\n", self.counter, msg);
@@ -124,7 +124,6 @@ impl AssertCollector {
         }
         self.counter += 1;
     }
-
 }
 
 /// Builder handles building ucg code for a single file.

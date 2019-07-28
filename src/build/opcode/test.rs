@@ -27,7 +27,7 @@ use super::VM;
 macro_rules! assert_cases {
     (__impl__ $cases:expr) => {
         for case in $cases.drain(0..) {
-            let mut vm = VM::new(Rc::new(case.0));
+            let mut vm = VM::new("foo.ucg", Rc::new(case.0));
             vm.run().unwrap();
             assert_eq!(dbg!(vm.pop()).unwrap(), Rc::new(case.1));
         }
@@ -88,7 +88,7 @@ fn test_bind_op() {
     )];
 
     for case in cases.drain(0..) {
-        let mut vm = VM::new(Rc::new(case.0));
+        let mut vm = VM::new("bar.ucg", Rc::new(case.0));
         vm.run().unwrap();
         let (name, result) = case.1;
         let v = vm.get_binding(name).unwrap();

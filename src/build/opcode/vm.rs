@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use std::cell::RefCell;
+use std::path::PathBuf;
 use std::rc::Rc;
 
 use super::pointer::OpPointer;
@@ -30,19 +31,21 @@ pub struct VM {
     symbols: Stack,
     runtime: Rc<RefCell<runtime::Builtins>>,
     ops: OpPointer,
+    path: PathBuf,
 }
 
 impl<'a> VM {
-    pub fn new(ops: Rc<Vec<Op>>) -> Self {
-        Self::with_pointer(OpPointer::new(ops))
+    pub fn new<P: Into<PathBuf>>(path: P, ops: Rc<Vec<Op>>) -> Self {
+        Self::with_pointer(path, OpPointer::new(ops))
     }
 
-    pub fn with_pointer(ops: OpPointer) -> Self {
+    pub fn with_pointer<P: Into<PathBuf>>(path: P, ops: OpPointer) -> Self {
         Self {
             stack: Vec::new(),
             symbols: Stack::new(),
             runtime: Rc::new(RefCell::new(runtime::Builtins::new())),
             ops: ops,
+            path: path.into(),
         }
     }
 
@@ -52,6 +55,7 @@ impl<'a> VM {
             symbols: symbols,
             runtime: self.runtime.clone(),
             ops: self.ops.clone(),
+            path: self.path.clone(),
         }
     }
 
@@ -226,26 +230,35 @@ impl<'a> VM {
         self.ops.jump(jptr)
     }
 
-    fn op_fcall(&mut self) -> Result<(), Error> {
-        let f = self.pop()?;
-        if let &F(Func {
+    pub fn fcall_impl<P: Into<PathBuf>>(
+        path: P,
+        f: &Func,
+        stack: &mut Vec<Rc<Value>>,
+    ) -> Result<Rc<Value>, Error> {
+        let Func {
             ref ptr,
             ref bindings,
             ref snapshot,
-        }) = f.as_ref()
-        {
-            // use the captured scope snapshot for the function.
-            let mut vm = Self::with_pointer(ptr.clone()).to_scoped(snapshot.clone());
-            for nm in bindings.iter() {
-                // now put each argument on our scope stack as a binding.
-                let val = self.pop()?;
-                vm.binding_push(nm.clone(), val)?;
-            }
-            // proceed to the function body
-            vm.run()?;
-            self.push(vm.pop()?)?;
-        } else {
-            return dbg!(Err(Error {}));
+        } = f;
+        // use the captured scope snapshot for the function.
+        let mut vm = Self::with_pointer(path, ptr.clone()).to_scoped(snapshot.clone());
+        for nm in bindings.iter() {
+            // now put each argument on our scope stack as a binding.
+            // TODO(jwall): This should do a better error if there is
+            // nothing on the stack.
+            let val = stack.pop().unwrap();
+            vm.binding_push(nm.clone(), val)?;
+        }
+        // proceed to the function body
+        vm.run()?;
+        return vm.pop();
+    }
+
+    fn op_fcall(&mut self) -> Result<(), Error> {
+        let f = self.pop()?;
+        if let &F(ref f) = f.as_ref() {
+            let val = Self::fcall_impl(&self.path, f, &mut self.stack)?;
+            self.push(val)?;
         }
         Ok(())
     }
@@ -428,7 +441,11 @@ impl<'a> VM {
         }
     }
 
-    fn find_in_flds(&self, index: &Value, flds: &Vec<(String, Rc<Value>)>) -> Result<Rc<Value>, Error> {
+    fn find_in_flds(
+        &self,
+        index: &Value,
+        flds: &Vec<(String, Rc<Value>)>,
+    ) -> Result<Rc<Value>, Error> {
         let idx = match index {
             S(p) => p,
             P(Str(p)) => p,
@@ -508,7 +525,7 @@ impl<'a> VM {
                 }
                 // FIXME(jwall): We need to populate the pkg key for modules.
                 //self.merge_field_into_tuple(&mut flds, "this".to_owned(), this)?;
-                let mut vm = Self::with_pointer(ptr.clone());
+                let mut vm = Self::with_pointer(self.path.clone(), ptr.clone());
                 vm.push(Rc::new(S("mod".to_owned())))?;
                 vm.push(Rc::new(C(Tuple(dbg!(flds)))))?;
                 vm.run()?;
@@ -548,7 +565,7 @@ impl<'a> VM {
         Ok(())
     }
 
-    fn binding_push(&mut self, name: String, val: Rc<Value>) -> Result<(), Error> {
+    pub fn binding_push(&mut self, name: String, val: Rc<Value>) -> Result<(), Error> {
         if self.symbols.is_bound(&name) {
             return Err(Error {});
         }
@@ -609,6 +626,8 @@ impl<'a> VM {
     }
 
     fn op_runtime(&mut self, h: Hook) -> Result<(), Error> {
-        self.runtime.borrow_mut().handle(h, &mut self.stack)
+        self.runtime
+            .borrow_mut()
+            .handle(&self.path, h, &mut self.stack)
     }
 }

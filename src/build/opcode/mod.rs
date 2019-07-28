@@ -11,14 +11,17 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use std::convert::{TryFrom, TryInto};
 use std::rc::Rc;
 
 mod cache;
+mod error;
 pub mod pointer;
 mod runtime;
 pub mod scope;
 mod vm;
 
+pub use error::Error;
 pub use vm::VM;
 
 use pointer::OpPointer;
@@ -34,11 +37,15 @@ pub enum Primitive {
     Empty,
 }
 
+use Primitive::{Bool, Empty, Float, Int, Str};
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Composite {
     List(Vec<Rc<Value>>),
     Tuple(Vec<(String, Rc<Value>)>),
 }
+
+use Composite::{List, Tuple};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Func {
@@ -69,6 +76,8 @@ pub enum Value {
     // Module
     M(Module),
 }
+
+use Value::{C, F, M, P, S, T};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Hook {
@@ -132,10 +141,101 @@ pub enum Op {
     FCall,
     // Runtime hooks
     Runtime(Hook),
+    // TODO(jwall): TRACE instruction
 }
 
-#[derive(Debug)]
-pub struct Error {}
+use super::ir::Val;
+
+impl TryFrom<Rc<Value>> for Val {
+    type Error = Error;
+
+    fn try_from(val: Rc<Value>) -> Result<Val, Self::Error> {
+        val.as_ref().try_into()
+    }
+}
+
+impl TryFrom<&Value> for Val {
+    type Error = Error;
+
+    fn try_from(val: &Value) -> Result<Val, Self::Error> {
+        Ok(match val {
+            P(Int(i)) => Val::Int(*i),
+            P(Float(f)) => Val::Float(*f),
+            P(Str(s)) => Val::Str(s.clone()),
+            P(Bool(b)) => Val::Boolean(*b),
+            P(Empty) => Val::Empty,
+            C(Tuple(fs)) => {
+                let mut flds = Vec::new();
+                for &(ref k, ref v) in fs.iter() {
+                    let v = v.clone();
+                    // TODO(jwall): The RC for a Val should no longer be required.
+                    flds.push((k.clone(), Rc::new(v.try_into()?)));
+                }
+                Val::Tuple(flds)
+            }
+            C(List(elems)) => {
+                let mut els = Vec::new();
+                for e in elems.iter() {
+                    let e = e.clone();
+                    // TODO
+                    els.push(Rc::new(e.try_into()?));
+                }
+                Val::List(els)
+            }
+            S(_) | F(_) | M(_) | T(_) => {
+                return Err(dbg!(Error {}));
+            }
+        })
+    }
+}
+
+impl TryFrom<Rc<Val>> for Value {
+    type Error = Error;
+
+    fn try_from(val: Rc<Val>) -> Result<Self, Self::Error> {
+        val.as_ref().try_into()
+    }
+}
+
+impl TryFrom<&Val> for Value {
+    type Error = Error;
+
+    fn try_from(val: &Val) -> Result<Self, Self::Error> {
+        Ok(match val {
+            Val::Int(i) => P(Int(*i)),
+            Val::Float(f) => P(Float(*f)),
+            Val::Boolean(b) => P(Bool(*b)),
+            Val::Str(s) => P(Str(s.clone())),
+            Val::Empty => P(Empty),
+            Val::List(els) => {
+                let mut lst = Vec::new();
+                for e in els.iter() {
+                    let e = e.clone();
+                    lst.push(Rc::new(e.try_into()?));
+                }
+                C(List(lst))
+            }
+            Val::Tuple(flds) => {
+                let mut field_list = Vec::new();
+                for &(ref key, ref val) in flds.iter() {
+                    let val = val.clone();
+                    field_list.push((key.clone(), Rc::new(val.try_into()?)));
+                }
+                C(Tuple(field_list))
+            }
+            Val::Env(flds) => {
+                let mut field_list = Vec::new();
+                for &(ref key, ref val) in flds.iter() {
+                    field_list.push((key.clone(), Rc::new(P(Str(val.clone())))));
+                }
+                C(Tuple(field_list))
+            }
+            // TODO(jwall): These can go away eventually when we replace the tree
+            // walking interpreter.
+            Val::Module(_) | Val::Func(_) => return Err(dbg!(Error {})),
+        })
+    }
+}
 
 #[cfg(test)]
 mod test;

@@ -12,43 +12,114 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use std::collections::BTreeMap;
+use std::convert::TryInto;
+use std::fs::File;
+use std::io::Read;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use super::cache;
+use super::Value::{P, C, F};
 use super::VM;
 use super::{Composite, Error, Hook, Primitive, Value};
 use crate::build::AssertCollector;
-use Composite::Tuple;
-use Primitive::{Bool, Str};
+use crate::convert::{ConverterRegistry, ImporterRegistry};
+use Composite::{List, Tuple};
+use Primitive::{Bool, Empty, Str};
 
 pub struct Builtins {
     op_cache: cache::Ops,
     val_cache: BTreeMap<String, Rc<Value>>,
     assert_results: AssertCollector,
+    converter_registry: ConverterRegistry,
+    importer_registry: ImporterRegistry,
+    working_dir: PathBuf,
+    import_path: Vec<PathBuf>,
     // TODO(jwall): IO sink for stderr
     // TODO(jwall): IO sink for stdout
 }
 
 impl Builtins {
     pub fn new() -> Self {
+        Self::with_working_dir(std::env::current_dir().unwrap())
+    }
+
+    pub fn with_working_dir<P: Into<PathBuf>>(path: P) -> Self {
         Self {
             op_cache: cache::Ops::new(),
             val_cache: BTreeMap::new(),
             assert_results: AssertCollector::new(),
+            converter_registry: ConverterRegistry::make_registry(),
+            importer_registry: ImporterRegistry::make_registry(),
+            // TODO(jwall): This should move into the VM and not in the Runtime.
+            working_dir: path.into(),
+            import_path: Vec::new(),
         }
     }
 
-    pub fn handle(&mut self, h: Hook, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
+    pub fn handle<P: AsRef<Path>>(
+        &mut self,
+        path: P,
+        h: Hook,
+        stack: &mut Vec<Rc<Value>>,
+    ) -> Result<(), Error> {
         match h {
             Hook::Import => self.import(stack),
             Hook::Include => self.include(stack),
             Hook::Assert => self.assert(stack),
             Hook::Convert => self.convert(stack),
-            Hook::Out => self.out(stack),
-            Hook::Map => self.map(stack),
-            Hook::Filter => self.filter(stack),
-            Hook::Reduce => self.reduce(stack),
+            Hook::Out => self.out(path, stack),
+            Hook::Map => self.map(path, stack),
+            Hook::Filter => self.filter(path, stack),
+            Hook::Reduce => self.reduce(path, stack),
         }
+    }
+
+    fn find_file<P: Into<PathBuf>>(
+        &self,
+        path: P,
+        use_import_path: bool,
+    ) -> Result<PathBuf, Error> {
+        // Try a relative path first.
+        let path = path.into();
+        let mut normalized = self.working_dir.clone();
+        if path.is_relative() {
+            normalized.push(&path);
+            // First see if the normalized file exists or not.
+            if !normalized.exists() && use_import_path {
+                // TODO(jwall): Support importing from a zip file in this
+                // import_path?
+                // If it does not then look for it in the list of import_paths
+                for mut p in self.import_path.iter().cloned() {
+                    p.push(&path);
+                    if p.exists() {
+                        normalized = p;
+                        break;
+                    }
+                }
+            }
+        } else {
+            normalized = path;
+        }
+        match normalized.canonicalize() {
+            Ok(p) => Ok(p),
+            Err(_e) => Err(dbg!(Error {})),
+        }
+    }
+
+    fn get_file_as_string(&self, path: &str) -> Result<String, Error> {
+        let sep = format!("{}", std::path::MAIN_SEPARATOR);
+        let raw_path = path.replace("/", &sep);
+        let normalized = match self.find_file(raw_path, false) {
+            Ok(p) => p,
+            Err(_e) => {
+                return Err(dbg!(Error {}));
+            }
+        };
+        let mut f = File::open(normalized).unwrap();
+        let mut contents = String::new();
+        f.read_to_string(&mut contents).unwrap();
+        Ok(contents)
     }
 
     fn import(&mut self, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
@@ -59,10 +130,10 @@ impl Builtins {
                     stack.push(self.val_cache[path].clone());
                 } else {
                     let op_pointer = self.op_cache.entry(path).get_pointer_or_else(|| {
-                        // TODO(jwall): import
+                        // FIXME(jwall): import
                         unimplemented!("Compiling paths are not implemented yet");
                     });
-                    let mut vm = VM::with_pointer(op_pointer);
+                    let mut vm = VM::with_pointer(path, op_pointer);
                     vm.run()?;
                     let result = Rc::new(vm.symbols_to_tuple(true));
                     self.val_cache.insert(path.clone(), result.clone());
@@ -77,15 +148,48 @@ impl Builtins {
     fn include(&self, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
         // TODO(jwall): include
         let path = stack.pop();
-        if let Some(val) = path {
-            if let &Value::P(Str(ref path)) = val.as_ref() {}
-            unimplemented!("TODO(jwall): Includes are not implemented yet")
+        let typ = stack.pop();
+        let path = if let Some(val) = path {
+            if let &Value::P(Str(ref path)) = val.as_ref() {
+                path.clone()
+            } else {
+                return dbg!(Err(Error {}));
+            }
+        } else {
+            return dbg!(Err(Error {}));
+        };
+        let typ = if let Some(val) = typ.as_ref() {
+            if let &Value::P(Str(ref typ)) = val.as_ref() {
+                typ.clone()
+            } else {
+                return dbg!(Err(Error {}));
+            }
+        } else {
+            return dbg!(Err(Error {}));
+        };
+        if typ == "str" {
+            stack.push(Rc::new(P(Str(self.get_file_as_string(&path)?))));
+        } else {
+            stack.push(Rc::new(match self.importer_registry.get_importer(&typ) {
+                Some(importer) => {
+                    let contents = self.get_file_as_string(&path)?;
+                    if contents.len() == 0 {
+                        eprintln!("including an empty file. Use NULL as the result");
+                        P(Empty)
+                    } else {
+                        match importer.import(contents.as_bytes()) {
+                            Ok(v) => v.try_into()?,
+                            Err(_e) => return dbg!(Err(Error {})),
+                        }
+                    }
+                }
+                None => return dbg!(Err(Error {})),
+            }));
         }
         return Err(Error {});
     }
 
     fn assert(&mut self, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
-        // TODO(jwall): assert
         let tuple = stack.pop();
         if let Some(val) = tuple.clone() {
             if let &Value::C(Tuple(ref tuple)) = val.as_ref() {
@@ -119,38 +223,177 @@ impl Builtins {
         return Ok(());
     }
 
+    fn out<P: AsRef<Path>>(&self, path: P, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
+        let val = stack.pop();
+        if let Some(val) = val {
+            let val = val.try_into()?;
+            if let Some(c_type_val) = stack.pop() {
+                if let &Value::S(ref c_type) = c_type_val.as_ref() {
+                    if let Some(c) = self.converter_registry.get_converter(c_type) {
+                        match c.convert(Rc::new(val), &mut File::create(path)?) {
+                            Ok(_) => {
+                                // noop
+                            }
+                            Err(_e) => return Err(Error {}),
+                        }
+                        return Ok(());
+                    }
+                }
+            }
+        }
+        return Err(Error {});
+    }
+
     fn convert(&self, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
-        // TODO(jwall): convert
         let val = stack.pop();
         if let Some(val) = val {
-            unimplemented!("TODO(jwall): Conversions are not implemented yet")
-        } else {
-            Err(Error {})
+            let val = val.try_into()?;
+            if let Some(c_type_val) = stack.pop() {
+                if let &Value::S(ref c_type) = c_type_val.as_ref() {
+                    if let Some(c) = self.converter_registry.get_converter(c_type) {
+                        let mut buf: Vec<u8> = Vec::new();
+                        match c.convert(Rc::new(val), &mut buf) {
+                            Ok(_) => {
+                                stack
+                                    .push(Rc::new(P(Str(
+                                        String::from_utf8_lossy(buf.as_slice()).to_string()
+                                    ))));
+                            }
+                            Err(_e) => return Err(Error {}),
+                        }
+                        return Ok(());
+                    }
+                }
+            }
         }
+        return Err(Error {});
     }
 
-    fn out(&self, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
-        // TODO(jwall): out
-        let val = stack.pop();
-        if let Some(val) = val {
-            unimplemented!("TODO(jwall): Out expressions are not implemented yet")
+    fn map<P: AsRef<Path>>(&self, path: P, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
+        // get the list from the stack
+        let list = if let Some(list) = stack.pop() {
+            list
         } else {
-            Err(Error {})
+            return dbg!(Err(Error {}));
+        };
+        let elems = if let &C(List(ref elems)) = list.as_ref() {
+            elems
+        } else {
+            return dbg!(Err(Error {}));
+        };
+
+        // get the func ptr from the stack
+        let fptr = if let Some(ptr) = stack.pop() {
+            ptr
+        } else {
+            return dbg!(Err(Error {}));
+        };
+
+        let f = if let &F(ref f) = fptr.as_ref() {
+            f
+        } else {
+            return dbg!(Err(Error {}));
+        };
+
+        let mut result_elems = Vec::new();
+        for e in elems.iter() {
+            // push function argument on the stack.
+            stack.push(e.clone());
+            // call function and push it's result on the stack.
+            result_elems.push(VM::fcall_impl(path.as_ref().to_owned(), f, stack)?);
         }
+        stack.push(Rc::new(C(List(result_elems))));
+        Ok(())
     }
 
-    fn map(&self, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
-        // TODO(jwall): map (combine these into one?)
-        unimplemented!("TODO(jwall): Map expressions are not implemented yet")
+    fn filter<P: AsRef<Path>>(&self, path: P, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
+        // get the list from the stack
+        let list = if let Some(list) = stack.pop() {
+            list
+        } else {
+            return dbg!(Err(Error {}));
+        };
+        let elems = if let &C(List(ref elems)) = list.as_ref() {
+            elems
+        } else {
+            return dbg!(Err(Error {}));
+        };
+
+        // get the func ptr from the stack
+        let fptr = if let Some(ptr) = stack.pop() {
+            ptr
+        } else {
+            return dbg!(Err(Error {}));
+        };
+
+        let f = if let &F(ref f) = fptr.as_ref() {
+            f
+        } else {
+            return dbg!(Err(Error {}));
+        };
+
+        let mut result_elems = Vec::new();
+        for e in elems.iter() {
+            // push function argument on the stack.
+            stack.push(e.clone());
+            // call function and push it's result on the stack.
+            let condition = VM::fcall_impl(path.as_ref().to_owned(), f, stack)?;
+            // Check for empty or boolean results and only push e back in
+            // if they are non empty and true
+            match condition.as_ref() {
+                &P(Empty) | &P(Bool(false)) => {
+                    continue;
+                }
+                _ => result_elems.push(e.clone()),
+            }
+        }
+        stack.push(Rc::new(C(List(result_elems))));
+        Ok(())
     }
 
-    fn filter(&self, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
-        // TODO(jwall): filter
-        unimplemented!("TODO(jwall): Filter expressions are not implemented yet")
-    }
+    fn reduce<P: AsRef<Path>>(&self, path: P, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
+        // get the list from the stack
+        let list = if let Some(list) = stack.pop() {
+            list
+        } else {
+            return dbg!(Err(Error {}));
+        };
+        let elems = if let &C(List(ref elems)) = list.as_ref() {
+            elems
+        } else {
+            return dbg!(Err(Error {}));
+        };
 
-    fn reduce(&self, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
-        // TODO(jwall): reduce
-        unimplemented!("TODO(jwall): Reduce expressions are not implemented yet")
+        // Get the accumulator from the stack
+        let mut acc = if let Some(acc) = stack.pop() {
+            acc
+        } else {
+            return dbg!(Err(Error {}));
+        };
+        // get the func ptr from the stack
+        let fptr = if let Some(ptr) = stack.pop() {
+            ptr
+        } else {
+            return dbg!(Err(Error {}));
+        };
+
+        let f = if let &F(ref f) = fptr.as_ref() {
+            f
+        } else {
+            return dbg!(Err(Error {}));
+        };
+
+        for e in elems.iter() {
+            // push function arguments on the stack.
+            stack.push(e.clone());
+            stack.push(acc.clone());
+            // call function and push it's result on the stack.
+            acc = VM::fcall_impl(path.as_ref().to_owned(), f, stack)?;
+            // Check for empty or boolean results and only push e back in
+            // if they are non empty and true
+        }
+        // push the acc on the stack as our result
+        stack.push(acc);
+        Ok(())
     }
 }
