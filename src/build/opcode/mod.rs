@@ -19,6 +19,7 @@ mod error;
 pub mod pointer;
 mod runtime;
 pub mod scope;
+mod translate;
 mod vm;
 
 pub use error::Error;

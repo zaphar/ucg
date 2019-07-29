@@ -31,6 +31,7 @@ pub struct VM {
     symbols: Stack,
     runtime: Rc<RefCell<runtime::Builtins>>,
     ops: OpPointer,
+    // TODO(jwall): This should be optional
     path: PathBuf,
 }
 

@@ -20,7 +20,7 @@ use super::Op::{
     InitThunk, InitTuple, Jump, JumpIfFalse, JumpIfTrue, Module, Mul, Noop, Pop, Return,
     SelectJump, Sub, Sym, Val,
 };
-use super::Primitive::{Bool, Float, Int, Str};
+use super::Primitive::{Bool, Float, Int, Str, Empty};
 use super::Value::{C, P};
 use super::VM;
 
@@ -45,7 +45,7 @@ macro_rules! assert_cases {
 }
 
 #[test]
-fn test_math_ops() {
+fn math_ops() {
     assert_cases!(
         // 1+1;
         vec![Val(Int(1)), Val(Int(1)), Add] => P(Int(2)),
@@ -79,7 +79,7 @@ fn test_math_ops() {
 }
 
 #[test]
-fn test_bind_op() {
+fn bind_op() {
     let mut cases = vec![(
         vec![Sym("foo".to_owned()), Val(Int(1)), Bind],
         ("foo", P(Int(1))),
@@ -97,7 +97,7 @@ fn test_bind_op() {
 }
 
 #[test]
-fn test_list_ops() {
+fn list_ops() {
     assert_cases!(
         vec![InitList] => C(List(Vec::new())),
         vec![InitList, Val(Int(1)), Element] => C(List(vec![Rc::new(P(Int(1)))])),
@@ -115,7 +115,7 @@ fn test_list_ops() {
 }
 
 #[test]
-fn test_tuple_ops() {
+fn tuple_ops() {
     assert_cases!(
         vec![InitTuple] => C(Tuple(Vec::new())),
         vec![
@@ -193,14 +193,14 @@ fn test_tuple_ops() {
 }
 
 #[test]
-fn test_jump_ops() {
+fn jump_ops() {
     assert_cases!(
         vec![Jump(1), Val(Int(1)), Noop, Val(Int(1))] => P(Int(1)),
     );
 }
 
 #[test]
-fn test_equality_ops() {
+fn equality_ops() {
     assert_cases![
         vec![
             Val(Str("foo".to_owned())),
@@ -261,7 +261,7 @@ fn test_equality_ops() {
 }
 
 #[test]
-fn test_conditional_jump_ops() {
+fn conditional_jump_ops() {
     assert_cases![
         vec![
             Val(Bool(false)),
@@ -311,7 +311,7 @@ fn test_conditional_jump_ops() {
 }
 
 #[test]
-fn test_function_definition_and_call() {
+fn function_definition_and_call() {
     assert_cases![
         vec![
             Sym("f".to_owned()),     // 0
@@ -348,7 +348,7 @@ fn test_function_definition_and_call() {
 }
 
 #[test]
-fn test_module_call() {
+fn module_call() {
     assert_cases![
         vec![
             InitTuple,               // 0 // override tuple
@@ -411,7 +411,7 @@ fn test_module_call() {
 }
 
 #[test]
-fn test_select_short_circuit() {
+fn select_short_circuit() {
     assert_cases![
         vec![
             Sym("field".to_owned()),              // 0 // search field
@@ -443,7 +443,7 @@ fn test_select_short_circuit() {
 }
 
 #[test]
-fn test_index_operation() {
+fn index_operation() {
     assert_cases![
         vec![
             InitTuple,
@@ -491,7 +491,7 @@ fn test_index_operation() {
 }
 
 #[test]
-fn test_scope_stacks() {
+fn scope_stacks() {
     let mut stack = Stack::new();
     stack.add("one".to_owned(), Rc::new(P(Int(1))));
     let mut val = stack.get("one").unwrap();
@@ -501,4 +501,41 @@ fn test_scope_stacks() {
     stack.to_open();
     val = stack.get("one").unwrap();
     assert_eq!(val.as_ref(), &P(Int(1)));
+}
+
+use crate::ast::{Expression, Statement, Value as ASTValue, PositionedItem, Position};
+use super::translate;
+use crate::parse::parse;
+use crate::iter::OffsetStrIter;
+
+macro_rules! assert_parse_cases {
+    (__impl__ $cases:expr) => {
+        for case in $cases.drain(0..) {
+            let stmts = parse(OffsetStrIter::from(case.0), None).unwrap();
+            let ops = Rc::new(translate::AST::translate(stmts));
+            assert!(ops.len() > 0);
+            let mut vm = VM::new("foo.ucg", ops.clone());
+            vm.run().unwrap();
+            assert_eq!(dbg!(vm.pop()).unwrap(), Rc::new(case.1));
+        }
+    };
+
+    ( ($input:expr, $result:expr), $( $tok:tt )* ) => {
+        assert_parse_cases!(__impl__ vec![($input, $result), $($tok)*])
+    };
+
+    ( $( $input:expr => $result:expr, )* ) => {
+        assert_parse_cases!($(($input, $result),)*)
+    }
+}
+
+#[test]
+fn simple_expr_scalar_value() {
+    assert_parse_cases!(
+        "1;" => P(Int(1)),
+        "1.0;" => P(Float(1.0)),
+        "true;" => P(Bool(true)),
+        "NULL;" => P(Empty),
+        "\"foo\";" => P(Str("foo".to_owned())),
+    )
 }
