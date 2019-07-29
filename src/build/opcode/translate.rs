@@ -95,13 +95,13 @@ impl AST {
                     }
                 };
             }
+            Expression::Grouped(expr, _) => {
+                Self::translate_expr(*expr, &mut ops);
+            }
             Expression::Fail(_) => unimplemented!("Fail expressions are not implmented yet"),
             Expression::Format(_) => unimplemented!("Format expressions are not implmented yet"),
             Expression::Func(_) => unimplemented!("Func expressions are not implmented yet"),
             Expression::FuncOp(_) => unimplemented!("FuncOp expressions are not implmented yet"),
-            Expression::Grouped(_, _) => {
-                unimplemented!("Grouped expressions are not implmented yet")
-            }
             Expression::Import(_) => unimplemented!("Import expressions are not implmented yet"),
             Expression::Include(_) => unimplemented!("Include expressions are not implmented yet"),
             Expression::Module(_) => unimplemented!("Module expressions are not implmented yet"),

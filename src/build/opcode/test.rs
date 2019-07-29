@@ -533,6 +533,7 @@ macro_rules! assert_parse_cases {
 fn simple_expr_scalar_value() {
     assert_parse_cases!(
         "1;" => P(Int(1)),
+        "(1);" => P(Int(1)),
         "1.0;" => P(Float(1.0)),
         "true;" => P(Bool(true)),
         "NULL;" => P(Empty),
