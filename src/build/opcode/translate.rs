@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use crate::ast::{Expression, Statement, Value};
+use crate::ast::{BinaryExprType, Expression, Statement, Value};
 use crate::build::opcode::Op;
 use crate::build::opcode::Primitive;
 use crate::build::opcode::Value::{C, F, M, P, T};
@@ -40,9 +40,60 @@ impl AST {
     }
 
     fn translate_expr(expr: Expression, mut ops: &mut Vec<Op>) {
-        match expr {
+        match dbg!(expr) {
             Expression::Simple(v) => {
                 Self::translate_value(v, &mut ops);
+            }
+            Expression::Binary(def) => {
+                Self::translate_expr(*def.right, &mut ops);
+                Self::translate_expr(*def.left, &mut ops);
+                match def.kind {
+                    BinaryExprType::Add => {
+                        ops.push(Op::Add);
+                    }
+                    BinaryExprType::Sub => {
+                        ops.push(Op::Sub);
+                    }
+                    BinaryExprType::Div => {
+                        ops.push(Op::Div);
+                    }
+                    BinaryExprType::Mul => {
+                        ops.push(Op::Mul);
+                    }
+                    BinaryExprType::Equal => {
+                        ops.push(Op::Equal);
+                    }
+                    BinaryExprType::GT => {
+                        ops.push(Op::Gt);
+                    }
+                    BinaryExprType::LT => {
+                        ops.push(Op::Lt);
+                    }
+                    BinaryExprType::GTEqual => {
+                        // An Equal and an And
+                        //ops.push(Op::GtEqual);
+                        unimplemented!("Binary expressions are not implmented yet")
+                    }
+                    BinaryExprType::LTEqual => {
+                        //ops.push(Op::LtEqual);
+                        unimplemented!("Binary expressions are not implmented yet")
+                    }
+                    BinaryExprType::NotEqual => {
+                        ops.push(Op::Not);
+                        ops.push(Op::Equal);
+                    }
+                    BinaryExprType::REMatch
+                    | BinaryExprType::NotREMatch
+                    | BinaryExprType::IN
+                    | BinaryExprType::IS
+                    | BinaryExprType::Mod
+                    | BinaryExprType::OR
+                    | BinaryExprType::AND
+                    | BinaryExprType::DOT => {
+                        unimplemented!("Binary expressions are not implmented yet")
+                        // TODO
+                    }
+                };
             }
             Expression::Fail(_) => unimplemented!("Fail expressions are not implmented yet"),
             Expression::Format(_) => unimplemented!("Format expressions are not implmented yet"),
@@ -57,7 +108,6 @@ impl AST {
             Expression::Not(_) => unimplemented!("Not expressions are not implmented yet"),
             Expression::Range(_) => unimplemented!("Range expressions are not implmented yet"),
             Expression::Select(_) => unimplemented!("Select expressions are not implmented yet"),
-            Expression::Binary(_) => unimplemented!("Binary expressions are not implmented yet"),
             Expression::Call(_) => unimplemented!("Call expressions are not implmented yet"),
             Expression::Copy(_) => unimplemented!("Copy expressions are not implmented yet"),
             Expression::Debug(_) => unimplemented!("Debug expressions are not implmented yet"),
@@ -65,7 +115,7 @@ impl AST {
     }
 
     fn translate_value(value: Value, ops: &mut Vec<Op>) {
-        match value {
+        match dbg!(value) {
             Value::Int(i) => ops.push(Op::Val(Primitive::Int(i.val))),
             Value::Float(f) => ops.push(Op::Val(Primitive::Float(f.val))),
             Value::Str(s) => ops.push(Op::Val(Primitive::Str(s.val))),

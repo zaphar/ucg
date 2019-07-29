@@ -108,6 +108,8 @@ pub enum Op {
     Lt,
     GtEq,
     LtEq,
+    // Not,
+    Not,
     // Primitive Types ops
     Val(Primitive),
     // A bareword for use in bindings or lookups

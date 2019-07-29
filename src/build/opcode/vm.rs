@@ -88,6 +88,7 @@ impl<'a> VM {
                 Op::Div => self.op_div()?,
                 Op::Bind => self.op_bind()?,
                 Op::Equal => self.op_equal()?,
+                Op::Not => self.op_not()?,
                 Op::Gt => self.op_gt()?,
                 Op::Lt => self.op_lt()?,
                 Op::GtEq => self.op_gteq()?,
@@ -269,6 +270,15 @@ impl<'a> VM {
         self.op_jump(jp)
     }
 
+    fn op_not(&mut self) -> Result<(), Error> {
+        let operand = self.pop()?;
+        if let P(Bool(val)) = operand.as_ref() {
+            self.push(Rc::new(P(Bool(!val))))?;
+            return Ok(());
+        }
+        return Err(dbg!(Error {}));
+    }
+    
     fn op_equal(&mut self) -> Result<(), Error> {
         let left = self.pop()?;
         let right = self.pop()?;

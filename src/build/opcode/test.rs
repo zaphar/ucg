@@ -20,7 +20,7 @@ use super::Op::{
     InitThunk, InitTuple, Jump, JumpIfFalse, JumpIfTrue, Module, Mul, Noop, Pop, Return,
     SelectJump, Sub, Sym, Val,
 };
-use super::Primitive::{Bool, Float, Int, Str, Empty};
+use super::Primitive::{Bool, Empty, Float, Int, Str};
 use super::Value::{C, P};
 use super::VM;
 
@@ -503,10 +503,10 @@ fn scope_stacks() {
     assert_eq!(val.as_ref(), &P(Int(1)));
 }
 
-use crate::ast::{Expression, Statement, Value as ASTValue, PositionedItem, Position};
 use super::translate;
-use crate::parse::parse;
+use crate::ast::{Expression, Position, PositionedItem, Statement, Value as ASTValue};
 use crate::iter::OffsetStrIter;
+use crate::parse::parse;
 
 macro_rules! assert_parse_cases {
     (__impl__ $cases:expr) => {
@@ -537,5 +537,18 @@ fn simple_expr_scalar_value() {
         "true;" => P(Bool(true)),
         "NULL;" => P(Empty),
         "\"foo\";" => P(Str("foo".to_owned())),
+    )
+}
+
+#[test]
+fn simple_binary_expr() {
+    assert_parse_cases!(
+        "1+1;" => P(Int(2)),
+        "2-1;" => P(Int(1)),
+        "2*2;" => P(Int(4)),
+        "6/2;" => P(Int(3)),
+        "1.0+1.0;" => P(Float(2.0)),
+        "\"foo\"+\"bar\";" => P(Str("foobar".to_owned())),
+        //"true && false;" => P(Bool(false)),
     )
 }
