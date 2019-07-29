@@ -105,7 +105,10 @@ impl AST {
             Expression::Import(_) => unimplemented!("Import expressions are not implmented yet"),
             Expression::Include(_) => unimplemented!("Include expressions are not implmented yet"),
             Expression::Module(_) => unimplemented!("Module expressions are not implmented yet"),
-            Expression::Not(_) => unimplemented!("Not expressions are not implmented yet"),
+            Expression::Not(def) => {
+                Self::translate_expr(*def.expr, &mut ops);
+                ops.push(Op::Not);
+            }
             Expression::Range(_) => unimplemented!("Range expressions are not implmented yet"),
             Expression::Select(_) => unimplemented!("Select expressions are not implmented yet"),
             Expression::Call(_) => unimplemented!("Call expressions are not implmented yet"),

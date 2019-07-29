@@ -559,3 +559,11 @@ fn simple_binary_expr() {
         //"true && false;" => P(Bool(false)),
     )
 }
+
+#[test]
+fn simple_not_expr() {
+    assert_parse_cases!(
+        "not 1==1;" => P(Bool(false)),
+        "not 1!=1;" => P(Bool(true)),
+    )
+}
