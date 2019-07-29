@@ -79,8 +79,8 @@ impl AST {
                         unimplemented!("Binary expressions are not implmented yet")
                     }
                     BinaryExprType::NotEqual => {
-                        ops.push(Op::Not);
                         ops.push(Op::Equal);
+                        ops.push(Op::Not);
                     }
                     BinaryExprType::REMatch
                     | BinaryExprType::NotREMatch

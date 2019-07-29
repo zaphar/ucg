@@ -550,6 +550,12 @@ fn simple_binary_expr() {
         "6/2;" => P(Int(3)),
         "1.0+1.0;" => P(Float(2.0)),
         "\"foo\"+\"bar\";" => P(Str("foobar".to_owned())),
+        "1==1;" => P(Bool(true)),
+        "1>1;" => P(Bool(false)),
+        "1<1;" => P(Bool(false)),
+        "2>1;" => P(Bool(true)),
+        "2<1;" => P(Bool(false)),
+        "1!=1;" => P(Bool(false)),
         //"true && false;" => P(Bool(false)),
     )
 }
