@@ -18,8 +18,10 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
+use regex::Regex;
+
 use super::cache;
-use super::Value::{P, C, F};
+use super::Value::{C, F, P};
 use super::VM;
 use super::{Composite, Error, Hook, Primitive, Value};
 use crate::build::AssertCollector;
@@ -72,6 +74,7 @@ impl Builtins {
             Hook::Map => self.map(path, stack),
             Hook::Filter => self.filter(path, stack),
             Hook::Reduce => self.reduce(path, stack),
+            Hook::Regex => self.regex(stack),
         }
     }
 
@@ -348,6 +351,35 @@ impl Builtins {
             }
         }
         stack.push(Rc::new(C(List(result_elems))));
+        Ok(())
+    }
+
+    fn regex(&self, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
+        // 1. get left side (string)
+        let left_str = if let Some(val) = stack.pop() {
+            if let &P(Str(ref s)) = val.as_ref() {
+                s.clone()
+            } else {
+                return dbg!(Err(Error {}));
+            }
+        } else {
+            return dbg!(Err(Error {}));
+        };
+
+        // 2. get right side (string)
+        let right_str = if let Some(val) = stack.pop() {
+            if let &P(Str(ref s)) = val.as_ref() {
+                s.clone()
+            } else {
+                return dbg!(Err(Error {}));
+            }
+        } else {
+            return dbg!(Err(Error {}));
+        };
+
+        // 3. compare via regex
+        let rex = Regex::new(&right_str)?;
+        stack.push(Rc::new(P(Bool(rex.find(&left_str).is_some()))));
         Ok(())
     }
 

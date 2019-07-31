@@ -90,6 +90,7 @@ pub enum Hook {
     Out,
     Assert,
     Convert,
+    Regex,
 }
 
 #[derive(Debug, PartialEq, Clone)]

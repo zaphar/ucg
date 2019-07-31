@@ -278,7 +278,7 @@ impl<'a> VM {
         }
         return Err(dbg!(Error {}));
     }
-    
+
     fn op_equal(&mut self) -> Result<(), Error> {
         let left = self.pop()?;
         let right = self.pop()?;

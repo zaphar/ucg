@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use crate::ast::{BinaryExprType, Expression, Statement, Value};
-use crate::build::opcode::Op;
 use crate::build::opcode::Primitive;
 use crate::build::opcode::Value::{C, F, M, P, T};
+use crate::build::opcode::{Hook, Op};
 
 pub struct AST();
 
@@ -82,9 +82,14 @@ impl AST {
                         ops.push(Op::Equal);
                         ops.push(Op::Not);
                     }
-                    BinaryExprType::REMatch
-                    | BinaryExprType::NotREMatch
-                    | BinaryExprType::IN
+                    BinaryExprType::REMatch => {
+                        ops.push(Op::Runtime(Hook::Regex));
+                    }
+                    BinaryExprType::NotREMatch => {
+                        ops.push(Op::Runtime(Hook::Regex));
+                        ops.push(Op::Not);
+                    }
+                    BinaryExprType::IN
                     | BinaryExprType::IS
                     | BinaryExprType::Mod
                     | BinaryExprType::OR

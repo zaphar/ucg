@@ -556,6 +556,7 @@ fn simple_binary_expr() {
         "2>1;" => P(Bool(true)),
         "2<1;" => P(Bool(false)),
         "1!=1;" => P(Bool(false)),
+        "\"foo\" ~ \"bar\";" => P(Bool(false)),
         //"true && false;" => P(Bool(false)),
     )
 }
