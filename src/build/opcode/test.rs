@@ -18,7 +18,7 @@ use super::Composite::{List, Tuple};
 use super::Op::{
     Add, Bang, Bind, Cp, DeRef, Div, Element, Equal, FCall, Field, Func, Index, InitList,
     InitThunk, InitTuple, Jump, JumpIfFalse, JumpIfTrue, Module, Mul, Noop, Pop, Return,
-    SelectJump, Sub, Sym, Val,
+    SelectJump, Sub, Sym, Typ, Val,
 };
 use super::Primitive::{Bool, Empty, Float, Int, Str};
 use super::Value::{C, P};
@@ -491,6 +491,46 @@ fn index_operation() {
 }
 
 #[test]
+fn type_comparisons() {
+    assert_cases![
+        vec![
+            Val(Str("foo".to_owned())),
+            Typ,
+        ] => P(Str("str".to_owned())),
+        vec![
+            Val(Int(1)),
+            Typ,
+        ] => P(Str("int".to_owned())),
+        vec![
+            Val(Float(1.0)),
+            Typ,
+        ] => P(Str("float".to_owned())),
+        vec![
+            Val(Bool(true)),
+            Typ,
+        ] => P(Str("bool".to_owned())),
+        vec![
+            Val(Empty),
+            Typ,
+        ] => P(Str("null".to_owned())),
+        vec![
+            InitTuple,
+            Typ,
+        ] => P(Str("tuple".to_owned())),
+        vec![
+            InitList,
+            Typ,
+        ] => P(Str("list".to_owned())),
+        vec![
+            Val(Str("str".to_owned())),
+            Val(Str("foo".to_owned())),
+            Typ,
+            Equal,
+        ] => P(Bool(true)),
+    ];
+}
+
+#[test]
 fn scope_stacks() {
     let mut stack = Stack::new();
     stack.add("one".to_owned(), Rc::new(P(Int(1))));
@@ -557,6 +597,7 @@ fn simple_binary_expr() {
         "2<1;" => P(Bool(false)),
         "1!=1;" => P(Bool(false)),
         "\"foo\" ~ \"bar\";" => P(Bool(false)),
+        "\"foo\" is \"str\";" => P(Bool(true)),
         //"true && false;" => P(Bool(false)),
     )
 }

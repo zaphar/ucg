@@ -22,7 +22,7 @@ use super::{Error, Op, Primitive, Value};
 
 use super::Composite::{List, Tuple};
 use super::Hook;
-use super::Primitive::{Bool, Float, Int, Str};
+use super::Primitive::{Bool, Empty, Float, Int, Str};
 use super::Value::{C, F, M, P, S, T};
 use super::{Func, Module};
 
@@ -118,9 +118,31 @@ impl<'a> VM {
                 Op::Pop => {
                     self.pop()?;
                 }
+                Op::Typ => self.op_typ()?,
                 Op::Runtime(h) => self.op_runtime(h)?,
             };
         }
+        Ok(())
+    }
+
+    fn op_typ(&mut self) -> Result<(), Error> {
+        let val = dbg!(self.pop())?;
+        let typ_name = match val.as_ref() {
+            P(Int(_)) => "int",
+            P(Float(_)) => "float",
+            P(Bool(_)) => "bool",
+            P(Str(_)) => "str",
+            P(Empty) => "null",
+            C(Tuple(_)) => "tuple",
+            C(List(_)) => "list",
+            F(_) => "func",
+            M(_) => "module",
+            S(_) | T(_) => {
+                return Err(dbg!(Error {}));
+            }
+        }
+        .to_owned();
+        self.push(Rc::new(P(Str(typ_name))))?;
         Ok(())
     }
 

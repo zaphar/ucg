@@ -143,6 +143,8 @@ pub enum Op {
     Return,
     // Calls
     FCall,
+    // TypeSystem
+    Typ,
     // Runtime hooks
     Runtime(Hook),
     // TODO(jwall): TRACE instruction

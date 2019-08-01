@@ -89,8 +89,11 @@ impl AST {
                         ops.push(Op::Runtime(Hook::Regex));
                         ops.push(Op::Not);
                     }
+                    BinaryExprType::IS => {
+                        ops.push(Op::Typ);
+                        ops.push(Op::Equal);
+                    }
                     BinaryExprType::IN
-                    | BinaryExprType::IS
                     | BinaryExprType::Mod
                     | BinaryExprType::OR
                     | BinaryExprType::AND
