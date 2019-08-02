@@ -551,7 +551,7 @@ use crate::parse::parse;
 macro_rules! assert_parse_cases {
     (__impl__ $cases:expr) => {
         for case in $cases.drain(0..) {
-            let stmts = parse(OffsetStrIter::from(case.0), None).unwrap();
+            let stmts = parse(OffsetStrIter::from(dbg!(case.0)), None).unwrap();
             let ops = Rc::new(translate::AST::translate(stmts));
             assert!(ops.len() > 0);
             let mut vm = VM::new("foo.ucg", ops.clone());
@@ -597,8 +597,16 @@ fn simple_binary_expr() {
         "2<1;" => P(Bool(false)),
         "1!=1;" => P(Bool(false)),
         "\"foo\" ~ \"bar\";" => P(Bool(false)),
+        "\"foo\" !~ \"bar\";" => P(Bool(true)),
         "\"foo\" is \"str\";" => P(Bool(true)),
-        //"true && false;" => P(Bool(false)),
+        "true && true;" => P(Bool(true)),
+        "true && false;" => P(Bool(false)),
+        "false && false;" => P(Bool(false)),
+        "false && true;" => P(Bool(false)),
+        "false || false;" => P(Bool(false)),
+        "true || false;" => P(Bool(true)),
+        "false || true;" => P(Bool(true)),
+        "true || true;" => P(Bool(true)),
     )
 }
 

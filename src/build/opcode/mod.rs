@@ -130,9 +130,8 @@ pub enum Op {
     JumpIfTrue(i32),
     JumpIfFalse(i32),
     SelectJump(i32),
-    // FIXME(jwall): Short circuiting operations
-    // - And(usize)
-    // - Or(usize)
+    And(i32),
+    Or(i32),
     // Spacer operation, Does nothing.
     Index, // indexing operation
     Noop,

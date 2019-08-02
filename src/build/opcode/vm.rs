@@ -72,15 +72,15 @@ impl<'a> VM {
 
     pub fn run(&mut self) -> Result<(), Error> {
         loop {
-            let op = if let Some(op) = dbg!(self.ops.next()) {
+            let op = if let Some(op) = self.ops.next() {
                 op.clone()
             } else {
                 break;
             };
             let idx = self.ops.idx()?;
             match op {
-                Op::Val(p) => self.push(Rc::new(dbg!(P(p.clone()))))?,
-                Op::Sym(s) => self.push(Rc::new(dbg!(S(s.clone()))))?,
+                Op::Val(p) => self.push(Rc::new(P(p.clone())))?,
+                Op::Sym(s) => self.push(Rc::new(S(s.clone())))?,
                 Op::DeRef(s) => self.op_deref(s.clone())?,
                 Op::Add => self.op_add()?,
                 Op::Sub => self.op_sub()?,
@@ -111,6 +111,8 @@ impl<'a> VM {
                 Op::JumpIfTrue(jp) => self.op_jump_if_true(jp)?,
                 Op::JumpIfFalse(jp) => self.op_jump_if_false(jp)?,
                 Op::SelectJump(jp) => self.op_select_jump(jp)?,
+                Op::And(jp) => self.op_and(jp)?,
+                Op::Or(jp) => self.op_or(jp)?,
                 Op::Module(mptr) => self.op_module(idx, mptr)?,
                 Op::Func(jptr) => self.op_func(idx, jptr)?,
                 Op::FCall => self.op_fcall()?,
@@ -126,7 +128,7 @@ impl<'a> VM {
     }
 
     fn op_typ(&mut self) -> Result<(), Error> {
-        let val = dbg!(self.pop())?;
+        let val = self.pop()?;
         let typ_name = match val.as_ref() {
             P(Int(_)) => "int",
             P(Float(_)) => "float",
@@ -147,7 +149,7 @@ impl<'a> VM {
     }
 
     fn op_deref(&mut self, name: String) -> Result<(), Error> {
-        let val = dbg!(self.get_binding(&name)?.clone());
+        let val = self.get_binding(&name)?.clone();
         self.push(val)
     }
 
@@ -161,12 +163,40 @@ impl<'a> VM {
         Ok(())
     }
 
+    fn op_and(&mut self, jp: i32) -> Result<(), Error> {
+        let cond = self.pop()?;
+        let cc = cond.clone();
+        if let &P(Bool(cond)) = cond.as_ref() {
+            if !cond {
+                self.push(cc)?;
+                self.op_jump(jp)?;
+            }
+        } else {
+            return Err(dbg!(Error {}));
+        }
+        Ok(())
+    }
+
+    fn op_or(&mut self, jp: i32) -> Result<(), Error> {
+        let cond = self.pop()?;
+        let cc = cond.clone();
+        if let &P(Bool(cond)) = cond.as_ref() {
+            if cond {
+                self.push(cc)?;
+                self.op_jump(jp)?;
+            }
+        }
+        Ok(())
+    }
+
     fn op_jump_if_true(&mut self, jp: i32) -> Result<(), Error> {
         let cond = self.pop()?;
         if let &P(Bool(cond)) = cond.as_ref() {
             if cond {
                 self.op_jump(jp)?;
             }
+        } else {
+            return Err(dbg!(Error {}));
         }
         Ok(())
     }
@@ -175,7 +205,7 @@ impl<'a> VM {
         let cond = self.pop()?;
         if let &P(Bool(cond)) = cond.as_ref() {
             if !cond {
-                self.op_jump(jp)?;
+                self.op_jump(dbg!(jp))?;
             }
         }
         Ok(())
@@ -318,7 +348,7 @@ impl<'a> VM {
             (&P(Float(f)), &P(Float(ff))) => {
                 self.push(Rc::new(P(Bool(f > ff))))?;
             }
-            _ => return Err(Error {}),
+            _ => return Err(dbg!(Error {})),
         }
         Ok(())
     }
@@ -333,7 +363,7 @@ impl<'a> VM {
             (&P(Float(f)), &P(Float(ff))) => {
                 self.push(Rc::new(P(Bool(f < ff))))?;
             }
-            _ => return Err(Error {}),
+            _ => return Err(dbg!(Error {})),
         }
         Ok(())
     }
@@ -348,7 +378,7 @@ impl<'a> VM {
             (&P(Float(f)), &P(Float(ff))) => {
                 self.push(Rc::new(P(Bool(f <= ff))))?;
             }
-            _ => return Err(Error {}),
+            _ => return Err(dbg!(Error {})),
         }
         Ok(())
     }
@@ -363,7 +393,7 @@ impl<'a> VM {
             (&P(Float(f)), &P(Float(ff))) => {
                 self.push(Rc::new(P(Bool(f >= ff))))?;
             }
-            _ => return Err(Error {}),
+            _ => return Err(dbg!(Error {})),
         }
         Ok(())
     }
@@ -412,7 +442,7 @@ impl<'a> VM {
         if let &S(ref name) = name.as_ref() {
             self.binding_push(name.clone(), val)?;
         } else {
-            return Err(Error {});
+            return Err(dbg!(Error {}));
         }
         Ok(())
     }
@@ -426,7 +456,7 @@ impl<'a> VM {
         let name = if let &S(ref s) | &P(Str(ref s)) = name_val.as_ref() {
             s
         } else {
-            return Err(Error {});
+            return Err(dbg!(Error {}));
         };
         // get composite tuple from stack
         let tpl = self.pop()?;
@@ -439,7 +469,7 @@ impl<'a> VM {
             // place composite tuple back on stack
             self.push(Rc::new(C(Tuple(flds))))?;
         } else {
-            return Err(Error {});
+            return Err(dbg!(Error {}));
         };
         Ok(())
     }
@@ -458,7 +488,7 @@ impl<'a> VM {
             // Add that value to the list and put list back on stack.
             self.push(Rc::new(C(List(elems))))?;
         } else {
-            return Err(Error {});
+            return Err(dbg!(Error {}));
         };
         Ok(())
     }
@@ -470,7 +500,7 @@ impl<'a> VM {
         };
         match elems.get(idx as usize) {
             Some(v) => Ok(v.clone()),
-            None => Err(Error {}),
+            None => Err(dbg!(Error {})),
         }
     }
 
@@ -489,14 +519,14 @@ impl<'a> VM {
                 return Ok(f.1.clone());
             }
         }
-        Err(Error {})
+        Err(dbg!(Error {}))
     }
 
     fn find_in_value(&self, index: &Value, target: &Value) -> Result<Rc<Value>, Error> {
         match target {
             C(Tuple(flds)) => self.find_in_flds(index, flds),
             C(List(elements)) => self.find_in_list(index, elements),
-            _ => return Err(Error {}),
+            _ => return Err(dbg!(Error {})),
         }
     }
 
@@ -505,11 +535,11 @@ impl<'a> VM {
         let path = if let &C(List(ref elems)) = path_val.as_ref() {
             elems.clone()
         } else {
-            return dbg!(Err(Error {}));
+            return Err(dbg!(Error {}));
         };
         let target_val = self.pop()?;
         match target_val.as_ref() {
-            &P(_) | &S(_) | &T(_) | &F(_) | &M(_) => return dbg!(Err(Error {})),
+            &P(_) | &S(_) | &T(_) | &F(_) | &M(_) => return Err(dbg!(Error {})),
             _ => {
                 let mut out = target_val.clone();
                 for p in path {
@@ -531,7 +561,7 @@ impl<'a> VM {
         let overrides = if let &C(Tuple(ref oflds)) = override_val.as_ref() {
             oflds.clone()
         } else {
-            return dbg!(Err(Error {}));
+            return Err(dbg!(Error {}));
         };
         match tgt.as_ref() {
             &C(Tuple(ref flds)) => {
@@ -571,7 +601,7 @@ impl<'a> VM {
                 }
             }
             _ => {
-                return Err(Error {});
+                return Err(dbg!(Error {}));
             }
         }
         Ok(())
@@ -600,7 +630,7 @@ impl<'a> VM {
 
     pub fn binding_push(&mut self, name: String, val: Rc<Value>) -> Result<(), Error> {
         if self.symbols.is_bound(&name) {
-            return Err(Error {});
+            return Err(dbg!(Error {}));
         }
         self.symbols.add(name, val);
         Ok(())
@@ -609,14 +639,14 @@ impl<'a> VM {
     pub fn get_binding(&'a self, name: &str) -> Result<Rc<Value>, Error> {
         match self.symbols.get(name) {
             Some(v) => Ok(v),
-            None => Err(Error {}),
+            None => Err(dbg!(Error {})),
         }
     }
 
     pub fn pop(&mut self) -> Result<Rc<Value>, Error> {
         match self.stack.pop() {
             Some(v) => Ok(v),
-            None => Err(Error {}),
+            None => Err(dbg!(Error {})),
         }
     }
 
@@ -624,7 +654,7 @@ impl<'a> VM {
         Ok(match (left, right) {
             (P(Int(i)), P(Int(ii))) => Int(i * ii),
             (P(Float(f)), P(Float(ff))) => Float(f * ff),
-            _ => return Err(Error {}),
+            _ => return Err(dbg!(Error {})),
         })
     }
 
@@ -632,7 +662,7 @@ impl<'a> VM {
         Ok(match (left, right) {
             (P(Int(i)), P(Int(ii))) => Int(i / ii),
             (P(Float(f)), P(Float(ff))) => Float(f / ff),
-            _ => return Err(Error {}),
+            _ => return Err(dbg!(Error {})),
         })
     }
 
@@ -640,7 +670,7 @@ impl<'a> VM {
         Ok(match (left, right) {
             (P(Int(i)), Value::P(Int(ii))) => Int(i - ii),
             (P(Float(f)), Value::P(Float(ff))) => Float(f - ff),
-            _ => return Err(Error {}),
+            _ => return Err(dbg!(Error {})),
         })
     }
 
@@ -654,7 +684,7 @@ impl<'a> VM {
                 ns.push_str(&ss);
                 Str(ns)
             }
-            _ => return Err(Error {}),
+            _ => return Err(dbg!(Error {})),
         })
     }
 

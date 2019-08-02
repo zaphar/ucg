@@ -49,7 +49,7 @@ impl OpPointer {
             self.ptr = Some(ptr);
             return Ok(());
         }
-        Err(Error {})
+        Err(dbg!(Error {}))
     }
 
     pub fn op(&self) -> Option<&Op> {

@@ -40,33 +40,45 @@ impl AST {
     }
 
     fn translate_expr(expr: Expression, mut ops: &mut Vec<Op>) {
-        match dbg!(expr) {
+        match expr {
             Expression::Simple(v) => {
                 Self::translate_value(v, &mut ops);
             }
             Expression::Binary(def) => {
-                Self::translate_expr(*def.right, &mut ops);
-                Self::translate_expr(*def.left, &mut ops);
                 match def.kind {
                     BinaryExprType::Add => {
+                        Self::translate_expr(*def.right, &mut ops);
+                        Self::translate_expr(*def.left, &mut ops);
                         ops.push(Op::Add);
                     }
                     BinaryExprType::Sub => {
+                        Self::translate_expr(*def.right, &mut ops);
+                        Self::translate_expr(*def.left, &mut ops);
                         ops.push(Op::Sub);
                     }
                     BinaryExprType::Div => {
+                        Self::translate_expr(*def.right, &mut ops);
+                        Self::translate_expr(*def.left, &mut ops);
                         ops.push(Op::Div);
                     }
                     BinaryExprType::Mul => {
+                        Self::translate_expr(*def.right, &mut ops);
+                        Self::translate_expr(*def.left, &mut ops);
                         ops.push(Op::Mul);
                     }
                     BinaryExprType::Equal => {
+                        Self::translate_expr(*def.right, &mut ops);
+                        Self::translate_expr(*def.left, &mut ops);
                         ops.push(Op::Equal);
                     }
                     BinaryExprType::GT => {
+                        Self::translate_expr(*def.right, &mut ops);
+                        Self::translate_expr(*def.left, &mut ops);
                         ops.push(Op::Gt);
                     }
                     BinaryExprType::LT => {
+                        Self::translate_expr(*def.right, &mut ops);
+                        Self::translate_expr(*def.left, &mut ops);
                         ops.push(Op::Lt);
                     }
                     BinaryExprType::GTEqual => {
@@ -79,25 +91,47 @@ impl AST {
                         unimplemented!("Binary expressions are not implmented yet")
                     }
                     BinaryExprType::NotEqual => {
+                        Self::translate_expr(*def.right, &mut ops);
+                        Self::translate_expr(*def.left, &mut ops);
                         ops.push(Op::Equal);
                         ops.push(Op::Not);
                     }
                     BinaryExprType::REMatch => {
+                        Self::translate_expr(*def.right, &mut ops);
+                        Self::translate_expr(*def.left, &mut ops);
                         ops.push(Op::Runtime(Hook::Regex));
                     }
                     BinaryExprType::NotREMatch => {
+                        Self::translate_expr(*def.right, &mut ops);
+                        Self::translate_expr(*def.left, &mut ops);
                         ops.push(Op::Runtime(Hook::Regex));
                         ops.push(Op::Not);
                     }
                     BinaryExprType::IS => {
+                        Self::translate_expr(*def.right, &mut ops);
+                        Self::translate_expr(*def.left, &mut ops);
                         ops.push(Op::Typ);
                         ops.push(Op::Equal);
                     }
-                    BinaryExprType::IN
-                    | BinaryExprType::Mod
-                    | BinaryExprType::OR
-                    | BinaryExprType::AND
-                    | BinaryExprType::DOT => {
+                    BinaryExprType::AND => {
+                        Self::translate_expr(*def.left, &mut ops);
+                        ops.push(Op::Noop);
+                        let idx = ops.len() - 1;
+                        Self::translate_expr(*def.right, &mut ops);
+                        let jptr = (ops.len() - 1 - idx) as i32;
+                        ops[idx] = Op::And(dbg!(jptr));
+                        dbg!(ops);
+                    }
+                    BinaryExprType::OR => {
+                        // FIXME(jwall): This needs to be handled very differently
+                        Self::translate_expr(*def.left, &mut ops);
+                        ops.push(Op::Noop); // Placeholder used for
+                        let idx = ops.len() - 1;
+                        Self::translate_expr(*def.right, &mut ops);
+                        let jptr = (ops.len() - 1 - idx) as i32;
+                        ops[idx] = Op::Or(jptr);
+                    }
+                    BinaryExprType::IN | BinaryExprType::Mod | BinaryExprType::DOT => {
                         unimplemented!("Binary expressions are not implmented yet")
                         // TODO
                     }
@@ -126,7 +160,7 @@ impl AST {
     }
 
     fn translate_value(value: Value, ops: &mut Vec<Op>) {
-        match dbg!(value) {
+        match value {
             Value::Int(i) => ops.push(Op::Val(Primitive::Int(i.val))),
             Value::Float(f) => ops.push(Op::Val(Primitive::Float(f.val))),
             Value::Str(s) => ops.push(Op::Val(Primitive::Str(s.val))),

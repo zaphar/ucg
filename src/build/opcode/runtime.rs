@@ -145,7 +145,7 @@ impl Builtins {
                 return Ok(());
             }
         }
-        return Err(Error {});
+        return Err(dbg!(Error {}));
     }
 
     fn include(&self, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
@@ -156,19 +156,19 @@ impl Builtins {
             if let &Value::P(Str(ref path)) = val.as_ref() {
                 path.clone()
             } else {
-                return dbg!(Err(Error {}));
+                return Err(dbg!(Error {}));
             }
         } else {
-            return dbg!(Err(Error {}));
+            return Err(dbg!(Error {}));
         };
         let typ = if let Some(val) = typ.as_ref() {
             if let &Value::P(Str(ref typ)) = val.as_ref() {
                 typ.clone()
             } else {
-                return dbg!(Err(Error {}));
+                return Err(dbg!(Error {}));
             }
         } else {
-            return dbg!(Err(Error {}));
+            return Err(dbg!(Error {}));
         };
         if typ == "str" {
             stack.push(Rc::new(P(Str(self.get_file_as_string(&path)?))));
@@ -182,14 +182,14 @@ impl Builtins {
                     } else {
                         match importer.import(contents.as_bytes()) {
                             Ok(v) => v.try_into()?,
-                            Err(_e) => return dbg!(Err(Error {})),
+                            Err(_e) => return Err(dbg!(Error {})),
                         }
                     }
                 }
-                None => return dbg!(Err(Error {})),
+                None => return Err(dbg!(Error {})),
             }));
         }
-        return Err(Error {});
+        return Err(dbg!(Error {}));
     }
 
     fn assert(&mut self, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
@@ -237,14 +237,14 @@ impl Builtins {
                             Ok(_) => {
                                 // noop
                             }
-                            Err(_e) => return Err(Error {}),
+                            Err(_e) => return Err(dbg!(Error {})),
                         }
                         return Ok(());
                     }
                 }
             }
         }
-        return Err(Error {});
+        return Err(dbg!(Error {}));
     }
 
     fn convert(&self, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
@@ -262,14 +262,14 @@ impl Builtins {
                                         String::from_utf8_lossy(buf.as_slice()).to_string()
                                     ))));
                             }
-                            Err(_e) => return Err(Error {}),
+                            Err(_e) => return Err(dbg!(Error {})),
                         }
                         return Ok(());
                     }
                 }
             }
         }
-        return Err(Error {});
+        return Err(dbg!(Error {}));
     }
 
     fn map<P: AsRef<Path>>(&self, path: P, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
@@ -277,25 +277,25 @@ impl Builtins {
         let list = if let Some(list) = stack.pop() {
             list
         } else {
-            return dbg!(Err(Error {}));
+            return Err(dbg!(Error {}));
         };
         let elems = if let &C(List(ref elems)) = list.as_ref() {
             elems
         } else {
-            return dbg!(Err(Error {}));
+            return Err(dbg!(Error {}));
         };
 
         // get the func ptr from the stack
         let fptr = if let Some(ptr) = stack.pop() {
             ptr
         } else {
-            return dbg!(Err(Error {}));
+            return Err(dbg!(Error {}));
         };
 
         let f = if let &F(ref f) = fptr.as_ref() {
             f
         } else {
-            return dbg!(Err(Error {}));
+            return Err(dbg!(Error {}));
         };
 
         let mut result_elems = Vec::new();
@@ -314,19 +314,19 @@ impl Builtins {
         let list = if let Some(list) = stack.pop() {
             list
         } else {
-            return dbg!(Err(Error {}));
+            return Err(dbg!(Error {}));
         };
         let elems = if let &C(List(ref elems)) = list.as_ref() {
             elems
         } else {
-            return dbg!(Err(Error {}));
+            return Err(dbg!(Error {}));
         };
 
         // get the func ptr from the stack
         let fptr = if let Some(ptr) = stack.pop() {
             ptr
         } else {
-            return dbg!(Err(Error {}));
+            return Err(dbg!(Error {}));
         };
 
         let f = if let &F(ref f) = fptr.as_ref() {
