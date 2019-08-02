@@ -83,6 +83,7 @@ impl<'a> VM {
                 Op::Sym(s) => self.push(Rc::new(S(s.clone())))?,
                 Op::DeRef(s) => self.op_deref(s.clone())?,
                 Op::Add => self.op_add()?,
+                Op::Mod => self.op_mod()?,
                 Op::Sub => self.op_sub()?,
                 Op::Mul => self.op_mul()?,
                 Op::Div => self.op_div()?,
@@ -398,6 +399,15 @@ impl<'a> VM {
         Ok(())
     }
 
+    fn op_mod(&mut self) -> Result<(), Error> {
+        // Adds the previous two items in the stack.
+        let left = self.pop()?;
+        let right = self.pop()?;
+        // Then pushes the result onto the stack.
+        self.push(Rc::new(P(self.modulus(&left, &right)?)))?;
+        Ok(())
+    }
+
     fn op_add(&mut self) -> Result<(), Error> {
         // Adds the previous two items in the stack.
         let left = self.pop()?;
@@ -670,6 +680,14 @@ impl<'a> VM {
         Ok(match (left, right) {
             (P(Int(i)), Value::P(Int(ii))) => Int(i - ii),
             (P(Float(f)), Value::P(Float(ff))) => Float(f - ff),
+            _ => return Err(dbg!(Error {})),
+        })
+    }
+
+    fn modulus(&self, left: &Value, right: &Value) -> Result<Primitive, Error> {
+        Ok(match (left, right) {
+            (P(Int(i)), Value::P(Int(ii))) => Int(i % ii),
+            (P(Float(f)), Value::P(Float(ff))) => Float(f % ff),
             _ => return Err(dbg!(Error {})),
         })
     }

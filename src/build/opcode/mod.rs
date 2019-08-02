@@ -103,6 +103,7 @@ pub enum Op {
     Sub,
     Div,
     Mul,
+    Mod,
     // Comparison Ops
     Equal,
     Gt,

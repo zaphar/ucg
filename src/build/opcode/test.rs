@@ -588,6 +588,8 @@ fn simple_binary_expr() {
         "2-1;" => P(Int(1)),
         "2*2;" => P(Int(4)),
         "6/2;" => P(Int(3)),
+        "4 %% 2;" => P(Int(0)),
+        "5 %% 2;" => P(Int(1)),
         "1.0+1.0;" => P(Float(2.0)),
         "\"foo\"+\"bar\";" => P(Str("foobar".to_owned())),
         "1==1;" => P(Bool(true)),

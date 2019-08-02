@@ -131,7 +131,12 @@ impl AST {
                         let jptr = (ops.len() - 1 - idx) as i32;
                         ops[idx] = Op::Or(jptr);
                     }
-                    BinaryExprType::IN | BinaryExprType::Mod | BinaryExprType::DOT => {
+                    BinaryExprType::Mod => {
+                        Self::translate_expr(*def.right, &mut ops);
+                        Self::translate_expr(*def.left, &mut ops);
+                        ops.push(Op::Mod);
+                    }
+                    BinaryExprType::IN | BinaryExprType::DOT => {
                         unimplemented!("Binary expressions are not implmented yet")
                         // TODO
                     }
