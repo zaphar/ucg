@@ -453,11 +453,9 @@ fn index_operation() {
             Val(Int(1)),
             Field,
             Field,
-            InitList,
             Val(Str("foo".to_owned())),
-            Element,
+            Index,
             Val(Str("bar".to_owned())),
-            Element,
             Index,
         ] => P(Int(1)),
         vec![
@@ -466,9 +464,7 @@ fn index_operation() {
             Element,
             Val(Str("bar".to_owned())),
             Element,
-            InitList,
             Val(Int(0)),
-            Element,
             Index,
         ] => P(Str("foo".to_owned())),
         vec![
@@ -480,11 +476,9 @@ fn index_operation() {
             Val(Str("bar".to_owned())),
             Element,
             Field,
-            InitList,
             Val(Str("field".to_owned())),
-            Element,
+            Index,
             Val(Int(0)),
-            Element,
             Index,
         ] => P(Str("foo".to_owned())),
     ];
@@ -610,6 +604,27 @@ fn simple_binary_expr() {
         "false || true;" => P(Bool(true)),
         "true || true;" => P(Bool(true)),
     )
+}
+
+#[test]
+fn dot_expressions() {
+    let mut ops = vec![
+        Sym("foo".to_owned()),
+        InitList,
+        Val(Int(0)),
+        Element,
+        Val(Int(1)),
+        Element,
+        Val(Int(2)),
+        Element,
+        Bind,
+    ];
+
+    let stmts = parse(OffsetStrIter::from(dbg!("foo.0;")), None).unwrap();
+    ops.append(&mut translate::AST::translate(stmts));
+    let ops = Rc::new(ops);
+    let mut vm = VM::new("foo.ucg", ops.clone());
+    vm.run().unwrap();
 }
 
 #[test]

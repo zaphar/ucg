@@ -541,25 +541,33 @@ impl<'a> VM {
     }
 
     fn op_index(&mut self) -> Result<(), Error> {
-        let path_val = self.pop()?;
-        let path = if let &C(List(ref elems)) = path_val.as_ref() {
-            elems.clone()
-        } else {
-            return Err(dbg!(Error {}));
-        };
-        let target_val = self.pop()?;
-        match target_val.as_ref() {
-            &P(_) | &S(_) | &T(_) | &F(_) | &M(_) => return Err(dbg!(Error {})),
-            _ => {
-                let mut out = target_val.clone();
-                for p in path {
-                    let tgt = self.find_in_value(&p, &out)?;
-                    out = tgt;
+        // left and then right
+        let right = dbg!(self.pop()?);
+        let left = dbg!(self.pop()?);
+        match right.as_ref() {
+            &P(Int(i)) => {
+                if let &C(List(ref elems)) = left.as_ref() {
+                    if i < (elems.len() as i64) && i >= 0 {
+                        self.push(elems[i as usize].clone())?;
+                        return Ok(());
+                    }
                 }
-                self.push(out)?;
+            }
+            &P(Str(ref s)) => {
+                if let &C(Tuple(ref flds)) = left.as_ref() {
+                    for &(ref key, ref val) in flds.iter() {
+                        if key == s {
+                            self.push(val.clone())?;
+                            return Ok(());
+                        }
+                    }
+                }
+            }
+            _ => {
+                // noop
             }
         };
-        Ok(())
+        return Err(dbg!(Error {}));
     }
 
     fn op_copy(&mut self) -> Result<(), Error> {

@@ -136,9 +136,26 @@ impl AST {
                         Self::translate_expr(*def.left, &mut ops);
                         ops.push(Op::Mod);
                     }
-                    BinaryExprType::IN | BinaryExprType::DOT => {
+                    BinaryExprType::IN => {
                         unimplemented!("Binary expressions are not implmented yet")
-                        // TODO
+                    }
+                    BinaryExprType::DOT => {
+                        // Dot expressions expect the left side to be pushed first
+                        Self::translate_expr(*def.left, &mut ops);
+                        // Symbols on the right side should be converted to strings to satisfy
+                        // the Index operation contract.
+                        match *def.right {
+                            Expression::Simple(Value::Symbol(name)) => {
+                                Self::translate_expr(
+                                    Expression::Simple(Value::Str(name)),
+                                    &mut ops,
+                                );
+                            }
+                            expr => {
+                                Self::translate_expr(expr, &mut ops);
+                            }
+                        }
+                        ops.push(Op::Index);
                     }
                 };
             }
@@ -171,7 +188,9 @@ impl AST {
             Value::Str(s) => ops.push(Op::Val(Primitive::Str(s.val))),
             Value::Empty(_pos) => ops.push(Op::Val(Primitive::Empty)),
             Value::Boolean(b) => ops.push(Op::Val(Primitive::Bool(b.val))),
-            Value::Symbol(s) => ops.push(Op::Sym(s.val)),
+            Value::Symbol(s) => {
+                ops.push(Op::DeRef(s.val));
+            }
             Value::Tuple(_flds) => unimplemented!("Select expression are not implmented yet"),
             Value::List(_els) => unimplemented!("Select expression are not implmented yet"),
         }
