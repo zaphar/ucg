@@ -607,6 +607,14 @@ fn simple_binary_expr() {
 }
 
 #[test]
+fn simple_let_statements() {
+    assert_parse_cases![
+        "let foo = 1; foo;" => P(Int(1)),
+        "let foo = 1 + 1; foo;" => P(Int(2)),
+    ];
+}
+
+#[test]
 fn dot_expressions() {
     let mut ops = vec![
         Sym("foo".to_owned()),

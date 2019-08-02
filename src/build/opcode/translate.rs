@@ -27,7 +27,12 @@ impl AST {
                 Statement::Assert(_, _) => {
                     unimplemented!("Assert statements are not implmented yet")
                 }
-                Statement::Let(_) => unimplemented!("Let statements are not implmented yet"),
+                Statement::Let(def) => {
+                    let binding = def.name.fragment;
+                    ops.push(Op::Sym(binding));
+                    Self::translate_expr(def.value, &mut ops);
+                    ops.push(Op::Bind);
+                }
                 Statement::Output(_, _, _) => {
                     unimplemented!("Out statements are not implmented yet")
                 }
