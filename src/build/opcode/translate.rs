@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use crate::ast::{BinaryExprType, Expression, Statement, Value};
+use crate::ast::{BinaryExprType, Expression, Statement, Value, FormatArgs};
 use crate::build::opcode::Primitive;
 use crate::build::opcode::Value::{C, F, M, P, T};
 use crate::build::opcode::{Hook, Op};
@@ -168,7 +168,24 @@ impl AST {
                 Self::translate_expr(*expr, &mut ops);
             }
             Expression::Fail(_) => unimplemented!("Fail expressions are not implmented yet"),
-            Expression::Format(_) => unimplemented!("Format expressions are not implmented yet"),
+            Expression::Format(def) => {
+                match def.args {
+                    FormatArgs::List(elems) => {
+                        ops.push(Op::InitList);
+                        for e in elems {
+                            Self::translate_expr(e, &mut ops);
+                            ops.push(Op::Element);
+                        }
+                    }
+                    FormatArgs::Single(e) => {
+                        ops.push(Op::InitList);
+                        Self::translate_expr(*e, &mut ops);
+                        ops.push(Op::Element);
+                    }
+                }
+                ops.push(Op::Val(Primitive::Str(def.template)));
+                ops.push(Op::Format);
+            }
             Expression::Func(_) => unimplemented!("Func expressions are not implmented yet"),
             Expression::FuncOp(_) => unimplemented!("FuncOp expressions are not implmented yet"),
             Expression::Import(_) => unimplemented!("Import expressions are not implmented yet"),

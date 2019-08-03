@@ -20,7 +20,7 @@ impl<E> From<E> for Error
 where
     E: std::error::Error + Sized,
 {
-    fn from(_e: E) -> Error {
+    fn from(_e: E) -> Self {
         // FIXME(jwall): This should really have more information for debugging
         Error {}
     }

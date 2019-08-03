@@ -16,7 +16,7 @@ use std::rc::Rc;
 use super::scope::Stack;
 use super::Composite::{List, Tuple};
 use super::Op::{
-    Add, Bang, Bind, Cp, DeRef, Div, Element, Equal, FCall, Field, Func, Index, InitList,
+    Add, Bang, Bind, Cp, DeRef, Div, Element, Equal, FCall, Field, Format, Func, Index, InitList,
     InitThunk, InitTuple, Jump, JumpIfFalse, JumpIfTrue, Module, Mul, Noop, Pop, Return,
     SelectJump, Sub, Sym, Typ, Val,
 };
@@ -631,4 +631,19 @@ fn simple_not_expr() {
         "not 1==1;" => P(Bool(false)),
         "not 1!=1;" => P(Bool(true)),
     )
+}
+
+#[test]
+fn simple_format_expr() {
+    assert_cases![
+        vec![
+            InitList,
+            Val(Int(1)),
+            Element,
+            Val(Int(2)),
+            Element,
+            Val(Str("@@".to_owned())),
+            Format,
+        ] => P(Str("12".to_owned())),
+    ];
 }

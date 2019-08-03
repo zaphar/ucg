@@ -40,6 +40,18 @@ pub enum Primitive {
 
 use Primitive::{Bool, Empty, Float, Int, Str};
 
+impl From<&Primitive> for String {
+    fn from(p: &Primitive) -> Self {
+        match p {
+            Int(i) => format!("{}", i),
+            Float(f) => format!("{}", f),
+            Str(s) => format!("{}", s),
+            Bool(b) => format!("{}", b),
+            Empty => "NULL".to_owned(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Composite {
     List(Vec<Rc<Value>>),
@@ -47,6 +59,35 @@ pub enum Composite {
 }
 
 use Composite::{List, Tuple};
+
+impl From<&Composite> for String {
+    fn from(c: &Composite) -> Self {
+        let mut buf = String::new();
+        match c {
+            &List(ref elems) => {
+                buf.push_str("[");
+                for e in elems.iter() {
+                    let val: String = e.as_ref().into();
+                    buf.push_str(&val);
+                    buf.push_str(",");
+                }
+                buf.push_str("]");
+            }
+            &Tuple(ref flds) => {
+                buf.push_str("{");
+                for &(ref k, ref v) in flds.iter() {
+                    buf.push_str(&k);
+                    buf.push_str(" = ");
+                    let val: String = v.as_ref().into();
+                    buf.push_str(&val);
+                    buf.push_str(",");
+                }
+                buf.push_str("}");
+            }
+        }
+        buf
+    }
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Func {
@@ -76,6 +117,19 @@ pub enum Value {
     F(Func),
     // Module
     M(Module),
+}
+
+impl From<&Value> for String {
+    fn from(v: &Value) -> Self {
+        match v {
+            &S(ref s) => s.clone(),
+            &P(ref p) => p.into(),
+            &C(ref c) => c.into(),
+            &T(_) => "<Thunk>".to_owned(),
+            &F(_) => "<Func>".to_owned(),
+            &M(_) => "<Module>".to_owned(),
+        }
+    }
 }
 
 use Value::{C, F, M, P, S, T};
@@ -148,6 +202,8 @@ pub enum Op {
     // Runtime hooks
     Runtime(Hook),
     // TODO(jwall): TRACE instruction
+    // TODO(jwall): Format instruction
+    Format,
 }
 
 use super::ir::Val;
