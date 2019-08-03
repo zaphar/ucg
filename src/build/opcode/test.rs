@@ -616,23 +616,13 @@ fn simple_let_statements() {
 
 #[test]
 fn dot_expressions() {
-    let mut ops = vec![
-        Sym("foo".to_owned()),
-        InitList,
-        Val(Int(0)),
-        Element,
-        Val(Int(1)),
-        Element,
-        Val(Int(2)),
-        Element,
-        Bind,
+    assert_parse_cases![
+        "let foo = [0,1,2]; foo.0;" => P(Int(0)),
+        "let foo = [0,1,2]; foo.2;" => P(Int(2)),
+        "let tpl = { foo = 1 }; tpl.foo;" => P(Int(1)),
+        "let tpl = { foo = { bar = 2 } }; tpl.foo.bar;" => P(Int(2)),
+        "let tpl = { foo = [ 3 ] }; tpl.foo.0;" => P(Int(3)),
     ];
-
-    let stmts = parse(OffsetStrIter::from(dbg!("foo.0;")), None).unwrap();
-    ops.append(&mut translate::AST::translate(stmts));
-    let ops = Rc::new(ops);
-    let mut vm = VM::new("foo.ucg", ops.clone());
-    vm.run().unwrap();
 }
 
 #[test]

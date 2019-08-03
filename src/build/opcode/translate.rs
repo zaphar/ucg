@@ -186,7 +186,7 @@ impl AST {
         }
     }
 
-    fn translate_value(value: Value, ops: &mut Vec<Op>) {
+    fn translate_value(value: Value, mut ops: &mut Vec<Op>) {
         match value {
             Value::Int(i) => ops.push(Op::Val(Primitive::Int(i.val))),
             Value::Float(f) => ops.push(Op::Val(Primitive::Float(f.val))),
@@ -196,8 +196,21 @@ impl AST {
             Value::Symbol(s) => {
                 ops.push(Op::DeRef(s.val));
             }
-            Value::Tuple(_flds) => unimplemented!("Select expression are not implmented yet"),
-            Value::List(_els) => unimplemented!("Select expression are not implmented yet"),
+            Value::Tuple(flds) => {
+                ops.push(Op::InitTuple);
+                for (k, v) in flds.val {
+                    ops.push(Op::Sym(k.fragment));
+                    Self::translate_expr(v, &mut ops);
+                    ops.push(Op::Field);
+                }
+            }
+            Value::List(els) => {
+                ops.push(Op::InitList);
+                for el in els.elems {
+                    Self::translate_expr(el, &mut ops);
+                    ops.push(Op::Element);
+                }
+            }
         }
     }
 }
