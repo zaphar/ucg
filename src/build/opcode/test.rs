@@ -16,8 +16,8 @@ use std::rc::Rc;
 use super::scope::Stack;
 use super::Composite::{List, Tuple};
 use super::Op::{
-    Add, Bang, Bind, Cp, DeRef, Div, Element, Equal, FCall, Field, Format, Func, Index, InitList,
-    InitThunk, InitTuple, Jump, JumpIfFalse, JumpIfTrue, Module, Mul, Noop, Pop, Return,
+    Add, Bang, Bind, Cp, DeRef, Div, Element, Equal, FCall, Field, Func, Index, InitList,
+    InitThunk, InitTuple, Jump, JumpIfFalse, JumpIfTrue, Module, Mul, Noop, Pop, Render, Return,
     SelectJump, Sub, Sym, Typ, Val,
 };
 use super::Primitive::{Bool, Empty, Float, Int, Str};
@@ -634,16 +634,43 @@ fn simple_not_expr() {
 }
 
 #[test]
-fn simple_format_expr() {
+fn simple_render_operation() {
     assert_cases![
         vec![
-            InitList,
             Val(Int(1)),
-            Element,
-            Val(Int(2)),
-            Element,
-            Val(Str("@@".to_owned())),
-            Format,
-        ] => P(Str("12".to_owned())),
+            Render,
+        ] => P(Str("1".to_owned())),
+        vec![
+            Val(Float(1.1)),
+            Render,
+        ] => P(Str("1.1".to_owned())),
+        vec![
+            Val(Bool(true)),
+            Render,
+        ] => P(Str("true".to_owned())),
+        vec![
+            Val(Bool(false)),
+            Render,
+        ] => P(Str("false".to_owned())),
+        vec![
+            Val(Empty),
+            Render,
+        ] => P(Str("NULL".to_owned())),
+        vec![
+            Val(Str("foo".to_owned())),
+            Render,
+        ] => P(Str("foo".to_owned())),
+    ];
+}
+
+#[test]
+fn simple_format_expressions() {
+    assert_parse_cases![
+        "\"@\" % (1);" => P(Str("1".to_owned())),
+        "\"@\" % (1.1);" => P(Str("1.1".to_owned())),
+        "\"@\" % (\"foo\");" => P(Str("foo".to_owned())),
+        "\"@\" % (NULL);" => P(Str("NULL".to_owned())),
+        "\"@ @ @\" % (1, 2, 3);" => P(Str("1 2 3".to_owned())),
+        "\"@ \\\\@\" % (1);" => P(Str("1 @".to_owned())),
     ];
 }

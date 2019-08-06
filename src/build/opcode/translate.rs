@@ -11,7 +11,11 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use crate::ast::{BinaryExprType, Expression, Statement, Value, FormatArgs};
+use crate::ast::Position;
+use crate::ast::{BinaryExprType, Expression, FormatArgs, Statement, Value};
+use crate::build::format::{
+    ExpressionFormatter, FormatRenderer, SimpleTemplate, TemplateParser, TemplatePart,
+};
 use crate::build::opcode::Primitive;
 use crate::build::opcode::Value::{C, F, M, P, T};
 use crate::build::opcode::{Hook, Op};
@@ -169,22 +173,33 @@ impl AST {
             }
             Expression::Fail(_) => unimplemented!("Fail expressions are not implmented yet"),
             Expression::Format(def) => {
+                // TODO(jwall): It would actually be safer if this was happening
+                // when we create the format def instead of here.
                 match def.args {
-                    FormatArgs::List(elems) => {
-                        ops.push(Op::InitList);
-                        for e in elems {
-                            Self::translate_expr(e, &mut ops);
-                            ops.push(Op::Element);
+                    FormatArgs::List(mut elems) => {
+                        let formatter = SimpleTemplate::new();
+                        let mut parts = dbg!(formatter.parse(&def.template));
+                        // We need to push process these in reverse order for the
+                        // vm to process things correctly;
+                        elems.reverse();
+                        parts.reverse();
+                        let mut elems_iter = elems.drain(0..);
+                        let mut parts_iter = parts.drain(0..);
+                        Self::translate_template_part(
+                            parts_iter.next().unwrap(),
+                            &mut elems_iter,
+                            &mut ops,
+                            true,
+                        );
+                        for p in parts_iter {
+                            Self::translate_template_part(p, &mut elems_iter, &mut ops, true);
+                            ops.push(Op::Add);
                         }
                     }
                     FormatArgs::Single(e) => {
-                        ops.push(Op::InitList);
-                        Self::translate_expr(*e, &mut ops);
-                        ops.push(Op::Element);
+                        // TODO(jwall): Use expression formatter here.
                     }
                 }
-                ops.push(Op::Val(Primitive::Str(def.template)));
-                ops.push(Op::Format);
             }
             Expression::Func(_) => unimplemented!("Func expressions are not implmented yet"),
             Expression::FuncOp(_) => unimplemented!("FuncOp expressions are not implmented yet"),
@@ -200,6 +215,36 @@ impl AST {
             Expression::Call(_) => unimplemented!("Call expressions are not implmented yet"),
             Expression::Copy(_) => unimplemented!("Copy expressions are not implmented yet"),
             Expression::Debug(_) => unimplemented!("Debug expressions are not implmented yet"),
+        }
+    }
+
+    fn translate_template_part<EI: Iterator<Item = Expression>>(
+        part: TemplatePart,
+        elems: &mut EI,
+        mut ops: &mut Vec<Op>,
+        place_holder: bool,
+    ) {
+        match part {
+            TemplatePart::Str(s) => {
+                ops.push(Op::Val(Primitive::Str(s.into_iter().collect())));
+            }
+            TemplatePart::PlaceHolder(_idx) => {
+                if !place_holder {
+                    // In theory this should never be reachable
+                    unreachable!();
+                } else {
+                    Self::translate_expr(dbg!(elems.next().unwrap()), &mut ops);
+                    ops.push(Op::Render);
+                }
+            }
+            TemplatePart::Expression(_expr) => {
+                // TODO(jwall): We need to parse this.
+                if place_holder {
+                    unreachable!();
+                } else {
+                    unimplemented!("Expression Formatters are unimmplemented");
+                }
+            }
         }
     }
 

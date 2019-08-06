@@ -202,8 +202,7 @@ pub enum Op {
     // Runtime hooks
     Runtime(Hook),
     // TODO(jwall): TRACE instruction
-    // TODO(jwall): Format instruction
-    Format,
+    Render,
 }
 
 use super::ir::Val;
@@ -230,7 +229,7 @@ impl TryFrom<&Value> for Val {
                 let mut flds = Vec::new();
                 for &(ref k, ref v) in fs.iter() {
                     let v = v.clone();
-                    // TODO(jwall): The RC for a Val should no longer be required.
+                    // TODO(jwall): The Rc for a Val should no longer be required.
                     flds.push((k.clone(), Rc::new(v.try_into()?)));
                 }
                 Val::Tuple(flds)

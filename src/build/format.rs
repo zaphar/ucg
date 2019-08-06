@@ -27,6 +27,25 @@ pub trait FormatRenderer {
     fn render(&self, pos: &Position) -> Result<String, Box<dyn Error>>;
 }
 
+#[derive(Debug)]
+pub enum TemplatePart<'a> {
+    Str(Vec<char>),
+    PlaceHolder(usize),
+    Expression(&'a str),
+}
+
+pub trait TemplateParser {
+    fn parse<'a>(&self, input: &'a str) -> Vec<TemplatePart<'a>>;
+}
+
+pub struct SimpleTemplate();
+
+impl SimpleTemplate {
+    pub fn new() -> Self {
+        Self()
+    }
+}
+
 /// Implements the logic for format strings in UCG format expressions.
 pub struct SimpleFormatter<V: Into<String> + Clone> {
     tmpl: String,
@@ -43,6 +62,36 @@ impl<V: Into<String> + Clone> SimpleFormatter<V> {
     }
 }
 
+impl TemplateParser for SimpleTemplate {
+    fn parse<'a>(&self, input: &'a str) -> Vec<TemplatePart<'a>> {
+        let mut result = Vec::new();
+        let mut count = 0;
+        let mut should_escape = false;
+        let mut buf: Vec<char> = Vec::new();
+        for c in dbg!(input).chars() {
+            if c == '@' && !should_escape {
+                result.push(TemplatePart::Str(buf));
+                buf = Vec::new();
+                // This is a placeholder in our template.
+                result.push(TemplatePart::PlaceHolder(count));
+                count += 1;
+            } else if c == '\\' && !should_escape {
+                eprintln!("escaping next character");
+                should_escape = true;
+                continue;
+            } else {
+                buf.push(c);
+                dbg!(&buf);
+            }
+            should_escape = false;
+        }
+        if buf.len() != 0 {
+            result.push(TemplatePart::Str(buf));
+        }
+        result
+    }
+}
+
 impl<V: Into<String> + Clone> FormatRenderer for SimpleFormatter<V> {
     /// Renders a formatter to a string or returns an error.
     ///
@@ -50,30 +99,33 @@ impl<V: Into<String> + Clone> FormatRenderer for SimpleFormatter<V> {
     /// it will return an error. Otherwise it will return the formatted string.
     fn render(&self, pos: &Position) -> Result<String, Box<dyn Error>> {
         let mut buf = String::new();
-        let mut should_escape = false;
         let mut count = 0;
-        for c in self.tmpl.chars() {
-            if c == '@' && !should_escape {
-                if count == self.args.len() {
-                    return Err(error::BuildError::with_pos(
-                        "Too few arguments to string \
-                         formatter.",
-                        error::ErrorType::FormatError,
-                        pos.clone(),
-                    )
-                    .to_boxed());
+        let parser = SimpleTemplate::new();
+        let parts = parser.parse(&self.tmpl);
+        for p in parts {
+            match p {
+                TemplatePart::PlaceHolder(idx) => {
+                    if idx == self.args.len() {
+                        return Err(error::BuildError::with_pos(
+                            "Too few arguments to string \
+                             formatter.",
+                            error::ErrorType::FormatError,
+                            pos.clone(),
+                        )
+                        .to_boxed());
+                    }
+                    let arg = self.args[count].clone();
+                    let strval = arg.into();
+                    buf.push_str(&strval);
+                    count += 1;
                 }
-                let arg = self.args[count].clone();
-                let strval = arg.into();
-                buf.push_str(&strval);
-                count += 1;
-                should_escape = false;
-            } else if c == '\\' && !should_escape {
-                eprintln!("found an escape char {}", self.tmpl);
-                should_escape = true;
-            } else {
-                buf.push(c);
-                should_escape = false;
+                TemplatePart::Str(cs) => {
+                    buf.reserve(cs.len());
+                    for c in cs {
+                        buf.push(c);
+                    }
+                }
+                TemplatePart::Expression(_) => unreachable!(),
             }
         }
         if self.args.len() != count {

@@ -24,8 +24,6 @@ use super::Primitive::{Bool, Empty, Float, Int, Str};
 use super::Value::{C, F, M, P, S, T};
 use super::{Error, Op, Primitive, Value};
 use super::{Func, Module};
-use crate::ast::Position;
-use crate::build::format::{ExpressionFormatter, FormatRenderer, SimpleFormatter};
 
 pub struct VM {
     stack: Vec<Rc<Value>>,
@@ -124,7 +122,7 @@ impl<'a> VM {
                 }
                 Op::Typ => self.op_typ()?,
                 Op::Runtime(h) => self.op_runtime(h)?,
-                Op::Format => self.op_format()?,
+                Op::Render => self.op_render()?,
             };
         }
         Ok(())
@@ -722,27 +720,9 @@ impl<'a> VM {
             .handle(&self.path, h, &mut self.stack)
     }
 
-    fn op_format(&mut self) -> Result<(), Error> {
-        let template = self.pop()?;
-        let template = match template.as_ref() {
-            &P(Str(ref s)) => s.clone(),
-            _ => return Err(dbg!(Error {})),
-        };
-        let args = self.pop()?;
-        let args: Vec<&Value> = match args.as_ref() {
-            &C(List(ref elems)) => elems.iter().map(|v| v.as_ref()).collect(),
-            _ => return Err(dbg!(Error {})),
-        };
-        let f = if args.len() == 1 {
-            unimplemented!("Expression formatters are not implemented yet");
-        } else {
-            SimpleFormatter::new(template, args)
-        };
-        // TODO(jwall): Position should be valid here.
-        match dbg!(f.render(&Position::new(0, 0, 0))) {
-            Err(_e) => return Err(dbg!(Error {})),
-            Ok(s) => self.push(Rc::new(P(Str(s))))?,
-        }
+    fn op_render(&mut self) -> Result<(), Error> {
+        let val = self.pop()?;
+        self.push(Rc::new(P(Str(val.as_ref().into()))))?;
         Ok(())
     }
 }
