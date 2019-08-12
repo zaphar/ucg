@@ -71,7 +71,11 @@ impl YamlConverter {
         Ok(yaml_val)
     }
 
-    fn merge_mapping_keys(&self, mut fs: &mut Vec<(String, Rc<Val>)>, m: &serde_yaml::Mapping) -> Result<(), Box<dyn Error>> {
+    fn merge_mapping_keys(
+        &self,
+        mut fs: &mut Vec<(String, Rc<Val>)>,
+        m: &serde_yaml::Mapping,
+    ) -> Result<(), Box<dyn Error>> {
         for (key, value) in m {
             // This is a little gross but since yaml allows maps to be keyed
             // by more than just a string it's necessary.
@@ -90,7 +94,6 @@ impl YamlConverter {
                 if let serde_yaml::Value::Mapping(merge_map) = value {
                     self.merge_mapping_keys(&mut fs, merge_map)?;
                 }
-
             } else {
                 fs.push((key, Rc::new(self.convert_yaml_val(&value)?)));
             }

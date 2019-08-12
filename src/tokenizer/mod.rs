@@ -49,7 +49,7 @@ fn is_symbol_char<'a>(i: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, u8> {
 
 fn escapequoted<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, String> {
     // loop until we find a " that is not preceded by \.
-    // Collapse all \<char> to just char  for escaping.
+    // Collapse all \<char> to just char  for escaping exept for \n \r \t and \@.
     let mut frag = String::new();
     let mut escape = false;
     let mut _input = input.clone();
@@ -58,6 +58,31 @@ fn escapequoted<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Strin
             Some(c) => *c,
             None => break,
         };
+        if escape {
+            match c as char {
+                'n' => {
+                    eprintln!("Pushing new line onto string");
+                    frag.push('\n');
+                    escape = false;
+                    continue;
+                }
+                'r' => {
+                    eprintln!("Pushing carriage return onto string");
+                    frag.push('\r');
+                    escape = false;
+                    continue;
+                }
+                't' => {
+                    eprintln!("Pushing tab onto string");
+                    frag.push('\t');
+                    escape = false;
+                    continue;
+                }
+                _ => {
+                    //noop
+                }
+            }
+        }
         if c == '\\' as u8 && !escape {
             // eat this slash and set our escaping sentinel
             escape = true;

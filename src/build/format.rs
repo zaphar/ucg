@@ -67,16 +67,23 @@ impl<V: Into<String> + Clone> FormatRenderer for SimpleFormatter<V> {
                 let strval = arg.into();
                 buf.push_str(&strval);
                 count += 1;
+                should_escape = false;
             } else if c == '\\' && !should_escape {
+                eprintln!("found an escape char {}", self.tmpl);
                 should_escape = true;
             } else {
                 buf.push(c);
+                should_escape = false;
             }
         }
         if self.args.len() != count {
             return Err(error::BuildError::with_pos(
-                "Too many arguments to string \
-                 formatter.",
+                format!(
+                    "Too many arguments to string \
+                     formatter. Expected {} got {}",
+                    count,
+                    self.args.len()
+                ),
                 error::ErrorType::FormatError,
                 pos.clone(),
             )
@@ -201,10 +208,12 @@ where
                 let val = self.consume_expr(&mut self.builder.borrow_mut(), &mut iter, pos)?;
                 let strval: String = val.into();
                 buf.push_str(&strval);
+                should_escape = false;
             } else if c == '\\' && !should_escape {
                 should_escape = true;
             } else {
                 buf.push(c);
+                should_escape = false;
             }
         }
         return Ok(buf);

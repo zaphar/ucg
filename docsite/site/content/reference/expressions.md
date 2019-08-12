@@ -320,6 +320,12 @@ let tpl = {
 "foo.bar.1 == @{item.foo.bar.1}" % tpl;
 ```
 
+The `@` symbol can be escaped with a double slash.
+
+```
+"https://username:password\\@@:@/" % (host, port)
+```
+
 If the `%` operator is followed by a parenthesized expression it will be treated
 as the first form with one item.
 

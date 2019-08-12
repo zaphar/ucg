@@ -47,6 +47,12 @@ Strings are any double quoted text. You can use the `\` to esacpe characters in 
 "This is an escaped \"string\"";
 ```
 
+*Character Escapes*
+
+* '\n' is a new line
+* '\r' is a carriage return
+* '\t' is a tab
+
 ### NULL or the Empty type
 
 NULL is the empty type. It represents the absence of a value. It is represented by the

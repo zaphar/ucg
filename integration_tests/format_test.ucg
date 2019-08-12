@@ -49,3 +49,13 @@ assert t.equal{
     left = "@{item.op()} is just great" % {op=func() => "BOB!"},
     right = "BOB! is just great",
 };
+
+assert t.equal{
+    left = "\\@@" % (NULL),
+    right = "@NULL",
+};
+
+assert t.equal{
+    left = "\\@{foo}@{item.op()} is just great" % {op=func() => "BOB!"},
+    right = "@{foo}BOB! is just great",
+};
