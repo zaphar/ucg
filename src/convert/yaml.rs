@@ -71,6 +71,33 @@ impl YamlConverter {
         Ok(yaml_val)
     }
 
+    fn merge_mapping_keys(&self, mut fs: &mut Vec<(String, Rc<Val>)>, m: &serde_yaml::Mapping) -> Result<(), Box<dyn Error>> {
+        for (key, value) in m {
+            // This is a little gross but since yaml allows maps to be keyed
+            // by more than just a string it's necessary.
+            let key = match key {
+                serde_yaml::Value::Bool(b) => b.to_string(),
+                serde_yaml::Value::Null => "null".to_string(),
+                serde_yaml::Value::Number(n) => n.to_string(),
+                serde_yaml::Value::String(s) => s.clone(),
+                serde_yaml::Value::Sequence(_) | serde_yaml::Value::Mapping(_) => {
+                    eprintln!("Unsupported key type in yaml import skipping");
+                    continue;
+                }
+            };
+            if key == "<<" {
+                // TODO(jwall): Handle merge keys
+                if let serde_yaml::Value::Mapping(merge_map) = value {
+                    self.merge_mapping_keys(&mut fs, merge_map)?;
+                }
+
+            } else {
+                fs.push((key, Rc::new(self.convert_yaml_val(&value)?)));
+            }
+        }
+        Ok(())
+    }
+
     fn convert_yaml_val(&self, v: &serde_yaml::Value) -> Result<Val, Box<dyn Error>> {
         Ok(match v {
             serde_yaml::Value::String(s) => Val::Str(s.clone()),
@@ -92,22 +119,7 @@ impl YamlConverter {
             }
             serde_yaml::Value::Mapping(m) => {
                 let mut fs = Vec::with_capacity(m.len());
-                for (key, value) in m {
-                    // This is a little gross but since yaml allows maps to be keyed
-                    // by more than just a string it's necessary.
-                    let key = match key {
-                        serde_yaml::Value::Bool(b) => b.to_string(),
-                        serde_yaml::Value::Null => "null".to_string(),
-                        serde_yaml::Value::Number(n) => n.to_string(),
-                        serde_yaml::Value::String(s) => s.clone(),
-                        serde_yaml::Value::Sequence(_) | serde_yaml::Value::Mapping(_) => {
-                            eprintln!("Unsupported key type in yaml import skipping");
-                            continue;
-                        }
-                    };
-                    eprintln!("yaml key is: {}", key);
-                    fs.push((key, Rc::new(self.convert_yaml_val(value)?)));
-                }
+                self.merge_mapping_keys(&mut fs, m)?;
                 Val::Tuple(fs)
             }
         })
