@@ -222,13 +222,11 @@ where
                 Ok(())
             }
             Err(e) => {
-                let err = simple_error::SimpleError::new(
-                    &format!(
-                        "Error building file: {}\n{}",
-                        file.to_string_lossy(),
-                        e.as_ref()
-                    ),
-                );
+                let err = simple_error::SimpleError::new(&format!(
+                    "Error building file: {}\n{}",
+                    file.to_string_lossy(),
+                    e.as_ref()
+                ));
                 Err(Box::new(err))
             }
         }

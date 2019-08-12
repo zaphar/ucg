@@ -280,7 +280,7 @@ fn inspect_command<C: Cache>(
     registry: &ConverterRegistry,
     strict: bool,
 ) {
-    let file = matches.value_of("INPUT").unwrap_or("std/functional.ucg");
+    let file = matches.value_of("INPUT");
     let sym = matches.value_of("expr");
     let target = matches.value_of("target").unwrap_or("json");
     let mut builder = build::FileBuilder::new(
@@ -292,10 +292,11 @@ fn inspect_command<C: Cache>(
     builder.set_strict(strict);
     match registry.get_converter(target) {
         Some(converter) => {
-            let result = builder.build(file);
-            if !result.is_ok() {
-                eprintln!("{:?}", result.err().unwrap());
-                process::exit(1);
+            if let Some(file) = file {
+                if let Err(e) = builder.build(file) {
+                    eprintln!("{:?}", e);
+                    process::exit(1);
+                }
             }
             let val = match sym {
                 Some(sym_name) => {
