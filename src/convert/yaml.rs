@@ -1,4 +1,5 @@
 use std;
+use std::collections::BTreeSet;
 use std::error::Error;
 use std::io::Write;
 use std::rc::Rc;
@@ -123,7 +124,17 @@ impl YamlConverter {
             serde_yaml::Value::Mapping(m) => {
                 let mut fs = Vec::with_capacity(m.len());
                 self.merge_mapping_keys(&mut fs, m)?;
-                Val::Tuple(fs)
+				fs.reverse();
+				let mut seen_keys = BTreeSet::new();
+				let mut collapsed = Vec::with_capacity(fs.len());
+				for (k, val) in fs {
+					if !seen_keys.contains(&k) {
+						collapsed.push((k.clone(), val));
+						seen_keys.insert(k);
+					}
+				}
+				collapsed.reverse();
+                Val::Tuple(collapsed)
             }
         })
     }
