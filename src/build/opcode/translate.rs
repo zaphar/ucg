@@ -188,7 +188,10 @@ impl AST {
             Expression::Grouped(expr, _) => {
                 Self::translate_expr(*expr, &mut ops);
             }
-            Expression::Fail(_) => unimplemented!("Fail expressions are not implmented yet"),
+            Expression::Fail(def) => {
+                Self::translate_expr(*def.message, &mut ops);
+                ops.push(Op::Bang);
+            }
             Expression::Format(def) => {
                 // TODO(jwall): It would actually be safer if this was happening
                 // when we create the format def instead of here.
