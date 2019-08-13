@@ -620,6 +620,8 @@ fn simple_binary_expr() {
         "1<1;" => P(Bool(false)),
         "2>1;" => P(Bool(true)),
         "2<1;" => P(Bool(false)),
+        "2<=1;" => P(Bool(false)),
+        "2>=1;" => P(Bool(true)),
         "1!=1;" => P(Bool(false)),
         "\"foo\" ~ \"bar\";" => P(Bool(false)),
         "\"foo\" !~ \"bar\";" => P(Bool(true)),
@@ -632,6 +634,8 @@ fn simple_binary_expr() {
         "true || false;" => P(Bool(true)),
         "false || true;" => P(Bool(true)),
         "true || true;" => P(Bool(true)),
+        "foo in {foo = 1};" => P(Bool(true)),
+        "bar in {foo = 1};" => P(Bool(false)),
     )
 }
 

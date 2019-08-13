@@ -89,13 +89,14 @@ impl AST {
                         ops.push(Op::Lt);
                     }
                     BinaryExprType::GTEqual => {
-                        // An Equal and an And
-                        //ops.push(Op::GtEqual);
-                        unimplemented!("Binary expressions are not implmented yet")
+                        Self::translate_expr(*def.right, &mut ops);
+                        Self::translate_expr(*def.left, &mut ops);
+                        ops.push(Op::GtEq);
                     }
                     BinaryExprType::LTEqual => {
-                        //ops.push(Op::LtEqual);
-                        unimplemented!("Binary expressions are not implmented yet")
+                        Self::translate_expr(*def.right, &mut ops);
+                        Self::translate_expr(*def.left, &mut ops);
+                        ops.push(Op::LtEq);
                     }
                     BinaryExprType::NotEqual => {
                         Self::translate_expr(*def.right, &mut ops);
@@ -144,7 +145,25 @@ impl AST {
                         ops.push(Op::Mod);
                     }
                     BinaryExprType::IN => {
-                        unimplemented!("Binary expressions are not implmented yet")
+                        // Dot expressions expect the left side to be pushed first
+                        Self::translate_expr(*def.right, &mut ops);
+                        // Symbols on the right side should be converted to strings to satisfy
+                        // the Index operation contract.
+                        match *def.left {
+                            Expression::Simple(Value::Symbol(name)) => {
+                                Self::translate_expr(
+                                    Expression::Simple(Value::Str(name)),
+                                    &mut ops,
+                                );
+                            }
+                            expr => {
+                                Self::translate_expr(expr, &mut ops);
+                            }
+                        }
+                        ops.push(Op::SafeIndex);
+                        ops.push(Op::Val(Primitive::Empty));
+                        ops.push(Op::Equal);
+                        ops.push(Op::Not);
                     }
                     BinaryExprType::DOT => {
                         // Dot expressions expect the left side to be pushed first

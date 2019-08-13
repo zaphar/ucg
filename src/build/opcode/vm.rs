@@ -100,7 +100,8 @@ impl<'a> VM {
                 Op::InitTuple => self.push(Rc::new(C(Tuple(Vec::new()))))?,
                 Op::Field => self.op_field()?,
                 Op::Element => self.op_element()?,
-                Op::Index => self.op_index()?,
+                Op::Index => self.op_index(false)?,
+                Op::SafeIndex => self.op_index(true)?,
                 Op::Cp => self.op_copy()?,
                 //TODO(jwall): Should this take a user provided message?
                 Op::Bang => return dbg!(Err(Error {})),
@@ -558,7 +559,7 @@ impl<'a> VM {
         }
     }
 
-    fn op_index(&mut self) -> Result<(), Error> {
+    fn op_index(&mut self, safe: bool) -> Result<(), Error> {
         // left and then right
         let right = self.pop()?;
         let left = self.pop()?;
@@ -585,6 +586,10 @@ impl<'a> VM {
                 // noop
             }
         };
+        if safe {
+            self.push(Rc::new(P(Empty)));
+            return Ok(());
+        }
         return Err(dbg!(Error {}));
     }
 

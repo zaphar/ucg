@@ -190,7 +190,8 @@ pub enum Op {
     And(i32),
     Or(i32),
     // Spacer operation, Does nothing.
-    Index, // indexing operation
+    Index,     // indexing operation
+    SafeIndex, // Safe indexing operation. Does Null Coelescing
     Noop,
     // Pending Computation
     InitThunk(i32), // Basically just used for module return expressions
