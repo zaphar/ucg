@@ -36,6 +36,13 @@ pub mod walk;
 
 pub use walk::Walker;
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum TemplatePart {
+    Str(Vec<char>),
+    PlaceHolder(usize),
+    Expression(Expression),
+}
+
 macro_rules! enum_type_equality {
     ( $slf:ident, $r:expr, $( $l:pat ),* ) => {
         match $slf {

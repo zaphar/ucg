@@ -150,8 +150,10 @@ pub enum Hook {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Op {
     // Stack and Name manipulation.
-    Bind, // Bind a Val to a name in the heap
-    Pop,  // Pop a Value off the value stack and discard it.
+    Bind,     // Bind a Val to a name in the heap
+    BindOver, // Overwrite a value in the heap
+    Pop,      // Pop a Value off the value stack and discard it.
+    NewScope(i32),
     // Math ops
     Add,
     Sub,

@@ -86,7 +86,8 @@ impl<'a> VM {
                 Op::Sub => self.op_sub()?,
                 Op::Mul => self.op_mul()?,
                 Op::Div => self.op_div()?,
-                Op::Bind => self.op_bind()?,
+                Op::Bind => self.op_bind(true)?,
+                Op::BindOver => self.op_bind(false)?,
                 Op::Equal => self.op_equal()?,
                 Op::Not => self.op_not()?,
                 Op::Gt => self.op_gt()?,
@@ -116,7 +117,11 @@ impl<'a> VM {
                 Op::Module(mptr) => self.op_module(idx, mptr)?,
                 Op::Func(jptr) => self.op_func(idx, jptr)?,
                 Op::FCall => self.op_fcall()?,
-                Op::Return => return Ok(()),
+                Op::NewScope(jp) => self.op_new_scope(jp, self.ops.clone())?,
+                Op::Return => {
+                    dbg!(&self.stack);
+                    return Ok(());
+                }
                 Op::Pop => {
                     self.pop()?;
                 }
@@ -161,6 +166,7 @@ impl<'a> VM {
                 .map(|v| (v as i32 + jp) as usize)
                 .unwrap_or(jp as usize),
         )?;
+        dbg!(&self.stack);
         Ok(())
     }
 
@@ -206,7 +212,7 @@ impl<'a> VM {
         let cond = self.pop()?;
         if let &P(Bool(cond)) = cond.as_ref() {
             if !cond {
-                self.op_jump(dbg!(jp))?;
+                self.op_jump(jp)?;
             }
         }
         Ok(())
@@ -214,15 +220,15 @@ impl<'a> VM {
 
     fn op_select_jump(&'a mut self, jp: i32) -> Result<(), Error> {
         // pop field value off
-        let field_name = dbg!(self.pop())?;
+        let field_name = self.pop()?;
         // pop search value off
-        let search = dbg!(self.pop())?;
+        let search = self.pop()?;
         // compare them.
-        if dbg!(field_name != search) {
-            self.op_jump(dbg!(jp))?;
-            self.push(dbg!(search))?;
+        if field_name != search {
+            self.op_jump(jp)?;
+            self.push(search)?;
         }
-        dbg!(self.ops.ptr.unwrap());
+        self.ops.ptr.unwrap();
         // if they aren't equal then push search value back on and jump
         Ok(())
     }
@@ -246,11 +252,11 @@ impl<'a> VM {
         let mut ops = self.ops.clone();
         ops.jump(idx)?;
         self.push(Rc::new(M(Module {
-            ptr: dbg!(ops),
+            ptr: ops,
             result_ptr: result_ptr,
-            flds: dbg!(flds),
+            flds: flds,
         })))?;
-        self.ops.jump(dbg!(jptr))
+        self.ops.jump(jptr)
     }
 
     fn op_func(&mut self, idx: usize, jptr: usize) -> Result<(), Error> {
@@ -276,11 +282,11 @@ impl<'a> VM {
         eprintln!("Pushing function definition on stack");
         let mut ops = self.ops.clone();
         ops.jump(idx)?;
-        self.push(Rc::new(dbg!(F(Func {
+        self.push(Rc::new(F(Func {
             ptr: ops, // where the function starts.
             bindings: bindings,
             snapshot: scope_snapshot,
-        }))))?;
+        })))?;
         eprintln!("Jumping to {} past the function body", jptr);
         self.ops.jump(jptr)
     }
@@ -302,11 +308,23 @@ impl<'a> VM {
             // TODO(jwall): This should do a better error if there is
             // nothing on the stack.
             let val = stack.pop().unwrap();
-            vm.binding_push(nm.clone(), val)?;
+            vm.binding_push(nm.clone(), val, false)?;
         }
         // proceed to the function body
         vm.run()?;
         return vm.pop();
+    }
+
+    fn op_new_scope(&mut self, jp: i32, ptr: OpPointer) -> Result<(), Error> {
+        let scope_snapshot = self.symbols.snapshot();
+        dbg!(&ptr);
+        let mut vm = Self::with_pointer(&self.path, ptr).to_scoped(scope_snapshot);
+        dbg!(&vm.stack);
+        vm.run()?;
+        dbg!(&vm.stack);
+        self.push(vm.pop()?)?;
+        self.op_jump(jp)?;
+        Ok(())
     }
 
     fn op_fcall(&mut self) -> Result<(), Error> {
@@ -319,7 +337,7 @@ impl<'a> VM {
     }
 
     fn op_thunk(&mut self, idx: usize, jp: i32) -> Result<(), Error> {
-        self.push(Rc::new(dbg!(T(idx))))?;
+        self.push(Rc::new(T(idx)))?;
         self.op_jump(jp)
     }
 
@@ -444,13 +462,13 @@ impl<'a> VM {
         Ok(())
     }
 
-    fn op_bind(&mut self) -> Result<(), Error> {
+    fn op_bind(&mut self, strict: bool) -> Result<(), Error> {
         // pop val off stack.
-        let val = dbg!(self.pop())?;
+        let val = self.pop()?;
         // pop name off stack.
-        let name = dbg!(self.pop())?;
+        let name = self.pop()?;
         if let &S(ref name) = name.as_ref() {
-            self.binding_push(name.clone(), val)?;
+            self.binding_push(name.clone(), val, strict)?;
         } else {
             return Err(dbg!(Error {}));
         }
@@ -542,8 +560,8 @@ impl<'a> VM {
 
     fn op_index(&mut self) -> Result<(), Error> {
         // left and then right
-        let right = dbg!(self.pop()?);
-        let left = dbg!(self.pop()?);
+        let right = self.pop()?;
+        let left = self.pop()?;
         match right.as_ref() {
             &P(Int(i)) => {
                 if let &C(List(ref elems)) = left.as_ref() {
@@ -573,7 +591,7 @@ impl<'a> VM {
     fn op_copy(&mut self) -> Result<(), Error> {
         // TODO Use Cow pointers for this?
         // get next value. It should be a Module or Tuple.
-        let tgt = dbg!(self.pop())?;
+        let tgt = self.pop()?;
         // This value should always be a tuple
         let override_val = self.pop()?;
         let overrides = if let &C(Tuple(ref oflds)) = override_val.as_ref() {
@@ -585,7 +603,7 @@ impl<'a> VM {
             &C(Tuple(ref flds)) => {
                 let mut flds = flds.clone();
                 for (name, val) in overrides {
-                    dbg!(self.merge_field_into_tuple(&mut flds, name, val))?;
+                    self.merge_field_into_tuple(&mut flds, name, val)?;
                 }
                 // Put the copy on the Stack
                 self.push(Rc::new(C(Tuple(flds))))?;
@@ -608,14 +626,14 @@ impl<'a> VM {
                 //self.merge_field_into_tuple(&mut flds, "this".to_owned(), this)?;
                 let mut vm = Self::with_pointer(self.path.clone(), ptr.clone());
                 vm.push(Rc::new(S("mod".to_owned())))?;
-                vm.push(Rc::new(C(Tuple(dbg!(flds)))))?;
+                vm.push(Rc::new(C(Tuple(flds))))?;
                 vm.run()?;
-                if let Some(ptr) = dbg!(result_ptr) {
+                if let Some(ptr) = result_ptr {
                     vm.ops.jump(ptr.clone())?;
                     vm.run()?;
                     self.push(vm.pop()?)?;
                 } else {
-                    self.push(dbg!(Rc::new(vm.symbols_to_tuple(false))))?;
+                    self.push(Rc::new(vm.symbols_to_tuple(false)))?;
                 }
             }
             _ => {
@@ -646,8 +664,13 @@ impl<'a> VM {
         Ok(())
     }
 
-    pub fn binding_push(&mut self, name: String, val: Rc<Value>) -> Result<(), Error> {
-        if self.symbols.is_bound(&name) {
+    pub fn binding_push(
+        &mut self,
+        name: String,
+        val: Rc<Value>,
+        strict: bool,
+    ) -> Result<(), Error> {
+        if self.symbols.is_bound(&name) && strict {
             return Err(dbg!(Error {}));
         }
         self.symbols.add(name, val);

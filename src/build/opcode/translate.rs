@@ -11,11 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use crate::ast::Position;
 use crate::ast::{BinaryExprType, Expression, FormatArgs, Statement, Value};
-use crate::build::format::{
-    ExpressionFormatter, FormatRenderer, SimpleTemplate, TemplateParser, TemplatePart,
-};
+use crate::ast::{Position, TemplatePart};
+use crate::build::format::{ExpressionTemplate, SimpleTemplate, TemplateParser};
 use crate::build::opcode::Primitive;
 use crate::build::opcode::Value::{C, F, M, P, T};
 use crate::build::opcode::{Hook, Op};
@@ -178,7 +176,9 @@ impl AST {
                 match def.args {
                     FormatArgs::List(mut elems) => {
                         let formatter = SimpleTemplate::new();
-                        let mut parts = dbg!(formatter.parse(&def.template));
+                        // TODO(jwall): This really belongs in a preprocess step
+                        // before here.
+                        let mut parts = formatter.parse(&def.template).unwrap();
                         // We need to push process these in reverse order for the
                         // vm to process things correctly;
                         elems.reverse();
@@ -196,8 +196,37 @@ impl AST {
                             ops.push(Op::Add);
                         }
                     }
-                    FormatArgs::Single(e) => {
-                        // TODO(jwall): Use expression formatter here.
+                    FormatArgs::Single(expr) => {
+                        let formatter = ExpressionTemplate::new();
+                        // TODO(jwall): This really belongs in a preprocess step
+                        // before here.
+                        let mut parts = formatter.parse(&def.template).unwrap();
+                        parts.reverse();
+                        let mut parts_iter = parts.drain(0..);
+                        // TODO(jwall): We need to assume there is a new scope introduced now
+                        ops.push(Op::Noop);
+                        let scope_idx = ops.len() - 1;
+
+                        // Add our item binding shadowing any binding that already
+                        // existed.
+                        ops.push(Op::Sym("item".to_owned()));
+                        Self::translate_expr(*expr, &mut ops);
+                        ops.push(Op::BindOver);
+                        let mut elems = Vec::new();
+                        let mut elems_iter = elems.drain(0..);
+                        Self::translate_template_part(
+                            parts_iter.next().unwrap(),
+                            &mut elems_iter,
+                            &mut ops,
+                            false,
+                        );
+                        for p in parts_iter {
+                            Self::translate_template_part(p, &mut elems_iter, &mut ops, false);
+                            ops.push(Op::Add);
+                        }
+                        ops.push(Op::Return);
+                        let jump_idx = (ops.len() - 1 - scope_idx) as i32;
+                        ops[scope_idx] = Op::NewScope(jump_idx);
                     }
                 }
             }
@@ -233,16 +262,16 @@ impl AST {
                     // In theory this should never be reachable
                     unreachable!();
                 } else {
-                    Self::translate_expr(dbg!(elems.next().unwrap()), &mut ops);
+                    Self::translate_expr(elems.next().unwrap(), &mut ops);
                     ops.push(Op::Render);
                 }
             }
-            TemplatePart::Expression(_expr) => {
-                // TODO(jwall): We need to parse this.
+            TemplatePart::Expression(expr) => {
                 if place_holder {
                     unreachable!();
                 } else {
-                    unimplemented!("Expression Formatters are unimmplemented");
+                    Self::translate_expr(expr, &mut ops);
+                    ops.push(Op::Render);
                 }
             }
         }

@@ -16,9 +16,9 @@ use std::rc::Rc;
 use super::scope::Stack;
 use super::Composite::{List, Tuple};
 use super::Op::{
-    Add, Bang, Bind, Cp, DeRef, Div, Element, Equal, FCall, Field, Func, Index, InitList,
-    InitThunk, InitTuple, Jump, JumpIfFalse, JumpIfTrue, Module, Mul, Noop, Pop, Render, Return,
-    SelectJump, Sub, Sym, Typ, Val,
+    Add, Bang, Bind, BindOver, Cp, DeRef, Div, Element, Equal, FCall, Field, Func, Index, InitList,
+    InitThunk, InitTuple, Jump, JumpIfFalse, JumpIfTrue, Module, Mul, NewScope, Noop, Pop, Render,
+    Return, SelectJump, Sub, Sym, Typ, Val,
 };
 use super::Primitive::{Bool, Empty, Float, Int, Str};
 use super::Value::{C, P};
@@ -76,6 +76,34 @@ fn math_ops() {
             Add, // 3 + 1
         ] => P(Int(4)),
     );
+}
+
+#[test]
+fn new_scopes() {
+    assert_cases![
+        vec![
+            Sym("foo".to_owned()),
+            Val(Int(1)),
+            Bind,
+            NewScope(5),
+            Sym("foo".to_owned()),
+            Val(Int(2)),
+            BindOver,
+            DeRef("foo".to_owned()),
+            Return,
+        ] => P(Int(2)),
+        vec![
+            Sym("bar".to_owned()),
+            Val(Int(1)),
+            Bind,
+            NewScope(5),
+            Sym("foo".to_owned()),
+            Val(Int(2)),
+            Bind,
+            DeRef("bar".to_owned()),
+            Return,
+        ] => P(Int(1)),
+    ];
 }
 
 #[test]
@@ -546,6 +574,7 @@ macro_rules! assert_parse_cases {
     (__impl__ $cases:expr) => {
         for case in $cases.drain(0..) {
             let stmts = parse(OffsetStrIter::from(dbg!(case.0)), None).unwrap();
+            // TODO(jwall): preprocessor
             let ops = Rc::new(translate::AST::translate(stmts));
             assert!(ops.len() > 0);
             let mut vm = VM::new("foo.ucg", ops.clone());
@@ -672,5 +701,6 @@ fn simple_format_expressions() {
         "\"@\" % (NULL);" => P(Str("NULL".to_owned())),
         "\"@ @ @\" % (1, 2, 3);" => P(Str("1 2 3".to_owned())),
         "\"@ \\\\@\" % (1);" => P(Str("1 @".to_owned())),
+        "\"@{item.num}\" % {num=1};" => P(Str("1".to_owned())),
     ];
 }

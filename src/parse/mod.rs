@@ -771,7 +771,7 @@ make_fn!(
     )
 );
 
-fn expression(input: SliceIter<Token>) -> ParseResult<Expression> {
+pub fn expression(input: SliceIter<Token>) -> ParseResult<Expression> {
     let _input = input.clone();
     match trace_parse!(_input, op_expression) {
         Result::Incomplete(i) => Result::Incomplete(i),
