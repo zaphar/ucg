@@ -235,7 +235,7 @@ impl<'a> VM {
     }
 
     fn op_module(&'a mut self, idx: usize, jptr: i32) -> Result<(), Error> {
-        let mod_val = self.pop()?;
+        let mod_val = dbg!(self.pop())?;
         let (result_ptr, flds) = match mod_val.as_ref() {
             &C(Tuple(ref flds)) => (None, flds.clone()),
             &T(ptr) => {
@@ -602,9 +602,9 @@ impl<'a> VM {
     fn op_copy(&mut self) -> Result<(), Error> {
         // TODO Use Cow pointers for this?
         // get next value. It should be a Module or Tuple.
-        let tgt = self.pop()?;
+        let tgt = dbg!(self.pop()?);
         // This value should always be a tuple
-        let override_val = self.pop()?;
+        let override_val = dbg!(self.pop()?);
         let overrides = if let &C(Tuple(ref oflds)) = override_val.as_ref() {
             oflds.clone()
         } else {
@@ -642,9 +642,10 @@ impl<'a> VM {
                 if let Some(ptr) = result_ptr {
                     vm.ops.jump(ptr.clone())?;
                     vm.run()?;
-                    self.push(vm.pop()?)?;
+                    self.push(dbg!(vm.pop())?)?;
                 } else {
-                    self.push(Rc::new(vm.symbols_to_tuple(false)))?;
+                    dbg!(&vm.symbols);
+                    self.push(Rc::new(dbg!(vm.symbols_to_tuple(false))))?;
                 }
             }
             _ => {

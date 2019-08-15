@@ -22,6 +22,11 @@ pub struct AST();
 impl AST {
     pub fn translate(stmts: Vec<Statement>) -> Vec<Op> {
         let mut ops = Vec::new();
+        Self::translate_stmts(stmts, &mut ops);
+        return ops;
+    }
+
+    fn translate_stmts(stmts: Vec<Statement>, mut ops: &mut Vec<Op>) {
         for stmt in stmts {
             match stmt {
                 Statement::Expression(expr) => Self::translate_expr(expr, &mut ops),
@@ -42,7 +47,6 @@ impl AST {
                 }
             }
         }
-        return ops;
     }
 
     fn translate_expr(expr: Expression, mut ops: &mut Vec<Op>) {
@@ -267,7 +271,40 @@ impl AST {
             Expression::FuncOp(_) => unimplemented!("FuncOp expressions are not implmented yet"),
             Expression::Import(_) => unimplemented!("Import expressions are not implmented yet"),
             Expression::Include(_) => unimplemented!("Include expressions are not implmented yet"),
-            Expression::Module(_) => unimplemented!("Module expressions are not implmented yet"),
+            Expression::Module(def) => {
+                let argset = def.arg_set;
+                let out_expr = def.out_expr;
+                let stmts = def.statements;
+                // Init our module tuple bindings
+                ops.push(Op::InitTuple);
+                for (t, e) in argset {
+                    ops.push(Op::Sym(t.fragment));
+                    Self::translate_expr(e, &mut ops);
+                    ops.push(Op::Field);
+                }
+                // If there is one then emit our return expression
+                if let Some(expr) = out_expr {
+                    // Insert placeholder until we know jptr for this thunk
+                    ops.push(Op::Noop);
+                    let idx = ops.len() - 1;
+                    Self::translate_expr(*expr, &mut ops);
+                    ops.push(Op::Return);
+                    let jptr = ops.len() - idx - 1;
+                    ops[idx] = Op::InitThunk(jptr as i32);
+                }
+                // Insert a placeholder Opcode until we know jptr for the
+                // module.
+                ops.push(Op::Noop);
+                let idx = ops.len() - 1;
+                // Bind our mod tuple.
+                ops.push(Op::Bind);
+                // emit all of our statements;
+                Self::translate_stmts(stmts, &mut ops);
+                // Return from the module
+                ops.push(Op::Return);
+                let jptr = ops.len() - idx - 1;
+                ops[idx] = Op::Module(jptr as i32);
+            }
             Expression::Not(def) => {
                 Self::translate_expr(*def.expr, &mut ops);
                 ops.push(Op::Not);
@@ -284,7 +321,16 @@ impl AST {
                 ops.push(Op::FCall);
                 dbg!(ops);
             }
-            Expression::Copy(_) => unimplemented!("Copy expressions are not implmented yet"),
+            Expression::Copy(def) => {
+                ops.push(Op::InitTuple);
+                for (t, e) in def.fields {
+                    ops.push(Op::Sym(t.fragment));
+                    Self::translate_expr(e, &mut ops);
+                    ops.push(Op::Field);
+                }
+                Self::translate_value(def.selector, &mut ops);
+                ops.push(Op::Cp);
+            }
             Expression::Debug(_) => unimplemented!("Debug expressions are not implmented yet"),
         }
     }

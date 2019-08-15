@@ -579,7 +579,7 @@ macro_rules! assert_parse_cases {
             assert!(ops.len() > 0);
             let mut vm = VM::new("foo.ucg", ops.clone());
             vm.run().unwrap();
-            assert_eq!(dbg!(vm.pop()).unwrap(), Rc::new(case.1));
+            assert_eq!(vm.pop().unwrap(), Rc::new(case.1));
         }
     };
 
@@ -714,5 +714,15 @@ fn simple_functions() {
     assert_parse_cases![
         "let f = func(val) => val; f(1);" => P(Int(1)),
         "let f = func(val1, val2) => val1 + val2; f(1, 1);" => P(Int(2)),
+    ];
+}
+
+#[test]
+fn simple_modules() {
+    assert_parse_cases![
+        "let m = module{} => { let v = 1; }; m{};" => C(Tuple(vec![("v".to_owned(), Rc::new(P(Int(1))))])),
+        "let m = module{} => (v) { let v = 1; }; m{};" => P(Int(1)),
+        "let m = module{val=NULL} => (v) { let v = mod.val; }; m{val=1};" => P(Int(1)),
+        "let m = module{val=NULL} => (v) { let v = mod.val + 1; }; m{val=1};" => P(Int(2)),
     ];
 }
