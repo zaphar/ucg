@@ -195,8 +195,8 @@ pub enum Op {
     Noop,
     // Pending Computation
     InitThunk(i32), // Basically just used for module return expressions
-    Module(usize),
-    Func(usize),
+    Module(i32),
+    Func(i32),
     Return,
     // Calls
     FCall,

@@ -346,7 +346,7 @@ fn function_definition_and_call() {
             InitList,                // 1
             Sym("arg".to_owned()),   // 2
             Element,                 // 3
-            Func(6),                 // 4
+            Func(2),                 // 4
             DeRef("arg".to_owned()), // 5
             Return,                  // 6
             Bind,                    // 7
@@ -362,7 +362,7 @@ fn function_definition_and_call() {
             InitList,                   // 4
             Sym("arg".to_owned()),      // 5
             Element,                    // 6
-            Func(11),                   // 7
+            Func(4),                    // 7
             DeRef("arg".to_owned()),    // 8
             DeRef("closed".to_owned()), // 9
             Add,                        // 10
@@ -391,7 +391,7 @@ fn module_call() {
             Sym("two".to_owned()),   // 9
             Val(Int(2)),             // 10
             Field,                   // 11
-            Module(17),              // 12 // Module body definition
+            Module(5),               // 12 // Module body definition
             Bind,                    // 13 // bind the mod tuple
             Sym("foo".to_owned()),   // 14
             DeRef("mod".to_owned()), // 15
@@ -425,7 +425,7 @@ fn module_call() {
             InitThunk(2),            // 12 // Module Return expression
             Val(Int(1)),             // 13
             Return,                  // 14
-            Module(20),              // 15 // Module definition
+            Module(5),              // 15 // Module definition
             Bind,                    // 16
             Sym("foo".to_owned()),   // 17
             DeRef("mod".to_owned()), // 18
@@ -706,5 +706,13 @@ fn simple_format_expressions() {
         "\"@ @ @\" % (1, 2, 3);" => P(Str("1 2 3".to_owned())),
         "\"@ \\\\@\" % (1);" => P(Str("1 @".to_owned())),
         "\"@{item.num}\" % {num=1};" => P(Str("1".to_owned())),
+    ];
+}
+
+#[test]
+fn simple_functions() {
+    assert_parse_cases![
+        "let f = func(val) => val; f(1);" => P(Int(1)),
+        "let f = func(val1, val2) => val1 + val2; f(1, 1);" => P(Int(2)),
     ];
 }

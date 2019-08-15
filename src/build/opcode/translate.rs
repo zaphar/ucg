@@ -15,8 +15,7 @@ use crate::ast::{BinaryExprType, Expression, FormatArgs, Statement, Value};
 use crate::ast::{Position, TemplatePart};
 use crate::build::format::{ExpressionTemplate, SimpleTemplate, TemplateParser};
 use crate::build::opcode::Primitive;
-use crate::build::opcode::Value::{C, F, M, P, T};
-use crate::build::opcode::{Hook, Op};
+use crate::build::opcode::{Func, Hook, Op};
 
 pub struct AST();
 
@@ -252,7 +251,19 @@ impl AST {
                     }
                 }
             }
-            Expression::Func(_) => unimplemented!("Func expressions are not implmented yet"),
+            Expression::Func(def) => {
+                ops.push(Op::InitList);
+                for b in def.argdefs {
+                    ops.push(Op::Sym(b.val));
+                    ops.push(Op::Element);
+                }
+                ops.push(Op::Noop);
+                let idx = ops.len() - 1;
+                Self::translate_expr(*def.fields, &mut ops);
+                ops.push(Op::Return);
+                let jptr = ops.len() - 1 - idx;
+                ops[idx] = Op::Func(jptr as i32);
+            }
             Expression::FuncOp(_) => unimplemented!("FuncOp expressions are not implmented yet"),
             Expression::Import(_) => unimplemented!("Import expressions are not implmented yet"),
             Expression::Include(_) => unimplemented!("Include expressions are not implmented yet"),
@@ -263,7 +274,16 @@ impl AST {
             }
             Expression::Range(_) => unimplemented!("Range expressions are not implmented yet"),
             Expression::Select(_) => unimplemented!("Select expressions are not implmented yet"),
-            Expression::Call(_) => unimplemented!("Call expressions are not implmented yet"),
+            Expression::Call(def) => {
+                // first push our arguments.
+                for e in def.arglist {
+                    Self::translate_expr(e, &mut ops);
+                }
+                // then push the func reference
+                Self::translate_value(def.funcref, &mut ops);
+                ops.push(Op::FCall);
+                dbg!(ops);
+            }
             Expression::Copy(_) => unimplemented!("Copy expressions are not implmented yet"),
             Expression::Debug(_) => unimplemented!("Debug expressions are not implmented yet"),
         }

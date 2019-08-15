@@ -104,7 +104,7 @@ impl<'a> VM {
                 Op::SafeIndex => self.op_index(true)?,
                 Op::Cp => self.op_copy()?,
                 //TODO(jwall): Should this take a user provided message?
-                Op::Bang => return dbg!(Err(Error {})),
+                Op::Bang => self.op_bang()?,
                 Op::InitThunk(jp) => self.op_thunk(idx, jp)?,
                 Op::Noop => {
                     // Do nothing
@@ -234,7 +234,7 @@ impl<'a> VM {
         Ok(())
     }
 
-    fn op_module(&'a mut self, idx: usize, jptr: usize) -> Result<(), Error> {
+    fn op_module(&'a mut self, idx: usize, jptr: i32) -> Result<(), Error> {
         let mod_val = self.pop()?;
         let (result_ptr, flds) = match mod_val.as_ref() {
             &C(Tuple(ref flds)) => (None, flds.clone()),
@@ -257,10 +257,10 @@ impl<'a> VM {
             result_ptr: result_ptr,
             flds: flds,
         })))?;
-        self.ops.jump(jptr)
+        self.op_jump(jptr)
     }
 
-    fn op_func(&mut self, idx: usize, jptr: usize) -> Result<(), Error> {
+    fn op_func(&mut self, idx: usize, jptr: i32) -> Result<(), Error> {
         // get arity from stack
         let mut scope_snapshot = self.symbols.snapshot();
         scope_snapshot.push();
@@ -289,7 +289,7 @@ impl<'a> VM {
             snapshot: scope_snapshot,
         })))?;
         eprintln!("Jumping to {} past the function body", jptr);
-        self.ops.jump(jptr)
+        self.op_jump(jptr)
     }
 
     pub fn fcall_impl<P: Into<PathBuf>>(
@@ -329,10 +329,10 @@ impl<'a> VM {
     }
 
     fn op_fcall(&mut self) -> Result<(), Error> {
-        let f = self.pop()?;
+        let f = dbg!(self.pop())?;
         if let &F(ref f) = f.as_ref() {
             let val = Self::fcall_impl(&self.path, f, &mut self.stack)?;
-            self.push(val)?;
+            self.push(dbg!(val))?;
         }
         Ok(())
     }
@@ -505,10 +505,10 @@ impl<'a> VM {
 
     fn op_element(&mut self) -> Result<(), Error> {
         // get element from stack.
-        let val = self.pop()?;
+        let val = dbg!(self.pop()?);
         // get next value. It should be a Composite list.
-        let tpl = self.pop()?;
-        if let &C(List(ref elems)) = tpl.as_ref() {
+        let list = dbg!(self.pop()?);
+        if let &C(List(ref elems)) = list.as_ref() {
             // add value to list
             // TODO(jwall): This is probably memory inefficient and we should
             // optimize it a bit.
@@ -557,6 +557,12 @@ impl<'a> VM {
             C(List(elements)) => self.find_in_list(index, elements),
             _ => return Err(dbg!(Error {})),
         }
+    }
+
+    fn op_bang(&mut self) -> Result<(), Error> {
+        let msg = self.pop()?;
+        // TODO(jwall): record an error here.
+        Ok(())
     }
 
     fn op_index(&mut self, safe: bool) -> Result<(), Error> {
