@@ -269,8 +269,15 @@ impl AST {
                 ops[idx] = Op::Func(jptr as i32);
             }
             Expression::FuncOp(_) => unimplemented!("FuncOp expressions are not implmented yet"),
-            Expression::Import(_) => unimplemented!("Import expressions are not implmented yet"),
-            Expression::Include(_) => unimplemented!("Include expressions are not implmented yet"),
+            Expression::Import(def) => {
+                ops.push(Op::Val(Primitive::Str(def.path.fragment)));
+                ops.push(Op::Runtime(Hook::Import));
+            }
+            Expression::Include(def) => {
+                ops.push(Op::Val(Primitive::Str(def.typ.fragment)));
+                ops.push(Op::Val(Primitive::Str(def.path.fragment)));
+                ops.push(Op::Runtime(Hook::Include));
+            }
             Expression::Module(def) => {
                 let argset = def.arg_set;
                 let out_expr = def.out_expr;
