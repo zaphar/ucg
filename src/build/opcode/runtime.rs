@@ -419,18 +419,6 @@ impl Builtins {
         } else {
             return Err(dbg!(Error {}));
         };
-        // TODO(jwall): This can also be tuples or strings.
-        let elems = match list.as_ref() {
-            &C(List(ref elems)) => elems,
-            &C(Tuple(ref _flds)) => {
-                unimplemented!("TODO Tuple functional operations");
-            }
-            &P(Str(ref _s)) => {
-                unimplemented!("TODO String functional operations");
-            }
-            _ => return Err(dbg!(Error {})),
-        };
-
         // get the func ptr from the stack
         let fptr = if let Some(ptr) = stack.pop() {
             ptr
@@ -444,22 +432,65 @@ impl Builtins {
             return dbg!(Err(Error {}));
         };
 
-        let mut result_elems = Vec::new();
-        for e in elems.iter() {
-            // push function argument on the stack.
-            stack.push(e.clone());
-            // call function and push it's result on the stack.
-            let condition = VM::fcall_impl(path.as_ref().to_owned(), f, stack, env.clone())?;
-            // Check for empty or boolean results and only push e back in
-            // if they are non empty and true
-            match condition.as_ref() {
-                &P(Empty) | &P(Bool(false)) => {
-                    continue;
+        // TODO(jwall): This can also be tuples or strings.
+        let elems = match list.as_ref() {
+            &C(List(ref elems)) => {
+                let mut result_elems = Vec::new();
+                for e in elems.iter() {
+                    // push function argument on the stack.
+                    stack.push(e.clone());
+                    // call function and push it's result on the stack.
+                    let condition =
+                        VM::fcall_impl(path.as_ref().to_owned(), f, stack, env.clone())?;
+                    // Check for empty or boolean results and only push e back in
+                    // if they are non empty and true
+                    match condition.as_ref() {
+                        &P(Empty) | &P(Bool(false)) => {
+                            continue;
+                        }
+                        _ => result_elems.push(e.clone()),
+                    }
                 }
-                _ => result_elems.push(e.clone()),
+                stack.push(Rc::new(C(List(result_elems))));
             }
-        }
-        stack.push(Rc::new(C(List(result_elems))));
+            &C(Tuple(ref _flds)) => {
+                let mut new_fields = Vec::new();
+                for (ref name, ref val) in _flds {
+                    stack.push(val.clone());
+                    stack.push(Rc::new(P(Str(name.clone()))));
+                    let condition =
+                        VM::fcall_impl(path.as_ref().to_owned(), f, stack, env.clone())?;
+                    // Check for empty or boolean results and only push e back in
+                    // if they are non empty and true
+                    match condition.as_ref() {
+                        &P(Empty) | &P(Bool(false)) => {
+                            continue;
+                        }
+                        _ => new_fields.push((name.clone(), val.clone())),
+                    }
+                }
+                stack.push(Rc::new(C(Tuple(dbg!(new_fields)))));
+            }
+            &P(Str(ref s)) => {
+                let mut buf = String::new();
+                for c in s.chars() {
+                    stack.push(Rc::new(P(Str(c.to_string()))));
+                    // call function and push it's result on the stack.
+                    let condition =
+                        VM::fcall_impl(path.as_ref().to_owned(), f, stack, env.clone())?;
+                    // Check for empty or boolean results and only push c back in
+                    // if they are non empty and true
+                    match condition.as_ref() {
+                        &P(Empty) | &P(Bool(false)) => {
+                            continue;
+                        }
+                        _ => buf.push(c),
+                    }
+                }
+                stack.push(Rc::new(P(Str(buf))));
+            }
+            _ => return Err(dbg!(Error {})),
+        };
         Ok(())
     }
 

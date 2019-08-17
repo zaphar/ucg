@@ -798,3 +798,32 @@ fn simple_maps() {
         ])),
     ];
 }
+
+#[test]
+fn simple_filters() {
+    assert_parse_cases![
+        "filter(func(el) => true, [1,2,3]);" => C(List(vec![
+            Rc::new(P(Int(1))),
+            Rc::new(P(Int(2))),
+            Rc::new(P(Int(3))),
+        ])),
+        "filter(func(el) => false, [1,2,3]);" => C(List(vec![
+        ])),
+        "filter(func(el) => el != 1, [1,2,3]);" => C(List(vec![
+            Rc::new(P(Int(2))),
+            Rc::new(P(Int(3))),
+        ])),
+        "filter(func(el) => true, \"foo\");" => P(Str("foo".to_owned())),
+        "filter(func(el) => false, \"foo\");" => P(Str("".to_owned())),
+        "filter(func(el) => el != \"f\", \"foo\");" => P(Str("oo".to_owned())),
+        "filter(func(k, v) => true, {foo = 1});" => C(Tuple(vec![
+            ("foo".to_owned(), Rc::new(P(Int(1)))),
+        ])),
+        "filter(func(k, v) => false, {foo = 1});" => C(Tuple(vec![
+        ])),
+        "filter(func(k, v) => k != \"foo\", {foo = 1});" => C(Tuple(vec![
+        ])),
+        "filter(func(k, v) => v != 1, {foo = 1});" => C(Tuple(vec![
+        ])),
+    ];
+}
