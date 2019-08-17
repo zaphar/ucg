@@ -167,7 +167,6 @@ impl<'a> VM {
                 .map(|v| (v as i32 + jp) as usize)
                 .unwrap_or(jp as usize),
         )?;
-        dbg!(&self.stack);
         Ok(())
     }
 
@@ -221,16 +220,19 @@ impl<'a> VM {
 
     fn op_select_jump(&'a mut self, jp: i32) -> Result<(), Error> {
         // pop field value off
-        let field_name = self.pop()?;
+        let field_name = dbg!(self.pop())?;
         // pop search value off
-        let search = self.pop()?;
+        let search = dbg!(self.pop())?;
         // compare them.
-        if field_name != search {
-            self.op_jump(jp)?;
-            self.push(search)?;
+        let matched = match (field_name.as_ref(), search.as_ref()) {
+            (&S(ref fname), &P(Str(ref sname))) | (&S(ref fname), &S(ref sname)) => fname == sname,
+            _ => false,
+        };
+        if !matched {
+            // if they aren't equal then push search value back on and jump
+            self.push(dbg!(search))?;
+            self.op_jump(dbg!(jp))?;
         }
-        self.ops.ptr.unwrap();
-        // if they aren't equal then push search value back on and jump
         Ok(())
     }
 
@@ -560,8 +562,6 @@ impl<'a> VM {
     }
 
     fn op_bang(&mut self) -> Result<(), Error> {
-        let msg = self.pop()?;
-        // TODO(jwall): record an error here.
         Ok(())
     }
 

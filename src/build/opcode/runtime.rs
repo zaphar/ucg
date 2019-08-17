@@ -27,7 +27,7 @@ use super::{Composite, Error, Hook, Primitive, Value};
 use crate::build::AssertCollector;
 use crate::convert::{ConverterRegistry, ImporterRegistry};
 use Composite::{List, Tuple};
-use Primitive::{Bool, Empty, Str};
+use Primitive::{Bool, Empty, Str, Int};
 
 pub struct Builtins {
     op_cache: cache::Ops,
@@ -75,6 +75,7 @@ impl Builtins {
             Hook::Filter => self.filter(path, stack),
             Hook::Reduce => self.reduce(path, stack),
             Hook::Regex => self.regex(stack),
+            Hook::Range => self.range(stack),
         }
     }
 
@@ -279,10 +280,16 @@ impl Builtins {
         } else {
             return Err(dbg!(Error {}));
         };
-        let elems = if let &C(List(ref elems)) = list.as_ref() {
-            elems
-        } else {
-            return Err(dbg!(Error {}));
+        // TODO(jwall): This can also be tuples or strings.
+        let elems = match list.as_ref() {
+            &C(List(ref elems)) => elems,
+            &C(Tuple(ref flds)) => {
+                unimplemented!("Tuple functional operations");
+            }
+            &P(Str(ref s)) => {
+                unimplemented!("string functional operations");
+            }
+            _ => return Err(dbg!(Error {})),
         };
 
         // get the func ptr from the stack
@@ -316,10 +323,16 @@ impl Builtins {
         } else {
             return Err(dbg!(Error {}));
         };
-        let elems = if let &C(List(ref elems)) = list.as_ref() {
-            elems
-        } else {
-            return Err(dbg!(Error {}));
+        // TODO(jwall): This can also be tuples or strings.
+        let elems = match list.as_ref() {
+            &C(List(ref elems)) => elems,
+            &C(Tuple(ref flds)) => {
+                unimplemented!("Tuple functional operations");
+            }
+            &P(Str(ref s)) => {
+                unimplemented!("string functional operations");
+            }
+            _ => return Err(dbg!(Error {})),
         };
 
         // get the func ptr from the stack
@@ -390,10 +403,16 @@ impl Builtins {
         } else {
             return dbg!(Err(Error {}));
         };
-        let elems = if let &C(List(ref elems)) = list.as_ref() {
-            elems
-        } else {
-            return dbg!(Err(Error {}));
+        // TODO(jwall): This can also be tuples or strings.
+        let elems = match list.as_ref() {
+            &C(List(ref elems)) => elems,
+            &C(Tuple(ref flds)) => {
+                unimplemented!("Tuple functional operations");
+            }
+            &P(Str(ref s)) => {
+                unimplemented!("string functional operations");
+            }
+            _ => return Err(dbg!(Error {})),
         };
 
         // Get the accumulator from the stack
@@ -426,6 +445,47 @@ impl Builtins {
         }
         // push the acc on the stack as our result
         stack.push(acc);
+        Ok(())
+    }
+
+    fn range(&self, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
+        let start = if let Some(start) = stack.pop() {
+            start
+        } else {
+            return dbg!(Err(Error {}));
+        };
+        let step = if let Some(step) = stack.pop() {
+            if let &P(Empty) = step.as_ref() {
+                Rc::new(P(Int(1)))
+            } else {
+                step
+            }
+        } else {
+            return dbg!(Err(Error {}));
+        };
+        let end = if let Some(end) = stack.pop() {
+            end
+        } else {
+            return dbg!(Err(Error {}));
+        };
+
+        let mut elems = Vec::new();
+        match (start.as_ref(), step.as_ref(), end.as_ref()) {
+            (&P(Int(start)), &P(Int(step)), &P(Int(end))) => {
+                let mut num = start;
+                loop {
+                    if num > end {
+                        break;
+                    }
+                    elems.push(Rc::new(P(Int(num))));
+                    num += step;
+                }
+            }
+            _ => {
+                return dbg!(Err(Error {}));
+            }
+        }
+        stack.push(Rc::new(C(List(elems))));
         Ok(())
     }
 }

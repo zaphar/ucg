@@ -442,7 +442,7 @@ fn module_call() {
 fn select_short_circuit() {
     assert_cases![
         vec![
-            Sym("field".to_owned()),              // 0 // search field
+            Val(Str("field".to_owned())),         // 0 // search field
             Sym("not_field".to_owned()),          // 1 // first field to compare
             SelectJump(2),                        // 2
             Val(Str("not our value".to_owned())), // 3 // expression for first field
@@ -455,7 +455,7 @@ fn select_short_circuit() {
             Bang,                                 // 10 // default case
         ] => P(Int(1)),
         vec![
-            Sym("field".to_owned()),              // 0 // search field
+            Val(Str("field".to_owned())),         // 0 // search field
             Sym("not_field".to_owned()),          // 1 // first field to compare
             SelectJump(2),                        // 2
             Val(Str("not our value".to_owned())), // 3 // expression for first field
@@ -724,5 +724,33 @@ fn simple_modules() {
         "let m = module{} => (v) { let v = 1; }; m{};" => P(Int(1)),
         "let m = module{val=NULL} => (v) { let v = mod.val; }; m{val=1};" => P(Int(1)),
         "let m = module{val=NULL} => (v) { let v = mod.val + 1; }; m{val=1};" => P(Int(2)),
+    ];
+}
+
+#[test]
+fn simple_range() {
+    assert_parse_cases![
+        "1:2;" => C(List(vec![
+            Rc::new(P(Int(1))),
+            Rc::new(P(Int(2))),
+        ])),
+        "0:2:4;" => C(List(vec![
+            Rc::new(P(Int(0))),
+            Rc::new(P(Int(2))),
+            Rc::new(P(Int(4))),
+        ])),
+        "0:3:4;" => C(List(vec![
+            Rc::new(P(Int(0))),
+            Rc::new(P(Int(3))),
+        ])),
+    ];
+}
+
+#[test]
+fn simple_selects() {
+    assert_parse_cases![
+        "select \"foo\", { foo = 1, bar = 2, };" => P(Int(1)),
+        "select \"bar\", { foo = 1, bar = 2, };" => P(Int(2)),
+        "select \"quux\", 3, { foo = 1, bar = 2, };" => P(Int(3)),
     ];
 }

@@ -145,6 +145,7 @@ pub enum Hook {
     Assert,
     Convert,
     Regex,
+    Range,
 }
 
 #[derive(Debug, PartialEq, Clone)]

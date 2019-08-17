@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use crate::ast::{BinaryExprType, Expression, FormatArgs, Statement, Value};
-use crate::ast::{Position, TemplatePart};
+use crate::ast::{FuncOpDef, Position, TemplatePart};
 use crate::build::format::{ExpressionTemplate, SimpleTemplate, TemplateParser};
 use crate::build::opcode::Primitive;
 use crate::build::opcode::{Func, Hook, Op};
@@ -268,7 +268,36 @@ impl AST {
                 let jptr = ops.len() - 1 - idx;
                 ops[idx] = Op::Func(jptr as i32);
             }
-            Expression::FuncOp(_) => unimplemented!("FuncOp expressions are not implmented yet"),
+            Expression::FuncOp(def) => {
+                match def {
+                    FuncOpDef::Map(def) => {
+                        // push the function on the stack first.
+                        Self::translate_expr(*def.func, &mut ops);
+                        // push the target on the stack third
+                        Self::translate_expr(*def.target, &mut ops);
+                        // finally push the Hook::Map opcode
+                        ops.push(Op::Runtime(Hook::Map));
+                    }
+                    FuncOpDef::Filter(def) => {
+                        // push the function on the stack first.
+                        Self::translate_expr(*def.func, &mut ops);
+                        // push the target on the stack third
+                        Self::translate_expr(*def.target, &mut ops);
+                        // finally push the Hook::Map opcode
+                        ops.push(Op::Runtime(Hook::Filter));
+                    }
+                    FuncOpDef::Reduce(def) => {
+                        // push the function on the stack first.
+                        Self::translate_expr(*def.func, &mut ops);
+                        // push the accumulator on the stack third
+                        Self::translate_expr(*def.acc, &mut ops);
+                        // push the target on the stack third
+                        Self::translate_expr(*def.target, &mut ops);
+                        // finally push the Hook::Map opcode
+                        ops.push(Op::Runtime(Hook::Reduce));
+                    }
+                }
+            }
             Expression::Import(def) => {
                 ops.push(Op::Val(Primitive::Str(def.path.fragment)));
                 ops.push(Op::Runtime(Hook::Import));
@@ -316,8 +345,42 @@ impl AST {
                 Self::translate_expr(*def.expr, &mut ops);
                 ops.push(Op::Not);
             }
-            Expression::Range(_) => unimplemented!("Range expressions are not implmented yet"),
-            Expression::Select(_) => unimplemented!("Select expressions are not implmented yet"),
+            Expression::Range(def) => {
+                Self::translate_expr(*def.end, &mut ops);
+                if let Some(expr) = def.step {
+                    Self::translate_expr(*expr, &mut ops);
+                } else {
+                    ops.push(Op::Val(Primitive::Empty));
+                }
+                Self::translate_expr(*def.start, &mut ops);
+                ops.push(Op::Runtime(Hook::Range));
+            }
+            Expression::Select(def) => {
+                Self::translate_expr(*def.val, &mut ops);
+                let mut jumps = Vec::new();
+                for (key, val) in def.tuple {
+                    ops.push(Op::Sym(key.fragment));
+                    ops.push(Op::Noop);
+                    let idx = ops.len() - 1;
+                    Self::translate_expr(val, &mut ops);
+                    ops.push(Op::Noop);
+                    jumps.push(ops.len() - 1);
+                    let jptr = ops.len() - idx - 1;
+                    ops[idx] = Op::SelectJump(jptr as i32);
+                }
+                ops.push(Op::Pop);
+                let end = ops.len() - 1;
+                for i in jumps {
+                    let idx = end - i;
+                    ops[i] = Op::Jump(idx as i32);
+                }
+                if let Some(default) = def.default {
+                    Self::translate_expr(*default, &mut ops);
+                } else {
+                    ops.push(Op::Bang);
+                }
+                dbg!(&ops);
+            }
             Expression::Call(def) => {
                 // first push our arguments.
                 for e in def.arglist {
@@ -338,7 +401,9 @@ impl AST {
                 Self::translate_value(def.selector, &mut ops);
                 ops.push(Op::Cp);
             }
-            Expression::Debug(_) => unimplemented!("Debug expressions are not implmented yet"),
+            Expression::Debug(def) => {
+                unimplemented!("Debug expressions are not implmented yet");
+            }
         }
     }
 
