@@ -35,8 +35,6 @@ where
     symbols: Stack,
     runtime: runtime::Builtins,
     ops: OpPointer,
-    // TODO(jwall): This should be optional
-    path: PathBuf,
     pub env: Rc<RefCell<Environment<O, E>>>,
 }
 
@@ -45,25 +43,16 @@ where
     O: std::io::Write,
     E: std::io::Write,
 {
-    pub fn new<P: Into<PathBuf>>(
-        path: P,
-        ops: Rc<Vec<Op>>,
-        env: Rc<RefCell<Environment<O, E>>>,
-    ) -> Self {
-        Self::with_pointer(path, OpPointer::new(ops), env)
+    pub fn new(ops: Rc<Vec<Op>>, env: Rc<RefCell<Environment<O, E>>>) -> Self {
+        Self::with_pointer(OpPointer::new(ops), env)
     }
 
-    pub fn with_pointer<P: Into<PathBuf>>(
-        path: P,
-        ops: OpPointer,
-        env: Rc<RefCell<Environment<O, E>>>,
-    ) -> Self {
+    pub fn with_pointer(ops: OpPointer, env: Rc<RefCell<Environment<O, E>>>) -> Self {
         Self {
             stack: Vec::new(),
             symbols: Stack::new(),
             runtime: runtime::Builtins::new(),
             ops: ops,
-            path: path.into(),
             env: env,
         }
     }
@@ -74,7 +63,6 @@ where
             symbols: symbols,
             runtime: self.runtime.clone(),
             ops: self.ops.clone(),
-            path: self.path.clone(),
             env: self.env.clone(),
         }
     }
@@ -327,8 +315,7 @@ where
         self.op_jump(jptr)
     }
 
-    pub fn fcall_impl<P: Into<PathBuf>>(
-        path: P,
+    pub fn fcall_impl(
         f: &Func,
         stack: &mut Vec<Rc<Value>>,
         env: Rc<RefCell<Environment<O, E>>>,
@@ -339,7 +326,7 @@ where
             ref snapshot,
         } = f;
         // use the captured scope snapshot for the function.
-        let mut vm = Self::with_pointer(path, ptr.clone(), env).to_scoped(snapshot.clone());
+        let mut vm = Self::with_pointer(ptr.clone(), env).to_scoped(snapshot.clone());
         for nm in bindings.iter() {
             // now put each argument on our scope stack as a binding.
             // TODO(jwall): This should do a better error if there is
@@ -355,8 +342,7 @@ where
     fn op_new_scope(&mut self, jp: i32, ptr: OpPointer) -> Result<(), Error> {
         let scope_snapshot = self.symbols.snapshot();
         dbg!(&ptr);
-        let mut vm =
-            Self::with_pointer(&self.path, ptr, self.env.clone()).to_scoped(scope_snapshot);
+        let mut vm = Self::with_pointer(ptr, self.env.clone()).to_scoped(scope_snapshot);
         dbg!(&vm.stack);
         vm.run()?;
         dbg!(&vm.stack);
@@ -368,7 +354,7 @@ where
     fn op_fcall(&mut self) -> Result<(), Error> {
         let f = dbg!(self.pop())?;
         if let &F(ref f) = f.as_ref() {
-            let val = Self::fcall_impl(&self.path, f, &mut self.stack, self.env.clone())?;
+            let val = Self::fcall_impl(f, &mut self.stack, self.env.clone())?;
             self.push(dbg!(val))?;
         }
         Ok(())
@@ -673,14 +659,13 @@ where
                 }
                 self.merge_field_into_tuple(&mut flds, "this".to_owned(), Rc::new(this))?;
                 if let Some(ptr) = pkg_ptr {
-                    let mut pkg_vm =
-                        Self::with_pointer(self.path.clone(), ptr.clone(), self.env.clone());
+                    let mut pkg_vm = Self::with_pointer(ptr.clone(), self.env.clone());
                     pkg_vm.run()?;
                     let pkg_func = pkg_vm.pop()?;
                     self.merge_field_into_tuple(&mut flds, "pkg".to_owned(), pkg_func)?;
                 }
 
-                let mut vm = Self::with_pointer(self.path.clone(), ptr.clone(), self.env.clone());
+                let mut vm = Self::with_pointer(ptr.clone(), self.env.clone());
                 vm.push(Rc::new(S("mod".to_owned())))?;
                 vm.push(Rc::new(C(Tuple(flds))))?;
                 vm.run()?;
@@ -806,7 +791,7 @@ where
 
     fn op_runtime(&mut self, h: Hook) -> Result<(), Error> {
         self.runtime
-            .handle(&self.path, h, &mut self.stack, self.env.clone())
+            .handle(self.ops.path.as_ref(), h, &mut self.stack, self.env.clone())
     }
 
     fn op_render(&mut self) -> Result<(), Error> {

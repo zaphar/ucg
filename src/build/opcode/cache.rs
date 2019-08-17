@@ -13,8 +13,8 @@
 // limitations under the License.
 use std::collections::btree_map;
 use std::collections::BTreeMap;
-use std::rc::Rc;
 use std::path::PathBuf;
+use std::rc::Rc;
 
 use super::{Op, OpPointer};
 
@@ -38,7 +38,11 @@ impl Ops {
 pub struct Entry<'a>(btree_map::Entry<'a, String, Rc<Vec<Op>>>);
 
 impl<'a> Entry<'a> {
-    pub fn get_pointer_or_else<F: FnOnce() -> Vec<Op>, P: Into<PathBuf>>(self, f: F, path: P) -> OpPointer {
+    pub fn get_pointer_or_else<F: FnOnce() -> Vec<Op>, P: Into<PathBuf>>(
+        self,
+        f: F,
+        path: P,
+    ) -> OpPointer {
         let cached = self.0.or_insert_with(|| Rc::new(f())).clone();
         OpPointer::new(cached).with_path(path.into())
     }

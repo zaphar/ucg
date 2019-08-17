@@ -62,7 +62,7 @@ impl Builtins {
 
     pub fn handle<P: AsRef<Path>, O, E>(
         &mut self,
-        path: P,
+        path: Option<P>,
         h: Hook,
         stack: &mut Vec<Rc<Value>>,
         env: Rc<RefCell<Environment<O, E>>>,
@@ -77,9 +77,9 @@ impl Builtins {
             Hook::Assert => self.assert(stack),
             Hook::Convert => self.convert(stack, env),
             Hook::Out => self.out(path, stack, env),
-            Hook::Map => self.map(path, stack, env),
-            Hook::Filter => self.filter(path, stack, env),
-            Hook::Reduce => self.reduce(path, stack, env),
+            Hook::Map => self.map(stack, env),
+            Hook::Filter => self.filter(stack, env),
+            Hook::Reduce => self.reduce(stack, env),
             Hook::Regex => self.regex(stack),
             Hook::Range => self.range(stack),
             Hook::Trace(pos) => self.trace(stack, pos, env),
@@ -168,7 +168,7 @@ impl Builtins {
                         },
                         &path,
                     );
-                    let mut vm = VM::with_pointer(path, op_pointer, env.clone());
+                    let mut vm = VM::with_pointer(op_pointer, env.clone());
                     vm.run()?;
                     let result = Rc::new(vm.symbols_to_tuple(true));
                     val_cache.insert(path.clone(), result.clone());
@@ -269,7 +269,7 @@ impl Builtins {
 
     fn out<P: AsRef<Path>, O, E>(
         &self,
-        path: P,
+        path: Option<P>,
         stack: &mut Vec<Rc<Value>>,
         env: Rc<RefCell<Environment<O, E>>>,
     ) -> Result<(), Error>
@@ -277,6 +277,11 @@ impl Builtins {
         O: std::io::Write,
         E: std::io::Write,
     {
+        let path = if let Some(path) = path {
+            path
+        } else {
+            return Err(dbg!(Error {}));
+        };
         let val = stack.pop();
         if let Some(val) = val {
             let val = val.try_into()?;
@@ -330,9 +335,8 @@ impl Builtins {
         return Err(dbg!(Error {}));
     }
 
-    fn map<P: AsRef<Path>, O, E>(
+    fn map<O, E>(
         &self,
-        path: P,
         stack: &mut Vec<Rc<Value>>,
         env: Rc<RefCell<Environment<O, E>>>,
     ) -> Result<(), Error>
@@ -366,12 +370,7 @@ impl Builtins {
                     // push function argument on the stack.
                     stack.push(e.clone());
                     // call function and push it's result on the stack.
-                    result_elems.push(VM::fcall_impl(
-                        path.as_ref().to_owned(),
-                        f,
-                        stack,
-                        env.clone(),
-                    )?);
+                    result_elems.push(VM::fcall_impl(f, stack, env.clone())?);
                 }
                 stack.push(Rc::new(C(List(result_elems))));
             }
@@ -380,7 +379,7 @@ impl Builtins {
                 for (ref name, ref val) in _flds {
                     stack.push(val.clone());
                     stack.push(Rc::new(P(Str(name.clone()))));
-                    let result = VM::fcall_impl(path.as_ref().to_owned(), f, stack, env.clone())?;
+                    let result = VM::fcall_impl(f, stack, env.clone())?;
                     if let &C(List(ref fval)) = result.as_ref() {
                         // we expect them to be a list of exactly 2 items.
                         if fval.len() != 2 {
@@ -400,7 +399,7 @@ impl Builtins {
                 for c in s.chars() {
                     stack.push(Rc::new(P(Str(c.to_string()))));
                     // call function and push it's result on the stack.
-                    let result = VM::fcall_impl(path.as_ref().to_owned(), f, stack, env.clone())?;
+                    let result = VM::fcall_impl(f, stack, env.clone())?;
                     if let &P(Str(ref s)) = result.as_ref() {
                         buf.push_str(s);
                     } else {
@@ -414,9 +413,8 @@ impl Builtins {
         Ok(())
     }
 
-    fn filter<P: AsRef<Path>, O, E>(
+    fn filter<O, E>(
         &self,
-        path: P,
         stack: &mut Vec<Rc<Value>>,
         env: Rc<RefCell<Environment<O, E>>>,
     ) -> Result<(), Error>
@@ -450,8 +448,7 @@ impl Builtins {
                     // push function argument on the stack.
                     stack.push(e.clone());
                     // call function and push it's result on the stack.
-                    let condition =
-                        VM::fcall_impl(path.as_ref().to_owned(), f, stack, env.clone())?;
+                    let condition = VM::fcall_impl(f, stack, env.clone())?;
                     // Check for empty or boolean results and only push e back in
                     // if they are non empty and true
                     match condition.as_ref() {
@@ -468,8 +465,7 @@ impl Builtins {
                 for (ref name, ref val) in _flds {
                     stack.push(val.clone());
                     stack.push(Rc::new(P(Str(name.clone()))));
-                    let condition =
-                        VM::fcall_impl(path.as_ref().to_owned(), f, stack, env.clone())?;
+                    let condition = VM::fcall_impl(f, stack, env.clone())?;
                     // Check for empty or boolean results and only push e back in
                     // if they are non empty and true
                     match condition.as_ref() {
@@ -486,8 +482,7 @@ impl Builtins {
                 for c in s.chars() {
                     stack.push(Rc::new(P(Str(c.to_string()))));
                     // call function and push it's result on the stack.
-                    let condition =
-                        VM::fcall_impl(path.as_ref().to_owned(), f, stack, env.clone())?;
+                    let condition = VM::fcall_impl(f, stack, env.clone())?;
                     // Check for empty or boolean results and only push c back in
                     // if they are non empty and true
                     match condition.as_ref() {
@@ -533,9 +528,8 @@ impl Builtins {
         Ok(())
     }
 
-    fn reduce<P: AsRef<Path>, O, E>(
+    fn reduce<O, E>(
         &self,
-        path: P,
         stack: &mut Vec<Rc<Value>>,
         env: Rc<RefCell<Environment<O, E>>>,
     ) -> Result<(), Error>
@@ -575,7 +569,7 @@ impl Builtins {
                     stack.push(dbg!(e.clone()));
                     stack.push(dbg!(acc.clone()));
                     // call function and push it's result on the stack.
-                    acc = VM::fcall_impl(path.as_ref().to_owned(), f, stack, env.clone())?;
+                    acc = VM::fcall_impl(f, stack, env.clone())?;
                 }
             }
             &C(Tuple(ref _flds)) => {
@@ -585,7 +579,7 @@ impl Builtins {
                     stack.push(Rc::new(P(Str(name.clone()))));
                     stack.push(dbg!(acc.clone()));
                     // call function and push it's result on the stack.
-                    acc = VM::fcall_impl(path.as_ref().to_owned(), f, stack, env.clone())?;
+                    acc = VM::fcall_impl(f, stack, env.clone())?;
                 }
             }
             &P(Str(ref _s)) => {
@@ -594,7 +588,7 @@ impl Builtins {
                     stack.push(dbg!(Rc::new(P(Str(c.to_string())))));
                     stack.push(dbg!(acc.clone()));
                     // call function and push it's result on the stack.
-                    acc = VM::fcall_impl(path.as_ref().to_owned(), f, stack, env.clone())?;
+                    acc = VM::fcall_impl(f, stack, env.clone())?;
                 }
             }
             _ => return Err(dbg!(Error {})),
