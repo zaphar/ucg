@@ -570,7 +570,6 @@ fn scope_stacks() {
 }
 
 use super::translate;
-use crate::ast::{Expression, Position, PositionedItem, Statement, Value as ASTValue};
 use crate::iter::OffsetStrIter;
 use crate::parse::parse;
 
@@ -774,4 +773,28 @@ fn simple_trace() {
         String::from_utf8_lossy(err_out).to_owned(),
         "TRACE: 1 + 1 = 2 at line: 1 column: 1\n"
     );
+}
+
+#[test]
+fn simple_maps() {
+    assert_parse_cases![
+        "map(func(el) => el, [1,2,3]);" => C(List(vec![
+            Rc::new(P(Int(1))),
+            Rc::new(P(Int(2))),
+            Rc::new(P(Int(3))),
+        ])),
+        "map(func(el) => el + 1, [1,2,3]);" => C(List(vec![
+            Rc::new(P(Int(2))),
+            Rc::new(P(Int(3))),
+            Rc::new(P(Int(4))),
+        ])),
+        "map(func(el) => el, \"foo\");" => P(Str("foo".to_owned())),
+        "map(func(el) => el + \"-\", \"foo\");" => P(Str("f-o-o-".to_owned())),
+        "map(func(k, v) => [k, v], {foo = 1});" => C(Tuple(vec![
+            ("foo".to_owned(), Rc::new(P(Int(1)))),
+        ])),
+        "map(func(k, v) => [k, v + 1], {foo = 1});" => C(Tuple(vec![
+            ("foo".to_owned(), Rc::new(P(Int(2)))),
+        ])),
+    ];
 }
