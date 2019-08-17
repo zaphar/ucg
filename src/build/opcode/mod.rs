@@ -28,6 +28,8 @@ pub use vm::VM;
 use pointer::OpPointer;
 use scope::Stack;
 
+use crate::ast::Position;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Primitive {
     // Primitive Types
@@ -146,6 +148,7 @@ pub enum Hook {
     Convert,
     Regex,
     Range,
+    Trace(Position),
 }
 
 #[derive(Debug, PartialEq, Clone)]

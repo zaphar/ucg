@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use std::collections::BTreeMap;
+use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
@@ -24,12 +25,14 @@ use super::cache;
 use super::Value::{C, F, P};
 use super::VM;
 use super::{Composite, Error, Hook, Primitive, Value};
+use crate::ast::Position;
+use crate::build::ir::Val;
 use crate::build::AssertCollector;
 use crate::convert::{ConverterRegistry, ImporterRegistry};
 use Composite::{List, Tuple};
-use Primitive::{Bool, Empty, Str, Int};
+use Primitive::{Bool, Empty, Int, Str};
 
-pub struct Builtins {
+pub struct Builtins<Out: Write, Err: Write> {
     op_cache: cache::Ops,
     val_cache: BTreeMap<String, Rc<Value>>,
     assert_results: AssertCollector,
@@ -37,26 +40,38 @@ pub struct Builtins {
     importer_registry: ImporterRegistry,
     working_dir: PathBuf,
     import_path: Vec<PathBuf>,
-    // TODO(jwall): IO sink for stderr
-    // TODO(jwall): IO sink for stdout
+    stdout: Out,
+    stderr: Err,
 }
 
-impl Builtins {
-    pub fn new() -> Self {
-        Self::with_working_dir(std::env::current_dir().unwrap())
+type ByteSink = Vec<u8>;
+
+impl<Out: Write, Err: Write> Builtins<Out, Err> {
+    pub fn new(out: Out, err: Err) -> Self {
+        Self::with_working_dir(std::env::current_dir().unwrap(), out, err)
     }
 
-    pub fn with_working_dir<P: Into<PathBuf>>(path: P) -> Self {
+    pub fn with_working_dir<P: Into<PathBuf>>(path: P, out: Out, err: Err) -> Self {
         Self {
             op_cache: cache::Ops::new(),
             val_cache: BTreeMap::new(),
             assert_results: AssertCollector::new(),
             converter_registry: ConverterRegistry::make_registry(),
             importer_registry: ImporterRegistry::make_registry(),
-            // TODO(jwall): This should move into the VM and not in the Runtime.
+            // FIXME(jwall): This should move into the VM and not in the Runtime.
             working_dir: path.into(),
             import_path: Vec::new(),
+            stdout: out,
+            stderr: err,
         }
+    }
+
+    pub fn get_stdout(&self) -> &Out {
+        &self.stdout
+    }
+
+    pub fn get_stderr(&self) -> &Err {
+        &self.stderr
     }
 
     pub fn handle<P: AsRef<Path>>(
@@ -76,6 +91,7 @@ impl Builtins {
             Hook::Reduce => self.reduce(path, stack),
             Hook::Regex => self.regex(stack),
             Hook::Range => self.range(stack),
+            Hook::Trace(pos) => self.trace(stack, pos),
         }
     }
 
@@ -486,6 +502,32 @@ impl Builtins {
             }
         }
         stack.push(Rc::new(C(List(elems))));
+        Ok(())
+    }
+
+    fn trace(&mut self, mut stack: &mut Vec<Rc<Value>>, pos: Position) -> Result<(), Error> {
+        let val = if let Some(val) = dbg!(stack.pop()) {
+            val
+        } else {
+            return Err(dbg!(Error {}));
+        };
+        let expr = stack.pop();
+        let expr_pretty = match expr {
+            Some(ref expr) => match dbg!(expr.as_ref()) {
+                &P(Str(ref expr)) => expr.clone(),
+                _ => return Err(dbg!(Error {})),
+            },
+            _ => return Err(dbg!(Error {})),
+        };
+        let writable_val: Val = TryFrom::try_from(val.clone())?;
+        if let Err(_) = writeln!(
+            &mut self.stderr,
+            "TRACE: {} = {} at {}",
+            expr_pretty, writable_val, pos
+        ) {
+            return Err(dbg!(Error {}));
+        };
+        stack.push(val);
         Ok(())
     }
 }

@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use std::cell::Ref;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -28,7 +29,8 @@ use super::{Func, Module};
 pub struct VM {
     stack: Vec<Rc<Value>>,
     symbols: Stack,
-    runtime: Rc<RefCell<runtime::Builtins>>,
+    // FIXME(jwall): This should be parameterized.
+    runtime: Rc<RefCell<runtime::Builtins<Vec<u8>, Vec<u8>>>>,
     ops: OpPointer,
     // TODO(jwall): This should be optional
     path: PathBuf,
@@ -43,10 +45,14 @@ impl<'a> VM {
         Self {
             stack: Vec::new(),
             symbols: Stack::new(),
-            runtime: Rc::new(RefCell::new(runtime::Builtins::new())),
+            runtime: Rc::new(RefCell::new(runtime::Builtins::new(Vec::new(), Vec::new()))),
             ops: ops,
             path: path.into(),
         }
+    }
+
+    pub fn get_runtime(&self) -> Ref<runtime::Builtins<Vec<u8>, Vec<u8>>> {
+        self.runtime.as_ref().borrow()
     }
 
     pub fn to_scoped(self, symbols: Stack) -> Self {

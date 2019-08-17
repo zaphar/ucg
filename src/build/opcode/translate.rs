@@ -402,7 +402,15 @@ impl AST {
                 ops.push(Op::Cp);
             }
             Expression::Debug(def) => {
-                unimplemented!("Debug expressions are not implmented yet");
+                let mut buffer: Vec<u8> = Vec::new();
+                {
+                    let mut printer = crate::ast::printer::AstPrinter::new(2, &mut buffer);
+                    let _ = printer.render_expr(&def.expr);
+                }
+                let expr_pretty = String::from_utf8(buffer).unwrap();
+                ops.push(Op::Val(Primitive::Str(expr_pretty)));
+                Self::translate_expr(*def.expr, &mut ops);
+                ops.push(Op::Runtime(Hook::Trace(def.pos)));
             }
         }
     }

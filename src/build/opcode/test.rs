@@ -754,3 +754,19 @@ fn simple_selects() {
         "select \"quux\", 3, { foo = 1, bar = 2, };" => P(Int(3)),
     ];
 }
+
+#[test]
+fn simple_trace() {
+    let stmts = parse(OffsetStrIter::from(dbg!("TRACE 1+1;")), None).unwrap();
+    let ops = Rc::new(translate::AST::translate(stmts));
+    assert!(ops.len() > 0);
+    let mut vm = VM::new("foo.ucg", ops.clone());
+    vm.run().unwrap();
+    assert_eq!(vm.pop().unwrap(), Rc::new(P(Int(2))));
+    let runtime = vm.get_runtime();
+    let err_out = runtime.get_stderr();
+    assert_eq!(
+        String::from_utf8_lossy(err_out).to_owned(),
+        "TRACE: 1 + 1 = 2 at line: 1 column: 1\n"
+    );
+}
