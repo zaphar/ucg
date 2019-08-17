@@ -11,8 +11,10 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use std::cell::RefCell;
 use std::rc::Rc;
 
+use super::environment::Environment;
 use super::scope::Stack;
 use super::Composite::{List, Tuple};
 use super::Op::{
@@ -27,7 +29,8 @@ use super::VM;
 macro_rules! assert_cases {
     (__impl__ $cases:expr) => {
         for case in $cases.drain(0..) {
-            let mut vm = VM::new("foo.ucg", Rc::new(case.0));
+            let env = Rc::new(RefCell::new(Environment::new(Vec::new(), Vec::new())));
+            let mut vm = VM::new("foo.ucg", Rc::new(case.0), env);
             vm.run().unwrap();
             assert_eq!(dbg!(vm.pop()).unwrap(), Rc::new(case.1));
         }
@@ -116,7 +119,8 @@ fn bind_op() {
     )];
 
     for case in cases.drain(0..) {
-        let mut vm = VM::new("bar.ucg", Rc::new(case.0));
+        let env = Rc::new(RefCell::new(Environment::new(Vec::new(), Vec::new())));
+        let mut vm = VM::new("bar.ucg", Rc::new(case.0), env);
         vm.run().unwrap();
         let (name, result) = case.1;
         let v = vm.get_binding(name).unwrap();
@@ -577,7 +581,8 @@ macro_rules! assert_parse_cases {
             // TODO(jwall): preprocessor
             let ops = Rc::new(translate::AST::translate(stmts));
             assert!(ops.len() > 0);
-            let mut vm = VM::new("foo.ucg", ops.clone());
+            let env = Rc::new(RefCell::new(Environment::new(Vec::new(), Vec::new())));
+            let mut vm = VM::new("foo.ucg", ops.clone(), env);
             vm.run().unwrap();
             assert_eq!(vm.pop().unwrap(), Rc::new(case.1));
         }
@@ -760,11 +765,11 @@ fn simple_trace() {
     let stmts = parse(OffsetStrIter::from(dbg!("TRACE 1+1;")), None).unwrap();
     let ops = Rc::new(translate::AST::translate(stmts));
     assert!(ops.len() > 0);
-    let mut vm = VM::new("foo.ucg", ops.clone());
+    let env = Rc::new(RefCell::new(Environment::new(Vec::new(), Vec::new())));
+    let mut vm = VM::new("foo.ucg", ops.clone(), env);
     vm.run().unwrap();
     assert_eq!(vm.pop().unwrap(), Rc::new(P(Int(2))));
-    let runtime = vm.get_runtime();
-    let err_out = runtime.get_stderr();
+    let err_out = &vm.env.borrow().stderr;
     assert_eq!(
         String::from_utf8_lossy(err_out).to_owned(),
         "TRACE: 1 + 1 = 2 at line: 1 column: 1\n"

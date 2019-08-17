@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use crate::ast::{BinaryExprType, Expression, FormatArgs, Statement, Value};
-use crate::ast::{FuncOpDef, Position, TemplatePart};
+use crate::ast::{FuncOpDef, TemplatePart};
 use crate::build::format::{ExpressionTemplate, SimpleTemplate, TemplateParser};
 use crate::build::opcode::Primitive;
-use crate::build::opcode::{Func, Hook, Op};
+use crate::build::opcode::{Hook, Op};
 
 pub struct AST();
 

@@ -11,11 +11,11 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use std::cell::Ref;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+use super::environment::Environment;
 use super::pointer::OpPointer;
 use super::runtime;
 use super::scope::Stack;
@@ -26,33 +26,46 @@ use super::Value::{C, F, M, P, S, T};
 use super::{Error, Op, Primitive, Value};
 use super::{Func, Module};
 
-pub struct VM {
+pub struct VM<O, E>
+where
+    O: std::io::Write,
+    E: std::io::Write,
+{
     stack: Vec<Rc<Value>>,
     symbols: Stack,
-    // FIXME(jwall): This should be parameterized.
-    runtime: Rc<RefCell<runtime::Builtins<Vec<u8>, Vec<u8>>>>,
+    runtime: runtime::Builtins,
     ops: OpPointer,
     // TODO(jwall): This should be optional
     path: PathBuf,
+    pub env: Rc<RefCell<Environment<O, E>>>,
 }
 
-impl<'a> VM {
-    pub fn new<P: Into<PathBuf>>(path: P, ops: Rc<Vec<Op>>) -> Self {
-        Self::with_pointer(path, OpPointer::new(ops))
+impl<'a, O, E> VM<O, E>
+where
+    O: std::io::Write,
+    E: std::io::Write,
+{
+    pub fn new<P: Into<PathBuf>>(
+        path: P,
+        ops: Rc<Vec<Op>>,
+        env: Rc<RefCell<Environment<O, E>>>,
+    ) -> Self {
+        Self::with_pointer(path, OpPointer::new(ops), env)
     }
 
-    pub fn with_pointer<P: Into<PathBuf>>(path: P, ops: OpPointer) -> Self {
+    pub fn with_pointer<P: Into<PathBuf>>(
+        path: P,
+        ops: OpPointer,
+        env: Rc<RefCell<Environment<O, E>>>,
+    ) -> Self {
         Self {
             stack: Vec::new(),
             symbols: Stack::new(),
-            runtime: Rc::new(RefCell::new(runtime::Builtins::new(Vec::new(), Vec::new()))),
+            runtime: runtime::Builtins::new(),
             ops: ops,
             path: path.into(),
+            env: env,
         }
-    }
-
-    pub fn get_runtime(&self) -> Ref<runtime::Builtins<Vec<u8>, Vec<u8>>> {
-        self.runtime.as_ref().borrow()
     }
 
     pub fn to_scoped(self, symbols: Stack) -> Self {
@@ -62,6 +75,7 @@ impl<'a> VM {
             runtime: self.runtime.clone(),
             ops: self.ops.clone(),
             path: self.path.clone(),
+            env: self.env.clone(),
         }
     }
 
@@ -304,6 +318,7 @@ impl<'a> VM {
         path: P,
         f: &Func,
         stack: &mut Vec<Rc<Value>>,
+        env: Rc<RefCell<Environment<O, E>>>,
     ) -> Result<Rc<Value>, Error> {
         let Func {
             ref ptr,
@@ -311,7 +326,7 @@ impl<'a> VM {
             ref snapshot,
         } = f;
         // use the captured scope snapshot for the function.
-        let mut vm = Self::with_pointer(path, ptr.clone()).to_scoped(snapshot.clone());
+        let mut vm = Self::with_pointer(path, ptr.clone(), env).to_scoped(snapshot.clone());
         for nm in bindings.iter() {
             // now put each argument on our scope stack as a binding.
             // TODO(jwall): This should do a better error if there is
@@ -327,7 +342,8 @@ impl<'a> VM {
     fn op_new_scope(&mut self, jp: i32, ptr: OpPointer) -> Result<(), Error> {
         let scope_snapshot = self.symbols.snapshot();
         dbg!(&ptr);
-        let mut vm = Self::with_pointer(&self.path, ptr).to_scoped(scope_snapshot);
+        let mut vm =
+            Self::with_pointer(&self.path, ptr, self.env.clone()).to_scoped(scope_snapshot);
         dbg!(&vm.stack);
         vm.run()?;
         dbg!(&vm.stack);
@@ -339,7 +355,7 @@ impl<'a> VM {
     fn op_fcall(&mut self) -> Result<(), Error> {
         let f = dbg!(self.pop())?;
         if let &F(ref f) = f.as_ref() {
-            let val = Self::fcall_impl(&self.path, f, &mut self.stack)?;
+            let val = Self::fcall_impl(&self.path, f, &mut self.stack, self.env.clone())?;
             self.push(dbg!(val))?;
         }
         Ok(())
@@ -641,7 +657,7 @@ impl<'a> VM {
                 }
                 // FIXME(jwall): We need to populate the pkg key for modules.
                 //self.merge_field_into_tuple(&mut flds, "this".to_owned(), this)?;
-                let mut vm = Self::with_pointer(self.path.clone(), ptr.clone());
+                let mut vm = Self::with_pointer(self.path.clone(), ptr.clone(), self.env.clone());
                 vm.push(Rc::new(S("mod".to_owned())))?;
                 vm.push(Rc::new(C(Tuple(flds))))?;
                 vm.run()?;
@@ -757,8 +773,7 @@ impl<'a> VM {
 
     fn op_runtime(&mut self, h: Hook) -> Result<(), Error> {
         self.runtime
-            .borrow_mut()
-            .handle(&self.path, h, &mut self.stack)
+            .handle(&self.path, h, &mut self.stack, self.env.clone())
     }
 
     fn op_render(&mut self) -> Result<(), Error> {

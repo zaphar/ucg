@@ -11,87 +11,75 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use std::collections::BTreeMap;
-use std::convert::TryFrom;
-use std::convert::TryInto;
+use std::cell::RefCell;
+use std::convert::{TryFrom, TryInto};
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use regex::Regex;
 
-use super::cache;
+use super::environment::Environment;
 use super::Value::{C, F, P};
 use super::VM;
 use super::{Composite, Error, Hook, Primitive, Value};
 use crate::ast::Position;
 use crate::build::ir::Val;
 use crate::build::AssertCollector;
-use crate::convert::{ConverterRegistry, ImporterRegistry};
 use Composite::{List, Tuple};
 use Primitive::{Bool, Empty, Int, Str};
 
-pub struct Builtins<Out: Write, Err: Write> {
-    op_cache: cache::Ops,
-    val_cache: BTreeMap<String, Rc<Value>>,
+pub struct Builtins {
     assert_results: AssertCollector,
-    converter_registry: ConverterRegistry,
-    importer_registry: ImporterRegistry,
     working_dir: PathBuf,
     import_path: Vec<PathBuf>,
-    stdout: Out,
-    stderr: Err,
 }
 
-type ByteSink = Vec<u8>;
-
-impl<Out: Write, Err: Write> Builtins<Out, Err> {
-    pub fn new(out: Out, err: Err) -> Self {
-        Self::with_working_dir(std::env::current_dir().unwrap(), out, err)
+impl Builtins {
+    pub fn new() -> Self {
+        Self::with_working_dir(std::env::current_dir().unwrap())
     }
 
-    pub fn with_working_dir<P: Into<PathBuf>>(path: P, out: Out, err: Err) -> Self {
+    pub fn with_working_dir<P: Into<PathBuf>>(path: P) -> Self {
         Self {
-            op_cache: cache::Ops::new(),
-            val_cache: BTreeMap::new(),
             assert_results: AssertCollector::new(),
-            converter_registry: ConverterRegistry::make_registry(),
-            importer_registry: ImporterRegistry::make_registry(),
-            // FIXME(jwall): This should move into the VM and not in the Runtime.
             working_dir: path.into(),
             import_path: Vec::new(),
-            stdout: out,
-            stderr: err,
         }
     }
 
-    pub fn get_stdout(&self) -> &Out {
-        &self.stdout
+    pub fn clone(&self) -> Self {
+        Self {
+            assert_results: AssertCollector::new(),
+            working_dir: self.working_dir.clone(),
+            import_path: self.import_path.clone(),
+        }
     }
 
-    pub fn get_stderr(&self) -> &Err {
-        &self.stderr
-    }
-
-    pub fn handle<P: AsRef<Path>>(
+    pub fn handle<P: AsRef<Path>, O, E>(
         &mut self,
         path: P,
         h: Hook,
         stack: &mut Vec<Rc<Value>>,
-    ) -> Result<(), Error> {
+        env: Rc<RefCell<Environment<O, E>>>,
+    ) -> Result<(), Error>
+    where
+        O: std::io::Write,
+        E: std::io::Write,
+    {
         match h {
-            Hook::Import => self.import(stack),
-            Hook::Include => self.include(stack),
+            Hook::Import => self.import(stack, env),
+            Hook::Include => self.include(stack, env),
             Hook::Assert => self.assert(stack),
-            Hook::Convert => self.convert(stack),
-            Hook::Out => self.out(path, stack),
-            Hook::Map => self.map(path, stack),
-            Hook::Filter => self.filter(path, stack),
-            Hook::Reduce => self.reduce(path, stack),
+            Hook::Convert => self.convert(stack, env),
+            Hook::Out => self.out(path, stack, env),
+            Hook::Map => self.map(path, stack, env),
+            Hook::Filter => self.filter(path, stack, env),
+            Hook::Reduce => self.reduce(path, stack, env),
             Hook::Regex => self.regex(stack),
             Hook::Range => self.range(stack),
-            Hook::Trace(pos) => self.trace(stack, pos),
+            Hook::Trace(pos) => self.trace(stack, pos, env),
         }
     }
 
@@ -142,21 +130,35 @@ impl<Out: Write, Err: Write> Builtins<Out, Err> {
         Ok(contents)
     }
 
-    fn import(&mut self, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
+    fn import<O, E>(
+        &mut self,
+        stack: &mut Vec<Rc<Value>>,
+        env: Rc<RefCell<Environment<O, E>>>,
+    ) -> Result<(), Error>
+    where
+        O: std::io::Write,
+        E: std::io::Write,
+    {
         let path = stack.pop();
         if let Some(val) = path {
             if let &Value::P(Str(ref path)) = val.as_ref() {
-                if self.val_cache.contains_key(path) {
-                    stack.push(self.val_cache[path].clone());
+                let mut borrowed_env = env.borrow_mut();
+                let val_cache = &mut borrowed_env.val_cache;
+                if val_cache.contains_key(path) {
+                    stack.push(val_cache[path].clone());
                 } else {
-                    let op_pointer = self.op_cache.entry(path).get_pointer_or_else(|| {
-                        // FIXME(jwall): import
-                        unimplemented!("Compiling paths are not implemented yet");
-                    });
-                    let mut vm = VM::with_pointer(path, op_pointer);
+                    let op_pointer =
+                        env.borrow_mut()
+                            .op_cache
+                            .entry(path)
+                            .get_pointer_or_else(|| {
+                                // FIXME(jwall): import
+                                unimplemented!("Compiling paths are not implemented yet");
+                            });
+                    let mut vm = VM::with_pointer(path, op_pointer, env.clone());
                     vm.run()?;
                     let result = Rc::new(vm.symbols_to_tuple(true));
-                    self.val_cache.insert(path.clone(), result.clone());
+                    val_cache.insert(path.clone(), result.clone());
                     stack.push(result);
                 }
                 return Ok(());
@@ -165,7 +167,15 @@ impl<Out: Write, Err: Write> Builtins<Out, Err> {
         return Err(dbg!(Error {}));
     }
 
-    fn include(&self, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
+    fn include<O, E>(
+        &self,
+        stack: &mut Vec<Rc<Value>>,
+        env: Rc<RefCell<Environment<O, E>>>,
+    ) -> Result<(), Error>
+    where
+        O: std::io::Write,
+        E: std::io::Write,
+    {
         // TODO(jwall): include
         let path = stack.pop();
         let typ = stack.pop();
@@ -190,21 +200,23 @@ impl<Out: Write, Err: Write> Builtins<Out, Err> {
         if typ == "str" {
             stack.push(Rc::new(P(Str(self.get_file_as_string(&path)?))));
         } else {
-            stack.push(Rc::new(match self.importer_registry.get_importer(&typ) {
-                Some(importer) => {
-                    let contents = self.get_file_as_string(&path)?;
-                    if contents.len() == 0 {
-                        eprintln!("including an empty file. Use NULL as the result");
-                        P(Empty)
-                    } else {
-                        match importer.import(contents.as_bytes()) {
-                            Ok(v) => v.try_into()?,
-                            Err(_e) => return Err(dbg!(Error {})),
+            stack.push(Rc::new(
+                match env.borrow().importer_registry.get_importer(&typ) {
+                    Some(importer) => {
+                        let contents = self.get_file_as_string(&path)?;
+                        if contents.len() == 0 {
+                            eprintln!("including an empty file. Use NULL as the result");
+                            P(Empty)
+                        } else {
+                            match importer.import(contents.as_bytes()) {
+                                Ok(v) => v.try_into()?,
+                                Err(_e) => return Err(dbg!(Error {})),
+                            }
                         }
                     }
-                }
-                None => return Err(dbg!(Error {})),
-            }));
+                    None => return Err(dbg!(Error {})),
+                },
+            ));
         }
         return Err(dbg!(Error {}));
     }
@@ -243,13 +255,22 @@ impl<Out: Write, Err: Write> Builtins<Out, Err> {
         return Ok(());
     }
 
-    fn out<P: AsRef<Path>>(&self, path: P, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
+    fn out<P: AsRef<Path>, O, E>(
+        &self,
+        path: P,
+        stack: &mut Vec<Rc<Value>>,
+        env: Rc<RefCell<Environment<O, E>>>,
+    ) -> Result<(), Error>
+    where
+        O: std::io::Write,
+        E: std::io::Write,
+    {
         let val = stack.pop();
         if let Some(val) = val {
             let val = val.try_into()?;
             if let Some(c_type_val) = stack.pop() {
                 if let &Value::S(ref c_type) = c_type_val.as_ref() {
-                    if let Some(c) = self.converter_registry.get_converter(c_type) {
+                    if let Some(c) = env.borrow().converter_registry.get_converter(c_type) {
                         match c.convert(Rc::new(val), &mut File::create(path)?) {
                             Ok(_) => {
                                 // noop
@@ -264,13 +285,21 @@ impl<Out: Write, Err: Write> Builtins<Out, Err> {
         return Err(dbg!(Error {}));
     }
 
-    fn convert(&self, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
+    fn convert<O, E>(
+        &self,
+        stack: &mut Vec<Rc<Value>>,
+        env: Rc<RefCell<Environment<O, E>>>,
+    ) -> Result<(), Error>
+    where
+        O: std::io::Write,
+        E: std::io::Write,
+    {
         let val = stack.pop();
         if let Some(val) = val {
             let val = val.try_into()?;
             if let Some(c_type_val) = stack.pop() {
                 if let &Value::S(ref c_type) = c_type_val.as_ref() {
-                    if let Some(c) = self.converter_registry.get_converter(c_type) {
+                    if let Some(c) = env.borrow().converter_registry.get_converter(c_type) {
                         let mut buf: Vec<u8> = Vec::new();
                         match c.convert(Rc::new(val), &mut buf) {
                             Ok(_) => {
@@ -289,7 +318,16 @@ impl<Out: Write, Err: Write> Builtins<Out, Err> {
         return Err(dbg!(Error {}));
     }
 
-    fn map<P: AsRef<Path>>(&self, path: P, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
+    fn map<P: AsRef<Path>, O, E>(
+        &self,
+        path: P,
+        stack: &mut Vec<Rc<Value>>,
+        env: Rc<RefCell<Environment<O, E>>>,
+    ) -> Result<(), Error>
+    where
+        O: std::io::Write,
+        E: std::io::Write,
+    {
         // get the list from the stack
         let list = if let Some(list) = stack.pop() {
             list
@@ -326,13 +364,27 @@ impl<Out: Write, Err: Write> Builtins<Out, Err> {
             // push function argument on the stack.
             stack.push(e.clone());
             // call function and push it's result on the stack.
-            result_elems.push(VM::fcall_impl(path.as_ref().to_owned(), f, stack)?);
+            result_elems.push(VM::fcall_impl(
+                path.as_ref().to_owned(),
+                f,
+                stack,
+                env.clone(),
+            )?);
         }
         stack.push(Rc::new(C(List(result_elems))));
         Ok(())
     }
 
-    fn filter<P: AsRef<Path>>(&self, path: P, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
+    fn filter<P: AsRef<Path>, O, E>(
+        &self,
+        path: P,
+        stack: &mut Vec<Rc<Value>>,
+        env: Rc<RefCell<Environment<O, E>>>,
+    ) -> Result<(), Error>
+    where
+        O: std::io::Write,
+        E: std::io::Write,
+    {
         // get the list from the stack
         let list = if let Some(list) = stack.pop() {
             list
@@ -369,7 +421,7 @@ impl<Out: Write, Err: Write> Builtins<Out, Err> {
             // push function argument on the stack.
             stack.push(e.clone());
             // call function and push it's result on the stack.
-            let condition = VM::fcall_impl(path.as_ref().to_owned(), f, stack)?;
+            let condition = VM::fcall_impl(path.as_ref().to_owned(), f, stack, env.clone())?;
             // Check for empty or boolean results and only push e back in
             // if they are non empty and true
             match condition.as_ref() {
@@ -412,7 +464,16 @@ impl<Out: Write, Err: Write> Builtins<Out, Err> {
         Ok(())
     }
 
-    fn reduce<P: AsRef<Path>>(&self, path: P, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
+    fn reduce<P: AsRef<Path>, O, E>(
+        &self,
+        path: P,
+        stack: &mut Vec<Rc<Value>>,
+        env: Rc<RefCell<Environment<O, E>>>,
+    ) -> Result<(), Error>
+    where
+        O: std::io::Write,
+        E: std::io::Write,
+    {
         // get the list from the stack
         let list = if let Some(list) = stack.pop() {
             list
@@ -455,7 +516,7 @@ impl<Out: Write, Err: Write> Builtins<Out, Err> {
             stack.push(e.clone());
             stack.push(acc.clone());
             // call function and push it's result on the stack.
-            acc = VM::fcall_impl(path.as_ref().to_owned(), f, stack)?;
+            acc = VM::fcall_impl(path.as_ref().to_owned(), f, stack, env.clone())?;
             // Check for empty or boolean results and only push e back in
             // if they are non empty and true
         }
@@ -505,7 +566,16 @@ impl<Out: Write, Err: Write> Builtins<Out, Err> {
         Ok(())
     }
 
-    fn trace(&mut self, mut stack: &mut Vec<Rc<Value>>, pos: Position) -> Result<(), Error> {
+    fn trace<O, E>(
+        &mut self,
+        stack: &mut Vec<Rc<Value>>,
+        pos: Position,
+        env: Rc<RefCell<Environment<O, E>>>,
+    ) -> Result<(), Error>
+    where
+        O: std::io::Write,
+        E: std::io::Write,
+    {
         let val = if let Some(val) = dbg!(stack.pop()) {
             val
         } else {
@@ -521,9 +591,11 @@ impl<Out: Write, Err: Write> Builtins<Out, Err> {
         };
         let writable_val: Val = TryFrom::try_from(val.clone())?;
         if let Err(_) = writeln!(
-            &mut self.stderr,
+            &mut env.borrow_mut().stderr,
             "TRACE: {} = {} at {}",
-            expr_pretty, writable_val, pos
+            expr_pretty,
+            writable_val,
+            pos
         ) {
             return Err(dbg!(Error {}));
         };

@@ -15,6 +15,7 @@ use std::convert::{TryFrom, TryInto};
 use std::rc::Rc;
 
 mod cache;
+mod environment;
 mod error;
 pub mod pointer;
 mod runtime;
