@@ -456,7 +456,7 @@ where
         let left = self.pop()?;
         let right = self.pop()?;
         // Then pushes the result onto the stack.
-        self.push(Rc::new(P(self.add(&left, &right)?)))?;
+        self.push(Rc::new(self.add(&left, &right)?))?;
         Ok(())
     }
 
@@ -757,15 +757,25 @@ where
         })
     }
 
-    fn add(&self, left: &Value, right: &Value) -> Result<Primitive, Error> {
+    fn add(&self, left: &Value, right: &Value) -> Result<Value, Error> {
         Ok(match (left, right) {
-            (P(Int(i)), Value::P(Int(ii))) => Int(i + ii),
-            (P(Float(f)), Value::P(Float(ff))) => Float(f + ff),
+            (P(Int(i)), Value::P(Int(ii))) => P(Int(i + ii)),
+            (P(Float(f)), Value::P(Float(ff))) => P(Float(f + ff)),
             (P(Str(s)), Value::P(Str(ss))) => {
                 let mut ns = String::new();
                 ns.push_str(&s);
                 ns.push_str(&ss);
-                Str(ns)
+                P(Str(ns))
+            }
+            (C(List(ref left_list)), C(List(ref right_list))) => {
+                let mut new_list = Vec::with_capacity(left_list.len() + right_list.len());
+                for v in left_list.iter() {
+                    new_list.push(v.clone());
+                }
+                for v in right_list.iter() {
+                    new_list.push(v.clone());
+                }
+                C(List(new_list))
             }
             _ => return Err(dbg!(Error {})),
         })

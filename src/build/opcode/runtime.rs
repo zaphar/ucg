@@ -539,18 +539,6 @@ impl Builtins {
         } else {
             return dbg!(Err(Error {}));
         };
-        // TODO(jwall): This can also be tuples or strings.
-        let elems = match list.as_ref() {
-            &C(List(ref elems)) => elems,
-            &C(Tuple(ref _flds)) => {
-                unimplemented!("TODO Tuple functional operations");
-            }
-            &P(Str(ref _s)) => {
-                unimplemented!("TODO String functional operations");
-            }
-            _ => return Err(dbg!(Error {})),
-        };
-
         // Get the accumulator from the stack
         let mut acc = if let Some(acc) = stack.pop() {
             acc
@@ -570,17 +558,41 @@ impl Builtins {
             return dbg!(Err(Error {}));
         };
 
-        for e in elems.iter() {
-            // push function arguments on the stack.
-            stack.push(e.clone());
-            stack.push(acc.clone());
-            // call function and push it's result on the stack.
-            acc = VM::fcall_impl(path.as_ref().to_owned(), f, stack, env.clone())?;
-            // Check for empty or boolean results and only push e back in
-            // if they are non empty and true
-        }
+        // TODO(jwall): This can also be tuples or strings.
+        match list.as_ref() {
+            &C(List(ref elems)) => {
+                for e in dbg!(elems).iter() {
+                    // push function arguments on the stack.
+                    stack.push(dbg!(e.clone()));
+                    stack.push(dbg!(acc.clone()));
+                    // call function and push it's result on the stack.
+                    acc = VM::fcall_impl(path.as_ref().to_owned(), f, stack, env.clone())?;
+                }
+            }
+            &C(Tuple(ref _flds)) => {
+                for (ref name, ref val) in _flds.iter() {
+                    // push function arguments on the stack.
+                    stack.push(val.clone());
+                    stack.push(Rc::new(P(Str(name.clone()))));
+                    stack.push(dbg!(acc.clone()));
+                    // call function and push it's result on the stack.
+                    acc = VM::fcall_impl(path.as_ref().to_owned(), f, stack, env.clone())?;
+                }
+            }
+            &P(Str(ref _s)) => {
+                for c in _s.chars() {
+                    // push function arguments on the stack.
+                    stack.push(dbg!(Rc::new(P(Str(c.to_string())))));
+                    stack.push(dbg!(acc.clone()));
+                    // call function and push it's result on the stack.
+                    acc = VM::fcall_impl(path.as_ref().to_owned(), f, stack, env.clone())?;
+                }
+            }
+            _ => return Err(dbg!(Error {})),
+        };
+
         // push the acc on the stack as our result
-        stack.push(acc);
+        stack.push(dbg!(acc));
         Ok(())
     }
 

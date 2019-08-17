@@ -827,3 +827,26 @@ fn simple_filters() {
         ])),
     ];
 }
+
+#[test]
+fn simple_reduces() {
+    assert_parse_cases![
+        "reduce(func(acc, el) => acc + [el], [], [1,2,3]);" => C(List(vec![
+            Rc::new(P(Int(1))),
+            Rc::new(P(Int(2))),
+            Rc::new(P(Int(3))),
+        ])),
+        "reduce(func(acc, el) => acc + [el+1], [], [1,2,3]);" => C(List(vec![
+            Rc::new(P(Int(2))),
+            Rc::new(P(Int(3))),
+            Rc::new(P(Int(4))),
+        ])),
+        "reduce(func(acc, s) => acc + s, \"\", \"foo\");" => P(Str("foo".to_owned())),
+        "reduce(func(acc, k, v) => acc + [[k, v]], [], {foo = 1});" => C(List(vec![
+            Rc::new(C(List(vec![
+                Rc::new(P(Str("foo".to_owned()))),
+                Rc::new(P(Int(1))),
+            ]))),
+        ])),
+    ];
+}
