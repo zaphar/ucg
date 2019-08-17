@@ -384,34 +384,30 @@ fn module_call() {
     assert_cases![
         vec![
             InitTuple,               // 0 // override tuple
-            Sym("one".to_owned()),   // 1
-            Val(Int(11)),            // 2
-            Field,                   // 3
-            Sym("m".to_owned()),     // 4 // binding name for module
-            InitTuple,               // 5 // Module tuple bindings
-            Sym("one".to_owned()),   // 6
-            Val(Int(1)),             // 7
-            Field,                   // 8
-            Sym("two".to_owned()),   // 9
-            Val(Int(2)),             // 10
-            Field,                   // 11
-            Module(5),               // 12 // Module body definition
-            Bind,                    // 13 // bind the mod tuple
-            Sym("foo".to_owned()),   // 14
-            DeRef("mod".to_owned()), // 15
-            Bind,                    // 16 // bind mod tuple to foo
-            Return,                  // 17 // end the module
-            Bind,                    // 18 // bind module to the binding name
-            DeRef("m".to_owned()),   // 19
-            Cp,                      // 20 // Call the module
+            Sym("one".to_owned()),      // 1
+            Val(Int(11)),               // 2
+            Field,                      // 3
+            Sym("m".to_owned()),        // 4 // binding name for module
+            InitTuple,                  // 5 // Module tuple bindings
+            Sym("one".to_owned()),      // 6
+            Val(Int(1)),                // 7
+            Field,                      // 8
+            Sym("two".to_owned()),      // 9
+            Val(Int(2)),                // 10
+            Field,                      // 11
+            Module(7),                  // 12 // Module body definition
+            Bind,                       // 13 // bind the mod tuple
+            Sym("foo".to_owned()),      // 14
+            DeRef("mod".to_owned()),    // 15
+            Val(Str("one".to_owned())), // 16
+            Index,                      // 17
+            Bind,                       // 18 // bind mod tuple to foo
+            Return,                     // 19 // end the module
+            Bind,                       // 20 // bind module to the binding name
+            DeRef("m".to_owned()),      // 21
+            Cp,                         // 22 // Call the module
         ] => C(Tuple(vec![
-            (
-                "foo".to_owned(),
-                Rc::new(C(Tuple(vec![
-                    ("one".to_owned(), Rc::new(P(Int(11)))),
-                    ("two".to_owned(), Rc::new(P(Int(2)))),
-                ])))
-            ),
+            ("foo".to_owned(), Rc::new(P(Int(11)))),
         ])),
         vec![
             InitTuple,               // 0 // override tuple
@@ -429,7 +425,7 @@ fn module_call() {
             InitThunk(2),            // 12 // Module Return expression
             Val(Int(1)),             // 13
             Return,                  // 14
-            Module(5),              // 15 // Module definition
+            Module(5),               // 15 // Module definition
             Bind,                    // 16
             Sym("foo".to_owned()),   // 17
             DeRef("mod".to_owned()), // 18
@@ -577,8 +573,9 @@ macro_rules! assert_parse_cases {
     (__impl__ $cases:expr) => {
         for case in $cases.drain(0..) {
             let stmts = parse(OffsetStrIter::from(dbg!(case.0)), None).unwrap();
+            let root = std::env::current_dir().unwrap();
             // TODO(jwall): preprocessor
-            let ops = Rc::new(translate::AST::translate(stmts));
+            let ops = Rc::new(translate::AST::translate(stmts, &root));
             assert!(ops.len() > 0);
             let env = Rc::new(RefCell::new(Environment::new(Vec::new(), Vec::new())));
             let mut vm = VM::new("foo.ucg", ops.clone(), env);
@@ -762,7 +759,8 @@ fn simple_selects() {
 #[test]
 fn simple_trace() {
     let stmts = parse(OffsetStrIter::from(dbg!("TRACE 1+1;")), None).unwrap();
-    let ops = Rc::new(translate::AST::translate(stmts));
+    let root = std::env::current_dir().unwrap();
+    let ops = Rc::new(translate::AST::translate(stmts, &root));
     assert!(ops.len() > 0);
     let env = Rc::new(RefCell::new(Environment::new(Vec::new(), Vec::new())));
     let mut vm = VM::new("foo.ucg", ops.clone(), env);

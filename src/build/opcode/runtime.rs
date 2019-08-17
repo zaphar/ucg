@@ -21,12 +21,15 @@ use std::rc::Rc;
 use regex::Regex;
 
 use super::environment::Environment;
+use super::pointer::OpPointer;
 use super::Value::{C, F, P, S};
 use super::VM;
 use super::{Composite, Error, Hook, Primitive, Value};
 use crate::ast::Position;
 use crate::build::ir::Val;
 use crate::build::AssertCollector;
+use crate::iter::OffsetStrIter;
+use crate::parse::parse;
 use Composite::{List, Tuple};
 use Primitive::{Bool, Empty, Int, Str};
 
@@ -147,14 +150,24 @@ impl Builtins {
                 if val_cache.contains_key(path) {
                     stack.push(val_cache[path].clone());
                 } else {
-                    let op_pointer =
-                        env.borrow_mut()
-                            .op_cache
-                            .entry(path)
-                            .get_pointer_or_else(|| {
-                                // FIXME(jwall): import
-                                unimplemented!("Compiling paths are not implemented yet");
-                            });
+                    let op_pointer = env.borrow_mut().op_cache.entry(path).get_pointer_or_else(
+                        || {
+                            // FIXME(jwall): We need to do proper error handling here.
+                            let p = PathBuf::from(&path);
+                            let root = p.parent().unwrap();
+                            // first we read in the file
+                            let mut f = File::open(&path).unwrap();
+                            // then we parse it
+                            let mut contents = String::new();
+                            f.read_to_string(&mut contents).unwrap();
+                            let iter = OffsetStrIter::new(&contents).with_src_file(&p);
+                            let stmts = parse(iter, None).unwrap();
+                            // then we create an ops from it
+                            let ops = super::translate::AST::translate(stmts, &root);
+                            ops
+                        },
+                        &path,
+                    );
                     let mut vm = VM::with_pointer(path, op_pointer, env.clone());
                     vm.run()?;
                     let result = Rc::new(vm.symbols_to_tuple(true));
@@ -176,7 +189,6 @@ impl Builtins {
         O: std::io::Write,
         E: std::io::Write,
     {
-        // TODO(jwall): include
         let path = stack.pop();
         let typ = stack.pop();
         let path = if let Some(val) = path {
@@ -347,7 +359,6 @@ impl Builtins {
             return Err(dbg!(Error {}));
         };
 
-        // TODO(jwall): This can also be tuples or strings.
         match list.as_ref() {
             &C(List(ref elems)) => {
                 let mut result_elems = Vec::new();
@@ -432,7 +443,6 @@ impl Builtins {
             return dbg!(Err(Error {}));
         };
 
-        // TODO(jwall): This can also be tuples or strings.
         let elems = match list.as_ref() {
             &C(List(ref elems)) => {
                 let mut result_elems = Vec::new();
@@ -558,7 +568,6 @@ impl Builtins {
             return dbg!(Err(Error {}));
         };
 
-        // TODO(jwall): This can also be tuples or strings.
         match list.as_ref() {
             &C(List(ref elems)) => {
                 for e in dbg!(elems).iter() {

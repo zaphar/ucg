@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use std::path::PathBuf;
 use std::rc::Rc;
 
 use super::{Error, Op};
@@ -19,6 +20,7 @@ use super::{Error, Op};
 pub struct OpPointer {
     pub ops: Rc<Vec<Op>>,
     pub ptr: Option<usize>,
+    pub path: Option<PathBuf>,
 }
 
 impl OpPointer {
@@ -27,7 +29,13 @@ impl OpPointer {
         Self {
             ops: ops,
             ptr: None,
+            path: None,
         }
+    }
+
+    pub fn with_path(mut self, path: PathBuf) -> Self {
+        self.path = Some(path);
+        self
     }
 
     pub fn next(&mut self) -> Option<&Op> {
@@ -70,6 +78,7 @@ impl OpPointer {
         Self {
             ops: self.ops.clone(),
             ptr: None,
+            path: self.path.clone(),
         }
     }
 }

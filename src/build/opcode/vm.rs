@@ -274,10 +274,23 @@ where
         };
         let mut ops = self.ops.clone();
         ops.jump(idx)?;
+        let pkg_ptr = if let Some(ref path) = self.ops.path {
+            let pkg_ops = vec![
+                Op::InitList,
+                Op::Func(3),
+                Op::Val(Str(path.to_string_lossy().to_string())),
+                Op::Runtime(Hook::Import),
+                Op::Return,
+            ];
+            Some(OpPointer::new(Rc::new(pkg_ops)))
+        } else {
+            None
+        };
         self.push(Rc::new(M(Module {
             ptr: ops,
             result_ptr: result_ptr,
             flds: flds,
+            pkg_ptr: pkg_ptr,
         })))?;
         self.op_jump(jptr)
     }
@@ -589,8 +602,8 @@ where
 
     fn op_index(&mut self, safe: bool) -> Result<(), Error> {
         // left and then right
-        let right = self.pop()?;
-        let left = self.pop()?;
+        let right = dbg!(self.pop()?);
+        let left = dbg!(self.pop()?);
         match right.as_ref() {
             &P(Int(i)) => {
                 if let &C(List(ref elems)) = left.as_ref() {
@@ -645,18 +658,28 @@ where
                 ref ptr,
                 ref result_ptr,
                 ref flds,
+                ref pkg_ptr,
             }) => {
-                //let this = M(Module {
-                //    ptr: ptr.clone(),
-                //    result_ptr: result_ptr.clone(),
-                //    flds: flds.clone(),
-                //});
+                let this = M(Module {
+                    ptr: ptr.clone(),
+                    result_ptr: result_ptr.clone(),
+                    flds: flds.clone(),
+                    pkg_ptr: pkg_ptr.clone(),
+                });
+
                 let mut flds = flds.clone();
                 for (name, val) in overrides {
                     self.merge_field_into_tuple(&mut flds, name, val)?;
                 }
-                // FIXME(jwall): We need to populate the pkg key for modules.
-                //self.merge_field_into_tuple(&mut flds, "this".to_owned(), this)?;
+                self.merge_field_into_tuple(&mut flds, "this".to_owned(), Rc::new(this))?;
+                if let Some(ptr) = pkg_ptr {
+                    let mut pkg_vm =
+                        Self::with_pointer(self.path.clone(), ptr.clone(), self.env.clone());
+                    pkg_vm.run()?;
+                    let pkg_func = pkg_vm.pop()?;
+                    self.merge_field_into_tuple(&mut flds, "pkg".to_owned(), pkg_func)?;
+                }
+
                 let mut vm = Self::with_pointer(self.path.clone(), ptr.clone(), self.env.clone());
                 vm.push(Rc::new(S("mod".to_owned())))?;
                 vm.push(Rc::new(C(Tuple(flds))))?;

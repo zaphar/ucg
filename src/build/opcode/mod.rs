@@ -104,6 +104,7 @@ pub struct Module {
     ptr: OpPointer,
     result_ptr: Option<usize>,
     flds: Vec<(String, Rc<Value>)>,
+    pkg_ptr: Option<OpPointer>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
