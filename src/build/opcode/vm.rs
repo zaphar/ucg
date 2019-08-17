@@ -615,7 +615,7 @@ where
             }
         };
         if safe {
-            self.push(Rc::new(P(Empty)));
+            self.push(Rc::new(P(Empty)))?;
             return Ok(());
         }
         return Err(dbg!(Error {}));

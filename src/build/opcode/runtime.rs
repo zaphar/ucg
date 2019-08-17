@@ -337,11 +337,11 @@ impl Builtins {
         // TODO(jwall): This can also be tuples or strings.
         let elems = match list.as_ref() {
             &C(List(ref elems)) => elems,
-            &C(Tuple(ref flds)) => {
-                unimplemented!("Tuple functional operations");
+            &C(Tuple(ref _flds)) => {
+                unimplemented!("TODO Tuple functional operations");
             }
-            &P(Str(ref s)) => {
-                unimplemented!("string functional operations");
+            &P(Str(ref _s)) => {
+                unimplemented!("TODO String functional operations");
             }
             _ => return Err(dbg!(Error {})),
         };
@@ -394,11 +394,11 @@ impl Builtins {
         // TODO(jwall): This can also be tuples or strings.
         let elems = match list.as_ref() {
             &C(List(ref elems)) => elems,
-            &C(Tuple(ref flds)) => {
-                unimplemented!("Tuple functional operations");
+            &C(Tuple(ref _flds)) => {
+                unimplemented!("TODO Tuple functional operations");
             }
-            &P(Str(ref s)) => {
-                unimplemented!("string functional operations");
+            &P(Str(ref _s)) => {
+                unimplemented!("TODO String functional operations");
             }
             _ => return Err(dbg!(Error {})),
         };
@@ -483,11 +483,11 @@ impl Builtins {
         // TODO(jwall): This can also be tuples or strings.
         let elems = match list.as_ref() {
             &C(List(ref elems)) => elems,
-            &C(Tuple(ref flds)) => {
-                unimplemented!("Tuple functional operations");
+            &C(Tuple(ref _flds)) => {
+                unimplemented!("TODO Tuple functional operations");
             }
-            &P(Str(ref s)) => {
-                unimplemented!("string functional operations");
+            &P(Str(ref _s)) => {
+                unimplemented!("TODO String functional operations");
             }
             _ => return Err(dbg!(Error {})),
         };
