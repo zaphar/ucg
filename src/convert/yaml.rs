@@ -91,7 +91,6 @@ impl YamlConverter {
                 }
             };
             if key == "<<" {
-                // TODO(jwall): Handle merge keys
                 if let serde_yaml::Value::Mapping(merge_map) = value {
                     self.merge_mapping_keys(&mut fs, merge_map)?;
                 }

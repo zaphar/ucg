@@ -210,7 +210,6 @@ pub enum Op {
     Typ,
     // Runtime hooks
     Runtime(Hook),
-    // TODO(jwall): TRACE instruction
     Render,
 }
 
@@ -238,7 +237,6 @@ impl TryFrom<&Value> for Val {
                 let mut flds = Vec::new();
                 for &(ref k, ref v) in fs.iter() {
                     let v = v.clone();
-                    // TODO(jwall): The Rc for a Val should no longer be required.
                     flds.push((k.clone(), Rc::new(v.try_into()?)));
                 }
                 Val::Tuple(flds)
@@ -247,7 +245,6 @@ impl TryFrom<&Value> for Val {
                 let mut els = Vec::new();
                 for e in elems.iter() {
                     let e = e.clone();
-                    // TODO
                     els.push(Rc::new(e.try_into()?));
                 }
                 Val::List(els)

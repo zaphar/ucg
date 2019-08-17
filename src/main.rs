@@ -591,7 +591,6 @@ fn do_repl<C: Cache>(
     loop {
         // print prompt
         let line = editor.readline(&format!("{}> ", lines.next_line()))?;
-        // TODO check for a repl command.
         // repl commands are only valid while not accumulating a statement;
         let trimmed = line.trim();
         if trimmed.starts_with("#") {

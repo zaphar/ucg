@@ -111,7 +111,7 @@ where
                 Op::Index => self.op_index(false)?,
                 Op::SafeIndex => self.op_index(true)?,
                 Op::Cp => self.op_copy()?,
-                //TODO(jwall): Should this take a user provided message?
+                //FIXME(jwall): Should this take a user provided message?
                 Op::Bang => self.op_bang()?,
                 Op::InitThunk(jp) => self.op_thunk(idx, jp)?,
                 Op::Noop => {
@@ -514,8 +514,6 @@ where
         let tpl = self.pop()?;
         if let &C(Tuple(ref flds)) = tpl.as_ref() {
             // add name and value to tuple
-            // TODO(jwall): This is probably memory inefficient and we should
-            // optimize it a bit.
             let mut flds = flds.clone();
             self.merge_field_into_tuple(&mut flds, name.clone(), val)?;
             // place composite tuple back on stack
@@ -533,8 +531,6 @@ where
         let list = dbg!(self.pop()?);
         if let &C(List(ref elems)) = list.as_ref() {
             // add value to list
-            // TODO(jwall): This is probably memory inefficient and we should
-            // optimize it a bit.
             let mut elems = elems.clone();
             elems.push(val);
             // Add that value to the list and put list back on stack.
@@ -621,7 +617,6 @@ where
     }
 
     fn op_copy(&mut self) -> Result<(), Error> {
-        // TODO Use Cow pointers for this?
         // get next value. It should be a Module or Tuple.
         let tgt = dbg!(self.pop()?);
         // This value should always be a tuple
