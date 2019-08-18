@@ -15,7 +15,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use super::environment::Environment;
-use super::scope::Stack;
 use super::translate::PositionMap;
 use super::Composite::{List, Tuple};
 use super::Op::{
@@ -33,7 +32,7 @@ macro_rules! assert_cases {
         for case in $cases.drain(0..) {
             let env = Rc::new(RefCell::new(Environment::new(Vec::new(), Vec::new())));
             let mut positions = Vec::with_capacity(case.0.len());
-            for i in 0..case.0.len() {
+            for _ in 0..case.0.len() {
                 positions.push(Position::new(0, 0, 0));
             }
             let map = PositionMap{
@@ -42,7 +41,7 @@ macro_rules! assert_cases {
             };
             let mut vm = VM::new(Rc::new(map), env);
             vm.run().unwrap();
-            assert_eq!(dbg!(vm.pop()).unwrap(), Rc::new(case.1));
+            assert_eq!(dbg!(vm.pop()).unwrap().0, Rc::new(case.1));
         }
     };
 
@@ -131,7 +130,7 @@ fn bind_op() {
     for case in cases.drain(0..) {
         let env = Rc::new(RefCell::new(Environment::new(Vec::new(), Vec::new())));
         let mut positions = Vec::with_capacity(case.0.len());
-        for i in 0..case.0.len() {
+        for _ in 0..case.0.len() {
             positions.push(Position::new(0, 0, 0));
         }
         let map = PositionMap {
@@ -570,19 +569,6 @@ fn type_comparisons() {
     ];
 }
 
-#[test]
-fn scope_stacks() {
-    let mut stack = Stack::new();
-    stack.add("one".to_owned(), Rc::new(P(Int(1))));
-    let mut val = stack.get("one").unwrap();
-    assert_eq!(val.as_ref(), &P(Int(1)));
-    stack.push();
-    assert!(stack.get("one").is_none());
-    stack.to_open();
-    val = stack.get("one").unwrap();
-    assert_eq!(val.as_ref(), &P(Int(1)));
-}
-
 use super::translate;
 use crate::iter::OffsetStrIter;
 use crate::parse::parse;
@@ -598,7 +584,7 @@ macro_rules! assert_parse_cases {
             let env = Rc::new(RefCell::new(Environment::new(Vec::new(), Vec::new())));
             let mut vm = VM::new(ops.clone(), env);
             vm.run().unwrap();
-            assert_eq!(vm.pop().unwrap(), Rc::new(case.1));
+            assert_eq!(vm.pop().unwrap().0, Rc::new(case.1));
         }
     };
 
@@ -783,11 +769,11 @@ fn simple_trace() {
     let env = Rc::new(RefCell::new(Environment::new(Vec::new(), Vec::new())));
     let mut vm = VM::new(ops.clone(), env);
     vm.run().unwrap();
-    assert_eq!(vm.pop().unwrap(), Rc::new(P(Int(2))));
+    assert_eq!(vm.pop().unwrap().0, Rc::new(P(Int(2))));
     let err_out = &vm.env.borrow().stderr;
     assert_eq!(
         String::from_utf8_lossy(err_out).to_owned(),
-        "TRACE: 1 + 1 = 2 at line: 1 column: 1\n"
+        "TRACE: 1 + 1 = 2 at line: 1 column: 7\n"
     );
 }
 

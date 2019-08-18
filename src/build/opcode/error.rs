@@ -18,14 +18,14 @@ use crate::ast::Position;
 #[derive(Debug)]
 pub struct Error {
     message: String,
-    pos: Position,
+    pos: Option<Position>,
 }
 
 impl Error {
     pub fn new(msg: String, pos: Position) -> Self {
         Self {
-            message: String::new(),
-            pos: pos,
+            message: msg,
+            pos: Some(pos),
         }
     }
 }
@@ -34,11 +34,10 @@ impl<E> From<E> for Error
 where
     E: std::error::Error + Sized,
 {
-    fn from(_e: E) -> Self {
-        // FIXME(jwall): This should really have more information for debugging
+    fn from(e: E) -> Self {
         Error {
-            message: _e.description().to_owned(),
-            pos: Position::new(0, 0, 0),
+            message: e.description().to_owned(),
+            pos: None,
         }
     }
 }

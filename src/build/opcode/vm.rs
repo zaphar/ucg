@@ -33,7 +33,7 @@ where
     O: std::io::Write,
     E: std::io::Write,
 {
-    stack: Vec<Rc<Value>>,
+    stack: Vec<(Rc<Value>, Position)>,
     symbols: Stack,
     runtime: runtime::Builtins,
     ops: OpPointer,
@@ -89,46 +89,46 @@ where
             let pos = self.ops.pos().unwrap().clone();
             let idx = self.ops.idx()?;
             match op {
-                Op::Val(p) => self.push(Rc::new(P(p.clone())))?,
-                Op::Sym(s) => self.push(Rc::new(S(s.clone())))?,
+                Op::Val(p) => self.push(Rc::new(P(p.clone())), pos)?,
+                Op::Sym(s) => self.push(Rc::new(S(s.clone())), pos)?,
                 Op::DeRef(s) => self.op_deref(s.clone(), &pos)?,
-                Op::Add => self.op_add(&pos)?,
-                Op::Mod => self.op_mod(&pos)?,
-                Op::Sub => self.op_sub(&pos)?,
-                Op::Mul => self.op_mul(&pos)?,
-                Op::Div => self.op_div(&pos)?,
-                Op::Bind => self.op_bind(true, &pos)?,
-                Op::BindOver => self.op_bind(false, &pos)?,
-                Op::Equal => self.op_equal()?,
+                Op::Add => self.op_add(pos)?,
+                Op::Mod => self.op_mod(pos)?,
+                Op::Sub => self.op_sub(pos)?,
+                Op::Mul => self.op_mul(pos)?,
+                Op::Div => self.op_div(pos)?,
+                Op::Bind => self.op_bind(true)?,
+                Op::BindOver => self.op_bind(false)?,
+                Op::Equal => self.op_equal(pos)?,
                 Op::Not => self.op_not(&pos)?,
                 Op::Gt => self.op_gt(&pos)?,
                 Op::Lt => self.op_lt(&pos)?,
-                Op::GtEq => self.op_gteq(&pos)?,
-                Op::LtEq => self.op_lteq(&pos)?,
+                Op::GtEq => self.op_gteq(pos)?,
+                Op::LtEq => self.op_lteq(pos)?,
                 // Add a Composite list value to the stack
-                Op::InitList => self.push(Rc::new(C(List(Vec::new()))))?,
+                Op::InitList => self.push(Rc::new(C(List(Vec::new()))), pos)?,
                 // Add a composite tuple value to the stack
-                Op::InitTuple => self.push(Rc::new(C(Tuple(Vec::new()))))?,
+                Op::InitTuple => self.push(Rc::new(C(Tuple(Vec::new()))), pos)?,
                 Op::Field => self.op_field()?,
                 Op::Element => self.op_element()?,
-                Op::Index => self.op_index(false, &pos)?,
-                Op::SafeIndex => self.op_index(true, &pos)?,
-                Op::Cp => self.op_copy(&pos)?,
+                Op::Index => self.op_index(false, pos)?,
+                Op::SafeIndex => self.op_index(true, pos)?,
+                Op::Cp => self.op_copy(pos)?,
                 //FIXME(jwall): Should this take a user provided message?
                 Op::Bang => self.op_bang()?,
-                Op::InitThunk(jp) => self.op_thunk(idx, jp)?,
+                Op::InitThunk(jp) => self.op_thunk(idx, jp, pos)?,
                 Op::Noop => {
                     // Do nothing
                 }
                 Op::Jump(jp) => self.op_jump(jp)?,
-                Op::JumpIfTrue(jp) => self.op_jump_if_true(jp, &pos)?,
-                Op::JumpIfFalse(jp) => self.op_jump_if_false(jp, &pos)?,
+                Op::JumpIfTrue(jp) => self.op_jump_if_true(jp)?,
+                Op::JumpIfFalse(jp) => self.op_jump_if_false(jp)?,
                 Op::SelectJump(jp) => self.op_select_jump(jp)?,
-                Op::And(jp) => self.op_and(jp, &pos)?,
-                Op::Or(jp) => self.op_or(jp, &pos)?,
-                Op::Module(mptr) => self.op_module(idx, mptr, &pos)?,
-                Op::Func(jptr) => self.op_func(idx, jptr, &pos)?,
-                Op::FCall => self.op_fcall(&pos)?,
+                Op::And(jp) => self.op_and(jp, pos)?,
+                Op::Or(jp) => self.op_or(jp, pos)?,
+                Op::Module(mptr) => self.op_module(idx, mptr, pos)?,
+                Op::Func(jptr) => self.op_func(idx, jptr, pos)?,
+                Op::FCall => self.op_fcall(pos)?,
                 Op::NewScope(jp) => self.op_new_scope(jp, self.ops.clone())?,
                 Op::Return => {
                     dbg!(&self.stack);
@@ -138,7 +138,7 @@ where
                     self.pop()?;
                 }
                 Op::Typ => self.op_typ()?,
-                Op::Runtime(h) => self.op_runtime(h, &pos)?,
+                Op::Runtime(h) => self.op_runtime(h, pos)?,
                 Op::Render => self.op_render()?,
             };
         }
@@ -146,7 +146,7 @@ where
     }
 
     fn op_typ(&mut self) -> Result<(), Error> {
-        let val = self.pop()?;
+        let (val, pos) = self.pop()?;
         let typ_name = match val.as_ref() {
             P(Int(_)) => "int",
             P(Float(_)) => "float",
@@ -161,13 +161,13 @@ where
             T(_) => "thunk",
         }
         .to_owned();
-        self.push(Rc::new(P(Str(typ_name))))?;
+        self.push(Rc::new(P(Str(typ_name))), pos)?;
         Ok(())
     }
 
     fn op_deref(&mut self, name: String, pos: &Position) -> Result<(), Error> {
         let val = self.get_binding(&name, pos)?.clone();
-        self.push(val)
+        self.push(val, pos.clone())
     }
 
     fn op_jump(&mut self, jp: i32) -> Result<(), Error> {
@@ -180,42 +180,48 @@ where
         Ok(())
     }
 
-    fn op_and(&mut self, jp: i32, pos: &Position) -> Result<(), Error> {
-        let cond = self.pop()?;
+    fn op_and(&mut self, jp: i32, pos: Position) -> Result<(), Error> {
+        let (cond, cond_pos) = self.pop()?;
         let cc = cond.clone();
         if let &P(Bool(cond)) = cond.as_ref() {
             if !cond {
-                self.push(cc)?;
+                self.push(cc, cond_pos)?;
                 self.op_jump(jp)?;
             }
         } else {
             return Err(dbg!(Error::new(
-                format!("Not a boolean condition {:?} in && expression!", cond),
-                pos.clone(),
+                format!(
+                    "Not a boolean condition {:?} in && expression at {}",
+                    cond, pos
+                ),
+                cond_pos.clone(),
             )));
         }
         Ok(())
     }
 
-    fn op_or(&mut self, jp: i32, pos: &Position) -> Result<(), Error> {
-        let cond = self.pop()?;
+    fn op_or(&mut self, jp: i32, pos: Position) -> Result<(), Error> {
+        let (cond, cond_pos) = self.pop()?;
         let cc = dbg!(cond.clone());
         if let &P(Bool(cond)) = cond.as_ref() {
             if dbg!(cond) {
-                self.push(cc)?;
+                self.push(cc, cond_pos)?;
                 self.op_jump(jp)?;
             }
         } else {
             return Err(dbg!(Error::new(
-                format!("Not a boolean condition {:?} in || expression!", cond),
-                pos.clone(),
+                format!(
+                    "Not a boolean condition {:?} in || expression at {}!",
+                    cond, pos
+                ),
+                cond_pos.clone(),
             )));
         }
         Ok(())
     }
 
-    fn op_jump_if_true(&mut self, jp: i32, pos: &Position) -> Result<(), Error> {
-        let cond = self.pop()?;
+    fn op_jump_if_true(&mut self, jp: i32) -> Result<(), Error> {
+        let (cond, cond_pos) = self.pop()?;
         if let &P(Bool(cond)) = cond.as_ref() {
             if cond {
                 self.op_jump(jp)?;
@@ -223,14 +229,14 @@ where
         } else {
             return Err(dbg!(Error::new(
                 format!("Expected boolean but got {:?}!", cond),
-                pos.clone(),
+                cond_pos.clone(),
             )));
         }
         Ok(())
     }
 
-    fn op_jump_if_false(&mut self, jp: i32, pos: &Position) -> Result<(), Error> {
-        let cond = self.pop()?;
+    fn op_jump_if_false(&mut self, jp: i32) -> Result<(), Error> {
+        let (cond, pos) = self.pop()?;
         if let &P(Bool(cond)) = cond.as_ref() {
             if !cond {
                 self.op_jump(jp)?;
@@ -246,9 +252,9 @@ where
 
     fn op_select_jump(&'a mut self, jp: i32) -> Result<(), Error> {
         // pop field value off
-        let field_name = dbg!(self.pop())?;
+        let (field_name, _) = dbg!(self.pop())?;
         // pop search value off
-        let search = dbg!(self.pop())?;
+        let (search, srch_pos) = dbg!(self.pop())?;
         // compare them.
         let matched = match (field_name.as_ref(), search.as_ref()) {
             (&S(ref fname), &P(Str(ref sname))) | (&S(ref fname), &S(ref sname)) => fname == sname,
@@ -256,31 +262,31 @@ where
         };
         if !matched {
             // if they aren't equal then push search value back on and jump
-            self.push(dbg!(search))?;
+            self.push(dbg!(search), srch_pos)?;
             self.op_jump(dbg!(jp))?;
         }
         Ok(())
     }
 
-    fn op_module(&'a mut self, idx: usize, jptr: i32, pos: &Position) -> Result<(), Error> {
-        let mod_val = dbg!(self.pop())?;
+    fn op_module(&'a mut self, idx: usize, jptr: i32, pos: Position) -> Result<(), Error> {
+        let (mod_val, mod_val_pos) = dbg!(self.pop())?;
         let (result_ptr, flds) = match mod_val.as_ref() {
             &C(Tuple(ref flds)) => (None, flds.clone()),
             &T(ptr) => {
-                let tpl_val = self.pop()?;
+                let (tpl_val, tpl_val_pos) = self.pop()?;
                 if let &C(Tuple(ref flds)) = tpl_val.as_ref() {
                     (Some(ptr), flds.clone())
                 } else {
                     return dbg!(Err(Error::new(
                         format!("Expected tuple but got {:?}", tpl_val),
-                        pos.clone(),
+                        tpl_val_pos,
                     )));
                 }
             }
             _ => {
                 return dbg!(Err(Error::new(
                     format!("Expected tuple but got {:?}", mod_val),
-                    pos.clone(),
+                    mod_val_pos,
                 )));
             }
         };
@@ -300,7 +306,7 @@ where
                 pkg_pos.clone(),
                 pkg_pos.clone(),
                 pkg_pos.clone(),
-                pkg_pos.clone(),
+                pkg_pos,
             ];
             Some(OpPointer::new(Rc::new(PositionMap {
                 ops: pkg_ops,
@@ -309,24 +315,24 @@ where
         } else {
             None
         };
-        self.push(Rc::new(M(Module {
-            ptr: ops,
-            result_ptr: result_ptr,
-            flds: flds,
-            pkg_ptr: pkg_ptr,
-        })))?;
+        self.push(
+            Rc::new(M(Module {
+                ptr: ops,
+                result_ptr: result_ptr,
+                flds: flds,
+                pkg_ptr: pkg_ptr,
+            })),
+            pos,
+        )?;
         self.op_jump(jptr)
     }
 
-    fn op_func(&mut self, idx: usize, jptr: i32, pos: &Position) -> Result<(), Error> {
+    fn op_func(&mut self, idx: usize, jptr: i32, pos: Position) -> Result<(), Error> {
         // get arity from stack
-        let mut scope_snapshot = self.symbols.snapshot();
-        scope_snapshot.push();
-        scope_snapshot.to_open();
-        eprintln!("Defining a new function");
+        let scope_snapshot = self.symbols.snapshot();
         let mut bindings = Vec::new();
         // get imported symbols from stack
-        let list_val = self.pop()?;
+        let (list_val, args_pos) = self.pop()?;
         if let &C(List(ref elems)) = list_val.as_ref() {
             for e in elems {
                 if let &S(ref sym) = e.as_ref() {
@@ -334,33 +340,35 @@ where
                 } else {
                     return dbg!(Err(Error::new(
                         format!("Not an argument name {:?}", e),
-                        pos.clone(),
+                        args_pos,
                     )));
                 }
             }
         } else {
             return dbg!(Err(Error::new(
                 format!("Fault!!! Bad Argument List"),
-                pos.clone(),
+                args_pos,
             )));
         }
         let mut ops = self.ops.clone();
         ops.jump(idx)?;
-        self.push(Rc::new(F(Func {
-            ptr: ops, // where the function starts.
-            bindings: bindings,
-            snapshot: scope_snapshot,
-        })))?;
-        eprintln!("Jumping to {} past the function body", jptr);
+        self.push(
+            Rc::new(F(Func {
+                ptr: ops, // where the function starts.
+                bindings: bindings,
+                snapshot: scope_snapshot,
+            })),
+            pos,
+        )?;
         self.op_jump(jptr)
     }
 
     pub fn fcall_impl(
         f: &Func,
-        stack: &mut Vec<Rc<Value>>,
+        stack: &mut Vec<(Rc<Value>, Position)>,
         env: Rc<RefCell<Environment<O, E>>>,
         pos: &Position,
-    ) -> Result<Rc<Value>, Error> {
+    ) -> Result<(Rc<Value>, Position), Error> {
         let Func {
             ref ptr,
             ref bindings,
@@ -372,8 +380,8 @@ where
             // now put each argument on our scope stack as a binding.
             // TODO(jwall): This should do a better error if there is
             // nothing on the stack.
-            let val = stack.pop().unwrap();
-            vm.binding_push(nm.clone(), val, false, pos)?;
+            let (val, pos) = stack.pop().unwrap();
+            vm.binding_push(nm.clone(), val, false, &pos)?;
         }
         // proceed to the function body
         vm.run()?;
@@ -382,58 +390,59 @@ where
 
     fn op_new_scope(&mut self, jp: i32, ptr: OpPointer) -> Result<(), Error> {
         let scope_snapshot = self.symbols.snapshot();
-        dbg!(&ptr);
         let mut vm = Self::with_pointer(ptr, self.env.clone()).to_scoped(scope_snapshot);
-        dbg!(&vm.stack);
         vm.run()?;
-        dbg!(&vm.stack);
-        self.push(vm.pop()?)?;
+        let result = vm.pop()?;
+        self.push(result.0, result.1)?;
         self.op_jump(jp)?;
         Ok(())
     }
 
-    fn op_fcall(&mut self, pos: &Position) -> Result<(), Error> {
-        let f = dbg!(self.pop())?;
+    fn op_fcall(&mut self, pos: Position) -> Result<(), Error> {
+        let (f, _) = dbg!(self.pop())?;
         if let &F(ref f) = f.as_ref() {
-            let val = Self::fcall_impl(f, &mut self.stack, self.env.clone(), pos)?;
-            self.push(dbg!(val))?;
+            let (val, _) = Self::fcall_impl(f, &mut self.stack, self.env.clone(), &pos)?;
+            self.push(dbg!(val), pos.clone())?;
         }
         Ok(())
     }
 
-    fn op_thunk(&mut self, idx: usize, jp: i32) -> Result<(), Error> {
-        self.push(Rc::new(T(idx)))?;
+    fn op_thunk(&mut self, idx: usize, jp: i32, pos: Position) -> Result<(), Error> {
+        self.push(Rc::new(T(idx)), pos)?;
         self.op_jump(jp)
     }
 
     fn op_not(&mut self, pos: &Position) -> Result<(), Error> {
-        let operand = self.pop()?;
+        let (operand, operand_pos) = self.pop()?;
         if let P(Bool(val)) = operand.as_ref() {
-            self.push(Rc::new(P(Bool(!val))))?;
+            self.push(Rc::new(P(Bool(!val))), operand_pos)?;
             return Ok(());
         }
         return Err(dbg!(Error::new(
-            format!("Expected Boolean but got {:?}", operand),
-            pos.clone(),
+            format!(
+                "Expected Boolean but got {:?} in expression at {}",
+                operand, pos
+            ),
+            operand_pos,
         )));
     }
 
-    fn op_equal(&mut self) -> Result<(), Error> {
-        let left = self.pop()?;
-        let right = self.pop()?;
-        self.push(Rc::new(P(Bool(left == right))))?;
+    fn op_equal(&mut self, pos: Position) -> Result<(), Error> {
+        let (left, _) = self.pop()?;
+        let (right, _) = self.pop()?;
+        self.push(Rc::new(P(Bool(left == right))), pos)?;
         Ok(())
     }
 
     fn op_gt(&mut self, pos: &Position) -> Result<(), Error> {
-        let left = self.pop()?;
-        let right = self.pop()?;
+        let (left, _) = self.pop()?;
+        let (right, _) = self.pop()?;
         match (left.as_ref(), right.as_ref()) {
             (&P(Int(i)), &P(Int(ii))) => {
-                self.push(Rc::new(P(Bool(i > ii))))?;
+                self.push(Rc::new(P(Bool(i > ii))), pos.clone())?;
             }
             (&P(Float(f)), &P(Float(ff))) => {
-                self.push(Rc::new(P(Bool(f > ff))))?;
+                self.push(Rc::new(P(Bool(f > ff))), pos.clone())?;
             }
             _ => {
                 return Err(dbg!(Error::new(
@@ -449,14 +458,14 @@ where
     }
 
     fn op_lt(&mut self, pos: &Position) -> Result<(), Error> {
-        let left = self.pop()?;
-        let right = self.pop()?;
+        let (left, _) = self.pop()?;
+        let (right, _) = self.pop()?;
         match (left.as_ref(), right.as_ref()) {
             (&P(Int(i)), &P(Int(ii))) => {
-                self.push(Rc::new(P(Bool(i < ii))))?;
+                self.push(Rc::new(P(Bool(i < ii))), pos.clone())?;
             }
             (&P(Float(f)), &P(Float(ff))) => {
-                self.push(Rc::new(P(Bool(f < ff))))?;
+                self.push(Rc::new(P(Bool(f < ff))), pos.clone())?;
             }
             _ => {
                 return Err(dbg!(Error::new(
@@ -471,15 +480,15 @@ where
         Ok(())
     }
 
-    fn op_lteq(&mut self, pos: &Position) -> Result<(), Error> {
-        let left = self.pop()?;
-        let right = self.pop()?;
+    fn op_lteq(&mut self, pos: Position) -> Result<(), Error> {
+        let (left, _) = self.pop()?;
+        let (right, _) = self.pop()?;
         match (left.as_ref(), right.as_ref()) {
             (&P(Int(i)), &P(Int(ii))) => {
-                self.push(Rc::new(P(Bool(i <= ii))))?;
+                self.push(Rc::new(P(Bool(i <= ii))), pos)?;
             }
             (&P(Float(f)), &P(Float(ff))) => {
-                self.push(Rc::new(P(Bool(f <= ff))))?;
+                self.push(Rc::new(P(Bool(f <= ff))), pos)?;
             }
             _ => {
                 return Err(dbg!(Error::new(
@@ -487,22 +496,22 @@ where
                         "Expected Numeric values of the same type but got {:?} and {:?}",
                         left, right
                     ),
-                    pos.clone(),
+                    pos,
                 )));
             }
         }
         Ok(())
     }
 
-    fn op_gteq(&mut self, pos: &Position) -> Result<(), Error> {
-        let left = self.pop()?;
-        let right = self.pop()?;
+    fn op_gteq(&mut self, pos: Position) -> Result<(), Error> {
+        let (left, _) = self.pop()?;
+        let (right, _) = self.pop()?;
         match (left.as_ref(), right.as_ref()) {
             (&P(Int(i)), &P(Int(ii))) => {
-                self.push(Rc::new(P(Bool(i >= ii))))?;
+                self.push(Rc::new(P(Bool(i >= ii))), pos)?;
             }
             (&P(Float(f)), &P(Float(ff))) => {
-                self.push(Rc::new(P(Bool(f >= ff))))?;
+                self.push(Rc::new(P(Bool(f >= ff))), pos)?;
             }
             _ => {
                 return Err(dbg!(Error::new(
@@ -510,65 +519,65 @@ where
                         "Expected Numeric values of the same type but got {:?} and {:?}",
                         left, right
                     ),
-                    pos.clone(),
+                    pos,
                 )));
             }
         }
         Ok(())
     }
 
-    fn op_mod(&mut self, pos: &Position) -> Result<(), Error> {
+    fn op_mod(&mut self, pos: Position) -> Result<(), Error> {
         // Adds the previous two items in the stack.
-        let left = self.pop()?;
-        let right = self.pop()?;
+        let (left, _) = self.pop()?;
+        let (right, _) = self.pop()?;
         // Then pushes the result onto the stack.
-        self.push(Rc::new(P(self.modulus(&left, &right, pos)?)))?;
+        self.push(Rc::new(P(self.modulus(&left, &right, &pos)?)), pos)?;
         Ok(())
     }
 
-    fn op_add(&mut self, pos: &Position) -> Result<(), Error> {
+    fn op_add(&mut self, pos: Position) -> Result<(), Error> {
         // Adds the previous two items in the stack.
-        let left = self.pop()?;
-        let right = self.pop()?;
+        let (left, _) = self.pop()?;
+        let (right, _) = self.pop()?;
         // Then pushes the result onto the stack.
-        self.push(Rc::new(self.add(&left, &right, pos)?))?;
+        self.push(Rc::new(self.add(&left, &right, &pos)?), pos)?;
         Ok(())
     }
 
-    fn op_sub(&mut self, pos: &Position) -> Result<(), Error> {
+    fn op_sub(&mut self, pos: Position) -> Result<(), Error> {
         // Subtracts the previous two items in the stack.
-        let left = self.pop()?;
-        let right = self.pop()?;
+        let (left, _) = self.pop()?;
+        let (right, _) = self.pop()?;
         // Then pushes the result onto the stack.
-        self.push(Rc::new(P(self.sub(&left, &right, pos)?)))?;
+        self.push(Rc::new(P(self.sub(&left, &right, &pos)?)), pos)?;
         Ok(())
     }
 
-    fn op_mul(&mut self, pos: &Position) -> Result<(), Error> {
+    fn op_mul(&mut self, pos: Position) -> Result<(), Error> {
         // Multiplies the previous two items in the stack.
-        let left = self.pop()?;
-        let right = self.pop()?;
+        let (left, _) = self.pop()?;
+        let (right, _) = self.pop()?;
         // Then pushes the result onto the stack.
-        self.push(Rc::new(P(self.mul(&left, &right, pos)?)))?;
+        self.push(Rc::new(P(self.mul(&left, &right, &pos)?)), pos)?;
         Ok(())
     }
 
-    fn op_div(&mut self, pos: &Position) -> Result<(), Error> {
+    fn op_div(&mut self, pos: Position) -> Result<(), Error> {
         // Divides the previous two items in the stack.
-        let left = self.pop()?;
-        let right = self.pop()?;
+        let (left, _) = self.pop()?;
+        let (right, _) = self.pop()?;
         // Then pushes the result onto the stack.
-        self.push(Rc::new(P(self.div(&left, &right, pos)?)))?;
+        self.push(Rc::new(P(self.div(&left, &right, &pos)?)), pos)?;
         Ok(())
     }
 
-    fn op_bind(&mut self, strict: bool, pos: &Position) -> Result<(), Error> {
+    fn op_bind(&mut self, strict: bool) -> Result<(), Error> {
         // pop val off stack.
-        let val = self.pop()?;
+        let (val, val_pos) = self.pop()?;
         // pop name off stack.
-        let name = self.pop()?;
+        let (name, _) = self.pop()?;
         if let &S(ref name) = name.as_ref() {
-            self.binding_push(name.clone(), val, strict, pos)?;
+            self.binding_push(name.clone(), val, strict, &val_pos)?;
         } else {
             unreachable!();
         }
@@ -578,22 +587,22 @@ where
     fn op_field(&mut self) -> Result<(), Error> {
         // Add a Composite field value to a tuple on the stack
         // get value from stack
-        let val = self.pop()?;
+        let (val, _) = self.pop()?;
         // get name from stack.
-        let name_val = self.pop()?;
+        let (name_val, _) = self.pop()?;
         let name = if let &S(ref s) | &P(Str(ref s)) = name_val.as_ref() {
             s
         } else {
             unreachable!();
         };
         // get composite tuple from stack
-        let tpl = self.pop()?;
+        let (tpl, tpl_pos) = self.pop()?;
         if let &C(Tuple(ref flds)) = tpl.as_ref() {
             // add name and value to tuple
             let mut flds = flds.clone();
             self.merge_field_into_tuple(&mut flds, name.clone(), val)?;
             // place composite tuple back on stack
-            self.push(Rc::new(C(Tuple(flds))))?;
+            self.push(Rc::new(C(Tuple(flds))), tpl_pos)?;
         } else {
             unreachable!();
         };
@@ -602,15 +611,15 @@ where
 
     fn op_element(&mut self) -> Result<(), Error> {
         // get element from stack.
-        let val = dbg!(self.pop()?);
+        let (val, _) = dbg!(self.pop()?);
         // get next value. It should be a Composite list.
-        let list = dbg!(self.pop()?);
+        let (list, pos) = dbg!(self.pop()?);
         if let &C(List(ref elems)) = list.as_ref() {
             // add value to list
             let mut elems = elems.clone();
             elems.push(val);
             // Add that value to the list and put list back on stack.
-            self.push(Rc::new(C(List(elems))))?;
+            self.push(Rc::new(C(List(elems))), pos)?;
         } else {
             unreachable!();
         };
@@ -621,15 +630,15 @@ where
         Ok(())
     }
 
-    fn op_index(&mut self, safe: bool, pos: &Position) -> Result<(), Error> {
+    fn op_index(&mut self, safe: bool, pos: Position) -> Result<(), Error> {
         // left and then right
-        let right = dbg!(self.pop()?);
-        let left = dbg!(self.pop()?);
+        let (right, right_pos) = dbg!(self.pop()?);
+        let (left, _) = dbg!(self.pop()?);
         match right.as_ref() {
             &P(Int(i)) => {
                 if let &C(List(ref elems)) = left.as_ref() {
                     if i < (elems.len() as i64) && i >= 0 {
-                        self.push(elems[i as usize].clone())?;
+                        self.push(elems[i as usize].clone(), right_pos)?;
                         return Ok(());
                     }
                 }
@@ -638,7 +647,7 @@ where
                 if let &C(Tuple(ref flds)) = left.as_ref() {
                     for &(ref key, ref val) in flds.iter() {
                         if key == s {
-                            self.push(val.clone())?;
+                            self.push(val.clone(), right_pos)?;
                             return Ok(());
                         }
                     }
@@ -649,20 +658,20 @@ where
             }
         };
         if safe {
-            self.push(Rc::new(P(Empty)))?;
+            self.push(Rc::new(P(Empty)), pos)?;
             return Ok(());
         }
         return Err(dbg!(Error::new(
             format!("Invalid selector index: {:?} target: {:?}", right, left),
-            pos.clone(),
+            pos,
         )));
     }
 
-    fn op_copy(&mut self, pos: &Position) -> Result<(), Error> {
+    fn op_copy(&mut self, pos: Position) -> Result<(), Error> {
         // get next value. It should be a Module or Tuple.
-        let tgt = dbg!(self.pop()?);
+        let (tgt, tgt_pos) = dbg!(self.pop()?);
         // This value should always be a tuple
-        let override_val = dbg!(self.pop()?);
+        let (override_val, _) = dbg!(self.pop()?);
         let overrides = if let &C(Tuple(ref oflds)) = override_val.as_ref() {
             oflds.clone()
         } else {
@@ -675,7 +684,7 @@ where
                     self.merge_field_into_tuple(&mut flds, name, val)?;
                 }
                 // Put the copy on the Stack
-                self.push(Rc::new(C(Tuple(flds))))?;
+                self.push(Rc::new(C(Tuple(flds))), tgt_pos)?;
             }
             &M(Module {
                 ref ptr,
@@ -698,27 +707,28 @@ where
                 if let Some(ptr) = pkg_ptr {
                     let mut pkg_vm = Self::with_pointer(ptr.clone(), self.env.clone());
                     pkg_vm.run()?;
-                    let pkg_func = pkg_vm.pop()?;
+                    let (pkg_func, _) = pkg_vm.pop()?;
                     self.merge_field_into_tuple(&mut flds, "pkg".to_owned(), pkg_func)?;
                 }
 
                 let mut vm = Self::with_pointer(ptr.clone(), self.env.clone());
-                vm.push(Rc::new(S("mod".to_owned())))?;
-                vm.push(Rc::new(C(Tuple(flds))))?;
+                vm.push(Rc::new(S("mod".to_owned())), pos.clone())?;
+                vm.push(Rc::new(C(Tuple(flds))), pos.clone())?;
                 vm.run()?;
                 if let Some(ptr) = result_ptr {
                     vm.ops.jump(ptr.clone())?;
                     vm.run()?;
-                    self.push(dbg!(vm.pop())?)?;
+                    let (result_val, result_pos) = vm.pop()?;
+                    self.push(dbg!(result_val), result_pos)?;
                 } else {
                     dbg!(&vm.symbols);
-                    self.push(Rc::new(dbg!(vm.symbols_to_tuple(false))))?;
+                    self.push(Rc::new(dbg!(vm.symbols_to_tuple(false))), pos)?;
                 }
             }
             _ => {
                 return Err(dbg!(Error::new(
                     format!("Expected a Tuple or a Module but got {:?}", tgt),
-                    pos.clone(),
+                    pos,
                 )));
             }
         }
@@ -741,8 +751,8 @@ where
         Ok(())
     }
 
-    fn push(&mut self, p: Rc<Value>) -> Result<(), Error> {
-        self.stack.push(p);
+    fn push(&mut self, val: Rc<Value>, pos: Position) -> Result<(), Error> {
+        self.stack.push((val, pos));
         Ok(())
     }
 
@@ -773,7 +783,7 @@ where
         }
     }
 
-    pub fn pop(&mut self) -> Result<Rc<Value>, Error> {
+    pub fn pop(&mut self) -> Result<(Rc<Value>, Position), Error> {
         match self.stack.pop() {
             Some(v) => Ok(v),
             None => unreachable!(),
@@ -873,7 +883,7 @@ where
         })
     }
 
-    fn op_runtime(&mut self, h: Hook, pos: &Position) -> Result<(), Error> {
+    fn op_runtime(&mut self, h: Hook, pos: Position) -> Result<(), Error> {
         self.runtime.handle(
             self.ops.path.as_ref(),
             h,
@@ -884,8 +894,8 @@ where
     }
 
     fn op_render(&mut self) -> Result<(), Error> {
-        let val = self.pop()?;
-        self.push(Rc::new(P(Str(val.as_ref().into()))))?;
+        let (val, pos) = self.pop()?;
+        self.push(Rc::new(P(Str(val.as_ref().into()))), pos)?;
         Ok(())
     }
 }

@@ -250,9 +250,10 @@ impl TryFrom<&Value> for Val {
                 Val::List(els)
             }
             S(_) | F(_) | M(_) | T(_) => {
-                return Err(dbg!(
-                    Error::new(format!("Invalid Value {:?} to Val translation", val),
-                    Position::new(0, 0, 0))));
+                return Err(dbg!(Error::new(
+                    format!("Invalid Value {:?} to Val translation", val),
+                    Position::new(0, 0, 0)
+                )));
             }
         })
     }
@@ -301,7 +302,12 @@ impl TryFrom<&Val> for Value {
             }
             // TODO(jwall): These can go away eventually when we replace the tree
             // walking interpreter.
-            Val::Module(_) | Val::Func(_) => return Err(dbg!(Error::new(format!("Invalid Translation from Val {} to Value", val), Position::new(0, 0, 0)))),
+            Val::Module(_) | Val::Func(_) => {
+                return Err(dbg!(Error::new(
+                    format!("Invalid Translation from Val {} to Value", val),
+                    Position::new(0, 0, 0)
+                )))
+            }
         })
     }
 }

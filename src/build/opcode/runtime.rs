@@ -63,9 +63,9 @@ impl Builtins {
         &mut self,
         path: Option<P>,
         h: Hook,
-        stack: &mut Vec<Rc<Value>>,
+        stack: &mut Vec<(Rc<Value>, Position)>,
         env: Rc<RefCell<Environment<O, E>>>,
-        pos: &Position,
+        pos: Position,
     ) -> Result<(), Error>
     where
         O: std::io::Write,
@@ -90,7 +90,7 @@ impl Builtins {
         &self,
         path: P,
         use_import_path: bool,
-        pos: &Position,
+        pos: Position,
     ) -> Result<PathBuf, Error> {
         // Try a relative path first.
         let path = path.into();
@@ -122,7 +122,7 @@ impl Builtins {
         }
     }
 
-    fn get_file_as_string(&self, path: &str, pos: &Position) -> Result<String, Error> {
+    fn get_file_as_string(&self, path: &str, pos: Position) -> Result<String, Error> {
         let sep = format!("{}", std::path::MAIN_SEPARATOR);
         let raw_path = path.replace("/", &sep);
         let normalized = self.find_file(raw_path, false, pos)?;
@@ -136,21 +136,21 @@ impl Builtins {
 
     fn import<O, E>(
         &mut self,
-        stack: &mut Vec<Rc<Value>>,
+        stack: &mut Vec<(Rc<Value>, Position)>,
         env: Rc<RefCell<Environment<O, E>>>,
-        pos: &Position,
+        pos: Position,
     ) -> Result<(), Error>
     where
         O: std::io::Write,
         E: std::io::Write,
     {
         let path = stack.pop();
-        if let Some(val) = path {
+        if let Some((val, path_pos)) = path {
             if let &Value::P(Str(ref path)) = val.as_ref() {
                 let mut borrowed_env = env.borrow_mut();
                 let val_cache = &mut borrowed_env.val_cache;
                 if val_cache.contains_key(path) {
-                    stack.push(val_cache[path].clone());
+                    stack.push((val_cache[path].clone(), path_pos));
                 } else {
                     let op_pointer = env.borrow_mut().op_cache.entry(path).get_pointer_or_else(
                         || {
@@ -174,23 +174,20 @@ impl Builtins {
                     vm.run()?;
                     let result = Rc::new(vm.symbols_to_tuple(true));
                     val_cache.insert(path.clone(), result.clone());
-                    stack.push(result);
+                    stack.push((result, pos));
                 }
                 return Ok(());
             }
-            return Err(dbg!(Error::new(
-                format!("Invalid Path {:?}", val),
-                pos.clone(),
-            )));
+            return Err(dbg!(Error::new(format!("Invalid Path {:?}", val), pos,)));
         }
         unreachable!();
     }
 
     fn include<O, E>(
         &self,
-        stack: &mut Vec<Rc<Value>>,
+        stack: &mut Vec<(Rc<Value>, Position)>,
         env: Rc<RefCell<Environment<O, E>>>,
-        pos: &Position,
+        pos: Position,
     ) -> Result<(), Error>
     where
         O: std::io::Write,
@@ -198,64 +195,66 @@ impl Builtins {
     {
         let path = stack.pop();
         let typ = stack.pop();
-        let path = if let Some(val) = path {
+        let path = if let Some((val, path_pos)) = path {
             if let &Value::P(Str(ref path)) = val.as_ref() {
                 path.clone()
             } else {
                 return Err(dbg!(Error::new(
                     format!("Invalid Path {:?}", val),
-                    pos.clone(),
+                    path_pos,
                 )));
             }
         } else {
             unreachable!();
         };
-        let typ = if let Some(val) = typ.as_ref() {
+        let typ = if let Some((val, typ_pos)) = typ {
             if let &Value::P(Str(ref typ)) = val.as_ref() {
                 typ.clone()
             } else {
                 return Err(dbg!(Error::new(
-                    format!("Expected conversion type but got {:?}", typ),
-                    pos.clone(),
+                    format!("Expected conversion type but got {:?}", val),
+                    typ_pos,
                 )));
             }
         } else {
             unreachable!();
         };
         if typ == "str" {
-            stack.push(Rc::new(P(Str(self.get_file_as_string(&path, pos)?))));
+            stack.push((
+                Rc::new(P(Str(self.get_file_as_string(&path, pos.clone())?))),
+                pos.clone(),
+            ));
         } else {
-            stack.push(Rc::new(
-                match env.borrow().importer_registry.get_importer(&typ) {
+            stack.push((
+                Rc::new(match env.borrow().importer_registry.get_importer(&typ) {
                     Some(importer) => {
-                        let contents = self.get_file_as_string(&path, pos)?;
+                        let contents = self.get_file_as_string(&path, pos.clone())?;
                         if contents.len() == 0 {
                             eprintln!("including an empty file. Use NULL as the result");
                             P(Empty)
                         } else {
                             match importer.import(contents.as_bytes()) {
                                 Ok(v) => v.try_into()?,
-                                Err(e) => {
-                                    return Err(dbg!(Error::new(format!("{}", e), pos.clone(),)))
-                                }
+                                Err(e) => return Err(dbg!(Error::new(format!("{}", e), pos,))),
                             }
                         }
                     }
                     None => {
                         return Err(dbg!(Error::new(
                             format!("No such conversion type {}", &typ),
-                            pos.clone(),
+                            pos,
                         )))
                     }
-                },
+                }),
+                pos,
             ));
         }
         Ok(())
     }
 
-    fn assert(&mut self, stack: &mut Vec<Rc<Value>>) -> Result<(), Error> {
+    fn assert(&mut self, stack: &mut Vec<(Rc<Value>, Position)>) -> Result<(), Error> {
         let tuple = stack.pop();
-        if let Some(val) = tuple.clone() {
+        if let Some((val, tpl_pos)) = tuple.clone() {
             if let &Value::C(Tuple(ref tuple)) = val.as_ref() {
                 // look for the description field
                 let mut desc = None;
@@ -278,21 +277,23 @@ impl Builtins {
                     }
                 }
             }
+            let msg = format!(
+                "TYPE FAIL - Expected tuple with ok and desc fields got {:?} at {}\n",
+                tuple, tpl_pos
+            );
+            self.assert_results.record_assert_result(&msg, false);
+        } else {
+            unreachable!();
         }
-        let msg = format!(
-            "TYPE FAIL - Expected tuple with ok and desc fields got {:?} at line: {} column: {}\n",
-            tuple, "TODO", "TODO"
-        );
-        self.assert_results.record_assert_result(&msg, false);
         return Ok(());
     }
 
     fn out<P: AsRef<Path>, O, E>(
         &self,
         path: Option<P>,
-        stack: &mut Vec<Rc<Value>>,
+        stack: &mut Vec<(Rc<Value>, Position)>,
         env: Rc<RefCell<Environment<O, E>>>,
-        pos: &Position,
+        pos: Position,
     ) -> Result<(), Error>
     where
         O: std::io::Write,
@@ -304,9 +305,9 @@ impl Builtins {
             Box::new(std::io::stdout())
         };
         let val = stack.pop();
-        if let Some(val) = val {
+        if let Some((val, val_pos)) = val {
             let val = val.try_into()?;
-            if let Some(c_type_val) = stack.pop() {
+            if let Some((c_type_val, c_type_pos)) = stack.pop() {
                 if let &Value::S(ref c_type) = c_type_val.as_ref() {
                     if let Some(c) = env.borrow().converter_registry.get_converter(c_type) {
                         if let Err(e) = c.convert(Rc::new(val), &mut writer) {
@@ -316,14 +317,14 @@ impl Builtins {
                     } else {
                         return Err(dbg!(Error::new(
                             format!("No such conversion type {:?}", c_type),
-                            pos.clone()
+                            c_type_pos,
                         )));
                     }
                 }
             }
             return Err(dbg!(Error::new(
                 format!("Not a conversion type {:?}", val),
-                pos.clone()
+                val_pos,
             )));
         }
         unreachable!();
@@ -331,32 +332,34 @@ impl Builtins {
 
     fn convert<O, E>(
         &self,
-        stack: &mut Vec<Rc<Value>>,
+        stack: &mut Vec<(Rc<Value>, Position)>,
         env: Rc<RefCell<Environment<O, E>>>,
-        pos: &Position,
+        pos: Position,
     ) -> Result<(), Error>
     where
         O: std::io::Write,
         E: std::io::Write,
     {
         let val = stack.pop();
-        if let Some(val) = val {
+        if let Some((val, val_pos)) = val {
             let val = val.try_into()?;
-            if let Some(c_type_val) = stack.pop() {
+            if let Some((c_type_val, c_typ_pos)) = stack.pop() {
                 if let &Value::S(ref c_type) = c_type_val.as_ref() {
                     if let Some(c) = env.borrow().converter_registry.get_converter(c_type) {
                         let mut buf: Vec<u8> = Vec::new();
                         match c.convert(Rc::new(val), &mut buf) {
                             Ok(_) => {
-                                stack
-                                    .push(Rc::new(P(Str(
+                                stack.push((
+                                    Rc::new(P(Str(
                                         String::from_utf8_lossy(buf.as_slice()).to_string()
-                                    ))));
+                                    ))),
+                                    pos,
+                                ));
                             }
                             Err(_e) => {
                                 return Err(dbg!(Error::new(
                                     format!("No such conversion type {:?}", c_type),
-                                    pos.clone()
+                                    c_typ_pos,
                                 )));
                             }
                         }
@@ -366,7 +369,7 @@ impl Builtins {
             }
             return Err(dbg!(Error::new(
                 format!("Not a conversion type {:?}", val),
-                pos.clone()
+                val_pos,
             )));
         }
         unreachable!()
@@ -374,22 +377,22 @@ impl Builtins {
 
     fn map<O, E>(
         &self,
-        stack: &mut Vec<Rc<Value>>,
+        stack: &mut Vec<(Rc<Value>, Position)>,
         env: Rc<RefCell<Environment<O, E>>>,
-        pos: &Position,
+        pos: Position,
     ) -> Result<(), Error>
     where
         O: std::io::Write,
         E: std::io::Write,
     {
         // get the list from the stack
-        let list = if let Some(list) = stack.pop() {
+        let (list, list_pos) = if let Some(list) = stack.pop() {
             list
         } else {
             unreachable!();
         };
         // get the func ptr from the stack
-        let fptr = if let Some(ptr) = stack.pop() {
+        let (fptr, fptr_pos) = if let Some(ptr) = stack.pop() {
             ptr
         } else {
             unreachable!();
@@ -398,7 +401,7 @@ impl Builtins {
         let f = if let &F(ref f) = fptr.as_ref() {
             f
         } else {
-            return Err(dbg!(Error::new(format!("Not a function!!"), pos.clone(),)));
+            return Err(dbg!(Error::new(format!("Not a function!!"), fptr_pos)));
         };
 
         match list.as_ref() {
@@ -406,18 +409,19 @@ impl Builtins {
                 let mut result_elems = Vec::new();
                 for e in elems.iter() {
                     // push function argument on the stack.
-                    stack.push(e.clone());
+                    stack.push((e.clone(), list_pos.clone()));
                     // call function and push it's result on the stack.
-                    result_elems.push(VM::fcall_impl(f, stack, env.clone(), pos)?);
+                    let (result, _) = VM::fcall_impl(f, stack, env.clone(), &pos)?;
+                    result_elems.push(result);
                 }
-                stack.push(Rc::new(C(List(result_elems))));
+                stack.push((Rc::new(C(List(result_elems))), list_pos));
             }
             &C(Tuple(ref _flds)) => {
                 let mut new_fields = Vec::new();
                 for (ref name, ref val) in _flds {
-                    stack.push(val.clone());
-                    stack.push(Rc::new(P(Str(name.clone()))));
-                    let result = VM::fcall_impl(f, stack, env.clone(), pos)?;
+                    stack.push((val.clone(), list_pos.clone()));
+                    stack.push((Rc::new(P(Str(name.clone()))), list_pos.clone()));
+                    let (result, result_pos) = VM::fcall_impl(f, stack, env.clone(), &fptr_pos)?;
                     if let &C(List(ref fval)) = result.as_ref() {
                         // we expect them to be a list of exactly 2 items.
                         if fval.len() != 2 {
@@ -425,42 +429,42 @@ impl Builtins {
                                 format!(
                                     "Map Functions over tuples must return a list of two items"
                                 ),
-                                pos.clone(),
+                                result_pos,
                             )));
                         }
                         let name = match fval[0].as_ref() {
                             &P(Str(ref name)) => name.clone(),
                             _ => return Err(dbg!(Error::new(
-                                format!("Map functionss over tuples must return a String as the first list item"),
-                                pos.clone(),
+                                format!("Map functions over tuples must return a String as the first list item"),
+                                result_pos,
                             ))),
                         };
                         new_fields.push((name, fval[1].clone()));
                     }
                 }
-                stack.push(Rc::new(C(Tuple(dbg!(new_fields)))));
+                stack.push((Rc::new(C(Tuple(dbg!(new_fields)))), pos));
             }
             &P(Str(ref s)) => {
                 let mut buf = String::new();
                 for c in s.chars() {
-                    stack.push(Rc::new(P(Str(c.to_string()))));
+                    stack.push((Rc::new(P(Str(c.to_string()))), list_pos.clone()));
                     // call function and push it's result on the stack.
-                    let result = VM::fcall_impl(f, stack, env.clone(), pos)?;
+                    let (result, result_pos) = VM::fcall_impl(f, stack, env.clone(), &fptr_pos)?;
                     if let &P(Str(ref s)) = result.as_ref() {
                         buf.push_str(s);
                     } else {
                         return Err(dbg!(Error::new(
                             format!("Map functions over string should return strings"),
-                            pos.clone()
+                            result_pos
                         )));
                     }
                 }
-                stack.push(Rc::new(P(Str(buf))));
+                stack.push((Rc::new(P(Str(buf))), pos));
             }
             _ => {
                 return Err(dbg!(Error::new(
                     format!("You can only map over lists, tuples, or strings"),
-                    pos.clone(),
+                    pos,
                 )))
             }
         };
@@ -469,22 +473,22 @@ impl Builtins {
 
     fn filter<O, E>(
         &self,
-        stack: &mut Vec<Rc<Value>>,
+        stack: &mut Vec<(Rc<Value>, Position)>,
         env: Rc<RefCell<Environment<O, E>>>,
-        pos: &Position,
+        pos: Position,
     ) -> Result<(), Error>
     where
         O: std::io::Write,
         E: std::io::Write,
     {
         // get the list from the stack
-        let list = if let Some(list) = stack.pop() {
+        let (list, list_pos) = if let Some(list) = stack.pop() {
             list
         } else {
             unreachable!();
         };
         // get the func ptr from the stack
-        let fptr = if let Some(ptr) = stack.pop() {
+        let (fptr, fptr_pos) = if let Some(ptr) = stack.pop() {
             ptr
         } else {
             unreachable!();
@@ -493,7 +497,7 @@ impl Builtins {
         let f = if let &F(ref f) = fptr.as_ref() {
             f
         } else {
-            return Err(dbg!(Error::new(format!("Not a function!!"), pos.clone(),)));
+            return Err(dbg!(Error::new(format!("Not a function!!"), fptr_pos)));
         };
 
         match list.as_ref() {
@@ -501,9 +505,9 @@ impl Builtins {
                 let mut result_elems = Vec::new();
                 for e in elems.iter() {
                     // push function argument on the stack.
-                    stack.push(e.clone());
+                    stack.push((e.clone(), list_pos.clone()));
                     // call function and push it's result on the stack.
-                    let condition = VM::fcall_impl(f, stack, env.clone(), pos)?;
+                    let (condition, _) = VM::fcall_impl(f, stack, env.clone(), &fptr_pos)?;
                     // Check for empty or boolean results and only push e back in
                     // if they are non empty and true
                     match condition.as_ref() {
@@ -513,14 +517,14 @@ impl Builtins {
                         _ => result_elems.push(e.clone()),
                     }
                 }
-                stack.push(Rc::new(C(List(result_elems))));
+                stack.push((Rc::new(C(List(result_elems))), pos));
             }
             &C(Tuple(ref _flds)) => {
                 let mut new_fields = Vec::new();
                 for (ref name, ref val) in _flds {
-                    stack.push(val.clone());
-                    stack.push(Rc::new(P(Str(name.clone()))));
-                    let condition = VM::fcall_impl(f, stack, env.clone(), pos)?;
+                    stack.push((val.clone(), list_pos.clone()));
+                    stack.push((Rc::new(P(Str(name.clone()))), list_pos.clone()));
+                    let (condition, _) = VM::fcall_impl(f, stack, env.clone(), &pos)?;
                     // Check for empty or boolean results and only push e back in
                     // if they are non empty and true
                     match condition.as_ref() {
@@ -530,14 +534,14 @@ impl Builtins {
                         _ => new_fields.push((name.clone(), val.clone())),
                     }
                 }
-                stack.push(Rc::new(C(Tuple(dbg!(new_fields)))));
+                stack.push((Rc::new(C(Tuple(dbg!(new_fields)))), pos));
             }
             &P(Str(ref s)) => {
                 let mut buf = String::new();
                 for c in s.chars() {
-                    stack.push(Rc::new(P(Str(c.to_string()))));
+                    stack.push((Rc::new(P(Str(c.to_string()))), list_pos.clone()));
                     // call function and push it's result on the stack.
-                    let condition = VM::fcall_impl(f, stack, env.clone(), pos)?;
+                    let (condition, _) = VM::fcall_impl(f, stack, env.clone(), &pos)?;
                     // Check for empty or boolean results and only push c back in
                     // if they are non empty and true
                     match condition.as_ref() {
@@ -547,27 +551,27 @@ impl Builtins {
                         _ => buf.push(c),
                     }
                 }
-                stack.push(Rc::new(P(Str(buf))));
+                stack.push((Rc::new(P(Str(buf))), pos));
             }
             _ => {
                 return Err(dbg!(Error::new(
                     format!("You can only filter over lists, tuples, or strings"),
-                    pos.clone(),
+                    pos,
                 )))
             }
         }
         Ok(())
     }
 
-    fn regex(&self, stack: &mut Vec<Rc<Value>>, pos: &Position) -> Result<(), Error> {
+    fn regex(&self, stack: &mut Vec<(Rc<Value>, Position)>, pos: Position) -> Result<(), Error> {
         // 1. get left side (string)
-        let left_str = if let Some(val) = stack.pop() {
+        let left_str = if let Some((val, val_pos)) = stack.pop() {
             if let &P(Str(ref s)) = val.as_ref() {
                 s.clone()
             } else {
                 return dbg!(Err(Error::new(
                     format!("Expected string bug got {:?}", val),
-                    pos.clone(),
+                    val_pos,
                 )));
             }
         } else {
@@ -575,13 +579,13 @@ impl Builtins {
         };
 
         // 2. get right side (string)
-        let right_str = if let Some(val) = stack.pop() {
+        let right_str = if let Some((val, val_pos)) = stack.pop() {
             if let &P(Str(ref s)) = val.as_ref() {
                 s.clone()
             } else {
                 return dbg!(Err(Error::new(
                     format!("Expected string bug got {:?}", val),
-                    pos.clone(),
+                    val_pos,
                 )));
             }
         } else {
@@ -590,34 +594,34 @@ impl Builtins {
 
         // 3. compare via regex
         let rex = Regex::new(&right_str)?;
-        stack.push(Rc::new(P(Bool(rex.find(&left_str).is_some()))));
+        stack.push((Rc::new(P(Bool(rex.find(&left_str).is_some()))), pos));
         Ok(())
     }
 
     fn reduce<O, E>(
         &self,
-        stack: &mut Vec<Rc<Value>>,
+        stack: &mut Vec<(Rc<Value>, Position)>,
         env: Rc<RefCell<Environment<O, E>>>,
-        pos: &Position,
+        pos: Position,
     ) -> Result<(), Error>
     where
         O: std::io::Write,
         E: std::io::Write,
     {
         // get the list from the stack
-        let list = if let Some(list) = stack.pop() {
+        let (list, list_pos) = if let Some(list) = stack.pop() {
             list
         } else {
             unreachable!();
         };
         // Get the accumulator from the stack
-        let mut acc = if let Some(acc) = stack.pop() {
+        let (mut acc, mut acc_pos) = if let Some(acc) = stack.pop() {
             acc
         } else {
             unreachable!();
         };
         // get the func ptr from the stack
-        let fptr = if let Some(ptr) = stack.pop() {
+        let (fptr, fptr_pos) = if let Some(ptr) = stack.pop() {
             ptr
         } else {
             unreachable!();
@@ -626,36 +630,42 @@ impl Builtins {
         let f = if let &F(ref f) = fptr.as_ref() {
             f
         } else {
-            return dbg!(Err(Error::new(format!("Not a function!"), pos.clone(),)));
+            return dbg!(Err(Error::new(format!("Not a function!"), fptr_pos)));
         };
 
         match list.as_ref() {
             &C(List(ref elems)) => {
                 for e in dbg!(elems).iter() {
                     // push function arguments on the stack.
-                    stack.push(dbg!(e.clone()));
-                    stack.push(dbg!(acc.clone()));
+                    stack.push((dbg!(e.clone()), list_pos.clone()));
+                    stack.push((dbg!(acc.clone()), acc_pos.clone()));
                     // call function and push it's result on the stack.
-                    acc = VM::fcall_impl(f, stack, env.clone(), pos)?;
+                    let (new_acc, new_acc_pos) = VM::fcall_impl(f, stack, env.clone(), &fptr_pos)?;
+                    acc = new_acc;
+                    acc_pos = new_acc_pos;
                 }
             }
             &C(Tuple(ref _flds)) => {
                 for (ref name, ref val) in _flds.iter() {
                     // push function arguments on the stack.
-                    stack.push(val.clone());
-                    stack.push(Rc::new(P(Str(name.clone()))));
-                    stack.push(dbg!(acc.clone()));
+                    stack.push((val.clone(), list_pos.clone()));
+                    stack.push((Rc::new(P(Str(name.clone()))), list_pos.clone()));
+                    stack.push((dbg!(acc.clone()), acc_pos.clone()));
                     // call function and push it's result on the stack.
-                    acc = VM::fcall_impl(f, stack, env.clone(), pos)?;
+                    let (new_acc, new_acc_pos) = VM::fcall_impl(f, stack, env.clone(), &fptr_pos)?;
+                    acc = new_acc;
+                    acc_pos = new_acc_pos;
                 }
             }
             &P(Str(ref _s)) => {
                 for c in _s.chars() {
                     // push function arguments on the stack.
-                    stack.push(dbg!(Rc::new(P(Str(c.to_string())))));
-                    stack.push(dbg!(acc.clone()));
+                    stack.push((dbg!(Rc::new(P(Str(c.to_string())))), list_pos.clone()));
+                    stack.push((dbg!(acc.clone()), acc_pos.clone()));
                     // call function and push it's result on the stack.
-                    acc = VM::fcall_impl(f, stack, env.clone(), pos)?;
+                    let (new_acc, new_acc_pos) = VM::fcall_impl(f, stack, env.clone(), &fptr_pos)?;
+                    acc = new_acc;
+                    acc_pos = new_acc_pos;
                 }
             }
             _ => {
@@ -667,26 +677,26 @@ impl Builtins {
         };
 
         // push the acc on the stack as our result
-        stack.push(dbg!(acc));
+        stack.push((dbg!(acc), pos));
         Ok(())
     }
 
-    fn range(&self, stack: &mut Vec<Rc<Value>>, pos: &Position) -> Result<(), Error> {
-        let start = if let Some(start) = stack.pop() {
+    fn range(&self, stack: &mut Vec<(Rc<Value>, Position)>, pos: Position) -> Result<(), Error> {
+        let (start, _) = if let Some(start) = stack.pop() {
             start
         } else {
             unreachable!();
         };
-        let step = if let Some(step) = stack.pop() {
+        let (step, _) = if let Some((step, step_pos)) = stack.pop() {
             if let &P(Empty) = step.as_ref() {
-                Rc::new(P(Int(1)))
+                (Rc::new(P(Int(1))), step_pos)
             } else {
-                step
+                (step, step_pos)
             }
         } else {
             unreachable!();
         };
-        let end = if let Some(end) = stack.pop() {
+        let (end, _) = if let Some(end) = stack.pop() {
             end
         } else {
             unreachable!();
@@ -707,17 +717,17 @@ impl Builtins {
             _ => {
                 return dbg!(Err(Error::new(
                     format!("Ranges can only be created with Ints"),
-                    pos.clone(),
+                    pos,
                 )));
             }
         }
-        stack.push(Rc::new(C(List(elems))));
+        stack.push((Rc::new(C(List(elems))), pos));
         Ok(())
     }
 
     fn trace<O, E>(
         &mut self,
-        stack: &mut Vec<Rc<Value>>,
+        stack: &mut Vec<(Rc<Value>, Position)>,
         pos: Position,
         env: Rc<RefCell<Environment<O, E>>>,
     ) -> Result<(), Error>
@@ -725,14 +735,14 @@ impl Builtins {
         O: std::io::Write,
         E: std::io::Write,
     {
-        let val = if let Some(val) = dbg!(stack.pop()) {
+        let (val, val_pos) = if let Some(val) = dbg!(stack.pop()) {
             val
         } else {
             unreachable!();
         };
         let expr = stack.pop();
         let expr_pretty = match expr {
-            Some(ref expr) => match dbg!(expr.as_ref()) {
+            Some((ref expr, _)) => match dbg!(expr.as_ref()) {
                 &P(Str(ref expr)) => expr.clone(),
                 _ => unreachable!(),
             },
@@ -744,11 +754,11 @@ impl Builtins {
             "TRACE: {} = {} at {}",
             expr_pretty,
             writable_val,
-            pos
+            &val_pos
         ) {
-            return Err(dbg!(Error::new(format!("{}", e), pos.clone(),)));
+            return Err(dbg!(Error::new(format!("{}", e), pos)));
         };
-        stack.push(val);
+        stack.push((val, val_pos));
         Ok(())
     }
 }
