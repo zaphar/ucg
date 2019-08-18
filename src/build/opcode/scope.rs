@@ -15,7 +15,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::iter::FromIterator;
 use std::rc::Rc;
 
-use super::{Error, Value};
+use super::Value;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Bindings {
@@ -115,12 +115,12 @@ impl Stack {
         std::mem::swap(&mut tmp, &mut self.curr);
     }
 
-    pub fn pop(&mut self) -> Result<(), Error> {
+    pub fn pop(&mut self) -> Result<(), String> {
         if let Some(parent) = self.prev.pop() {
             self.curr = parent;
             Ok(())
         } else {
-            dbg!(Err(Error {}))
+            dbg!(Err(format!("Exceeded Stack depth!!")))
         }
     }
 

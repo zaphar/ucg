@@ -14,20 +14,23 @@
 use std::path::PathBuf;
 use std::rc::Rc;
 
+use crate::ast::Position;
+
+use super::translate::PositionMap;
 use super::{Error, Op};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct OpPointer {
-    pub ops: Rc<Vec<Op>>,
+    pub pos_map: Rc<PositionMap>,
     pub ptr: Option<usize>,
     pub path: Option<PathBuf>,
 }
 
 impl OpPointer {
-    pub fn new(ops: Rc<Vec<Op>>) -> Self {
+    pub fn new(ops: Rc<PositionMap>) -> Self {
         // If we load an empty program what happens?
         Self {
-            ops: ops,
+            pos_map: ops,
             ptr: None,
             path: None,
         }
@@ -41,28 +44,41 @@ impl OpPointer {
     pub fn next(&mut self) -> Option<&Op> {
         if let Some(i) = self.ptr {
             let nxt = i + 1;
-            if nxt < self.ops.len() {
+            if nxt < self.pos_map.len() {
                 self.ptr = Some(nxt);
             } else {
                 return None;
             }
-        } else if self.ops.len() != 0 {
+        } else if self.pos_map.len() != 0 {
             self.ptr = Some(0);
         }
         self.op()
     }
 
     pub fn jump(&mut self, ptr: usize) -> Result<(), Error> {
-        if ptr < self.ops.len() {
+        if ptr < self.pos_map.len() {
             self.ptr = Some(ptr);
             return Ok(());
         }
-        Err(dbg!(Error {}))
+        Err(dbg!(Error::new(
+            format!("FAULT!!! Invalid Jump!"),
+            match self.pos() {
+                Some(pos) => pos.clone(),
+                None => Position::new(0, 0, 0),
+            },
+        )))
     }
 
     pub fn op(&self) -> Option<&Op> {
         if let Some(i) = self.ptr {
-            return self.ops.get(i);
+            return self.pos_map.ops.get(i);
+        }
+        None
+    }
+
+    pub fn pos(&self) -> Option<&Position> {
+        if let Some(i) = self.ptr {
+            return self.pos_map.pos.get(i);
         }
         None
     }
@@ -70,13 +86,16 @@ impl OpPointer {
     pub fn idx(&self) -> Result<usize, Error> {
         match self.ptr {
             Some(ptr) => Ok(ptr),
-            None => dbg!(Err(Error {})),
+            None => dbg!(Err(Error::new(
+                format!("FAULT!!! Position Check failure!"),
+                Position::new(0, 0, 0),
+            ))),
         }
     }
 
     pub fn snapshot(&self) -> Self {
         Self {
-            ops: self.ops.clone(),
+            pos_map: self.pos_map.clone(),
             ptr: None,
             path: self.path.clone(),
         }

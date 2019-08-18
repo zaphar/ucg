@@ -16,6 +16,7 @@ use std::rc::Rc;
 
 use super::environment::Environment;
 use super::scope::Stack;
+use super::translate::PositionMap;
 use super::Composite::{List, Tuple};
 use super::Op::{
     Add, Bang, Bind, BindOver, Cp, DeRef, Div, Element, Equal, FCall, Field, Func, Index, InitList,
@@ -25,12 +26,21 @@ use super::Op::{
 use super::Primitive::{Bool, Empty, Float, Int, Str};
 use super::Value::{C, P};
 use super::VM;
+use crate::ast::Position;
 
 macro_rules! assert_cases {
     (__impl__ $cases:expr) => {
         for case in $cases.drain(0..) {
             let env = Rc::new(RefCell::new(Environment::new(Vec::new(), Vec::new())));
-            let mut vm = VM::new(Rc::new(case.0), env);
+            let mut positions = Vec::with_capacity(case.0.len());
+            for i in 0..case.0.len() {
+                positions.push(Position::new(0, 0, 0));
+            }
+            let map = PositionMap{
+                ops: case.0,
+                pos: positions,
+            };
+            let mut vm = VM::new(Rc::new(map), env);
             vm.run().unwrap();
             assert_eq!(dbg!(vm.pop()).unwrap(), Rc::new(case.1));
         }
@@ -120,10 +130,18 @@ fn bind_op() {
 
     for case in cases.drain(0..) {
         let env = Rc::new(RefCell::new(Environment::new(Vec::new(), Vec::new())));
-        let mut vm = VM::new(Rc::new(case.0), env);
+        let mut positions = Vec::with_capacity(case.0.len());
+        for i in 0..case.0.len() {
+            positions.push(Position::new(0, 0, 0));
+        }
+        let map = PositionMap {
+            ops: case.0,
+            pos: positions,
+        };
+        let mut vm = VM::new(Rc::new(map), env);
         vm.run().unwrap();
         let (name, result) = case.1;
-        let v = vm.get_binding(name).unwrap();
+        let v = vm.get_binding(name, &Position::new(0, 0, 0)).unwrap();
         assert_eq!(&result, v.as_ref());
     }
 }

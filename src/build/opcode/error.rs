@@ -13,8 +13,22 @@
 // limitations under the License.
 use std::convert::From;
 
+use crate::ast::Position;
+
 #[derive(Debug)]
-pub struct Error {}
+pub struct Error {
+    message: String,
+    pos: Position,
+}
+
+impl Error {
+    pub fn new(msg: String, pos: Position) -> Self {
+        Self {
+            message: String::new(),
+            pos: pos,
+        }
+    }
+}
 
 impl<E> From<E> for Error
 where
@@ -22,6 +36,9 @@ where
 {
     fn from(_e: E) -> Self {
         // FIXME(jwall): This should really have more information for debugging
-        Error {}
+        Error {
+            message: _e.description().to_owned(),
+            pos: Position::new(0, 0, 0),
+        }
     }
 }
