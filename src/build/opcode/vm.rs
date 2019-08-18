@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use std::cell::RefCell;
-use std::path::PathBuf;
 use std::rc::Rc;
 
 use crate::ast::Position;
@@ -279,10 +278,10 @@ where
                 }
             }
             _ => {
-                    return dbg!(Err(Error::new(
-                        format!("Expected tuple but got {:?}", mod_val),
-                        pos.clone(),
-                    )));
+                return dbg!(Err(Error::new(
+                    format!("Expected tuple but got {:?}", mod_val),
+                    pos.clone(),
+                )));
             }
         };
         let mut ops = self.ops.clone();
@@ -438,10 +437,13 @@ where
             }
             _ => {
                 return Err(dbg!(Error::new(
-                    format!("Expected Numeric values of the same type but got {:?} and {:?}", left, right),
+                    format!(
+                        "Expected Numeric values of the same type but got {:?} and {:?}",
+                        left, right
+                    ),
                     pos.clone(),
                 )));
-            },
+            }
         }
         Ok(())
     }
@@ -458,10 +460,13 @@ where
             }
             _ => {
                 return Err(dbg!(Error::new(
-                    format!("Expected Numeric values of the same type but got {:?} and {:?}", left, right),
+                    format!(
+                        "Expected Numeric values of the same type but got {:?} and {:?}",
+                        left, right
+                    ),
                     pos.clone(),
                 )));
-            },
+            }
         }
         Ok(())
     }
@@ -478,10 +483,13 @@ where
             }
             _ => {
                 return Err(dbg!(Error::new(
-                    format!("Expected Numeric values of the same type but got {:?} and {:?}", left, right),
+                    format!(
+                        "Expected Numeric values of the same type but got {:?} and {:?}",
+                        left, right
+                    ),
                     pos.clone(),
                 )));
-            },
+            }
         }
         Ok(())
     }
@@ -498,10 +506,13 @@ where
             }
             _ => {
                 return Err(dbg!(Error::new(
-                    format!("Expected Numeric values of the same type but got {:?} and {:?}", left, right),
+                    format!(
+                        "Expected Numeric values of the same type but got {:?} and {:?}",
+                        left, right
+                    ),
                     pos.clone(),
                 )));
-            },
+            }
         }
         Ok(())
     }
@@ -604,59 +615,6 @@ where
             unreachable!();
         };
         Ok(())
-    }
-
-    fn find_in_list(&self, index: &Value, elems: &Vec<Rc<Value>>, pos: &Position) -> Result<Rc<Value>, Error> {
-        let idx = match index {
-            P(Int(i)) => i.clone(),
-            _ => return Err(dbg!(Error::new(
-                format!("Expected int for index but got {:?}", index),
-                pos.clone(),
-            ))),
-        };
-        match elems.get(idx as usize) {
-            Some(v) => Ok(v.clone()),
-            None => return Err(dbg!(Error::new(
-                format!("No such index {}", idx),
-                pos.clone(),
-            ))),
-        }
-    }
-
-    fn find_in_flds(
-        &self,
-        index: &Value,
-        flds: &Vec<(String, Rc<Value>)>,
-        pos: &Position,
-    ) -> Result<Rc<Value>, Error> {
-        let idx = match index {
-            S(p) => p,
-            P(Str(p)) => p,
-            _ => return Err(dbg!(Error::new(
-                format!("Expected String or Symbol for index but got {:?}", index),
-                pos.clone(),
-            ))),
-        };
-        for f in flds.iter() {
-            if idx == &f.0 {
-                return Ok(f.1.clone());
-            }
-        }
-        Err(dbg!(Error::new(
-            format!("No such field {}", idx),
-            pos.clone()
-        )))
-    }
-
-    fn find_in_value(&self, index: &Value, target: &Value, pos: &Position) -> Result<Rc<Value>, Error> {
-        match target {
-            C(Tuple(flds)) => self.find_in_flds(index, flds, pos),
-            C(List(elements)) => self.find_in_list(index, elements, pos),
-            _ => return Err(dbg!(Error::new(
-                format!("Expected tuple for list but got {:?}", target),
-                pos.clone(),
-            ))),
-        }
     }
 
     fn op_bang(&mut self) -> Result<(), Error> {
@@ -826,10 +784,15 @@ where
         Ok(match (left, right) {
             (P(Int(i)), P(Int(ii))) => Int(i * ii),
             (P(Float(f)), P(Float(ff))) => Float(f * ff),
-            _ => return Err(dbg!(Error::new(
-                format!("Expected numeric values of the same type but got {:?} and {:?}", left, right),
-                pos.clone(),
-            ))),
+            _ => {
+                return Err(dbg!(Error::new(
+                    format!(
+                        "Expected numeric values of the same type but got {:?} and {:?}",
+                        left, right
+                    ),
+                    pos.clone(),
+                )))
+            }
         })
     }
 
@@ -837,10 +800,15 @@ where
         Ok(match (left, right) {
             (P(Int(i)), P(Int(ii))) => Int(i / ii),
             (P(Float(f)), P(Float(ff))) => Float(f / ff),
-            _ => return Err(dbg!(Error::new(
-                format!("Expected numeric values of the same type but got {:?} and {:?}", left, right),
-                pos.clone(),
-            ))),
+            _ => {
+                return Err(dbg!(Error::new(
+                    format!(
+                        "Expected numeric values of the same type but got {:?} and {:?}",
+                        left, right
+                    ),
+                    pos.clone(),
+                )))
+            }
         })
     }
 
@@ -848,10 +816,15 @@ where
         Ok(match (left, right) {
             (P(Int(i)), Value::P(Int(ii))) => Int(i - ii),
             (P(Float(f)), Value::P(Float(ff))) => Float(f - ff),
-            _ => return Err(dbg!(Error::new(
-                format!("Expected numeric values of the same type but got {:?} and {:?}", left, right),
-                pos.clone(),
-            ))),
+            _ => {
+                return Err(dbg!(Error::new(
+                    format!(
+                        "Expected numeric values of the same type but got {:?} and {:?}",
+                        left, right
+                    ),
+                    pos.clone(),
+                )))
+            }
         })
     }
 
@@ -859,10 +832,15 @@ where
         Ok(match (left, right) {
             (P(Int(i)), Value::P(Int(ii))) => Int(i % ii),
             (P(Float(f)), Value::P(Float(ff))) => Float(f % ff),
-            _ => return Err(dbg!(Error::new(
-                format!("Expected numeric values of the same type but got {:?} and {:?}", left, right),
-                pos.clone(),
-            ))),
+            _ => {
+                return Err(dbg!(Error::new(
+                    format!(
+                        "Expected numeric values of the same type but got {:?} and {:?}",
+                        left, right
+                    ),
+                    pos.clone(),
+                )))
+            }
         })
     }
 
@@ -886,16 +864,23 @@ where
                 }
                 C(List(new_list))
             }
-            _ => return Err(dbg!(Error::new(
-                format!("You can not add {:?} and {:?}", left, right), 
-                pos.clone()
-            ))),
+            _ => {
+                return Err(dbg!(Error::new(
+                    format!("You can not add {:?} and {:?}", left, right),
+                    pos.clone()
+                )))
+            }
         })
     }
 
     fn op_runtime(&mut self, h: Hook, pos: &Position) -> Result<(), Error> {
-        self.runtime
-            .handle(self.ops.path.as_ref(), h, &mut self.stack, self.env.clone(), pos)
+        self.runtime.handle(
+            self.ops.path.as_ref(),
+            h,
+            &mut self.stack,
+            self.env.clone(),
+            pos,
+        )
     }
 
     fn op_render(&mut self) -> Result<(), Error> {
