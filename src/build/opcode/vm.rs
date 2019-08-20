@@ -38,6 +38,7 @@ where
     runtime: runtime::Builtins,
     ops: OpPointer,
     pub env: Rc<RefCell<Environment<O, E>>>,
+    pub last: Option<(Rc<Value>, Position)>,
 }
 
 impl<'a, O, E> VM<O, E>
@@ -56,6 +57,7 @@ where
             runtime: runtime::Builtins::new(),
             ops: ops,
             env: env,
+            last: None,
         }
     }
 
@@ -66,6 +68,7 @@ where
             runtime: self.runtime.clone(),
             ops: self.ops.clone(),
             env: self.env.clone(),
+            last: self.last,
         }
     }
 
@@ -135,7 +138,7 @@ where
                     return Ok(());
                 }
                 Op::Pop => {
-                    self.pop()?;
+                    self.last = Some(self.pop()?);
                 }
                 Op::Typ => self.op_typ()?,
                 Op::Runtime(h) => self.op_runtime(h, pos)?,

@@ -55,7 +55,11 @@ impl AST {
     fn translate_stmts(stmts: Vec<Statement>, mut ops: &mut PositionMap, root: &Path) {
         for stmt in stmts {
             match stmt {
-                Statement::Expression(expr) => Self::translate_expr(expr, &mut ops, root),
+                Statement::Expression(expr) => {
+                    let expr_pos = expr.pos().clone();
+                    Self::translate_expr(expr, &mut ops, root);
+                    ops.push(Op::Pop, expr_pos);
+                }
                 Statement::Assert(_, _) => {
                     unimplemented!("Assert statements are not implmented yet")
                 }

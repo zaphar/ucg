@@ -584,7 +584,7 @@ macro_rules! assert_parse_cases {
             let env = Rc::new(RefCell::new(Environment::new(Vec::new(), Vec::new())));
             let mut vm = VM::new(ops.clone(), env);
             vm.run().unwrap();
-            assert_eq!(vm.pop().unwrap().0, Rc::new(case.1));
+            assert_eq!(vm.last.unwrap().0, Rc::new(case.1));
         }
     };
 
@@ -769,7 +769,7 @@ fn simple_trace() {
     let env = Rc::new(RefCell::new(Environment::new(Vec::new(), Vec::new())));
     let mut vm = VM::new(ops.clone(), env);
     vm.run().unwrap();
-    assert_eq!(vm.pop().unwrap().0, Rc::new(P(Int(2))));
+    assert_eq!(vm.last.unwrap().0, Rc::new(P(Int(2))));
     let err_out = &vm.env.borrow().stderr;
     assert_eq!(
         String::from_utf8_lossy(err_out).to_owned(),
