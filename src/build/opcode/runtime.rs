@@ -411,7 +411,7 @@ impl Builtins {
                     // push function argument on the stack.
                     stack.push((e.clone(), list_pos.clone()));
                     // call function and push it's result on the stack.
-                    let (result, _) = VM::fcall_impl(f, stack, env.clone(), &pos)?;
+                    let (result, _) = VM::fcall_impl(f, stack, env.clone())?;
                     result_elems.push(result);
                 }
                 stack.push((Rc::new(C(List(result_elems))), list_pos));
@@ -421,7 +421,7 @@ impl Builtins {
                 for (ref name, ref val) in _flds {
                     stack.push((val.clone(), list_pos.clone()));
                     stack.push((Rc::new(P(Str(name.clone()))), list_pos.clone()));
-                    let (result, result_pos) = VM::fcall_impl(f, stack, env.clone(), &fptr_pos)?;
+                    let (result, result_pos) = VM::fcall_impl(f, stack, env.clone())?;
                     if let &C(List(ref fval)) = result.as_ref() {
                         // we expect them to be a list of exactly 2 items.
                         if fval.len() != 2 {
@@ -449,7 +449,7 @@ impl Builtins {
                 for c in s.chars() {
                     stack.push((Rc::new(P(Str(c.to_string()))), list_pos.clone()));
                     // call function and push it's result on the stack.
-                    let (result, result_pos) = VM::fcall_impl(f, stack, env.clone(), &fptr_pos)?;
+                    let (result, result_pos) = VM::fcall_impl(f, stack, env.clone())?;
                     if let &P(Str(ref s)) = result.as_ref() {
                         buf.push_str(s);
                     } else {
@@ -507,7 +507,7 @@ impl Builtins {
                     // push function argument on the stack.
                     stack.push((e.clone(), list_pos.clone()));
                     // call function and push it's result on the stack.
-                    let (condition, _) = VM::fcall_impl(f, stack, env.clone(), &fptr_pos)?;
+                    let (condition, _) = VM::fcall_impl(f, stack, env.clone())?;
                     // Check for empty or boolean results and only push e back in
                     // if they are non empty and true
                     match condition.as_ref() {
@@ -524,7 +524,7 @@ impl Builtins {
                 for (ref name, ref val) in _flds {
                     stack.push((val.clone(), list_pos.clone()));
                     stack.push((Rc::new(P(Str(name.clone()))), list_pos.clone()));
-                    let (condition, _) = VM::fcall_impl(f, stack, env.clone(), &pos)?;
+                    let (condition, _) = VM::fcall_impl(f, stack, env.clone())?;
                     // Check for empty or boolean results and only push e back in
                     // if they are non empty and true
                     match condition.as_ref() {
@@ -541,7 +541,7 @@ impl Builtins {
                 for c in s.chars() {
                     stack.push((Rc::new(P(Str(c.to_string()))), list_pos.clone()));
                     // call function and push it's result on the stack.
-                    let (condition, _) = VM::fcall_impl(f, stack, env.clone(), &pos)?;
+                    let (condition, _) = VM::fcall_impl(f, stack, env.clone())?;
                     // Check for empty or boolean results and only push c back in
                     // if they are non empty and true
                     match condition.as_ref() {
@@ -640,7 +640,7 @@ impl Builtins {
                     stack.push((dbg!(e.clone()), list_pos.clone()));
                     stack.push((dbg!(acc.clone()), acc_pos.clone()));
                     // call function and push it's result on the stack.
-                    let (new_acc, new_acc_pos) = VM::fcall_impl(f, stack, env.clone(), &fptr_pos)?;
+                    let (new_acc, new_acc_pos) = VM::fcall_impl(f, stack, env.clone())?;
                     acc = new_acc;
                     acc_pos = new_acc_pos;
                 }
@@ -652,7 +652,7 @@ impl Builtins {
                     stack.push((Rc::new(P(Str(name.clone()))), list_pos.clone()));
                     stack.push((dbg!(acc.clone()), acc_pos.clone()));
                     // call function and push it's result on the stack.
-                    let (new_acc, new_acc_pos) = VM::fcall_impl(f, stack, env.clone(), &fptr_pos)?;
+                    let (new_acc, new_acc_pos) = VM::fcall_impl(f, stack, env.clone())?;
                     acc = new_acc;
                     acc_pos = new_acc_pos;
                 }
@@ -663,7 +663,7 @@ impl Builtins {
                     stack.push((dbg!(Rc::new(P(Str(c.to_string())))), list_pos.clone()));
                     stack.push((dbg!(acc.clone()), acc_pos.clone()));
                     // call function and push it's result on the stack.
-                    let (new_acc, new_acc_pos) = VM::fcall_impl(f, stack, env.clone(), &fptr_pos)?;
+                    let (new_acc, new_acc_pos) = VM::fcall_impl(f, stack, env.clone())?;
                     acc = new_acc;
                     acc_pos = new_acc_pos;
                 }

@@ -370,7 +370,6 @@ where
         f: &Func,
         stack: &mut Vec<(Rc<Value>, Position)>,
         env: Rc<RefCell<Environment<O, E>>>,
-        pos: &Position,
     ) -> Result<(Rc<Value>, Position), Error> {
         let Func {
             ref ptr,
@@ -404,7 +403,7 @@ where
     fn op_fcall(&mut self, pos: Position) -> Result<(), Error> {
         let (f, _) = dbg!(self.pop())?;
         if let &F(ref f) = f.as_ref() {
-            let (val, _) = Self::fcall_impl(f, &mut self.stack, self.env.clone(), &pos)?;
+            let (val, _) = Self::fcall_impl(f, &mut self.stack, self.env.clone())?;
             self.push(dbg!(val), pos.clone())?;
         }
         Ok(())
