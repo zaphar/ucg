@@ -14,11 +14,12 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
+use crate::ast::Position;
 use super::Value;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Stack {
-    curr: BTreeMap<String, Rc<Value>>,
+    curr: BTreeMap<String, (Rc<Value>, Position)>,
 }
 
 impl Stack {
@@ -28,7 +29,7 @@ impl Stack {
         }
     }
 
-    pub fn get(&self, name: &str) -> Option<Rc<Value>> {
+    pub fn get(&self, name: &str) -> Option<(Rc<Value>, Position)> {
         self.curr.get(name).cloned()
     }
 
@@ -36,8 +37,8 @@ impl Stack {
         self.curr.get(name).is_some()
     }
 
-    pub fn add(&mut self, name: String, val: Rc<Value>) {
-        self.curr.insert(name, val);
+    pub fn add(&mut self, name: String, val: Rc<Value>, pos: Position) {
+        self.curr.insert(name, (val, pos));
     }
 
     pub fn symbol_list(&self) -> Vec<&String> {

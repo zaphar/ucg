@@ -76,7 +76,8 @@ where
         let mut flds = Vec::new();
         for sym in self.symbols.symbol_list() {
             if include_mod || sym != "mod" {
-                flds.push((sym.clone(), self.symbols.get(sym).unwrap().clone()));
+                let (val, _) = self.symbols.get(sym).unwrap().clone();
+                flds.push((sym.clone(), val));
             }
         }
         return C(Tuple(flds));
@@ -169,7 +170,7 @@ where
     }
 
     fn op_deref(&mut self, name: String, pos: &Position) -> Result<(), Error> {
-        let val = self.get_binding(&name, pos)?.clone();
+        let (val, _) = self.get_binding(&name, pos)?.clone();
         self.push(val, pos.clone())
     }
 
@@ -686,7 +687,8 @@ where
                     self.merge_field_into_tuple(&mut flds, name, val)?;
                 }
                 // Put the copy on the Stack
-                self.push(Rc::new(C(Tuple(flds))), tgt_pos)?;
+                self.push(Rc::new(C(Tuple(flds))), tgt_pos.clone())?;
+                self.last = Some((tgt.clone(), tgt_pos));
             }
             &M(Module {
                 ref ptr,
@@ -771,13 +773,17 @@ where
                 pos.clone(),
             )));
         }
-        self.symbols.add(name, val);
+        self.symbols.add(name, val, pos.clone());
         Ok(())
     }
 
-    pub fn get_binding(&'a self, name: &str, pos: &Position) -> Result<Rc<Value>, Error> {
+    pub fn get_binding(
+        &'a self,
+        name: &str,
+        pos: &Position,
+    ) -> Result<(Rc<Value>, Position), Error> {
         match self.symbols.get(name) {
-            Some(v) => Ok(v),
+            Some((ref v, ref pos)) => Ok((v.clone(), pos.clone())),
             None => Err(dbg!(Error::new(
                 format!("No such binding {}", name),
                 pos.clone()

@@ -140,7 +140,7 @@ fn bind_op() {
         let mut vm = VM::new(Rc::new(map), env);
         vm.run().unwrap();
         let (name, result) = case.1;
-        let v = vm.get_binding(name, &Position::new(0, 0, 0)).unwrap();
+        let (v, _) = vm.get_binding(name, &Position::new(0, 0, 0)).unwrap();
         assert_eq!(&result, v.as_ref());
     }
 }
@@ -400,7 +400,7 @@ fn function_definition_and_call() {
 fn module_call() {
     assert_cases![
         vec![
-            InitTuple,               // 0 // override tuple
+            InitTuple,                  // 0 // override tuple
             Sym("one".to_owned()),      // 1
             Val(Int(11)),               // 2
             Field,                      // 3
@@ -729,6 +729,14 @@ fn simple_modules() {
         "let m = module{} => (v) { let v = 1; }; m{};" => P(Int(1)),
         "let m = module{val=NULL} => (v) { let v = mod.val; }; m{val=1};" => P(Int(1)),
         "let m = module{val=NULL} => (v) { let v = mod.val + 1; }; m{val=1};" => P(Int(2)),
+    ];
+}
+
+#[test]
+fn tuple_copies() {
+    assert_parse_cases![
+        "let tpl = { v = 1, }; tpl{};" => C(Tuple(vec![("v".to_owned(), Rc::new(P(Int(1))))])),
+        "let tpl = { v = 1, }; tpl{v=2};" => C(Tuple(vec![("v".to_owned(), Rc::new(P(Int(2))))])),
     ];
 }
 
