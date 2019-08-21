@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use std::cell::RefCell;
+use std::collections::BTreeSet;
 use std::rc::Rc;
 
 use crate::ast::Position;
@@ -28,6 +29,17 @@ use super::Value::{C, F, M, P, S, T};
 use super::{Error, Op, Primitive, Value};
 use super::{Func, Module};
 
+fn construct_reserved_word_set() -> BTreeSet<&'static str> {
+    let mut words = BTreeSet::new();
+    for word in vec![
+        "let", "module", "func", "out", "assert", "self", "import", "include", "as", "map",
+        "filter", "convert", "fail", "NULL", "in", "is", "TRACE",
+    ] {
+        words.insert(word);
+    }
+    words
+}
+
 pub struct VM<O, E>
 where
     O: std::io::Write,
@@ -40,6 +52,7 @@ where
     pub env: Rc<RefCell<Environment<O, E>>>,
     pub last: Option<(Rc<Value>, Position)>,
     self_stack: Vec<(Rc<Value>, Position)>,
+    reserved_words: BTreeSet<&'static str>,
 }
 
 impl<'a, O, E> VM<O, E>
@@ -60,6 +73,7 @@ where
             env: env,
             last: None,
             self_stack: Vec::new(),
+            reserved_words: construct_reserved_word_set(),
         }
     }
 
@@ -72,6 +86,7 @@ where
             env: self.env.clone(),
             last: self.last,
             self_stack: self.self_stack,
+            reserved_words: self.reserved_words,
         }
     }
 
@@ -389,7 +404,7 @@ where
             // TODO(jwall): This should do a better error if there is
             // nothing on the stack.
             let (val, pos) = stack.pop().unwrap();
-            vm.binding_push(nm.clone(), val, false, &pos)?;
+            vm.binding_push(nm.clone(), val, false, &pos, &pos)?;
         }
         // proceed to the function body
         vm.run()?;
@@ -597,9 +612,10 @@ where
         // pop val off stack.
         let (val, val_pos) = self.pop()?;
         // pop name off stack.
-        let (name, _) = self.pop()?;
+        let (name, name_pos) = self.pop()?;
+        // TODO(jwall): We need to restrict against our reserved word list.
         if let &S(ref name) = name.as_ref() {
-            self.binding_push(name.clone(), val, strict, &val_pos)?;
+            self.binding_push(name.clone(), val, strict, &val_pos, &name_pos)?;
         } else {
             unreachable!();
         }
@@ -785,7 +801,14 @@ where
         val: Rc<Value>,
         strict: bool,
         pos: &Position,
+        name_pos: &Position,
     ) -> Result<(), Error> {
+        if self.reserved_words.contains(name.as_str()) {
+            return Err(dbg!(Error::new(
+                format!("{} is a reserved word.", name),
+                name_pos.clone(),
+            )));
+        }
         if self.symbols.is_bound(&name) && strict {
             return Err(dbg!(Error::new(
                 format!("Binding {} already exists", name),
@@ -813,7 +836,6 @@ where
         match self.symbols.get(name) {
             Some((ref v, ref pos)) => Ok((v.clone(), pos.clone())),
             None => {
-                // TODO(jwall): Look in the last item?
                 return Err(dbg!(Error::new(
                     format!("No such binding {}", name),
                     pos.clone()

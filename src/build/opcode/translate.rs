@@ -13,7 +13,7 @@
 // limitations under the License.
 use std::path::Path;
 
-use crate::ast::{Token, BinaryExprType, Expression, FormatArgs, Position, Statement, Value};
+use crate::ast::{BinaryExprType, Expression, FormatArgs, Position, Statement, Token, Value};
 use crate::ast::{FuncOpDef, TemplatePart};
 use crate::build::format::{ExpressionTemplate, SimpleTemplate, TemplateParser};
 use crate::build::opcode::Primitive;
@@ -212,9 +212,7 @@ impl AST {
                                     Value::Int(sym) => {
                                         ops.push(Op::Val(Primitive::Int(sym.val)), sym.pos);
                                     }
-                                    _ => {
-                                        unreachable!()
-                                    }
+                                    _ => unreachable!(),
                                 }
                                 ops.push(Op::Index, copy_def.pos.clone());
                                 Self::translate_copy(ops, copy_def.fields, copy_def.pos, root);
@@ -234,9 +232,7 @@ impl AST {
                                     Value::Int(sym) => {
                                         ops.push(Op::Val(Primitive::Int(sym.val)), sym.pos);
                                     }
-                                    _ => {
-                                        unreachable!()
-                                    }
+                                    _ => unreachable!(),
                                 }
                                 ops.push(Op::FCall, func_pos);
                                 return;
@@ -529,7 +525,12 @@ impl AST {
         }
     }
 
-    fn translate_copy(mut ops: &mut PositionMap, flds: Vec<(Token, Expression)>, pos: Position, root: &Path) {
+    fn translate_copy(
+        mut ops: &mut PositionMap,
+        flds: Vec<(Token, Expression)>,
+        pos: Position,
+        root: &Path,
+    ) {
         ops.push(Op::PushSelf, pos.clone());
         ops.push(Op::InitTuple, pos.clone());
         for (t, e) in flds {

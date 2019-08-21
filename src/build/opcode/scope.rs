@@ -14,8 +14,8 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use crate::ast::Position;
 use super::Value;
+use crate::ast::Position;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Stack {
