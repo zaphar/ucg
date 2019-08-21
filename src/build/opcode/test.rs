@@ -742,9 +742,24 @@ fn tuple_copies() {
         "let tpl = { v = 1, }; tpl{};" => C(Tuple(vec![("v".to_owned(), Rc::new(P(Int(1))))])),
         "let tpl = { v = 1, }; tpl{v=2};" => C(Tuple(vec![("v".to_owned(), Rc::new(P(Int(2))))])),
         // Tests for Self lookups
-        "let tpl = { v = 1, w = 2}; tpl{v=self.w};" => C(Tuple(vec![
+        "let tpl = { v = 1, w = 2}; tpl{v=self.w, x=self.v};" => C(Tuple(vec![
             ("v".to_owned(), Rc::new(P(Int(2)))),
             ("w".to_owned(), Rc::new(P(Int(2)))),
+            ("x".to_owned(), Rc::new(P(Int(1)))),
+        ])),
+        // the deep copy case identity copy
+        "let tpl = { v = 1, inner = { w = 2 }}; tpl{inner=self.inner{}};" => C(Tuple(vec![
+            ("v".to_owned(), Rc::new(P(Int(1)))),
+            ("inner".to_owned(), Rc::new(C(Tuple(vec![
+                ("w".to_owned(), Rc::new(P(Int(2)))),
+            ])))),
+        ])),
+        // the deep copy case modifications
+        "let tpl = { v = 1, inner = { w = 2 }}; tpl{inner=self.inner{w=3}};" => C(Tuple(vec![
+            ("v".to_owned(), Rc::new(P(Int(1)))),
+            ("inner".to_owned(), Rc::new(C(Tuple(vec![
+                ("w".to_owned(), Rc::new(P(Int(3)))),
+            ])))),
         ])),
     ];
 }

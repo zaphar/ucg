@@ -13,7 +13,7 @@
 // limitations under the License.
 use std::path::Path;
 
-use crate::ast::{BinaryExprType, Expression, FormatArgs, Position, Statement, Value};
+use crate::ast::{Token, BinaryExprType, Expression, FormatArgs, Position, Statement, Value};
 use crate::ast::{FuncOpDef, TemplatePart};
 use crate::build::format::{ExpressionTemplate, SimpleTemplate, TemplateParser};
 use crate::build::opcode::Primitive;
@@ -202,7 +202,45 @@ impl AST {
                         Self::translate_expr(*def.left, &mut ops, root);
                         // Symbols on the right side should be converted to strings to satisfy
                         // the Index operation contract.
-                        match *def.right {
+                        match dbg!(*def.right) {
+                            Expression::Copy(copy_def) => {
+                                // first handle the selector
+                                match copy_def.selector {
+                                    Value::Str(sym) | Value::Symbol(sym) => {
+                                        ops.push(Op::Val(Primitive::Str(sym.val)), sym.pos);
+                                    }
+                                    Value::Int(sym) => {
+                                        ops.push(Op::Val(Primitive::Int(sym.val)), sym.pos);
+                                    }
+                                    _ => {
+                                        unreachable!()
+                                    }
+                                }
+                                ops.push(Op::Index, copy_def.pos.clone());
+                                Self::translate_copy(ops, copy_def.fields, copy_def.pos, root);
+                                return;
+                            }
+                            Expression::Call(call_def) => {
+                                // first push our arguments.
+                                for e in call_def.arglist {
+                                    Self::translate_expr(e, &mut ops, root);
+                                }
+                                // then handle the selector
+                                let func_pos = call_def.funcref.pos().clone();
+                                match call_def.funcref {
+                                    Value::Str(sym) | Value::Symbol(sym) => {
+                                        ops.push(Op::Val(Primitive::Str(sym.val)), sym.pos);
+                                    }
+                                    Value::Int(sym) => {
+                                        ops.push(Op::Val(Primitive::Int(sym.val)), sym.pos);
+                                    }
+                                    _ => {
+                                        unreachable!()
+                                    }
+                                }
+                                ops.push(Op::FCall, func_pos);
+                                return;
+                            }
                             Expression::Simple(Value::Symbol(name)) => {
                                 Self::translate_expr(
                                     Expression::Simple(Value::Str(name)),
@@ -443,15 +481,7 @@ impl AST {
             }
             Expression::Copy(def) => {
                 Self::translate_value(def.selector, &mut ops, root);
-                ops.push(Op::PushSelf, def.pos.clone());
-                ops.push(Op::InitTuple, def.pos.clone());
-                for (t, e) in def.fields {
-                    ops.push(Op::Sym(t.fragment), t.pos.clone());
-                    Self::translate_expr(e, &mut ops, root);
-                    ops.push(Op::Field, t.pos.clone());
-                }
-                ops.push(Op::Cp, def.pos.clone());
-                ops.push(Op::PopSelf, def.pos);
+                Self::translate_copy(ops, def.fields, def.pos, root);
             }
             Expression::Debug(def) => {
                 let mut buffer: Vec<u8> = Vec::new();
@@ -497,6 +527,18 @@ impl AST {
                 }
             }
         }
+    }
+
+    fn translate_copy(mut ops: &mut PositionMap, flds: Vec<(Token, Expression)>, pos: Position, root: &Path) {
+        ops.push(Op::PushSelf, pos.clone());
+        ops.push(Op::InitTuple, pos.clone());
+        for (t, e) in flds {
+            ops.push(Op::Sym(t.fragment), t.pos.clone());
+            Self::translate_expr(e, &mut ops, root);
+            ops.push(Op::Field, t.pos.clone());
+        }
+        ops.push(Op::Cp, pos.clone());
+        ops.push(Op::PopSelf, pos);
     }
 
     fn translate_value(value: Value, mut ops: &mut PositionMap, root: &Path) {

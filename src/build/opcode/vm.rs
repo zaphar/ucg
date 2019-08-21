@@ -88,7 +88,7 @@ where
 
     pub fn run(&mut self) -> Result<(), Error> {
         loop {
-            let op = if let Some(op) = dbg!(self.ops.next()) {
+            let op = if let Some(op) = self.ops.next() {
                 op.clone()
             } else {
                 break;
@@ -142,7 +142,7 @@ where
                     return Ok(());
                 }
                 Op::Pop => {
-                    self.last = Some(self.pop()?);
+                    self.pop()?;
                 }
                 Op::Typ => self.op_typ()?,
                 Op::Runtime(h) => self.op_runtime(h, pos)?,
@@ -582,7 +582,7 @@ where
     fn op_push_self(&mut self) -> Result<(), Error> {
         // We'll need a self stack.
         let (val, pos) = self.pop()?;
-        self.self_stack.push((val.clone(), pos.clone()));
+        self.self_stack.push((dbg!(val.clone()), pos.clone()));
         self.push(val.clone(), pos)?;
         Ok(())
     }
@@ -803,7 +803,7 @@ where
     ) -> Result<(Rc<Value>, Position), Error> {
         if name == "self" {
             if let Some((val, pos)) = self.self_stack.last() {
-                return Ok((val.clone(), pos.clone()));
+                return Ok((dbg!(val.clone()), pos.clone()));
             }
             return Err(dbg!(Error::new(
                 format!("No such binding {}", name),
@@ -812,16 +812,22 @@ where
         }
         match self.symbols.get(name) {
             Some((ref v, ref pos)) => Ok((v.clone(), pos.clone())),
-            None => Err(dbg!(Error::new(
-                format!("No such binding {}", name),
-                pos.clone()
-            ))),
+            None => {
+                // TODO(jwall): Look in the last item?
+                return Err(dbg!(Error::new(
+                    format!("No such binding {}", name),
+                    pos.clone()
+                )));
+            }
         }
     }
 
     pub fn pop(&mut self) -> Result<(Rc<Value>, Position), Error> {
         match self.stack.pop() {
-            Some(v) => Ok(v),
+            Some(v) => {
+                self.last = Some(v.clone());
+                Ok(v)
+            }
             None => unreachable!(),
         }
     }
