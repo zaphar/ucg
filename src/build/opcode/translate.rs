@@ -442,14 +442,16 @@ impl AST {
                 ops.push(Op::FCall, func_pos);
             }
             Expression::Copy(def) => {
+                Self::translate_value(def.selector, &mut ops, root);
+                ops.push(Op::PushSelf, def.pos.clone());
                 ops.push(Op::InitTuple, def.pos.clone());
                 for (t, e) in def.fields {
                     ops.push(Op::Sym(t.fragment), t.pos.clone());
                     Self::translate_expr(e, &mut ops, root);
                     ops.push(Op::Field, t.pos.clone());
                 }
-                Self::translate_value(def.selector, &mut ops, root);
-                ops.push(Op::Cp, def.pos);
+                ops.push(Op::Cp, def.pos.clone());
+                ops.push(Op::PopSelf, def.pos);
             }
             Expression::Debug(def) => {
                 let mut buffer: Vec<u8> = Vec::new();

@@ -220,10 +220,7 @@ fn tuple_ops() {
             ("foo".to_owned(), Rc::new(P(Int(2)))),
         ])),
         vec![
-            InitTuple, // Override tuple
-            Val(Str("foo".to_owned())),
-            Val(Int(2)),
-            Field,
+            Sym("tpl".to_owned()),
             InitTuple, // Target tuple
             Sym("bar".to_owned()),
             Val(Str("ux".to_owned())),
@@ -232,6 +229,13 @@ fn tuple_ops() {
             Field,
             Val(Str("foo".to_owned())),
             Val(Int(1)),
+            Field,
+            Bind,
+            DeRef("tpl".to_owned()),
+            InitTuple,
+            // Begin the field overrides
+            Val(Str("foo".to_owned())),
+            Val(Int(2)),
             Field,
             Cp, // Do the tuple copy operation
         ] => C(Tuple(vec![
@@ -400,10 +404,6 @@ fn function_definition_and_call() {
 fn module_call() {
     assert_cases![
         vec![
-            InitTuple,                  // 0 // override tuple
-            Sym("one".to_owned()),      // 1
-            Val(Int(11)),               // 2
-            Field,                      // 3
             Sym("m".to_owned()),        // 4 // binding name for module
             InitTuple,                  // 5 // Module tuple bindings
             Sym("one".to_owned()),      // 6
@@ -422,15 +422,15 @@ fn module_call() {
             Return,                     // 19 // end the module
             Bind,                       // 20 // bind module to the binding name
             DeRef("m".to_owned()),      // 21
+            InitTuple,                  // 0 // override tuple
+            Sym("one".to_owned()),      // 1
+            Val(Int(11)),               // 2
+            Field,                      // 3
             Cp,                         // 22 // Call the module
         ] => C(Tuple(vec![
             ("foo".to_owned(), Rc::new(P(Int(11)))),
         ])),
         vec![
-            InitTuple,               // 0 // override tuple
-            Sym("one".to_owned()),   // 1
-            Val(Int(11)),            // 2
-            Field,                   // 3
             Sym("m".to_owned()),     // 4 // binding name for module
             InitTuple,               // 5 // Module tuple bindings
             Sym("one".to_owned()),   // 6
@@ -450,6 +450,10 @@ fn module_call() {
             Return,                  // 20 // end the module
             Bind,                    // 21 // bind module to the binding name
             DeRef("m".to_owned()),   // 22
+            InitTuple,               // 0 // override tuple
+            Sym("one".to_owned()),   // 1
+            Val(Int(11)),            // 2
+            Field,                   // 3
             Cp,                      // 23
         ] => P(Int(1)),
     ];
@@ -737,6 +741,11 @@ fn tuple_copies() {
     assert_parse_cases![
         "let tpl = { v = 1, }; tpl{};" => C(Tuple(vec![("v".to_owned(), Rc::new(P(Int(1))))])),
         "let tpl = { v = 1, }; tpl{v=2};" => C(Tuple(vec![("v".to_owned(), Rc::new(P(Int(2))))])),
+        // Tests for Self lookups
+        "let tpl = { v = 1, w = 2}; tpl{v=self.w};" => C(Tuple(vec![
+            ("v".to_owned(), Rc::new(P(Int(2)))),
+            ("w".to_owned(), Rc::new(P(Int(2)))),
+        ])),
     ];
 }
 

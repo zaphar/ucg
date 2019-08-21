@@ -39,6 +39,7 @@ where
     ops: OpPointer,
     pub env: Rc<RefCell<Environment<O, E>>>,
     pub last: Option<(Rc<Value>, Position)>,
+    self_stack: Vec<(Rc<Value>, Position)>,
 }
 
 impl<'a, O, E> VM<O, E>
@@ -58,6 +59,7 @@ where
             ops: ops,
             env: env,
             last: None,
+            self_stack: Vec::new(),
         }
     }
 
@@ -69,6 +71,7 @@ where
             ops: self.ops.clone(),
             env: self.env.clone(),
             last: self.last,
+            self_stack: self.self_stack,
         }
     }
 
@@ -144,6 +147,8 @@ where
                 Op::Typ => self.op_typ()?,
                 Op::Runtime(h) => self.op_runtime(h, pos)?,
                 Op::Render => self.op_render()?,
+                Op::PushSelf => self.op_push_self()?,
+                Op::PopSelf => self.op_pop_self()?,
             };
         }
         Ok(())
@@ -574,6 +579,20 @@ where
         Ok(())
     }
 
+    fn op_push_self(&mut self) -> Result<(), Error> {
+        // We'll need a self stack.
+        let (val, pos) = self.pop()?;
+        self.self_stack.push((val.clone(), pos.clone()));
+        self.push(val.clone(), pos)?;
+        Ok(())
+    }
+
+    fn op_pop_self(&mut self) -> Result<(), Error> {
+        // We'll need a self stack.
+        self.self_stack.pop();
+        Ok(())
+    }
+
     fn op_bind(&mut self, strict: bool) -> Result<(), Error> {
         // pop val off stack.
         let (val, val_pos) = self.pop()?;
@@ -671,10 +690,10 @@ where
     }
 
     fn op_copy(&mut self, pos: Position) -> Result<(), Error> {
-        // get next value. It should be a Module or Tuple.
-        let (tgt, tgt_pos) = dbg!(self.pop()?);
         // This value should always be a tuple
         let (override_val, _) = dbg!(self.pop()?);
+        // get targett value. It should be a Module or Tuple.
+        let (tgt, tgt_pos) = dbg!(self.pop()?);
         let overrides = if let &C(Tuple(ref oflds)) = override_val.as_ref() {
             oflds.clone()
         } else {
@@ -782,6 +801,15 @@ where
         name: &str,
         pos: &Position,
     ) -> Result<(Rc<Value>, Position), Error> {
+        if name == "self" {
+            if let Some((val, pos)) = self.self_stack.last() {
+                return Ok((val.clone(), pos.clone()));
+            }
+            return Err(dbg!(Error::new(
+                format!("No such binding {}", name),
+                pos.clone()
+            )));
+        }
         match self.symbols.get(name) {
             Some((ref v, ref pos)) => Ok((v.clone(), pos.clone())),
             None => Err(dbg!(Error::new(

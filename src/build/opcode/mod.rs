@@ -211,6 +211,9 @@ pub enum Op {
     // Runtime hooks
     Runtime(Hook),
     Render,
+    // The self lookup for tuples.
+    PushSelf,
+    PopSelf,
 }
 
 use super::ir::Val;
