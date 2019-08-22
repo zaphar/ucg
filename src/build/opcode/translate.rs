@@ -60,8 +60,9 @@ impl AST {
                     Self::translate_expr(expr, &mut ops, root);
                     ops.push(Op::Pop, expr_pos);
                 }
-                Statement::Assert(_, _) => {
-                    unimplemented!("Assert statements are not implmented yet")
+                Statement::Assert(pos, expr) => {
+                    Self::translate_expr(expr, &mut ops, root);
+                    ops.push(Op::Runtime(Hook::Assert), pos);
                 }
                 Statement::Let(def) => {
                     let binding = def.name.fragment;
@@ -69,11 +70,16 @@ impl AST {
                     Self::translate_expr(def.value, &mut ops, root);
                     ops.push(Op::Bind, def.pos);
                 }
-                Statement::Output(_, _, _) => {
-                    unimplemented!("Out statements are not implmented yet")
+                Statement::Output(pos, tok, expr) => {
+                    ops.push(Op::Val(Primitive::Str(tok.fragment)), tok.pos);
+                    Self::translate_expr(expr, &mut ops, root);
+                    ops.push(Op::Runtime(Hook::Out), pos);
                 }
-                Statement::Print(_, _, _) => {
-                    unimplemented!("Print statements are not implmented yet")
+                Statement::Print(pos, tok, expr) => {
+                    ops.push(Op::Val(Primitive::Str(tok.fragment)), tok.pos);
+                    Self::translate_expr(expr, &mut ops, root);
+                    ops.push(Op::Runtime(Hook::Convert), pos.clone());
+                    ops.push(Op::Pop, pos);
                 }
             }
         }

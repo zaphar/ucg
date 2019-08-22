@@ -307,7 +307,8 @@ impl Builtins {
         let val = stack.pop();
         if let Some((val, val_pos)) = val {
             let val = val.try_into()?;
-            if let Some((c_type_val, c_type_pos)) = stack.pop() {
+            let c_type = stack.pop();
+            if let Some((c_type_val, c_type_pos)) = c_type {
                 if let &Value::S(ref c_type) = c_type_val.as_ref() {
                     if let Some(c) = env.borrow().converter_registry.get_converter(c_type) {
                         if let Err(e) = c.convert(Rc::new(val), &mut writer) {
@@ -321,11 +322,11 @@ impl Builtins {
                         )));
                     }
                 }
+                return Err(dbg!(Error::new(
+                    format!("Not a conversion type {:?}", c_type_val),
+                    val_pos,
+                )));
             }
-            return Err(dbg!(Error::new(
-                format!("Not a conversion type {:?}", val),
-                val_pos,
-            )));
         }
         unreachable!();
     }
