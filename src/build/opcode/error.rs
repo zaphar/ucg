@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use std::convert::From;
+use std::fmt;
+use std::fmt::Display;
 
 use crate::ast::Position;
 
@@ -30,14 +32,32 @@ impl Error {
     }
 }
 
-impl<E> From<E> for Error
-where
-    E: std::error::Error + Sized,
-{
-    fn from(e: E) -> Self {
+impl From<regex::Error> for Error {
+    fn from(e: regex::Error) -> Self {
         Error {
-            message: e.description().to_owned(),
+            message: format!("{}", e),
             pos: None,
         }
     }
 }
+
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Self {
+        Error {
+            message: format!("{}", e),
+            pos: None,
+        }
+    }
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(ref pos) = self.pos {
+            write!(f, "{} at {}", self.message, pos)
+        } else {
+            write!(f, "{}", self.message)
+        }
+    }
+}
+
+impl std::error::Error for Error {}

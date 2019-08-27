@@ -52,36 +52,40 @@ impl AST {
         return ops;
     }
 
+    pub fn translate_stmt(stmt: Statement, mut ops: &mut PositionMap, root: &Path) {
+        match stmt {
+            Statement::Expression(expr) => {
+                let expr_pos = expr.pos().clone();
+                Self::translate_expr(expr, &mut ops, root);
+                ops.push(Op::Pop, expr_pos);
+            }
+            Statement::Assert(pos, expr) => {
+                Self::translate_expr(expr, &mut ops, root);
+                ops.push(Op::Runtime(Hook::Assert), pos);
+            }
+            Statement::Let(def) => {
+                let binding = def.name.fragment;
+                ops.push(Op::Sym(binding), def.name.pos);
+                Self::translate_expr(def.value, &mut ops, root);
+                ops.push(Op::Bind, def.pos);
+            }
+            Statement::Output(pos, tok, expr) => {
+                ops.push(Op::Val(Primitive::Str(tok.fragment)), tok.pos);
+                Self::translate_expr(expr, &mut ops, root);
+                ops.push(Op::Runtime(Hook::Out), pos);
+            }
+            Statement::Print(pos, tok, expr) => {
+                ops.push(Op::Val(Primitive::Str(tok.fragment)), tok.pos);
+                Self::translate_expr(expr, &mut ops, root);
+                ops.push(Op::Runtime(Hook::Convert), pos.clone());
+                ops.push(Op::Pop, pos);
+            }
+        }
+    }
+
     fn translate_stmts(stmts: Vec<Statement>, mut ops: &mut PositionMap, root: &Path) {
         for stmt in stmts {
-            match stmt {
-                Statement::Expression(expr) => {
-                    let expr_pos = expr.pos().clone();
-                    Self::translate_expr(expr, &mut ops, root);
-                    ops.push(Op::Pop, expr_pos);
-                }
-                Statement::Assert(pos, expr) => {
-                    Self::translate_expr(expr, &mut ops, root);
-                    ops.push(Op::Runtime(Hook::Assert), pos);
-                }
-                Statement::Let(def) => {
-                    let binding = def.name.fragment;
-                    ops.push(Op::Sym(binding), def.name.pos);
-                    Self::translate_expr(def.value, &mut ops, root);
-                    ops.push(Op::Bind, def.pos);
-                }
-                Statement::Output(pos, tok, expr) => {
-                    ops.push(Op::Val(Primitive::Str(tok.fragment)), tok.pos);
-                    Self::translate_expr(expr, &mut ops, root);
-                    ops.push(Op::Runtime(Hook::Out), pos);
-                }
-                Statement::Print(pos, tok, expr) => {
-                    ops.push(Op::Val(Primitive::Str(tok.fragment)), tok.pos);
-                    Self::translate_expr(expr, &mut ops, root);
-                    ops.push(Op::Runtime(Hook::Convert), pos.clone());
-                    ops.push(Op::Pop, pos);
-                }
-            }
+            Self::translate_stmt(stmt, &mut ops, root);
         }
     }
 
@@ -166,7 +170,7 @@ impl AST {
                         let idx = ops.len() - 1;
                         Self::translate_expr(*def.right, &mut ops, root);
                         let jptr = (ops.len() - 1 - idx) as i32;
-                        ops.replace(idx, Op::And(dbg!(jptr)));
+                        ops.replace(idx, Op::And(jptr));
                     }
                     BinaryExprType::OR => {
                         Self::translate_expr(*def.left, &mut ops, root);
@@ -174,7 +178,7 @@ impl AST {
                         let idx = ops.len() - 1;
                         Self::translate_expr(*def.right, &mut ops, root);
                         let jptr = (ops.len() - 1 - idx) as i32;
-                        ops.replace(idx, Op::Or(dbg!(jptr)));
+                        ops.replace(idx, Op::Or(jptr));
                     }
                     BinaryExprType::Mod => {
                         Self::translate_expr(*def.right, &mut ops, root);
@@ -208,7 +212,7 @@ impl AST {
                         Self::translate_expr(*def.left, &mut ops, root);
                         // Symbols on the right side should be converted to strings to satisfy
                         // the Index operation contract.
-                        match dbg!(*def.right) {
+                        match *def.right {
                             Expression::Copy(copy_def) => {
                                 // first handle the selector
                                 match copy_def.selector {
@@ -460,15 +464,15 @@ impl AST {
                     ops.replace(idx, Op::SelectJump(jptr as i32));
                 }
                 ops.push(Op::Pop, def.pos.clone());
-                let end = ops.len() - 1;
-                for i in jumps {
-                    let idx = end - i;
-                    ops.replace(i, Op::Jump(idx as i32));
-                }
                 if let Some(default) = def.default {
                     Self::translate_expr(*default, &mut ops, root);
                 } else {
                     ops.push(Op::Bang, def.pos);
+                }
+                let end = ops.len() - 1;
+                for i in jumps {
+                    let idx = end - i;
+                    ops.replace(i, Op::Jump(idx as i32));
                 }
             }
             Expression::Call(def) => {

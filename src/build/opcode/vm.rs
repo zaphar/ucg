@@ -77,6 +77,10 @@ where
         }
     }
 
+    pub fn enable_validate_mode(&mut self) {
+        self.runtime.enable_validate_mode();
+    }
+
     pub fn to_scoped(self, symbols: Stack) -> Self {
         Self {
             stack: Vec::new(),
@@ -153,7 +157,7 @@ where
                 Op::FCall => self.op_fcall(pos)?,
                 Op::NewScope(jp) => self.op_new_scope(jp, self.ops.clone())?,
                 Op::Return => {
-                    dbg!(&self.stack);
+                    &self.stack;
                     return Ok(());
                 }
                 Op::Pop => {
@@ -213,33 +217,33 @@ where
                 self.op_jump(jp)?;
             }
         } else {
-            return Err(dbg!(Error::new(
+            return Err(Error::new(
                 format!(
                     "Not a boolean condition {:?} in && expression at {}",
                     cond, pos
                 ),
                 cond_pos.clone(),
-            )));
+            ));
         }
         Ok(())
     }
 
     fn op_or(&mut self, jp: i32, pos: Position) -> Result<(), Error> {
         let (cond, cond_pos) = self.pop()?;
-        let cc = dbg!(cond.clone());
+        let cc = cond.clone();
         if let &P(Bool(cond)) = cond.as_ref() {
-            if dbg!(cond) {
+            if cond {
                 self.push(cc, cond_pos)?;
                 self.op_jump(jp)?;
             }
         } else {
-            return Err(dbg!(Error::new(
+            return Err(Error::new(
                 format!(
                     "Not a boolean condition {:?} in || expression at {}!",
                     cond, pos
                 ),
                 cond_pos.clone(),
-            )));
+            ));
         }
         Ok(())
     }
@@ -251,10 +255,10 @@ where
                 self.op_jump(jp)?;
             }
         } else {
-            return Err(dbg!(Error::new(
+            return Err(Error::new(
                 format!("Expected boolean but got {:?}!", cond),
                 cond_pos.clone(),
-            )));
+            ));
         }
         Ok(())
     }
@@ -266,19 +270,19 @@ where
                 self.op_jump(jp)?;
             }
         } else {
-            return Err(dbg!(Error::new(
+            return Err(Error::new(
                 format!("Expected boolean but got {:?}!", cond),
                 pos.clone(),
-            )));
+            ));
         }
         Ok(())
     }
 
     fn op_select_jump(&'a mut self, jp: i32) -> Result<(), Error> {
         // pop field value off
-        let (field_name, _) = dbg!(self.pop())?;
+        let (field_name, _) = self.pop()?;
         // pop search value off
-        let (search, srch_pos) = dbg!(self.pop())?;
+        let (search, srch_pos) = self.pop()?;
         // compare them.
         let matched = match (field_name.as_ref(), search.as_ref()) {
             (&S(ref fname), &P(Str(ref sname))) | (&S(ref fname), &S(ref sname)) => fname == sname,
@@ -286,14 +290,14 @@ where
         };
         if !matched {
             // if they aren't equal then push search value back on and jump
-            self.push(dbg!(search), srch_pos)?;
-            self.op_jump(dbg!(jp))?;
+            self.push(search, srch_pos)?;
+            self.op_jump(jp)?;
         }
         Ok(())
     }
 
     fn op_module(&'a mut self, idx: usize, jptr: i32, pos: Position) -> Result<(), Error> {
-        let (mod_val, mod_val_pos) = dbg!(self.pop())?;
+        let (mod_val, mod_val_pos) = self.pop()?;
         let (result_ptr, flds) = match mod_val.as_ref() {
             &C(Tuple(ref flds)) => (None, flds.clone()),
             &T(ptr) => {
@@ -301,17 +305,17 @@ where
                 if let &C(Tuple(ref flds)) = tpl_val.as_ref() {
                     (Some(ptr), flds.clone())
                 } else {
-                    return dbg!(Err(Error::new(
+                    return Err(Error::new(
                         format!("Expected tuple but got {:?}", tpl_val),
                         tpl_val_pos,
-                    )));
+                    ));
                 }
             }
             _ => {
-                return dbg!(Err(Error::new(
+                return Err(Error::new(
                     format!("Expected tuple but got {:?}", mod_val),
                     mod_val_pos,
-                )));
+                ));
             }
         };
         let mut ops = self.ops.clone();
@@ -362,17 +366,14 @@ where
                 if let &S(ref sym) = e.as_ref() {
                     bindings.push(sym.clone());
                 } else {
-                    return dbg!(Err(Error::new(
+                    return Err(Error::new(
                         format!("Not an argument name {:?}", e),
                         args_pos,
-                    )));
+                    ));
                 }
             }
         } else {
-            return dbg!(Err(Error::new(
-                format!("Fault!!! Bad Argument List"),
-                args_pos,
-            )));
+            return Err(Error::new(format!("Fault!!! Bad Argument List"), args_pos));
         }
         let mut ops = self.ops.clone();
         ops.jump(idx)?;
@@ -422,10 +423,10 @@ where
     }
 
     fn op_fcall(&mut self, pos: Position) -> Result<(), Error> {
-        let (f, _) = dbg!(self.pop())?;
+        let (f, _) = self.pop()?;
         if let &F(ref f) = f.as_ref() {
             let (val, _) = Self::fcall_impl(f, &mut self.stack, self.env.clone())?;
-            self.push(dbg!(val), pos.clone())?;
+            self.push(val, pos.clone())?;
         }
         Ok(())
     }
@@ -441,18 +442,19 @@ where
             self.push(Rc::new(P(Bool(!val))), operand_pos)?;
             return Ok(());
         }
-        return Err(dbg!(Error::new(
+        return Err(Error::new(
             format!(
                 "Expected Boolean but got {:?} in expression at {}",
                 operand, pos
             ),
             operand_pos,
-        )));
+        ));
     }
 
     fn op_equal(&mut self, pos: Position) -> Result<(), Error> {
         let (left, _) = self.pop()?;
         let (right, _) = self.pop()?;
+        // FIXME(jwall): We need to enforce our equality rules here.
         self.push(Rc::new(P(Bool(left == right))), pos)?;
         Ok(())
     }
@@ -468,13 +470,13 @@ where
                 self.push(Rc::new(P(Bool(f > ff))), pos.clone())?;
             }
             _ => {
-                return Err(dbg!(Error::new(
+                return Err(Error::new(
                     format!(
                         "Expected Numeric values of the same type but got {:?} and {:?}",
                         left, right
                     ),
                     pos.clone(),
-                )));
+                ));
             }
         }
         Ok(())
@@ -491,13 +493,13 @@ where
                 self.push(Rc::new(P(Bool(f < ff))), pos.clone())?;
             }
             _ => {
-                return Err(dbg!(Error::new(
+                return Err(Error::new(
                     format!(
                         "Expected Numeric values of the same type but got {:?} and {:?}",
                         left, right
                     ),
                     pos.clone(),
-                )));
+                ));
             }
         }
         Ok(())
@@ -514,13 +516,13 @@ where
                 self.push(Rc::new(P(Bool(f <= ff))), pos)?;
             }
             _ => {
-                return Err(dbg!(Error::new(
+                return Err(Error::new(
                     format!(
                         "Expected Numeric values of the same type but got {:?} and {:?}",
                         left, right
                     ),
                     pos,
-                )));
+                ));
             }
         }
         Ok(())
@@ -537,13 +539,13 @@ where
                 self.push(Rc::new(P(Bool(f >= ff))), pos)?;
             }
             _ => {
-                return Err(dbg!(Error::new(
+                return Err(Error::new(
                     format!(
                         "Expected Numeric values of the same type but got {:?} and {:?}",
                         left, right
                     ),
                     pos,
-                )));
+                ));
             }
         }
         Ok(())
@@ -597,7 +599,7 @@ where
     fn op_push_self(&mut self) -> Result<(), Error> {
         // We'll need a self stack.
         let (val, pos) = self.pop()?;
-        self.self_stack.push((dbg!(val.clone()), pos.clone()));
+        self.self_stack.push((val.clone(), pos.clone()));
         self.push(val.clone(), pos)?;
         Ok(())
     }
@@ -625,12 +627,15 @@ where
     fn op_field(&mut self) -> Result<(), Error> {
         // Add a Composite field value to a tuple on the stack
         // get value from stack
+        //dbg!(&self.stack);
         let (val, _) = self.pop()?;
         // get name from stack.
         let (name_val, _) = self.pop()?;
         let name = if let &S(ref s) | &P(Str(ref s)) = name_val.as_ref() {
             s
         } else {
+            //dbg!(name_val);
+            //dbg!(val);
             unreachable!();
         };
         // get composite tuple from stack
@@ -649,9 +654,9 @@ where
 
     fn op_element(&mut self) -> Result<(), Error> {
         // get element from stack.
-        let (val, _) = dbg!(self.pop()?);
+        let (val, _) = self.pop()?;
         // get next value. It should be a Composite list.
-        let (list, pos) = dbg!(self.pop()?);
+        let (list, pos) = self.pop()?;
         if let &C(List(ref elems)) = list.as_ref() {
             // add value to list
             let mut elems = elems.clone();
@@ -670,8 +675,8 @@ where
 
     fn op_index(&mut self, safe: bool, pos: Position) -> Result<(), Error> {
         // left and then right
-        let (right, right_pos) = dbg!(self.pop()?);
-        let (left, _) = dbg!(self.pop()?);
+        let (right, right_pos) = self.pop()?;
+        let (left, _) = self.pop()?;
         match right.as_ref() {
             &P(Int(i)) => {
                 if let &C(List(ref elems)) = left.as_ref() {
@@ -699,17 +704,17 @@ where
             self.push(Rc::new(P(Empty)), pos)?;
             return Ok(());
         }
-        return Err(dbg!(Error::new(
+        return Err(Error::new(
             format!("Invalid selector index: {:?} target: {:?}", right, left),
             pos,
-        )));
+        ));
     }
 
     fn op_copy(&mut self, pos: Position) -> Result<(), Error> {
         // This value should always be a tuple
-        let (override_val, _) = dbg!(self.pop()?);
+        let (override_val, _) = self.pop()?;
         // get targett value. It should be a Module or Tuple.
-        let (tgt, tgt_pos) = dbg!(self.pop()?);
+        let (tgt, tgt_pos) = self.pop()?;
         let overrides = if let &C(Tuple(ref oflds)) = override_val.as_ref() {
             oflds.clone()
         } else {
@@ -758,17 +763,16 @@ where
                     vm.ops.jump(ptr.clone())?;
                     vm.run()?;
                     let (result_val, result_pos) = vm.pop()?;
-                    self.push(dbg!(result_val), result_pos)?;
+                    self.push(result_val, result_pos)?;
                 } else {
-                    dbg!(&vm.symbols);
-                    self.push(Rc::new(dbg!(vm.symbols_to_tuple(false))), pos)?;
+                    self.push(Rc::new(vm.symbols_to_tuple(false)), pos)?;
                 }
             }
             _ => {
-                return Err(dbg!(Error::new(
+                return Err(Error::new(
                     format!("Expected a Tuple or a Module but got {:?}", tgt),
                     pos,
-                )));
+                ));
             }
         }
         Ok(())
@@ -804,16 +808,16 @@ where
         name_pos: &Position,
     ) -> Result<(), Error> {
         if self.reserved_words.contains(name.as_str()) {
-            return Err(dbg!(Error::new(
+            return Err(Error::new(
                 format!("{} is a reserved word.", name),
                 name_pos.clone(),
-            )));
+            ));
         }
         if self.symbols.is_bound(&name) && strict {
-            return Err(dbg!(Error::new(
+            return Err(Error::new(
                 format!("Binding {} already exists", name),
                 pos.clone(),
-            )));
+            ));
         }
         self.symbols.add(name, val, pos.clone());
         Ok(())
@@ -826,20 +830,14 @@ where
     ) -> Result<(Rc<Value>, Position), Error> {
         if name == "self" {
             if let Some((val, pos)) = self.self_stack.last() {
-                return Ok((dbg!(val.clone()), pos.clone()));
+                return Ok((val.clone(), pos.clone()));
             }
-            return Err(dbg!(Error::new(
-                format!("No such binding {}", name),
-                pos.clone()
-            )));
+            return Err(Error::new(format!("No such binding {}", name), pos.clone()));
         }
         match self.symbols.get(name) {
             Some((ref v, ref pos)) => Ok((v.clone(), pos.clone())),
             None => {
-                return Err(dbg!(Error::new(
-                    format!("No such binding {}", name),
-                    pos.clone()
-                )));
+                return Err(Error::new(format!("No such binding {}", name), pos.clone()));
             }
         }
     }
@@ -859,13 +857,10 @@ where
             (P(Int(i)), P(Int(ii))) => Int(i * ii),
             (P(Float(f)), P(Float(ff))) => Float(f * ff),
             _ => {
-                return Err(dbg!(Error::new(
-                    format!(
-                        "Expected numeric values of the same type but got {:?} and {:?}",
-                        left, right
-                    ),
+                return Err(Error::new(
+                    format!("Expected {} but got {:?}", left.type_name(), right),
                     pos.clone(),
-                )))
+                ))
             }
         })
     }
@@ -875,13 +870,10 @@ where
             (P(Int(i)), P(Int(ii))) => Int(i / ii),
             (P(Float(f)), P(Float(ff))) => Float(f / ff),
             _ => {
-                return Err(dbg!(Error::new(
-                    format!(
-                        "Expected numeric values of the same type but got {:?} and {:?}",
-                        left, right
-                    ),
+                return Err(Error::new(
+                    format!("Expected {} but got {:?}", left.type_name(), right),
                     pos.clone(),
-                )))
+                ))
             }
         })
     }
@@ -891,13 +883,10 @@ where
             (P(Int(i)), Value::P(Int(ii))) => Int(i - ii),
             (P(Float(f)), Value::P(Float(ff))) => Float(f - ff),
             _ => {
-                return Err(dbg!(Error::new(
-                    format!(
-                        "Expected numeric values of the same type but got {:?} and {:?}",
-                        left, right
-                    ),
+                return Err(Error::new(
+                    format!("Expected {} but got {:?}", left.type_name(), right),
                     pos.clone(),
-                )))
+                ))
             }
         })
     }
@@ -907,13 +896,10 @@ where
             (P(Int(i)), Value::P(Int(ii))) => Int(i % ii),
             (P(Float(f)), Value::P(Float(ff))) => Float(f % ff),
             _ => {
-                return Err(dbg!(Error::new(
-                    format!(
-                        "Expected numeric values of the same type but got {:?} and {:?}",
-                        left, right
-                    ),
+                return Err(Error::new(
+                    format!("Expected {} but got {:?}", left.type_name(), right),
                     pos.clone(),
-                )))
+                ))
             }
         })
     }
@@ -939,10 +925,10 @@ where
                 C(List(new_list))
             }
             _ => {
-                return Err(dbg!(Error::new(
-                    format!("You can not add {:?} and {:?}", left, right),
-                    pos.clone()
-                )))
+                return Err(Error::new(
+                    format!("Expected {} but got {:?}", left.type_name(), right),
+                    pos.clone(),
+                ))
             }
         })
     }

@@ -41,7 +41,7 @@ macro_rules! assert_cases {
             };
             let mut vm = VM::new(Rc::new(map), env);
             vm.run().unwrap();
-            assert_eq!(dbg!(vm.pop()).unwrap().0, Rc::new(case.1));
+            assert_eq!(vm.pop().unwrap().0, Rc::new(case.1));
         }
     };
 
@@ -793,8 +793,29 @@ fn simple_selects() {
 }
 
 #[test]
+#[should_panic]
+fn select_fails() {
+    assert_parse_cases![
+        "select \"quux\", { foo = 1, bar = 2, };" => P(Int(1)),
+    ];
+}
+
+#[test]
+fn select_compound_expressions() {
+    assert_parse_cases![
+        "select \"foo\", { foo = 1, bar = 2, } == 1;" => P(Bool(true)),
+        "select \"foo\", { foo = 1, bar = 2, } == 2;" => P(Bool(false)),
+        "select \"foo\", 3, { foo = 1, bar = 2, } == 2;" => P(Bool(false)),
+        "select \"quux\", 3, { foo = 1, bar = 2, } == 3;" => P(Bool(true)),
+        "let want = \"foo\"; select want, { foo = 1, bar = 2, } == 1;" => P(Bool(true)),
+        "let want = \"foo\"; select want, 3, { foo = 1, bar = 2, } == 1;" => P(Bool(true)),
+        "{ok = select \"foo\", { foo = 1, bar = 2, } == 2}.ok;" => P(Bool(false)),
+    ];
+}
+
+#[test]
 fn simple_trace() {
-    let stmts = parse(OffsetStrIter::from(dbg!("TRACE 1+1;")), None).unwrap();
+    let stmts = parse(OffsetStrIter::from("TRACE 1+1;"), None).unwrap();
     let root = std::env::current_dir().unwrap();
     let ops = Rc::new(translate::AST::translate(stmts, &root));
     assert!(ops.len() > 0);

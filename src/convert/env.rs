@@ -73,17 +73,9 @@ impl EnvConverter {
             &Val::Tuple(ref flds) => {
                 self.convert_tuple(flds, w)?;
             }
-            &Val::Func(ref _def) => {
-                // This is ignored
-                eprintln!("Skipping func...");
-            }
             &Val::Env(ref _fs) => {
                 // This is ignored
                 eprintln!("Skipping env...");
-            }
-            &Val::Module(ref _def) => {
-                // This is ignored
-                eprintln!("Skipping module...");
             }
         }
         Ok(())

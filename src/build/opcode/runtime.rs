@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use std::cell::RefCell;
-use std::convert::{TryFrom, TryInto};
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -27,8 +26,6 @@ use super::{Composite, Error, Hook, Primitive, Value};
 use crate::ast::Position;
 use crate::build::ir::Val;
 use crate::build::AssertCollector;
-use crate::iter::OffsetStrIter;
-use crate::parse::parse;
 use Composite::{List, Tuple};
 use Primitive::{Bool, Empty, Int, Str};
 
@@ -36,6 +33,7 @@ pub struct Builtins {
     assert_results: AssertCollector,
     working_dir: PathBuf,
     import_path: Vec<PathBuf>,
+    validate_mode: bool,
 }
 
 impl Builtins {
@@ -47,7 +45,9 @@ impl Builtins {
         Self {
             assert_results: AssertCollector::new(),
             working_dir: path.into(),
+            // FIXME(jwall): This should probably be injected in.
             import_path: Vec::new(),
+            validate_mode: false,
         }
     }
 
@@ -56,7 +56,12 @@ impl Builtins {
             assert_results: AssertCollector::new(),
             working_dir: self.working_dir.clone(),
             import_path: self.import_path.clone(),
+            validate_mode: self.validate_mode,
         }
+    }
+
+    pub fn enable_validate_mode(&mut self) {
+        self.validate_mode = true;
     }
 
     pub fn handle<P: AsRef<Path>, O, E>(
@@ -115,10 +120,10 @@ impl Builtins {
         }
         match normalized.canonicalize() {
             Ok(p) => Ok(p),
-            Err(_e) => Err(dbg!(Error::new(
+            Err(_e) => Err(Error::new(
                 format!("Invalid path: {}", normalized.to_string_lossy()),
                 pos.clone(),
-            ))),
+            )),
         }
     }
 
@@ -134,6 +139,14 @@ impl Builtins {
         Ok(contents)
     }
 
+    // FIXME(jwall): Should probably move this to the runtime.
+    //fn detect_import_cycle(&self, path: &str) -> bool {
+    //    self.scope
+    //        .import_stack
+    //        .iter()
+    //        .find(|p| *p == path)
+    //        .is_some()
+    //}
     fn import<O, E>(
         &mut self,
         stack: &mut Vec<(Rc<Value>, Position)>,
@@ -148,37 +161,22 @@ impl Builtins {
         if let Some((val, path_pos)) = path {
             if let &Value::P(Str(ref path)) = val.as_ref() {
                 let mut borrowed_env = env.borrow_mut();
-                let val_cache = &mut borrowed_env.val_cache;
-                if val_cache.contains_key(path) {
-                    stack.push((val_cache[path].clone(), path_pos));
-                } else {
-                    let op_pointer = env.borrow_mut().op_cache.entry(path).get_pointer_or_else(
-                        || {
-                            // FIXME(jwall): We need to do proper error handling here.
-                            let p = PathBuf::from(&path);
-                            let root = p.parent().unwrap();
-                            // first we read in the file
-                            let mut f = File::open(&path).unwrap();
-                            // then we parse it
-                            let mut contents = String::new();
-                            f.read_to_string(&mut contents).unwrap();
-                            let iter = OffsetStrIter::new(&contents).with_src_file(&p);
-                            let stmts = parse(iter, None).unwrap();
-                            // then we create an ops from it
-                            let ops = super::translate::AST::translate(stmts, &root);
-                            ops
-                        },
-                        &path,
-                    );
-                    let mut vm = VM::with_pointer(op_pointer, env.clone());
-                    vm.run()?;
-                    let result = Rc::new(vm.symbols_to_tuple(true));
-                    val_cache.insert(path.clone(), result.clone());
-                    stack.push((result, pos));
+                match borrowed_env.get_cached_path_val(path) {
+                    Some(v) => {
+                        stack.push((v, path_pos));
+                    }
+                    None => {
+                        let op_pointer = borrowed_env.get_ops_for_path(path)?;
+                        let mut vm = VM::with_pointer(op_pointer, env.clone());
+                        vm.run()?;
+                        let result = Rc::new(vm.symbols_to_tuple(true));
+                        borrowed_env.update_path_val(&path, result.clone());
+                        stack.push((result, pos));
+                    }
                 }
                 return Ok(());
             }
-            return Err(dbg!(Error::new(format!("Invalid Path {:?}", val), pos,)));
+            return Err(Error::new(format!("Invalid Path {:?}", val), pos));
         }
         unreachable!();
     }
@@ -199,10 +197,7 @@ impl Builtins {
             if let &Value::P(Str(ref path)) = val.as_ref() {
                 path.clone()
             } else {
-                return Err(dbg!(Error::new(
-                    format!("Invalid Path {:?}", val),
-                    path_pos,
-                )));
+                return Err(Error::new(format!("Invalid Path {:?}", val), path_pos));
             }
         } else {
             unreachable!();
@@ -211,10 +206,10 @@ impl Builtins {
             if let &Value::P(Str(ref typ)) = val.as_ref() {
                 typ.clone()
             } else {
-                return Err(dbg!(Error::new(
+                return Err(Error::new(
                     format!("Expected conversion type but got {:?}", val),
                     typ_pos,
-                )));
+                ));
             }
         } else {
             unreachable!();
@@ -234,16 +229,13 @@ impl Builtins {
                             P(Empty)
                         } else {
                             match importer.import(contents.as_bytes()) {
-                                Ok(v) => v.try_into()?,
-                                Err(e) => return Err(dbg!(Error::new(format!("{}", e), pos,))),
+                                Ok(v) => v.into(),
+                                Err(e) => return Err(Error::new(format!("{}", e), pos)),
                             }
                         }
                     }
                     None => {
-                        return Err(dbg!(Error::new(
-                            format!("No such conversion type {}", &typ),
-                            pos,
-                        )))
+                        return Err(Error::new(format!("No such conversion type {}", &typ), pos))
                     }
                 }),
                 pos,
@@ -306,26 +298,26 @@ impl Builtins {
         };
         let val = stack.pop();
         if let Some((val, val_pos)) = val {
-            let val = val.try_into()?;
+            let val = val.into();
             let c_type = stack.pop();
             if let Some((c_type_val, c_type_pos)) = c_type {
                 if let &Value::S(ref c_type) = c_type_val.as_ref() {
                     if let Some(c) = env.borrow().converter_registry.get_converter(c_type) {
                         if let Err(e) = c.convert(Rc::new(val), &mut writer) {
-                            return Err(dbg!(Error::new(format!("{}", e), pos.clone(),)));
+                            return Err(Error::new(format!("{}", e), pos.clone()));
                         }
                         return Ok(());
                     } else {
-                        return Err(dbg!(Error::new(
+                        return Err(Error::new(
                             format!("No such conversion type {:?}", c_type),
                             c_type_pos,
-                        )));
+                        ));
                     }
                 }
-                return Err(dbg!(Error::new(
+                return Err(Error::new(
                     format!("Not a conversion type {:?}", c_type_val),
                     val_pos,
-                )));
+                ));
             }
         }
         unreachable!();
@@ -343,7 +335,7 @@ impl Builtins {
     {
         let val = stack.pop();
         if let Some((val, val_pos)) = val {
-            let val = val.try_into()?;
+            let val = val.into();
             if let Some((c_type_val, c_typ_pos)) = stack.pop() {
                 if let &Value::S(ref c_type) = c_type_val.as_ref() {
                     if let Some(c) = env.borrow().converter_registry.get_converter(c_type) {
@@ -358,20 +350,20 @@ impl Builtins {
                                 ));
                             }
                             Err(_e) => {
-                                return Err(dbg!(Error::new(
+                                return Err(Error::new(
                                     format!("No such conversion type {:?}", c_type),
                                     c_typ_pos,
-                                )));
+                                ));
                             }
                         }
                         return Ok(());
                     }
                 }
             }
-            return Err(dbg!(Error::new(
+            return Err(Error::new(
                 format!("Not a conversion type {:?}", val),
                 val_pos,
-            )));
+            ));
         }
         unreachable!()
     }
@@ -402,7 +394,7 @@ impl Builtins {
         let f = if let &F(ref f) = fptr.as_ref() {
             f
         } else {
-            return Err(dbg!(Error::new(format!("Not a function!!"), fptr_pos)));
+            return Err(Error::new(format!("Not a function!!"), fptr_pos));
         };
 
         match list.as_ref() {
@@ -426,24 +418,24 @@ impl Builtins {
                     if let &C(List(ref fval)) = result.as_ref() {
                         // we expect them to be a list of exactly 2 items.
                         if fval.len() != 2 {
-                            return Err(dbg!(Error::new(
+                            return Err(Error::new(
                                 format!(
                                     "Map Functions over tuples must return a list of two items"
                                 ),
                                 result_pos,
-                            )));
+                            ));
                         }
                         let name = match fval[0].as_ref() {
                             &P(Str(ref name)) => name.clone(),
-                            _ => return Err(dbg!(Error::new(
+                            _ => return Err(Error::new(
                                 format!("Map functions over tuples must return a String as the first list item"),
                                 result_pos,
-                            ))),
+                            )),
                         };
                         new_fields.push((name, fval[1].clone()));
                     }
                 }
-                stack.push((Rc::new(C(Tuple(dbg!(new_fields)))), pos));
+                stack.push((Rc::new(C(Tuple(new_fields))), pos));
             }
             &P(Str(ref s)) => {
                 let mut buf = String::new();
@@ -454,19 +446,19 @@ impl Builtins {
                     if let &P(Str(ref s)) = result.as_ref() {
                         buf.push_str(s);
                     } else {
-                        return Err(dbg!(Error::new(
+                        return Err(Error::new(
                             format!("Map functions over string should return strings"),
-                            result_pos
-                        )));
+                            result_pos,
+                        ));
                     }
                 }
                 stack.push((Rc::new(P(Str(buf))), pos));
             }
             _ => {
-                return Err(dbg!(Error::new(
+                return Err(Error::new(
                     format!("You can only map over lists, tuples, or strings"),
                     pos,
-                )))
+                ))
             }
         };
         Ok(())
@@ -498,7 +490,7 @@ impl Builtins {
         let f = if let &F(ref f) = fptr.as_ref() {
             f
         } else {
-            return Err(dbg!(Error::new(format!("Not a function!!"), fptr_pos)));
+            return Err(Error::new(format!("Not a function!!"), fptr_pos));
         };
 
         match list.as_ref() {
@@ -535,7 +527,7 @@ impl Builtins {
                         _ => new_fields.push((name.clone(), val.clone())),
                     }
                 }
-                stack.push((Rc::new(C(Tuple(dbg!(new_fields)))), pos));
+                stack.push((Rc::new(C(Tuple(new_fields))), pos));
             }
             &P(Str(ref s)) => {
                 let mut buf = String::new();
@@ -555,10 +547,10 @@ impl Builtins {
                 stack.push((Rc::new(P(Str(buf))), pos));
             }
             _ => {
-                return Err(dbg!(Error::new(
+                return Err(Error::new(
                     format!("You can only filter over lists, tuples, or strings"),
                     pos,
-                )))
+                ))
             }
         }
         Ok(())
@@ -570,10 +562,10 @@ impl Builtins {
             if let &P(Str(ref s)) = val.as_ref() {
                 s.clone()
             } else {
-                return dbg!(Err(Error::new(
+                return Err(Error::new(
                     format!("Expected string bug got {:?}", val),
                     val_pos,
-                )));
+                ));
             }
         } else {
             unreachable!();
@@ -584,10 +576,10 @@ impl Builtins {
             if let &P(Str(ref s)) = val.as_ref() {
                 s.clone()
             } else {
-                return dbg!(Err(Error::new(
+                return Err(Error::new(
                     format!("Expected string bug got {:?}", val),
                     val_pos,
-                )));
+                ));
             }
         } else {
             unreachable!();
@@ -631,15 +623,15 @@ impl Builtins {
         let f = if let &F(ref f) = fptr.as_ref() {
             f
         } else {
-            return dbg!(Err(Error::new(format!("Not a function!"), fptr_pos)));
+            return Err(Error::new(format!("Not a function!"), fptr_pos));
         };
 
         match list.as_ref() {
             &C(List(ref elems)) => {
-                for e in dbg!(elems).iter() {
+                for e in elems.iter() {
                     // push function arguments on the stack.
-                    stack.push((dbg!(e.clone()), list_pos.clone()));
-                    stack.push((dbg!(acc.clone()), acc_pos.clone()));
+                    stack.push((e.clone(), list_pos.clone()));
+                    stack.push((acc.clone(), acc_pos.clone()));
                     // call function and push it's result on the stack.
                     let (new_acc, new_acc_pos) = VM::fcall_impl(f, stack, env.clone())?;
                     acc = new_acc;
@@ -651,7 +643,7 @@ impl Builtins {
                     // push function arguments on the stack.
                     stack.push((val.clone(), list_pos.clone()));
                     stack.push((Rc::new(P(Str(name.clone()))), list_pos.clone()));
-                    stack.push((dbg!(acc.clone()), acc_pos.clone()));
+                    stack.push((acc.clone(), acc_pos.clone()));
                     // call function and push it's result on the stack.
                     let (new_acc, new_acc_pos) = VM::fcall_impl(f, stack, env.clone())?;
                     acc = new_acc;
@@ -661,8 +653,8 @@ impl Builtins {
             &P(Str(ref _s)) => {
                 for c in _s.chars() {
                     // push function arguments on the stack.
-                    stack.push((dbg!(Rc::new(P(Str(c.to_string())))), list_pos.clone()));
-                    stack.push((dbg!(acc.clone()), acc_pos.clone()));
+                    stack.push((Rc::new(P(Str(c.to_string()))), list_pos.clone()));
+                    stack.push((acc.clone(), acc_pos.clone()));
                     // call function and push it's result on the stack.
                     let (new_acc, new_acc_pos) = VM::fcall_impl(f, stack, env.clone())?;
                     acc = new_acc;
@@ -670,15 +662,15 @@ impl Builtins {
                 }
             }
             _ => {
-                return Err(dbg!(Error::new(
+                return Err(Error::new(
                     format!("You can only reduce over lists, tuples, or strings"),
-                    pos.clone()
-                )))
+                    pos.clone(),
+                ))
             }
         };
 
         // push the acc on the stack as our result
-        stack.push((dbg!(acc), pos));
+        stack.push((acc, pos));
         Ok(())
     }
 
@@ -716,10 +708,10 @@ impl Builtins {
                 }
             }
             _ => {
-                return dbg!(Err(Error::new(
+                return Err(Error::new(
                     format!("Ranges can only be created with Ints"),
                     pos,
-                )));
+                ));
             }
         }
         stack.push((Rc::new(C(List(elems))), pos));
@@ -736,20 +728,20 @@ impl Builtins {
         O: std::io::Write,
         E: std::io::Write,
     {
-        let (val, val_pos) = if let Some(val) = dbg!(stack.pop()) {
+        let (val, val_pos) = if let Some(val) = stack.pop() {
             val
         } else {
             unreachable!();
         };
         let expr = stack.pop();
         let expr_pretty = match expr {
-            Some((ref expr, _)) => match dbg!(expr.as_ref()) {
+            Some((ref expr, _)) => match expr.as_ref() {
                 &P(Str(ref expr)) => expr.clone(),
                 _ => unreachable!(),
             },
             _ => unreachable!(),
         };
-        let writable_val: Val = TryFrom::try_from(val.clone())?;
+        let writable_val: Val = val.clone().into();
         if let Err(e) = writeln!(
             &mut env.borrow_mut().stderr,
             "TRACE: {} = {} at {}",
@@ -757,7 +749,7 @@ impl Builtins {
             writable_val,
             &val_pos
         ) {
-            return Err(dbg!(Error::new(format!("{}", e), pos)));
+            return Err(Error::new(format!("{}", e), pos));
         };
         stack.push((val, val_pos));
         Ok(())

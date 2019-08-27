@@ -60,13 +60,13 @@ impl OpPointer {
             self.ptr = Some(ptr);
             return Ok(());
         }
-        Err(dbg!(Error::new(
+        Err(Error::new(
             format!("FAULT!!! Invalid Jump!"),
             match self.pos() {
                 Some(pos) => pos.clone(),
                 None => Position::new(0, 0, 0),
             },
-        )))
+        ))
     }
 
     pub fn op(&self) -> Option<&Op> {
@@ -86,10 +86,10 @@ impl OpPointer {
     pub fn idx(&self) -> Result<usize, Error> {
         match self.ptr {
             Some(ptr) => Ok(ptr),
-            None => dbg!(Err(Error::new(
+            None => Err(Error::new(
                 format!("FAULT!!! Position Check failure!"),
                 Position::new(0, 0, 0),
-            ))),
+            )),
         }
     }
 

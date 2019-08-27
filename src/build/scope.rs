@@ -169,9 +169,7 @@ impl Scope {
                 | Val::Empty
                 | Val::Float(_)
                 | Val::Int(_)
-                | Val::Module(_)
-                | Val::Str(_)
-                | Val::Func(_) => {
+                | Val::Str(_) => {
                     // noop
                 }
             };

@@ -68,14 +68,6 @@ impl TomlConverter {
             &Val::Float(f) => toml::Value::Float(f),
             &Val::Int(i) => toml::Value::Integer(i),
             &Val::Str(ref s) => toml::Value::String(s.clone()),
-            &Val::Func(_) => {
-                let err = SimpleError::new("Functions are not allowed in Toml Conversions!");
-                return Err(Box::new(err));
-            }
-            &Val::Module(_) => {
-                let err = SimpleError::new("Modules are not allowed in Toml Conversions!");
-                return Err(Box::new(err));
-            }
             &Val::Env(ref fs) => self.convert_env(fs)?,
             &Val::List(ref l) => self.convert_list(l)?,
             &Val::Tuple(ref t) => self.convert_tuple(t)?,

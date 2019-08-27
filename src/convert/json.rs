@@ -72,14 +72,6 @@ impl JsonConverter {
                 serde_json::Value::Number(n)
             }
             &Val::Str(ref s) => serde_json::Value::String(s.clone()),
-            &Val::Func(_) => {
-                eprintln!("Skipping func encoding as null...");
-                serde_json::Value::Null
-            }
-            &Val::Module(_) => {
-                eprintln!("Skipping module encoding as null...");
-                serde_json::Value::Null
-            }
             &Val::Env(ref fs) => self.convert_env(fs)?,
             &Val::List(ref l) => self.convert_list(l)?,
             &Val::Tuple(ref t) => self.convert_tuple(t)?,

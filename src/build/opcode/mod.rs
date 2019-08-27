@@ -15,14 +15,16 @@ use std::convert::{TryFrom, TryInto};
 use std::rc::Rc;
 
 mod cache;
-mod environment;
+mod debug;
+pub mod environment;
 mod error;
 pub mod pointer;
 mod runtime;
 pub mod scope;
-mod translate;
+pub mod translate;
 mod vm;
 
+pub use environment::Environment;
 pub use error::Error;
 pub use vm::VM;
 
@@ -42,6 +44,24 @@ pub enum Primitive {
 }
 
 use Primitive::{Bool, Empty, Float, Int, Str};
+
+impl Value {
+    fn type_name(&self) -> &'static str {
+        match self {
+            P(Int(_)) => "Int",
+            P(Float(_)) => "Float",
+            P(Str(_)) => "String",
+            P(Bool(_)) => "Bool",
+            P(Empty) => "NULL",
+            C(List(_)) => "List",
+            C(Tuple(_)) => "Tuple",
+            F(_) => "Func",
+            M(_) => "Func",
+            T(_) => "Expression",
+            S(_) => "Symbol",
+        }
+    }
+}
 
 impl From<&Primitive> for String {
     fn from(p: &Primitive) -> Self {
@@ -107,7 +127,7 @@ pub struct Module {
     pkg_ptr: Option<OpPointer>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(PartialEq, Clone)]
 pub enum Value {
     // Binding names.
     S(String),
@@ -218,29 +238,30 @@ pub enum Op {
 
 use super::ir::Val;
 
-impl TryFrom<Rc<Value>> for Val {
-    type Error = Error;
-
-    fn try_from(val: Rc<Value>) -> Result<Val, Self::Error> {
-        val.as_ref().try_into()
+impl From<Rc<Value>> for Val {
+    fn from(val: Rc<Value>) -> Val {
+        val.as_ref().into()
     }
 }
 
-impl TryFrom<&Value> for Val {
-    type Error = Error;
+impl From<Value> for Val {
+    fn from(val: Value) -> Val {
+        (&val).into()
+    }
+}
 
-    fn try_from(val: &Value) -> Result<Val, Self::Error> {
-        Ok(match val {
+impl From<&Value> for Val {
+    fn from(val: &Value) -> Val {
+        match val {
             P(Int(i)) => Val::Int(*i),
             P(Float(f)) => Val::Float(*f),
             P(Str(s)) => Val::Str(s.clone()),
             P(Bool(b)) => Val::Boolean(*b),
-            P(Empty) => Val::Empty,
             C(Tuple(fs)) => {
                 let mut flds = Vec::new();
                 for &(ref k, ref v) in fs.iter() {
                     let v = v.clone();
-                    flds.push((k.clone(), Rc::new(v.try_into()?)));
+                    flds.push((k.clone(), Rc::new(v.into())));
                 }
                 Val::Tuple(flds)
             }
@@ -248,33 +269,30 @@ impl TryFrom<&Value> for Val {
                 let mut els = Vec::new();
                 for e in elems.iter() {
                     let e = e.clone();
-                    els.push(Rc::new(e.try_into()?));
+                    els.push(Rc::new(e.into()));
                 }
                 Val::List(els)
             }
-            S(_) | F(_) | M(_) | T(_) => {
-                return Err(dbg!(Error::new(
-                    format!("Invalid Value {:?} to Val translation", val),
-                    Position::new(0, 0, 0)
-                )));
-            }
-        })
+            S(_) | F(_) | M(_) | T(_) | P(Empty) => Val::Empty,
+        }
     }
 }
 
-impl TryFrom<Rc<Val>> for Value {
-    type Error = Error;
-
-    fn try_from(val: Rc<Val>) -> Result<Self, Self::Error> {
-        val.as_ref().try_into()
+impl From<Rc<Val>> for Value {
+    fn from(val: Rc<Val>) -> Self {
+        val.as_ref().into()
     }
 }
 
-impl TryFrom<&Val> for Value {
-    type Error = Error;
+impl From<Val> for Value {
+    fn from(val: Val) -> Self {
+        (&val).into()
+    }
+}
 
-    fn try_from(val: &Val) -> Result<Self, Self::Error> {
-        Ok(match val {
+impl From<&Val> for Value {
+    fn from(val: &Val) -> Self {
+        match val {
             Val::Int(i) => P(Int(*i)),
             Val::Float(f) => P(Float(*f)),
             Val::Boolean(b) => P(Bool(*b)),
@@ -284,7 +302,7 @@ impl TryFrom<&Val> for Value {
                 let mut lst = Vec::new();
                 for e in els.iter() {
                     let e = e.clone();
-                    lst.push(Rc::new(e.try_into()?));
+                    lst.push(Rc::new(e.into()));
                 }
                 C(List(lst))
             }
@@ -292,7 +310,7 @@ impl TryFrom<&Val> for Value {
                 let mut field_list = Vec::new();
                 for &(ref key, ref val) in flds.iter() {
                     let val = val.clone();
-                    field_list.push((key.clone(), Rc::new(val.try_into()?)));
+                    field_list.push((key.clone(), Rc::new(val.into())));
                 }
                 C(Tuple(field_list))
             }
@@ -303,15 +321,7 @@ impl TryFrom<&Val> for Value {
                 }
                 C(Tuple(field_list))
             }
-            // TODO(jwall): These can go away eventually when we replace the tree
-            // walking interpreter.
-            Val::Module(_) | Val::Func(_) => {
-                return Err(dbg!(Error::new(
-                    format!("Invalid Translation from Val {} to Value", val),
-                    Position::new(0, 0, 0)
-                )))
-            }
-        })
+        }
     }
 }
 

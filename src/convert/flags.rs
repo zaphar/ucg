@@ -55,7 +55,7 @@ impl FlagConverter {
         // first of all we need to make sure that each &Val is only a primitive type.
         for v in def.iter() {
             let vref = v.as_ref();
-            if vref.is_list() || vref.is_tuple() || vref.is_func() || vref.is_module() {
+            if vref.is_list() || vref.is_tuple() {
                 eprintln!(
                     "Skipping non primitive val in list for flag {}{}",
                     pfx, name
@@ -86,7 +86,7 @@ impl FlagConverter {
             &Val::Str(ref s) => {
                 write!(w, "'{}' ", s)?;
             }
-            &Val::List(_) | &Val::Tuple(_) | &Val::Func(_) | &Val::Env(_) | &Val::Module(_) => {
+            &Val::List(_) | &Val::Tuple(_) | &Val::Env(_) => {
                 // This is ignored
                 eprintln!("Skipping {}...", v.type_name());
             }
@@ -101,7 +101,7 @@ impl FlagConverter {
                 continue;
             }
             match val.as_ref() {
-                &Val::Tuple(_) | &Val::Module(_) | &Val::Func(_) | &Val::Env(_) => {
+                &Val::Tuple(_) | &Val::Env(_) => {
                     eprintln!("Skipping {} in flag output tuple.", val.type_name());
                 }
                 &Val::List(ref def) => {

@@ -20,8 +20,6 @@ pub enum Val {
     List(Vec<Rc<Val>>),
     Tuple(Vec<(String, Rc<Val>)>),
     Env(Vec<(String, String)>),
-    Func(FuncDef),
-    Module(ModuleDef),
 }
 
 impl Val {
@@ -36,8 +34,6 @@ impl Val {
             &Val::List(_) => "List".to_string(),
             &Val::Tuple(_) => "Tuple".to_string(),
             &Val::Env(_) => "Env".to_string(),
-            &Val::Func(_) => "Func".to_string(),
-            &Val::Module(_) => "Module".to_string(),
         }
     }
 
@@ -53,9 +49,7 @@ impl Val {
             &Val::Str(_),
             &Val::List(_),
             &Val::Tuple(_),
-            &Val::Env(_),
-            &Val::Func(_),
-            &Val::Module(_)
+            &Val::Env(_)
         )
     }
 
@@ -99,14 +93,6 @@ impl Val {
                     Ok(true)
                 }
             }
-            (&Val::Func(_), &Val::Func(_)) => Err(error::BuildError::new(
-                "Func are not comparable",
-                error::ErrorType::TypeFail,
-            )),
-            (&Val::Module(_), &Val::Module(_)) => Err(error::BuildError::new(
-                "Module are not comparable",
-                error::ErrorType::TypeFail,
-            )),
             // EMPTY is always comparable for equality.
             (&Val::Empty, _) => Ok(false),
             (_, &Val::Empty) => Ok(false),
@@ -182,21 +168,8 @@ impl Val {
         return false;
     }
 
-    pub fn is_func(&self) -> bool {
-        if let &Val::Func(_) = self {
-            return true;
-        }
-        return false;
-    }
-
     pub fn is_str(&self) -> bool {
         if let &Val::Str(_) = self {
-            return true;
-        }
-        return false;
-    }
-    pub fn is_module(&self) -> bool {
-        if let &Val::Module(_) = self {
             return true;
         }
         return false;
@@ -218,8 +191,6 @@ impl Display for Val {
                 }
                 write!(f, "]")
             }
-            &Val::Func(_) => write!(f, "Func(..)"),
-            &Val::Module(_) => write!(f, "Module{{..}}"),
             &Val::Tuple(ref def) => {
                 write!(f, "{{\n")?;
                 for v in def.iter() {
