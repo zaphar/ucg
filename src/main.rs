@@ -22,6 +22,7 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs::File;
 use std::io;
+use std::io::{Stdout, Stderr};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process;
@@ -96,47 +97,46 @@ fn run_converter(c: &dyn traits::Converter, v: Rc<Val>, f: Option<&str>) -> trai
     result
 }
 
-fn build_file<'a, C: Cache>(
+fn build_file<'a>(
     file: &'a str,
     validate: bool,
     strict: bool,
     import_paths: &'a Vec<PathBuf>,
-    cache: Rc<RefCell<C>>,
-    registry: &'a ConverterRegistry,
-) -> Result<build::FileBuilder<'a, C>, Box<dyn Error>> {
+) -> Result<build::FileBuilder<'a, Stdout, Stderr>, Box<dyn Error>> {
     let mut file_path_buf = PathBuf::from(file);
     if file_path_buf.is_relative() {
         file_path_buf = std::env::current_dir()?.join(file_path_buf);
     }
+    let out = std::io::stdout();
+    let err = std::io::stderr();
     let mut builder =
-        build::FileBuilder::new(std::env::current_dir()?, import_paths, cache, registry);
-    builder.set_strict(strict);
+        build::FileBuilder::new(std::env::current_dir()?, import_paths, out, err);
+    // FIXME(jwall): builder.set_strict(strict);
     if validate {
         builder.enable_validate_mode();
     }
     builder.build(file_path_buf)?;
     if validate {
-        println!("{}", builder.assert_collector.summary);
+        // FIXME(jwall): println!("{}", builder.assert_collector.summary);
     }
     Ok(builder)
 }
 
-fn do_validate<C: Cache>(
+fn do_validate(
     file: &str,
     strict: bool,
     import_paths: &Vec<PathBuf>,
-    cache: Rc<RefCell<C>>,
-    registry: &ConverterRegistry,
 ) -> bool {
     println!("Validating {}", file);
-    match build_file(file, true, strict, import_paths, cache, registry) {
+    match build_file(file, true, strict, import_paths) {
         Ok(b) => {
-            if b.assert_collector.success {
-                println!("File {} Pass\n", file);
-            } else {
-                println!("File {} Fail\n", file);
+            // FIXM(jwall): assert collector access. 
+            //if b.assert_collector.success {
+            //    println!("File {} Pass\n", file);
+            //} else {
+            //    println!("File {} Fail\n", file);
                 return false;
-            }
+            //}
         }
         Err(msg) => {
             eprintln!("Err: {}", msg);
@@ -149,7 +149,6 @@ fn do_validate<C: Cache>(
 fn process_output(
     output: &Option<(String, Rc<Val>)>,
     file: Option<&str>,
-    registry: &ConverterRegistry,
 ) -> bool {
     let (typ, val) = match output {
         Some((ref typ, ref val)) => (typ, val.clone()),
@@ -157,48 +156,46 @@ fn process_output(
             return false;
         }
     };
-    match registry.get_converter(typ) {
-        Some(converter) => {
-            run_converter(converter, val, file).unwrap();
-            eprintln!("\nConversion successful");
-            return true;
-        }
-        None => {
-            eprintln!("No such converter {}", typ);
+    // FIXME(jwall): Is this function even still necessary?
+    //match registry.get_converter(typ) {
+    //    Some(converter) => {
+    //        run_converter(converter, val, file).unwrap();
+    //        eprintln!("\nConversion successful");
+    //        return true;
+    //    }
+    //    None => {
+    //        eprintln!("No such converter {}", typ);
             return false;
-        }
-    }
+    //    }
+    //}
 }
 
-fn do_compile<C: Cache>(
+fn do_compile(
     file: &str,
     strict: bool,
     import_paths: &Vec<PathBuf>,
-    cache: Rc<RefCell<C>>,
-    registry: &ConverterRegistry,
 ) -> bool {
     println!("Building {}", file);
-    let builder = match build_file(file, false, strict, import_paths, cache.clone(), registry) {
+    let builder = match build_file(file, false, strict, import_paths) {
         Ok(builder) => builder,
         Err(err) => {
             eprintln!("{}", err);
             return false;
         }
     };
-    if builder.out_lock.is_none() {
+    if builder.out.is_none() {
         eprintln!("Build results in no artifacts.");
     }
-    process_output(&builder.out_lock, Some(file), registry)
+    // FIXME(jwall): tuple? process_output(&builder.out, Some(file))
+    return false;
 }
 
-fn visit_ucg_files<C: Cache>(
+fn visit_ucg_files(
     path: &Path,
     recurse: bool,
     validate: bool,
     strict: bool,
     import_paths: &Vec<PathBuf>,
-    cache: Rc<RefCell<C>>,
-    registry: &ConverterRegistry,
 ) -> Result<bool, Box<dyn Error>> {
     let our_path = String::from(path.to_string_lossy());
     let mut result = true;
@@ -222,8 +219,6 @@ fn visit_ucg_files<C: Cache>(
                     validate,
                     strict,
                     import_paths,
-                    cache.clone(),
-                    registry,
                 ) {
                     eprintln!("{}", e);
                     result = false;
@@ -234,8 +229,6 @@ fn visit_ucg_files<C: Cache>(
                         &path_as_string,
                         strict,
                         import_paths,
-                        cache.clone(),
-                        registry,
                     ) {
                         result = false;
                         summary.push_str(format!("{} - FAIL\n", path_as_string).as_str())
@@ -247,8 +240,6 @@ fn visit_ucg_files<C: Cache>(
                         &path_as_string,
                         strict,
                         import_paths,
-                        cache.clone(),
-                        registry,
                     ) {
                         result = false;
                     }
@@ -256,14 +247,14 @@ fn visit_ucg_files<C: Cache>(
             }
         }
     } else if validate && our_path.ends_with("_test.ucg") {
-        if !do_validate(&our_path, strict, import_paths, cache, registry) {
+        if !do_validate(&our_path, strict, import_paths) {
             result = false;
             summary.push_str(format!("{} - FAIL\n", our_path).as_str());
         } else {
             summary.push_str(format!("{} - PASS\n", &our_path).as_str());
         }
     } else if !validate {
-        if !do_compile(&our_path, strict, import_paths, cache, registry) {
+        if !do_compile(&our_path, strict, import_paths) {
             result = false;
         }
     }
@@ -274,11 +265,9 @@ fn visit_ucg_files<C: Cache>(
     Ok(result)
 }
 
-fn inspect_command<C: Cache>(
+fn inspect_command(
     matches: &clap::ArgMatches,
     import_paths: &Vec<PathBuf>,
-    cache: Rc<RefCell<C>>,
-    registry: &ConverterRegistry,
     strict: bool,
 ) {
     let file = matches.value_of("INPUT");
@@ -287,66 +276,65 @@ fn inspect_command<C: Cache>(
     let mut builder = build::FileBuilder::new(
         std::env::current_dir().unwrap(),
         import_paths,
-        cache,
-        registry,
+        io::stdout(),
+        io::stderr(),
     );
-    builder.set_strict(strict);
-    match registry.get_converter(target) {
-        Some(converter) => {
-            if let Some(file) = file {
-                if let Err(e) = builder.build(file) {
-                    eprintln!("{:?}", e);
-                    process::exit(1);
-                }
-            }
-            let val = match sym {
-                Some(sym_name) => {
-                    let normalized = if !sym_name.ends_with(";") {
-                        let mut temp = sym_name.to_owned();
-                        temp.push_str(";");
-                        temp
-                    } else {
-                        sym_name.to_owned()
-                    };
-                    let mut builder = builder.clone_builder();
-                    match builder.eval_string(&normalized) {
-                        Ok(v) => Some(v.clone()),
-                        Err(e) => {
-                            eprintln!("{}", e);
-                            process::exit(1);
-                        }
-                    }
-                }
-                None => builder.last,
-            };
-            match val {
-                Some(value) => {
-                    // We use None here because we always output to stdout for an inspect.
-                    run_converter(converter, value, None).unwrap();
-                    println!("");
-                    process::exit(0);
-                }
-                None => {
-                    eprintln!("No value.");
-                    process::exit(1);
-                }
-            }
-        }
-        None => {
-            eprintln!(
-                "No such format {}\nrun `ucg converters` to see available formats.",
-                target
-            );
-            process::exit(1);
-        }
-    }
+    // FIXME(jwall): builder.set_strict(strict);
+    // FIXME(jwall): Converting a value should be built into our builder?
+    //match registry.get_converter(target) {
+    //    Some(converter) => {
+    //        if let Some(file) = file {
+    //            if let Err(e) = builder.build(file) {
+    //                eprintln!("{:?}", e);
+    //                process::exit(1);
+    //            }
+    //        }
+    //        let val = match sym {
+    //            Some(sym_name) => {
+    //                let normalized = if !sym_name.ends_with(";") {
+    //                    let mut temp = sym_name.to_owned();
+    //                    temp.push_str(";");
+    //                    temp
+    //                } else {
+    //                    sym_name.to_owned()
+    //                };
+    //                let mut builder = builder.clone_builder();
+    //                match builder.eval_string(&normalized) {
+    //                    Ok(v) => Some(v.clone()),
+    //                    Err(e) => {
+    //                        eprintln!("{}", e);
+    //                        process::exit(1);
+    //                    }
+    //                }
+    //            }
+    //            None => builder.last,
+    //        };
+    //        match val {
+    //            Some(value) => {
+    //                // We use None here because we always output to stdout for an inspect.
+    //                run_converter(converter, value, None).unwrap();
+    //                println!("");
+    //                process::exit(0);
+    //            }
+    //            None => {
+    //                eprintln!("No value.");
+    //                process::exit(1);
+    //            }
+    //        }
+    //    }
+    //    None => {
+    //        eprintln!(
+    //            "No such format {}\nrun `ucg converters` to see available formats.",
+    //            target
+    //        );
+    //        process::exit(1);
+    //    }
+    //}
 }
 
-fn build_command<C: Cache>(
+fn build_command(
     matches: &clap::ArgMatches,
     import_paths: &Vec<PathBuf>,
-    cache: Rc<RefCell<C>>,
-    registry: &ConverterRegistry,
     strict: bool,
 ) {
     let files = matches.values_of("INPUT");
@@ -360,8 +348,6 @@ fn build_command<C: Cache>(
             false,
             strict,
             import_paths,
-            cache.clone(),
-            &registry,
         );
         if let Ok(false) = ok {
             process::exit(1)
@@ -376,8 +362,6 @@ fn build_command<C: Cache>(
             false,
             strict,
             import_paths,
-            cache.clone(),
-            &registry,
         ) {
             ok = false;
         }
@@ -450,11 +434,9 @@ fn fmt_command(matches: &clap::ArgMatches) -> std::result::Result<(), Box<dyn Er
     Ok(())
 }
 
-fn test_command<C: Cache>(
+fn test_command(
     matches: &clap::ArgMatches,
     import_paths: &Vec<PathBuf>,
-    cache: Rc<RefCell<C>>,
-    registry: &ConverterRegistry,
     strict: bool,
 ) {
     let files = matches.values_of("INPUT");
@@ -467,8 +449,6 @@ fn test_command<C: Cache>(
             true,
             strict,
             import_paths,
-            cache.clone(),
-            &registry,
         );
         if let Ok(false) = ok {
             process::exit(1)
@@ -484,8 +464,6 @@ fn test_command<C: Cache>(
                 true,
                 strict,
                 import_paths,
-                cache.clone(),
-                &registry,
             ) {
                 ok = false;
             }
@@ -545,10 +523,8 @@ fn print_repl_help() {
     println!(include_str!("help/repl.txt"));
 }
 
-fn do_repl<C: Cache>(
+fn do_repl(
     import_paths: &Vec<PathBuf>,
-    cache: Rc<RefCell<C>>,
-    registry: &ConverterRegistry,
 ) -> std::result::Result<(), Box<dyn Error>> {
     let config = rustyline::Config::builder();
     let mut editor = rustyline::Editor::<()>::with_config(
@@ -582,7 +558,7 @@ fn do_repl<C: Cache>(
         }
     }
     let mut builder =
-        build::FileBuilder::new(std::env::current_dir()?, import_paths, cache, registry);
+        build::FileBuilder::new(std::env::current_dir()?, import_paths, io::stdout(), io::stderr());
     // loop
     let mut lines = ucglib::io::StatementAccumulator::new();
     println!("Welcome to the UCG repl. Ctrl-D to exit");
@@ -608,9 +584,10 @@ fn do_repl<C: Cache>(
                         pos: ucglib::ast::Position::new(0, 0, 0),
                         val: args[0].to_string(),
                     };
-                    if let None = builder.scope_mut().build_output.remove(&key) {
-                        eprintln!("No such binding {}", key.val);
-                    }
+                    // FIXME(jwall): handle this in an actual repl driver?
+                    //if let None = builder.scope_mut().build_output.remove(&key) {
+                    //    eprintln!("No such binding {}", key.val);
+                    //}
                 }
             } else {
                 eprintln!("Invalid repl command...");
@@ -630,9 +607,9 @@ fn do_repl<C: Cache>(
                     // print the result
                     Err(e) => eprintln!("{}", e),
                     Ok(v) => {
-                        if builder.out_lock.is_some() {
-                            process_output(&builder.out_lock, None, registry);
-                            builder.out_lock = None;
+                        if builder.out.is_some() {
+                            // FIXME(jwall): process_output(&builder.out, None);
+                            builder.out = None;
                         } else {
                             println!("{}", v);
                             editor.history_mut().add(stmt);
@@ -649,12 +626,10 @@ fn do_repl<C: Cache>(
     }
 }
 
-fn repl<C: Cache>(
+fn repl(
     import_paths: &Vec<PathBuf>,
-    cache: Rc<RefCell<C>>,
-    registry: &ConverterRegistry,
 ) {
-    if let Err(e) = do_repl(import_paths, cache, registry) {
+    if let Err(e) = do_repl(import_paths) {
         eprintln!("{}", e);
         process::exit(1);
     }
@@ -663,6 +638,7 @@ fn repl<C: Cache>(
 fn main() {
     let mut app = do_flags();
     let app_matches = app.clone().get_matches();
+    // FIXME(jwall): Do we want these to be shared or not?
     let cache = Rc::new(RefCell::new(MemoryCache::new()));
     let registry = ConverterRegistry::make_registry();
     let mut import_paths = Vec::new();
@@ -685,11 +661,11 @@ fn main() {
         true
     };
     if let Some(matches) = app_matches.subcommand_matches("eval") {
-        inspect_command(matches, &import_paths, cache, &registry, strict);
+        inspect_command(matches, &import_paths, strict);
     } else if let Some(matches) = app_matches.subcommand_matches("build") {
-        build_command(matches, &import_paths, cache, &registry, strict);
+        build_command(matches, &import_paths, strict);
     } else if let Some(matches) = app_matches.subcommand_matches("test") {
-        test_command(matches, &import_paths, cache, &registry, strict);
+        test_command(matches, &import_paths, strict);
     } else if let Some(matches) = app_matches.subcommand_matches("converters") {
         converters_command(matches, &registry)
     } else if let Some(_) = app_matches.subcommand_matches("importers") {
@@ -698,7 +674,7 @@ fn main() {
     } else if let Some(_) = app_matches.subcommand_matches("env") {
         env_help()
     } else if let Some(_) = app_matches.subcommand_matches("repl") {
-        repl(&import_paths, cache, &registry)
+        repl(&import_paths)
     } else if let Some(matches) = app_matches.subcommand_matches("fmt") {
         if let Err(e) = fmt_command(matches) {
             eprintln!("{}", e);

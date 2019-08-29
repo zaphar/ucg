@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use std::collections::BTreeMap;
-use std::io::{Write, Read};
-use std::rc::Rc;
-use std::path::PathBuf;
 use std::fs::File;
+use std::io::{Read, Write};
+use std::path::PathBuf;
+use std::rc::Rc;
 
-use super::pointer::OpPointer;
 use super::cache;
-use super::Value;
+use super::pointer::OpPointer;
 use super::Error;
+use super::Value;
 use crate::convert::{ConverterRegistry, ImporterRegistry};
 use crate::iter::OffsetStrIter;
 use crate::parse::parse;
@@ -66,24 +66,24 @@ impl<Stdout: Write, Stderr: Write> Environment<Stdout, Stderr> {
     }
 
     pub fn get_ops_for_path(&mut self, path: &String) -> Result<OpPointer, Error> {
-        let op_pointer = self.op_cache.entry(path).get_pointer_or_else(
+        self.op_cache.entry(path).get_pointer_or_else(
             || {
                 // FIXME(jwall): We need to do proper error handling here.
                 let p = PathBuf::from(&path);
                 let root = p.parent().unwrap();
                 // first we read in the file
-                let mut f = File::open(&path).unwrap();
+                let mut f = File::open(&path)?;
                 // then we parse it
                 let mut contents = String::new();
-                f.read_to_string(&mut contents).unwrap();
+                f.read_to_string(&mut contents)?;
                 let iter = OffsetStrIter::new(&contents).with_src_file(&p);
+                // FIXME(jwall): Unify BuildError and our other Error
                 let stmts = parse(iter, None).unwrap();
                 // then we create an ops from it
                 let ops = super::translate::AST::translate(stmts, &root);
-                ops
+                Ok(ops)
             },
             &path,
-        );
-        Ok(op_pointer)
+        )
     }
 }

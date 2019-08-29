@@ -17,6 +17,7 @@ use std::rc::Rc;
 mod cache;
 mod debug;
 pub mod environment;
+#[macro_use]
 mod error;
 pub mod pointer;
 mod runtime;

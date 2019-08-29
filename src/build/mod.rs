@@ -94,6 +94,7 @@ where
     environment: Rc<RefCell<Environment<Stdout, Stderr>>>,
     working_dir: PathBuf,
     // FIXME(jwall): These need to be compiled and added to the op cache.
+    // specifically in the environment.
     std: Rc<HashMap<String, &'static str>>,
     import_path: &'a Vec<PathBuf>,
     pub last: Option<Rc<Val>>,

@@ -17,6 +17,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use super::translate::PositionMap;
+use super::Error;
 use super::OpPointer;
 
 /// A Cache of Op codes.
@@ -39,12 +40,21 @@ impl Ops {
 pub struct Entry<'a>(btree_map::Entry<'a, String, Rc<PositionMap>>);
 
 impl<'a> Entry<'a> {
-    pub fn get_pointer_or_else<F: FnOnce() -> PositionMap, P: Into<PathBuf>>(
+    pub fn get_pointer_or_else<F: FnOnce() -> Result<PositionMap, Error>, P: Into<PathBuf>>(
         self,
         f: F,
         path: P,
-    ) -> OpPointer {
-        let cached = self.0.or_insert_with(|| Rc::new(f())).clone();
-        OpPointer::new(cached).with_path(path.into())
+    ) -> Result<OpPointer, Error> {
+        let cached = match self.0 {
+            btree_map::Entry::Occupied(e) => {
+                e.get().clone()
+            }
+            btree_map::Entry::Vacant(e) => {
+                let v = Rc::new(f()?);
+                e.insert(v.clone());
+                v
+            }
+        };
+        Ok(OpPointer::new(cached).with_path(path.into()))
     }
 }

@@ -460,8 +460,8 @@ where
     }
 
     fn op_gt(&mut self, pos: &Position) -> Result<(), Error> {
-        let (left, _) = self.pop()?;
-        let (right, _) = self.pop()?;
+        let (left, left_pos) = self.pop()?;
+        let (right, right_pos) = self.pop()?;
         match (left.as_ref(), right.as_ref()) {
             (&P(Int(i)), &P(Int(ii))) => {
                 self.push(Rc::new(P(Bool(i > ii))), pos.clone())?;
@@ -472,8 +472,8 @@ where
             _ => {
                 return Err(Error::new(
                     format!(
-                        "Expected Numeric values of the same type but got {:?} and {:?}",
-                        left, right
+                        "Expected numeric values of the same type but got {:?} at {} and {:?} at {} for expression",
+                        left, left_pos, right, right_pos,
                     ),
                     pos.clone(),
                 ));
@@ -483,8 +483,8 @@ where
     }
 
     fn op_lt(&mut self, pos: &Position) -> Result<(), Error> {
-        let (left, _) = self.pop()?;
-        let (right, _) = self.pop()?;
+        let (left, left_pos) = self.pop()?;
+        let (right, right_pos) = self.pop()?;
         match (left.as_ref(), right.as_ref()) {
             (&P(Int(i)), &P(Int(ii))) => {
                 self.push(Rc::new(P(Bool(i < ii))), pos.clone())?;
@@ -495,8 +495,8 @@ where
             _ => {
                 return Err(Error::new(
                     format!(
-                        "Expected Numeric values of the same type but got {:?} and {:?}",
-                        left, right
+                        "Expected numeric values of the same type but got {:?} at {} and {:?} at {} for expression",
+                        left, left_pos, right, right_pos,
                     ),
                     pos.clone(),
                 ));
@@ -506,8 +506,8 @@ where
     }
 
     fn op_lteq(&mut self, pos: Position) -> Result<(), Error> {
-        let (left, _) = self.pop()?;
-        let (right, _) = self.pop()?;
+        let (left, left_pos) = self.pop()?;
+        let (right, right_pos) = self.pop()?;
         match (left.as_ref(), right.as_ref()) {
             (&P(Int(i)), &P(Int(ii))) => {
                 self.push(Rc::new(P(Bool(i <= ii))), pos)?;
@@ -518,8 +518,8 @@ where
             _ => {
                 return Err(Error::new(
                     format!(
-                        "Expected Numeric values of the same type but got {:?} and {:?}",
-                        left, right
+                        "Expected numeric values of the same type but got {:?} at {} and {:?} at {} for expression",
+                        left, left_pos, right, right_pos,
                     ),
                     pos,
                 ));
@@ -529,8 +529,8 @@ where
     }
 
     fn op_gteq(&mut self, pos: Position) -> Result<(), Error> {
-        let (left, _) = self.pop()?;
-        let (right, _) = self.pop()?;
+        let (left, left_pos) = self.pop()?;
+        let (right, right_pos) = self.pop()?;
         match (left.as_ref(), right.as_ref()) {
             (&P(Int(i)), &P(Int(ii))) => {
                 self.push(Rc::new(P(Bool(i >= ii))), pos)?;
@@ -541,8 +541,8 @@ where
             _ => {
                 return Err(Error::new(
                     format!(
-                        "Expected Numeric values of the same type but got {:?} and {:?}",
-                        left, right
+                        "Expected numeric values of the same type but got {:?} at {} and {:?} at {} for expression",
+                        left, left_pos, right, right_pos,
                     ),
                     pos,
                 ));
@@ -554,45 +554,45 @@ where
     fn op_mod(&mut self, pos: Position) -> Result<(), Error> {
         // Adds the previous two items in the stack.
         let (left, _) = self.pop()?;
-        let (right, _) = self.pop()?;
+        let (right, right_pos) = self.pop()?;
         // Then pushes the result onto the stack.
-        self.push(Rc::new(P(self.modulus(&left, &right, &pos)?)), pos)?;
+        self.push(Rc::new(P(self.modulus(&left, &right, &right_pos)?)), pos)?;
         Ok(())
     }
 
     fn op_add(&mut self, pos: Position) -> Result<(), Error> {
         // Adds the previous two items in the stack.
         let (left, _) = self.pop()?;
-        let (right, _) = self.pop()?;
+        let (right, right_pos) = self.pop()?;
         // Then pushes the result onto the stack.
-        self.push(Rc::new(self.add(&left, &right, &pos)?), pos)?;
+        self.push(Rc::new(self.add(&left, &right, &right_pos)?), pos)?;
         Ok(())
     }
 
     fn op_sub(&mut self, pos: Position) -> Result<(), Error> {
         // Subtracts the previous two items in the stack.
         let (left, _) = self.pop()?;
-        let (right, _) = self.pop()?;
+        let (right, right_pos) = self.pop()?;
         // Then pushes the result onto the stack.
-        self.push(Rc::new(P(self.sub(&left, &right, &pos)?)), pos)?;
+        self.push(Rc::new(P(self.sub(&left, &right, &right_pos)?)), pos)?;
         Ok(())
     }
 
     fn op_mul(&mut self, pos: Position) -> Result<(), Error> {
         // Multiplies the previous two items in the stack.
         let (left, _) = self.pop()?;
-        let (right, _) = self.pop()?;
+        let (right, right_pos) = self.pop()?;
         // Then pushes the result onto the stack.
-        self.push(Rc::new(P(self.mul(&left, &right, &pos)?)), pos)?;
+        self.push(Rc::new(P(self.mul(&left, &right, &right_pos)?)), pos)?;
         Ok(())
     }
 
     fn op_div(&mut self, pos: Position) -> Result<(), Error> {
         // Divides the previous two items in the stack.
         let (left, _) = self.pop()?;
-        let (right, _) = self.pop()?;
+        let (right, right_pos) = self.pop()?;
         // Then pushes the result onto the stack.
-        self.push(Rc::new(P(self.div(&left, &right, &pos)?)), pos)?;
+        self.push(Rc::new(P(self.div(&left, &right, &right_pos)?)), pos)?;
         Ok(())
     }
 
@@ -670,7 +670,12 @@ where
     }
 
     fn op_bang(&mut self) -> Result<(), Error> {
-        Ok(())
+        let (msg_val, err_pos) = self.pop()?;
+        if let &P(Str(ref msg)) = msg_val.as_ref() {
+            return Err(Error::new(msg.clone(), err_pos));
+        } else {
+            unreachable!();
+        }
     }
 
     fn op_index(&mut self, safe: bool, pos: Position) -> Result<(), Error> {

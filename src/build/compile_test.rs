@@ -258,8 +258,8 @@ fn test_binary_sum_operator_wrong_type_on_rhs_compile_failure() {
     assert_build_failure(
         "1 + \"foo\";",
         vec![
-            Regex::new(r"Expected Integer but got \(.foo.\)").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 5").unwrap(),
+            Regex::new(r"Expected Int but got String\(foo\)").unwrap(),
+            Regex::new(r"line: 1 column: 5").unwrap(),
         ],
     )
 }
@@ -269,8 +269,8 @@ fn test_binary_minus_operator_wrong_type_on_rhs_compile_failure() {
     assert_build_failure(
         "1 - \"foo\";",
         vec![
-            Regex::new(r"Expected Integer but got \(.foo.\)").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 5").unwrap(),
+            Regex::new(r"Expected Int but got String\(foo\)").unwrap(),
+            Regex::new(r"line: 1 column: 5").unwrap(),
         ],
     )
 }
@@ -280,8 +280,8 @@ fn test_binary_mul_operator_wrong_type_on_rhs_compile_failure() {
     assert_build_failure(
         "1 * \"foo\";",
         vec![
-            Regex::new(r"Expected Integer but got \(.foo.\)").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 5").unwrap(),
+            Regex::new(r"Expected Int but got String\(foo\)").unwrap(),
+            Regex::new(r"line: 1 column: 5").unwrap(),
         ],
     )
 }
@@ -291,8 +291,8 @@ fn test_binary_div_operator_wrong_type_on_rhs_compile_failure() {
     assert_build_failure(
         "1 / \"foo\";",
         vec![
-            Regex::new(r"Expected Integer but got \(.foo.\)").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 5").unwrap(),
+            Regex::new(r"Expected Int but got String\(foo\)").unwrap(),
+            Regex::new(r"line: 1 column: 5").unwrap(),
         ],
     )
 }
@@ -302,8 +302,11 @@ fn test_binary_gt_operator_wrong_type_on_rhs_compile_failure() {
     assert_build_failure(
         "1 > \"foo\";",
         vec![
-            Regex::new(r"Expected Integer but got \(.foo.\)").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 5").unwrap(),
+            Regex::new(
+                r"Expected numeric values of the same type but got Int\(1\) at line: 1 column: 1 and String\(foo\) at line: 1 column: 5 for expression",
+            )
+            .unwrap(),
+            Regex::new(r"line: 1 column: 1").unwrap(),
         ],
     )
 }
@@ -313,8 +316,11 @@ fn test_binary_lt_operator_wrong_type_on_rhs_compile_failure() {
     assert_build_failure(
         "1 < \"foo\";",
         vec![
-            Regex::new(r"Expected Integer but got \(.foo.\)").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 5").unwrap(),
+            Regex::new(
+                r"Expected numeric values of the same type but got Int\(1\) at line: 1 column: 1 and String\(foo\) at line: 1 column: 5 for expression",
+            )
+            .unwrap(),
+            Regex::new(r"line: 1 column: 1").unwrap(),
         ],
     )
 }
@@ -324,8 +330,11 @@ fn test_binary_lteq_operator_wrong_type_on_rhs_compile_failure() {
     assert_build_failure(
         "1 <= \"foo\";",
         vec![
-            Regex::new(r"Expected Integer but got \(.foo.\)").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 6").unwrap(),
+            Regex::new(
+                r"Expected numeric values of the same type but got Int\(1\) at line: 1 column: 1 and String\(foo\) at line: 1 column: 6 for expression",
+            )
+            .unwrap(),
+            Regex::new(r"line: 1 column: 1").unwrap(),
         ],
     )
 }
@@ -335,8 +344,11 @@ fn test_binary_gteq_operator_wrong_type_on_rhs_compile_failure() {
     assert_build_failure(
         "1 >= \"foo\";",
         vec![
-            Regex::new(r"Expected Integer but got \(.foo.\)").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 6").unwrap(),
+            Regex::new(
+                r"Expected numeric values of the same type but got Int\(1\) at line: 1 column: 1 and String\(foo\) at line: 1 column: 6 for expression",
+            )
+            .unwrap(),
+            Regex::new(r"line: 1 column: 1").unwrap(),
         ],
     )
 }
@@ -346,8 +358,11 @@ fn test_binary_eqeq_operator_wrong_type_on_rhs_compile_failure() {
     assert_build_failure(
         "1 == \"foo\";",
         vec![
-            Regex::new(r"Expected Integer but got \(.foo.\)").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 6").unwrap(),
+            Regex::new(
+                r"Expected numeric values of the same type but got Int\(1\) at line: 1 column: 1 and String\(foo\) at line: 1 column: 5 for expression",
+            )
+            .unwrap(),
+            Regex::new(r"line: 1 column: 1").unwrap(),
         ],
     )
 }
@@ -358,7 +373,7 @@ fn test_incomplete_tuple_compile_failure() {
         "{;",
         vec![
             Regex::new(r"Expected \(\}\) but got \(;\)").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 2").unwrap(),
+            Regex::new(r"at <eval> line: 1 column: 2").unwrap(),
         ],
     )
 }
@@ -501,7 +516,7 @@ fn test_copy_expression_not_a_tuple_compile_failure() {
         "let foo = 1;\nfoo{};",
         vec![
             Regex::new(r"Expected Tuple or Module but got \(1\)").unwrap(),
-            Regex::new(r"at <eval> line: 2, column: 1").unwrap(),
+            Regex::new(r"line: 2 column: 1").unwrap(),
         ],
     )
 }
@@ -546,8 +561,8 @@ fn test_select_missed_case_string_no_default_compile_failure() {
     assert_build_failure(
         "select \"a\", { b = 1, };",
         vec![
-            Regex::new(r"Unhandled select case .a. with no default").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 8").unwrap(),
+            Regex::new(r"Unhandled select case with no default").unwrap(),
+            Regex::new(r"line: 1 column: 8").unwrap(),
         ],
     )
 }
@@ -557,8 +572,8 @@ fn test_select_missed_case_boolean_no_default_compile_failure() {
     assert_build_failure(
         "select true, { false = 1, };",
         vec![
-            Regex::new(r"Unhandled select case true with no default").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 8").unwrap(),
+            Regex::new(r"Unhandled select case with no default").unwrap(),
+            Regex::new(r"line: 1 column: 8").unwrap(),
         ],
     )
 }
@@ -569,7 +584,7 @@ fn test_bad_import_path_compile_failure() {
         "let bad = import \"no/such/path.ucg\";",
         vec![
             Regex::new(r"OSError: Path not found").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 18").unwrap(),
+            Regex::new(r"line: 1 column: 18").unwrap(),
         ],
     )
 }

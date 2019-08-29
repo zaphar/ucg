@@ -14,6 +14,7 @@
 use std::convert::From;
 use std::fmt;
 use std::fmt::Display;
+use std::io;
 
 use crate::ast::Position;
 
@@ -30,6 +31,22 @@ impl Error {
             pos: Some(pos),
         }
     }
+
+    pub fn with_pos(mut self, pos: Position) -> Self {
+        self.pos = Some(pos);
+        self
+    }
+}
+
+macro_rules! decorate_error {
+    ($pos:expr => $result:expr) => {
+        match $result {
+            Ok(v) => Ok(v),
+            Err(e) => {
+                Err(e.with_pos($pos.clone()))
+            }
+        }
+    };
 }
 
 impl From<regex::Error> for Error {
@@ -43,8 +60,12 @@ impl From<regex::Error> for Error {
 
 impl From<std::io::Error> for Error {
     fn from(e: std::io::Error) -> Self {
+        let msg = match e.kind() {
+            io::ErrorKind::NotFound => format!("OSError: Path not found: {}", e),
+            _ => format!("{}", e),
+        };
         Error {
-            message: format!("{}", e),
+            message: msg,
             pos: None,
         }
     }

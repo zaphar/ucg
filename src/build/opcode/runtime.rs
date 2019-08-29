@@ -166,7 +166,7 @@ impl Builtins {
                         stack.push((v, path_pos));
                     }
                     None => {
-                        let op_pointer = borrowed_env.get_ops_for_path(path)?;
+                        let op_pointer = decorate_error!(path_pos => borrowed_env.get_ops_for_path(path))?;
                         let mut vm = VM::with_pointer(op_pointer, env.clone());
                         vm.run()?;
                         let result = Rc::new(vm.symbols_to_tuple(true));

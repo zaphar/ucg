@@ -266,7 +266,13 @@ impl AST {
                 Self::translate_expr(*expr, &mut ops, root);
             }
             Expression::Fail(def) => {
+                let msg_pos = def.message.pos().clone();
                 Self::translate_expr(*def.message, &mut ops, root);
+                ops.push(
+                    Op::Val(Primitive::Str("UserDefined: ".to_owned())),
+                    msg_pos,
+                );
+                ops.push(Op::Add, def.pos.clone());
                 ops.push(Op::Bang, def.pos);
             }
             Expression::Format(def) => {
@@ -450,6 +456,7 @@ impl AST {
                 ops.push(Op::Runtime(Hook::Range), def.pos);
             }
             Expression::Select(def) => {
+                let default_pos = def.val.pos().clone();
                 Self::translate_expr(*def.val, &mut ops, root);
                 let mut jumps = Vec::new();
                 for (key, val) in def.tuple {
@@ -467,6 +474,12 @@ impl AST {
                 if let Some(default) = def.default {
                     Self::translate_expr(*default, &mut ops, root);
                 } else {
+                    ops.push(
+                        Op::Val(Primitive::Str(
+                            "Unhandled select case with no default".to_owned(),
+                        )),
+                        default_pos,
+                    );
                     ops.push(Op::Bang, def.pos);
                 }
                 let end = ops.len() - 1;
