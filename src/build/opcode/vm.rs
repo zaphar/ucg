@@ -139,6 +139,7 @@ where
                 Op::Element => self.op_element()?,
                 Op::Index => self.op_index(false, pos)?,
                 Op::SafeIndex => self.op_index(true, pos)?,
+                Op::Exist => self.op_exist(pos)?,
                 Op::Cp => self.op_copy(pos)?,
                 //FIXME(jwall): Should this take a user provided message?
                 Op::Bang => self.op_bang()?,
@@ -286,6 +287,15 @@ where
         // compare them.
         let matched = match (field_name.as_ref(), search.as_ref()) {
             (&S(ref fname), &P(Str(ref sname))) | (&S(ref fname), &S(ref sname)) => fname == sname,
+            (&S(ref fname), &P(Bool(b))) => {
+                if fname == "true" && b {
+                    true
+                } else if fname == "false" && !b {
+                    true
+                } else {
+                    false
+                }
+            }
             _ => false,
         };
         if !matched {
@@ -377,6 +387,8 @@ where
         }
         let mut ops = self.ops.clone();
         ops.jump(idx)?;
+        // Our arguments will be pulled off the stack in reverse order;
+        bindings.reverse();
         self.push(
             Rc::new(F(Func {
                 ptr: ops, // where the function starts.
@@ -634,8 +646,8 @@ where
         let name = if let &S(ref s) | &P(Str(ref s)) = name_val.as_ref() {
             s
         } else {
-            //dbg!(name_val);
-            //dbg!(val);
+            dbg!(name_val);
+            dbg!(val);
             unreachable!();
         };
         // get composite tuple from stack
@@ -713,6 +725,50 @@ where
             format!("Invalid selector index: {:?} target: {:?}", right, left),
             pos,
         ));
+    }
+
+    fn op_exist(&mut self, pos: Position) -> Result<(), Error> {
+        let (right, right_pos) = self.pop()?;
+        let (left, left_pos) = self.pop()?;
+        match left.as_ref() {
+            &C(Tuple(ref flds)) => {
+                if let &P(Str(ref name)) = right.as_ref() {
+                    for (ref nm, _) in flds {
+                        if nm == name {
+                            self.push(Rc::new(P(Bool(true))), pos)?;
+                            return Ok(());
+                        }
+                    }
+                } else {
+                    return Err(Error::new(
+                        format!("Expected String or Symbol got: {}", right.type_name()),
+                        right_pos,
+                    ));
+                }
+            }
+            &C(List(ref elems)) => {
+                for e in elems {
+                    if e == &right {
+                        self.push(Rc::new(P(Bool(true))), pos)?;
+                        return Ok(());
+                    }
+                }
+            }
+            &P(Str(ref s)) => {
+                if let &P(Str(ref part)) = right.as_ref() {
+                    self.push(Rc::new(P(Bool(s.contains(part)))), pos)?;
+                    return Ok(());
+                }
+            }
+            _ => {
+                return Err(Error::new(
+                    format!("Expected String, Tuple, or List got: {}", left.type_name()),
+                    left_pos,
+                ));
+            }
+        };
+        self.push(Rc::new(P(Bool(false))), pos)?;
+        Ok(())
     }
 
     fn op_copy(&mut self, pos: Position) -> Result<(), Error> {

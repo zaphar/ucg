@@ -17,9 +17,8 @@ use std::rc::Rc;
 
 use regex::Regex;
 
-use super::assets::MemoryCache;
+//TODO(jwall): use super::assets::MemoryCache;
 use super::FileBuilder;
-use crate::convert::ConverterRegistry;
 
 fn assert_build(input: &str) {
     let i_paths = Vec::new();
@@ -28,10 +27,10 @@ fn assert_build(input: &str) {
     let mut b = FileBuilder::new("<Eval>", &i_paths, out_buffer, err_buffer);
     b.enable_validate_mode();
     b.eval_string(input).unwrap();
-    // FIXME(jwall): What do we want to do with the assert collector?
-    //if !b.assert_collector.success {
-    //    assert!(false, b.assert_collector.failures);
-    //}
+    let env = b.environment.borrow();
+    if !env.assert_results.success {
+        assert!(false, env.assert_results.failures.clone());
+    }
 }
 
 fn assert_build_failure(input: &str, expect: Vec<Regex>) {
@@ -44,18 +43,18 @@ fn assert_build_failure(input: &str, expect: Vec<Regex>) {
     match err {
         Ok(_) => {
             for r in expect.iter() {
-                // FIXME(jwall): Assert collector...
-                //if !b.assert_collector.success {
-                //    if let None = r.find(&b.assert_collector.failures) {
-                //        assert!(
-                //            false,
-                //            "[{}] was not found in Assertion Failures:\n{}",
-                //            r, b.assert_collector.failures
-                //        );
-                //    }
-                //} else {
-                //    assert!(false, "Building input Did not panic!");
-                //}
+                let env = b.environment.borrow();
+                if !env.assert_results.success {
+                    if let None = r.find(&env.assert_results.failures) {
+                        assert!(
+                            false,
+                            "[{}] was not found in Assertion Failures:\n{}",
+                            r, env.assert_results.failures
+                        );
+                    }
+                } else {
+                    assert!(false, "Building input Did not panic!");
+                }
             }
         }
         Err(ref err) => {

@@ -94,11 +94,8 @@ impl ExpressionTemplate {
             }
             if c == '}' {
                 brace_count -= 1;
-                // We ignore the closing brace
-                if brace_count == 0 {
-                    continue;
-                }
             }
+            // We ignore the closing brace
             if brace_count == 0 {
                 break;
             }

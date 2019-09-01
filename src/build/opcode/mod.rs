@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use std::collections::BTreeSet;
 use std::convert::{TryFrom, TryInto};
 use std::rc::Rc;
 
@@ -128,7 +129,7 @@ pub struct Module {
     pkg_ptr: Option<OpPointer>,
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(Clone)]
 pub enum Value {
     // Binding names.
     S(String),
@@ -219,6 +220,7 @@ pub enum Op {
     // Spacer operation, Does nothing.
     Index,     // indexing operation
     SafeIndex, // Safe indexing operation. Does Null Coelescing
+    Exist,
     Noop,
     // Pending Computation
     InitThunk(i32), // Basically just used for module return expressions
@@ -238,6 +240,39 @@ pub enum Op {
 }
 
 use super::ir::Val;
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Value) -> bool {
+        match (self, other) {
+            (P(left), P(right)) => left == right,
+            (C(List(left)), C(List(right))) => left == right,
+            (C(Tuple(left)), C(Tuple(right))) => {
+                if left.len() != right.len() {
+                    return false;
+                }
+                for (ref lk, ref lv) in left.iter() {
+                    let mut found = false;
+                    for (ref rk, ref rv) in right.iter() {
+                        if lk == rk {
+                            found = true;
+                            if lv != rv {
+                                return false;
+                            }
+                        }
+                    }
+                    if !found {
+                        return false;
+                    }
+                }
+                true
+            }
+            (F(left), F(right)) => left == right,
+            (M(left), M(right)) => left == right,
+            (T(_), T(_)) | (S(_), S(_)) => false,
+            (_, _) => false,
+        }
+    }
+}
 
 impl From<Rc<Value>> for Val {
     fn from(val: Rc<Value>) -> Val {

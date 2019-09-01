@@ -186,6 +186,11 @@ assert {
 };
 
 assert {
+    ok = "f" in "foo",
+    desc = "You can check for substrings in strings",
+};
+
+assert {
     ok = true && true == true,
     desc = "&&: truth",
 };

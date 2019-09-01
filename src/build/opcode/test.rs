@@ -645,6 +645,7 @@ fn simple_binary_expr() {
         "true || true;" => P(Bool(true)),
         "foo in {foo = 1};" => P(Bool(true)),
         "bar in {foo = 1};" => P(Bool(false)),
+        "let bar = \"foo\"; (bar) in {foo = 1};" => P(Bool(true)),
     )
 }
 
@@ -715,6 +716,7 @@ fn simple_format_expressions() {
         "\"@ @ @\" % (1, 2, 3);" => P(Str("1 2 3".to_owned())),
         "\"@ \\\\@\" % (1);" => P(Str("1 @".to_owned())),
         "\"@{item.num}\" % {num=1};" => P(Str("1".to_owned())),
+        "\"@{item.num()}\" % {num=func() => 1};" => P(Str("1".to_owned())),
     ];
 }
 
@@ -789,6 +791,7 @@ fn simple_selects() {
         "select \"foo\", { foo = 1, bar = 2, };" => P(Int(1)),
         "select \"bar\", { foo = 1, bar = 2, };" => P(Int(2)),
         "select \"quux\", 3, { foo = 1, bar = 2, };" => P(Int(3)),
+        "select true, { true = 1, false = 2, };" => P(Int(1)),
     ];
 }
 
@@ -810,6 +813,7 @@ fn select_compound_expressions() {
         "let want = \"foo\"; select want, { foo = 1, bar = 2, } == 1;" => P(Bool(true)),
         "let want = \"foo\"; select want, 3, { foo = 1, bar = 2, } == 1;" => P(Bool(true)),
         "{ok = select \"foo\", { foo = 1, bar = 2, } == 2}.ok;" => P(Bool(false)),
+        "{ok = func() => true}.ok();" => P(Bool(true)),
     ];
 }
 
@@ -905,3 +909,5 @@ fn simple_reduces() {
         ])),
     ];
 }
+
+// TODO(jwall): functions and modules comparable?

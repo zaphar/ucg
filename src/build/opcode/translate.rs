@@ -188,8 +188,9 @@ impl AST {
                     BinaryExprType::IN => {
                         // Dot expressions expect the left side to be pushed first
                         Self::translate_expr(*def.right, &mut ops, root);
-                        // Symbols on the right side should be converted to strings to satisfy
+                        // Symbols on the left side should be converted to strings to satisfy
                         // the Index operation contract.
+                        // FIXME(jwall): List checks.
                         match *def.left {
                             Expression::Simple(Value::Symbol(name)) => {
                                 Self::translate_expr(
@@ -202,10 +203,7 @@ impl AST {
                                 Self::translate_expr(expr, &mut ops, root);
                             }
                         }
-                        ops.push(Op::SafeIndex, def.pos.clone());
-                        ops.push(Op::Val(Primitive::Empty), def.pos.clone());
-                        ops.push(Op::Equal, def.pos.clone());
-                        ops.push(Op::Not, def.pos);
+                        ops.push(Op::Exist, def.pos.clone());
                     }
                     BinaryExprType::DOT => {
                         // Dot expressions expect the left side to be pushed first
@@ -244,6 +242,7 @@ impl AST {
                                     }
                                     _ => unreachable!(),
                                 }
+                                ops.push(Op::Index, def.pos);
                                 ops.push(Op::FCall, func_pos);
                                 return;
                             }
@@ -268,10 +267,7 @@ impl AST {
             Expression::Fail(def) => {
                 let msg_pos = def.message.pos().clone();
                 Self::translate_expr(*def.message, &mut ops, root);
-                ops.push(
-                    Op::Val(Primitive::Str("UserDefined: ".to_owned())),
-                    msg_pos,
-                );
+                ops.push(Op::Val(Primitive::Str("UserDefined: ".to_owned())), msg_pos);
                 ops.push(Op::Add, def.pos.clone());
                 ops.push(Op::Bang, def.pos);
             }

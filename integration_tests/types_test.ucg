@@ -64,7 +64,9 @@ assert t.not_ok{
 
 let test_for_field = func(name, tpl) => (name) in tpl;
 
+let name = "foo";
+
 assert t.ok{
-    test = test_for_field("name", {name="foo"}),
+    test = (name) in {foo="foo"},
     desc = "bareword collisions with field names still works for `in` operator",
 };

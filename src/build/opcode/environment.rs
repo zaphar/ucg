@@ -21,6 +21,7 @@ use super::cache;
 use super::pointer::OpPointer;
 use super::Error;
 use super::Value;
+use crate::build::AssertCollector;
 use crate::convert::{ConverterRegistry, ImporterRegistry};
 use crate::iter::OffsetStrIter;
 use crate::parse::parse;
@@ -35,6 +36,7 @@ where
     pub op_cache: cache::Ops,
     pub converter_registry: ConverterRegistry,
     pub importer_registry: ImporterRegistry,
+    pub assert_results: AssertCollector,
     pub stdout: Stdout,
     pub stderr: Stderr,
     pub env_vars: BTreeMap<String, String>, // Environment Variables
@@ -50,6 +52,7 @@ impl<Stdout: Write, Stderr: Write> Environment<Stdout, Stderr> {
             val_cache: BTreeMap::new(),
             env_vars: vars,
             op_cache: cache::Ops::new(),
+            assert_results: AssertCollector::new(),
             converter_registry: ConverterRegistry::make_registry(),
             importer_registry: ImporterRegistry::make_registry(),
             stdout: out,
@@ -85,5 +88,9 @@ impl<Stdout: Write, Stderr: Write> Environment<Stdout, Stderr> {
             },
             &path,
         )
+    }
+
+    pub fn record_assert_result(&mut self, desc: &str, ok: bool) {
+        self.assert_results.record_assert_result(desc, ok);
     }
 }
