@@ -38,7 +38,7 @@ assert t.equal{
 
 assert t.ok{
     test = tpl.has_fields{tpl={foo=1, bar=2}, fields=["foo", "bar"]},
-    desc = "tuple has fields has foo and bar fields",
+    desc = "tuple has foo and bar fields",
 };
 
 assert t.not_ok{

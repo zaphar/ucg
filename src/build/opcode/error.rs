@@ -58,7 +58,6 @@ macro_rules! decorate_call {
         match $result {
             Ok(v) => Ok(v),
             Err(mut e) => {
-                dbg!(&$pos);
                 e.push_call_stack($pos.clone());
                 Err(e)
             }

@@ -16,6 +16,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::fmt::Debug;
 
 use regex::Regex;
 
@@ -29,7 +30,6 @@ use Composite::{List, Tuple};
 use Primitive::{Bool, Empty, Int, Str};
 
 pub struct Builtins {
-    working_dir: PathBuf,
     import_path: Vec<PathBuf>,
     validate_mode: bool,
 }
@@ -37,12 +37,7 @@ pub struct Builtins {
 impl Builtins {
     pub fn new() -> Self {
         // FIXME(jwall): This should probably be injected in.
-        Self::with_working_dir(std::env::current_dir().unwrap())
-    }
-
-    pub fn with_working_dir<P: Into<PathBuf>>(path: P) -> Self {
         Self {
-            working_dir: path.into(),
             import_path: Vec::new(),
             validate_mode: false,
         }
@@ -50,7 +45,6 @@ impl Builtins {
 
     pub fn clone(&self) -> Self {
         Self {
-            working_dir: self.working_dir.clone(),
             import_path: self.import_path.clone(),
             validate_mode: self.validate_mode,
         }
@@ -60,22 +54,25 @@ impl Builtins {
         self.validate_mode = true;
     }
 
-    pub fn handle<P: AsRef<Path>, O, E>(
+    pub fn handle<P, WP, O, E>(
         &mut self,
         path: Option<P>,
         h: Hook,
         stack: &mut Vec<(Rc<Value>, Position)>,
         env: Rc<RefCell<Environment<O, E>>>,
         import_stack: &mut Vec<String>,
+        working_dir: WP,
         pos: Position,
     ) -> Result<(), Error>
     where
+        P: AsRef<Path>,
+        WP: Into<PathBuf> + Clone + Debug,
         O: std::io::Write,
         E: std::io::Write,
     {
         match h {
-            Hook::Import => self.import(stack, env, import_stack, pos),
-            Hook::Include => self.include(stack, env, pos),
+            Hook::Import => self.import(working_dir, stack, env, import_stack, pos),
+            Hook::Include => self.include(working_dir, stack, env, pos),
             Hook::Assert => self.assert(stack, env),
             Hook::Convert => self.convert(stack, env, pos),
             Hook::Out => self.out(path, stack, env, pos),
@@ -88,15 +85,23 @@ impl Builtins {
         }
     }
 
-    fn find_file<P: Into<PathBuf>>(
+    fn normalize_path<P, BP>(
         &self,
-        path: P,
+        base_path: BP,
         use_import_path: bool,
-        pos: Position,
-    ) -> Result<PathBuf, Error> {
+        path: P,
+    ) -> Result<PathBuf, Error>
+    where
+        BP: Into<PathBuf>,
+        P: Into<PathBuf>,
+    {
         // Try a relative path first.
         let path = path.into();
-        let mut normalized = self.working_dir.clone();
+        // stdlib paths are special
+        if path.starts_with("std/") {
+            return Ok(path);
+        }
+        let mut normalized = base_path.into();
         if path.is_relative() {
             normalized.push(&path);
             // First see if the normalized file exists or not.
@@ -115,6 +120,23 @@ impl Builtins {
         } else {
             normalized = path;
         }
+        Ok(normalized.canonicalize()?)
+    }
+
+    fn find_file<P, BP>(
+        &self,
+        base_path: BP,
+        path: P,
+        use_import_path: bool,
+        pos: Position,
+    ) -> Result<PathBuf, Error>
+    where
+        P: Into<PathBuf>,
+        BP: Into<PathBuf>,
+    {
+        // Try a relative path first.
+        // FIXME(jwall): Use import paths if desired.
+        let normalized = self.normalize_path(base_path, use_import_path, path)?;
         match normalized.canonicalize() {
             Ok(p) => Ok(p),
             Err(_e) => Err(Error::new(
@@ -124,10 +146,11 @@ impl Builtins {
         }
     }
 
-    fn get_file_as_string(&self, path: &str, pos: Position) -> Result<String, Error> {
+    fn get_file_as_string<P: Into<PathBuf>>(&self, base_path: P, path: &str, pos: Position) -> Result<String, Error> {
         let sep = format!("{}", std::path::MAIN_SEPARATOR);
         let raw_path = path.replace("/", &sep);
-        let normalized = self.find_file(raw_path, false, pos)?;
+        // FIXME(jwall): import paths?
+        let normalized = self.find_file(base_path, raw_path, false, pos)?;
         // TODO(jwall): Proper error here
         let mut f = File::open(normalized)?;
         let mut contents = String::new();
@@ -136,8 +159,9 @@ impl Builtins {
         Ok(contents)
     }
 
-    fn import<O, E>(
+    fn import<P, O, E>(
         &mut self,
+        base_path: P,
         stack: &mut Vec<(Rc<Value>, Position)>,
         env: Rc<RefCell<Environment<O, E>>>,
         import_stack: &mut Vec<String>,
@@ -146,31 +170,37 @@ impl Builtins {
     where
         O: std::io::Write,
         E: std::io::Write,
+        P: Into<PathBuf> + Clone + Debug, 
     {
         let path = stack.pop();
         if let Some((val, path_pos)) = path {
             if let &Value::P(Str(ref path)) = val.as_ref() {
+                // TODO(jwall): A bit hacky we should probably change import stacks to be pathbufs.
+                let normalized = decorate_error!(path_pos => self.normalize_path(base_path, false, path))?;
+                let path = normalized.to_string_lossy().to_string();
                 if import_stack
                    .iter()
-                   .find(|p| *p == path)
+                   .find(|p| *p == &path)
                    .is_some() {
                        return Err(Error::new(
-                           format!("You can only have one output per file"),
+                           format!("Import cycle detected: {} in {:?}", path, import_stack),
                            pos));
                 }
-                import_stack.push(path.clone());
-                let mut borrowed_env = env.borrow_mut();
-                match borrowed_env.get_cached_path_val(path) {
+                let val = {
+                    env.borrow_mut().get_cached_path_val(&path)
+                };
+                match val {
                     Some(v) => {
                         stack.push((v, path_pos));
                     }
                     None => {
                         let op_pointer =
-                            decorate_error!(path_pos => borrowed_env.get_ops_for_path(path))?;
-                        let mut vm = VM::with_pointer(op_pointer, env.clone());
+                            decorate_error!(path_pos => env.borrow_mut().get_ops_for_path(&normalized))?;
+                        // TODO(jwall): What if we don't have a base path?
+                        let mut vm = VM::with_pointer(op_pointer, env.clone(), normalized.parent().unwrap());
                         vm.run()?;
                         let result = Rc::new(vm.symbols_to_tuple(true));
-                        borrowed_env.update_path_val(&path, result.clone());
+                        env.borrow_mut().update_path_val(&path, result.clone());
                         stack.push((result, pos));
                     }
                 }
@@ -181,8 +211,9 @@ impl Builtins {
         unreachable!();
     }
 
-    fn include<O, E>(
+    fn include<P, O, E>(
         &self,
+        base_path: P,
         stack: &mut Vec<(Rc<Value>, Position)>,
         env: Rc<RefCell<Environment<O, E>>>,
         pos: Position,
@@ -190,6 +221,7 @@ impl Builtins {
     where
         O: std::io::Write,
         E: std::io::Write,
+        P: Into<PathBuf> + Clone + Debug,
     {
         let path = stack.pop();
         let typ = stack.pop();
@@ -216,14 +248,14 @@ impl Builtins {
         };
         if typ == "str" {
             stack.push((
-                Rc::new(P(Str(self.get_file_as_string(&path, pos.clone())?))),
+                Rc::new(P(Str(self.get_file_as_string(base_path, &path, pos.clone())?))),
                 pos.clone(),
             ));
         } else {
             stack.push((
                 Rc::new(match env.borrow().importer_registry.get_importer(&typ) {
                     Some(importer) => {
-                        let contents = self.get_file_as_string(&path, pos.clone())?;
+                        let contents = self.get_file_as_string(base_path, &path, pos.clone())?;
                         if contents.len() == 0 {
                             eprintln!("including an empty file. Use NULL as the result");
                             P(Empty)

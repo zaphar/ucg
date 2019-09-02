@@ -70,3 +70,14 @@ assert t.ok{
     test = (name) in {foo="foo"},
     desc = "bareword collisions with field names still works for `in` operator",
 };
+
+assert t.ok{
+    test = "foo" in ["foo"],
+    desc = "List presence checks work",
+};
+
+let foo_string = "foo";
+assert t.ok{
+    test = foo_string in ["foo"],
+    desc = "List presence checks work",
+};

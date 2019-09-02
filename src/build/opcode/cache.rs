@@ -22,7 +22,7 @@ use super::OpPointer;
 
 /// A Cache of Op codes.
 pub struct Ops {
-    ops: BTreeMap<String, Rc<PositionMap>>,
+    ops: BTreeMap<PathBuf, Rc<PositionMap>>,
 }
 
 impl Ops {
@@ -32,12 +32,12 @@ impl Ops {
         }
     }
 
-    pub fn entry<'a, S: Into<String>>(&'a mut self, path: S) -> Entry<'a> {
+    pub fn entry<'a, P: Into<PathBuf>>(&'a mut self, path: P) -> Entry<'a> {
         Entry(self.ops.entry(path.into()))
     }
 }
 
-pub struct Entry<'a>(btree_map::Entry<'a, String, Rc<PositionMap>>);
+pub struct Entry<'a>(btree_map::Entry<'a, PathBuf, Rc<PositionMap>>);
 
 impl<'a> Entry<'a> {
     pub fn get_pointer_or_else<F: FnOnce() -> Result<PositionMap, Error>, P: Into<PathBuf>>(

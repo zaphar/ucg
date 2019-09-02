@@ -70,14 +70,18 @@ impl<Stdout: Write, Stderr: Write> Environment<Stdout, Stderr> {
         self.val_cache.insert(path.clone(), val);
     }
 
-    pub fn get_ops_for_path(&mut self, path: &String) -> Result<OpPointer, Error> {
-        self.op_cache.entry(path).get_pointer_or_else(
+    pub fn get_ops_for_path<P>(&mut self, path: P) -> Result<OpPointer, Error>
+    where
+        P: Into<PathBuf> + Clone,
+    {
+        let path_copy = path.clone();
+        self.op_cache.entry(path.clone()).get_pointer_or_else(
             || {
                 // FIXME(jwall): We need to do proper error handling here.
-                let p = PathBuf::from(&path);
+                let p = path.into();
                 let root = p.parent().unwrap();
                 // first we read in the file
-                let mut f = File::open(&path)?;
+                let mut f = File::open(&p)?;
                 // then we parse it
                 let mut contents = String::new();
                 f.read_to_string(&mut contents)?;
@@ -88,7 +92,7 @@ impl<Stdout: Write, Stderr: Write> Environment<Stdout, Stderr> {
                 let ops = super::translate::AST::translate(stmts, &root);
                 Ok(ops)
             },
-            &path,
+            path_copy,
         )
     }
 

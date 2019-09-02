@@ -13,7 +13,10 @@
 // limitations under the License.
 use std::path::Path;
 
-use crate::ast::{BinaryExprType, Expression, FormatArgs, Position, Statement, Token, Value};
+use crate::ast::{
+    BinaryExprType, BinaryOpDef, Expression, FormatArgs, Position, PositionedItem, SelectDef,
+    Statement, Token, TokenType, Value,
+};
 use crate::ast::{FuncOpDef, TemplatePart};
 use crate::build::format::{ExpressionTemplate, SimpleTemplate, TemplateParser};
 use crate::build::opcode::Primitive;
@@ -186,18 +189,38 @@ impl AST {
                         ops.push(Op::Mod, def.pos);
                     }
                     BinaryExprType::IN => {
-                        // Dot expressions expect the left side to be pushed first
-                        Self::translate_expr(*def.right, &mut ops, root);
+                        // Dot expressions expect the right side to be pushed first
+                        Self::translate_expr(*def.right.clone(), &mut ops, root);
                         // Symbols on the left side should be converted to strings to satisfy
                         // the Index operation contract.
-                        // FIXME(jwall): List checks.
-                        match *def.left {
+                        // FIXME(jwall): List checks should not use symbol translation.
+                        match *def.left.clone() {
                             Expression::Simple(Value::Symbol(name)) => {
-                                Self::translate_expr(
-                                    Expression::Simple(Value::Str(name)),
-                                    &mut ops,
-                                    root,
-                                );
+                                // We really just want an expression that turns a symbol
+                                // into a name if the subject is a tuple and doesn't
+                                // otherwise
+                                let new_expr = Expression::Select(SelectDef {
+                                    val: Box::new(Expression::Binary(BinaryOpDef {
+                                        kind: BinaryExprType::IS,
+                                        right: Box::new(Expression::Simple(Value::Str(
+                                            PositionedItem::new(
+                                                "tuple".to_owned(),
+                                                def.left.pos().clone(),
+                                            ),
+                                        ))),
+                                        left: def.right.clone(),
+                                        pos: def.left.pos().clone(),
+                                    })),
+                                    default: Some(Box::new(Expression::Simple(Value::Symbol(
+                                        name.clone(),
+                                    )))),
+                                    tuple: vec![(
+                                        Token::new("true", TokenType::BAREWORD, def.right.pos()),
+                                        Expression::Simple(Value::Str(name)),
+                                    )],
+                                    pos: def.left.pos().clone(),
+                                });
+                                Self::translate_expr(new_expr, &mut ops, root);
                             }
                             expr => {
                                 Self::translate_expr(expr, &mut ops, root);

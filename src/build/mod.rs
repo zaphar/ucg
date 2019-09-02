@@ -190,7 +190,7 @@ where
     pub fn eval_stmts(&mut self, ast: Vec<Statement>) -> BuildResult {
         // We should probably stash this in an op_cache somewhere?
         let ops = translate::AST::translate(ast, &self.working_dir);
-        let mut vm = VM::new(Rc::new(ops), self.environment.clone());
+        let mut vm = VM::new(Rc::new(ops), self.environment.clone(), &self.working_dir);
         if self.validate_mode {
             vm.enable_validate_mode();
         }
@@ -227,7 +227,11 @@ where
             &mut ops_map,
             &self.working_dir,
         );
-        let mut vm = VM::new(Rc::new(ops_map), self.environment.clone());
+        let mut vm = VM::new(
+            Rc::new(ops_map),
+            self.environment.clone(),
+            &self.working_dir,
+        );
         if self.validate_mode {
             vm.enable_validate_mode();
         }

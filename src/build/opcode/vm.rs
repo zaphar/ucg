@@ -13,6 +13,7 @@
 // limitations under the License.
 use std::cell::RefCell;
 use std::collections::BTreeSet;
+use std::path::PathBuf;
 use std::rc::Rc;
 
 use crate::ast::Position;
@@ -45,6 +46,7 @@ where
     O: std::io::Write,
     E: std::io::Write,
 {
+    working_dir: PathBuf,
     stack: Vec<(Rc<Value>, Position)>,
     symbols: Stack,
     import_stack: Vec<String>,
@@ -54,7 +56,6 @@ where
     pub last: Option<(Rc<Value>, Position)>,
     self_stack: Vec<(Rc<Value>, Position)>,
     reserved_words: BTreeSet<&'static str>,
-    out_lock: bool,
 }
 
 impl<'a, O, E> VM<O, E>
@@ -62,12 +63,21 @@ where
     O: std::io::Write,
     E: std::io::Write,
 {
-    pub fn new(ops: Rc<PositionMap>, env: Rc<RefCell<Environment<O, E>>>) -> Self {
-        Self::with_pointer(OpPointer::new(ops), env)
+    pub fn new<P: Into<PathBuf>>(
+        ops: Rc<PositionMap>,
+        env: Rc<RefCell<Environment<O, E>>>,
+        working_dir: P,
+    ) -> Self {
+        Self::with_pointer(OpPointer::new(ops), env, working_dir)
     }
 
-    pub fn with_pointer(ops: OpPointer, env: Rc<RefCell<Environment<O, E>>>) -> Self {
+    pub fn with_pointer<P: Into<PathBuf>>(
+        ops: OpPointer,
+        env: Rc<RefCell<Environment<O, E>>>,
+        working_dir: P,
+    ) -> Self {
         Self {
+            working_dir: working_dir.into(),
             stack: Vec::new(),
             symbols: Stack::new(),
             import_stack: Vec::new(),
@@ -77,9 +87,14 @@ where
             last: None,
             self_stack: Vec::new(),
             reserved_words: construct_reserved_word_set(),
-            out_lock: false,
         }
     }
+
+    pub fn to_new_pointer(mut self, ops: OpPointer) -> Self {
+        self.ops = ops;
+        self
+    }
+
     pub fn with_import_stack(mut self, imports: Vec<String>) -> Self {
         self.import_stack = imports;
         self
@@ -89,19 +104,24 @@ where
         self.runtime.enable_validate_mode();
     }
 
-    pub fn to_scoped(self, symbols: Stack) -> Self {
+    pub fn clean_copy(&self) -> Self {
         Self {
+            working_dir: self.working_dir.clone(),
             stack: Vec::new(),
-            symbols: symbols,
-            import_stack: self.import_stack.clone(),
+            symbols: Stack::new(),
+            import_stack: Vec::new(),
             runtime: self.runtime.clone(),
             ops: self.ops.clone(),
             env: self.env.clone(),
-            last: self.last,
-            self_stack: self.self_stack,
-            reserved_words: self.reserved_words,
-            out_lock: self.out_lock,
+            last: None,
+            self_stack: self.self_stack.clone(),
+            reserved_words: self.reserved_words.clone(),
         }
+    }
+
+    pub fn to_scoped(mut self, symbols: Stack) -> Self {
+        self.symbols = symbols;
+        self
     }
 
     pub fn symbols_to_tuple(&self, include_mod: bool) -> Value {
@@ -182,6 +202,9 @@ where
                 Op::PushSelf => self.op_push_self()?,
                 Op::PopSelf => self.op_pop_self()?,
             };
+        }
+        if let Some(p) = self.ops.path.as_ref() {
+            self.import_stack.push(p.to_string_lossy().to_string());
         }
         Ok(())
     }
@@ -425,7 +448,7 @@ where
             ref snapshot,
         } = f;
         // use the captured scope snapshot for the function.
-        let mut vm = Self::with_pointer(ptr.clone(), env)
+        let mut vm = Self::with_pointer(ptr.clone(), env, std::env::current_dir()?)
             .to_scoped(snapshot.clone())
             .with_import_stack(import_stack.clone());
         for nm in bindings.iter() {
@@ -442,7 +465,9 @@ where
 
     fn op_new_scope(&mut self, jp: i32, ptr: OpPointer) -> Result<(), Error> {
         let scope_snapshot = self.symbols.snapshot();
-        let mut vm = Self::with_pointer(ptr, self.env.clone())
+        let mut vm = self
+            .clean_copy()
+            .to_new_pointer(ptr)
             .to_scoped(scope_snapshot)
             .with_import_stack(self.import_stack.clone());
         vm.run()?;
@@ -809,7 +834,7 @@ where
             }
             &C(List(ref elems, _)) => {
                 for e in elems {
-                    if e == &right {
+                    if dbg!(e) == dbg!(&right) {
                         self.push(Rc::new(P(Bool(true))), pos)?;
                         return Ok(());
                     }
@@ -905,7 +930,9 @@ where
                     &val_pos,
                 )?;
                 if let Some(ptr) = pkg_ptr {
-                    let mut pkg_vm = Self::with_pointer(ptr.clone(), self.env.clone())
+                    let mut pkg_vm = self
+                        .clean_copy()
+                        .to_new_pointer(ptr.clone())
                         .with_import_stack(self.import_stack.clone());
                     pkg_vm.run()?;
                     let (pkg_func, val_pos) = pkg_vm.pop()?;
@@ -919,8 +946,9 @@ where
                     )?;
                 }
 
-                // TODO(jwall): We should have a notion of a call stack here.
-                let mut vm = Self::with_pointer(ptr.clone(), self.env.clone())
+                let mut vm = self
+                    .clean_copy()
+                    .to_new_pointer(ptr.clone())
                     .with_import_stack(self.import_stack.clone());
                 vm.push(Rc::new(S("mod".to_owned())), pos.clone())?;
                 vm.push(Rc::new(C(Tuple(flds, flds_pos_list))), pos.clone())?;
@@ -1137,6 +1165,7 @@ where
             &mut self.stack,
             self.env.clone(),
             &mut self.import_stack,
+            &self.working_dir,
             pos,
         )
     }
