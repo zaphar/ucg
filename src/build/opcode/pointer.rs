@@ -36,9 +36,8 @@ impl OpPointer {
         }
     }
 
-    pub fn with_path(mut self, path: PathBuf) -> Self {
+    pub fn set_path(&mut self, path: PathBuf) {
         self.path = Some(path);
-        self
     }
 
     pub fn next(&mut self) -> Option<&Op> {

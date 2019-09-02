@@ -88,10 +88,10 @@ impl AssertCollector {
 /// Builder handles building ucg code for a single file.
 pub struct FileBuilder<'a, Stdout, Stderr>
 where
-    Stdout: std::io::Write,
-    Stderr: std::io::Write,
+    Stdout: std::io::Write + Clone,
+    Stderr: std::io::Write + Clone,
 {
-    environment: Rc<RefCell<Environment<Stdout, Stderr>>>,
+    pub environment: Rc<RefCell<Environment<Stdout, Stderr>>>,
     working_dir: PathBuf,
     // FIXME(jwall): These need to be compiled and added to the op cache.
     // specifically in the environment.
@@ -104,8 +104,8 @@ where
 
 impl<'a, Stdout, Stderr> FileBuilder<'a, Stdout, Stderr>
 where
-    Stdout: std::io::Write,
-    Stderr: std::io::Write,
+    Stdout: std::io::Write + Clone,
+    Stderr: std::io::Write + Clone,
 {
     /// Constructs a new Builder.
     pub fn new<P: Into<PathBuf>>(
@@ -148,7 +148,7 @@ where
         f.read_to_string(&mut s)?;
         let input = OffsetStrIter::new(&s).with_src_file(file.clone());
         // TODO(jwall): Pass in the file name?
-        let eval_result = self.eval_input(input);
+        let eval_result = self.eval_input(input, Some(file.clone()));
         match eval_result {
             Ok(v) => {
                 self.last = Some(v);
@@ -187,10 +187,13 @@ where
     }
 
     /// Builds a list of parsed UCG Statements.
-    pub fn eval_stmts(&mut self, ast: Vec<Statement>) -> BuildResult {
+    pub fn eval_stmts(&mut self, ast: Vec<Statement>, path: Option<PathBuf>) -> BuildResult {
         // We should probably stash this in an op_cache somewhere?
         let ops = translate::AST::translate(ast, &self.working_dir);
         let mut vm = VM::new(Rc::new(ops), self.environment.clone(), &self.working_dir);
+        if path.is_some() {
+            vm.set_path(path.unwrap());
+        }
         if self.validate_mode {
             vm.enable_validate_mode();
         }
@@ -199,10 +202,14 @@ where
         Ok(())
     }
 
-    pub fn eval_input(&mut self, input: OffsetStrIter) -> Result<Rc<Val>, Box<dyn Error>> {
+    pub fn eval_input(
+        &mut self,
+        input: OffsetStrIter,
+        path: Option<PathBuf>,
+    ) -> Result<Rc<Val>, Box<dyn Error>> {
         match parse(input.clone(), None) {
             Ok(stmts) => {
-                self.eval_stmts(stmts)?;
+                self.eval_stmts(stmts, path)?;
                 if let Some(v) = self.out.clone() {
                     return Ok(v);
                 }
@@ -214,7 +221,7 @@ where
 
     /// Evaluate an input string as UCG.
     pub fn eval_string(&mut self, input: &str) -> Result<Rc<Val>, Box<dyn Error>> {
-        self.eval_input(OffsetStrIter::new(input))
+        self.eval_input(OffsetStrIter::new(input), None)
     }
 
     pub fn eval_expr(&mut self, expr: Expression) -> Result<Rc<Val>, Box<dyn Error>> {

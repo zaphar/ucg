@@ -55,6 +55,8 @@ impl<'a> Entry<'a> {
                 v
             }
         };
-        Ok(OpPointer::new(cached).with_path(path.into()))
+        let mut ptr = OpPointer::new(cached);
+        ptr.set_path(path.into());
+        Ok(ptr)
     }
 }

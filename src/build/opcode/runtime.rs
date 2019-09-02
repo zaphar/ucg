@@ -65,10 +65,10 @@ impl Builtins {
         pos: Position,
     ) -> Result<(), Error>
     where
-        P: AsRef<Path>,
+        P: AsRef<Path> + Debug,
         WP: Into<PathBuf> + Clone + Debug,
-        O: std::io::Write,
-        E: std::io::Write,
+        O: std::io::Write + Clone,
+        E: std::io::Write + Clone,
     {
         match h {
             Hook::Import => self.import(working_dir, stack, env, import_stack, pos),
@@ -168,8 +168,8 @@ impl Builtins {
         pos: Position,
     ) -> Result<(), Error>
     where
-        O: std::io::Write,
-        E: std::io::Write,
+        O: std::io::Write + Clone,
+        E: std::io::Write + Clone,
         P: Into<PathBuf> + Clone + Debug, 
     {
         let path = stack.pop();
@@ -219,8 +219,8 @@ impl Builtins {
         pos: Position,
     ) -> Result<(), Error>
     where
-        O: std::io::Write,
-        E: std::io::Write,
+        O: std::io::Write + Clone,
+        E: std::io::Write + Clone,
         P: Into<PathBuf> + Clone + Debug,
     {
         let path = stack.pop();
@@ -282,8 +282,8 @@ impl Builtins {
         env: Rc<RefCell<Environment<O, E>>>,
     ) -> Result<(), Error>
     where
-        O: std::io::Write,
-        E: std::io::Write,
+        O: std::io::Write + Clone,
+        E: std::io::Write + Clone,
     {
         if let Some((tuple, tpl_pos)) = stack.pop() {
             if let &Value::C(Tuple(ref tuple_flds, _)) = tuple.as_ref() {
@@ -334,7 +334,7 @@ impl Builtins {
         return Ok(());
     }
 
-    fn out<P: AsRef<Path>, O, E>(
+    fn out<P, O, E>(
         &self,
         path: Option<P>,
         stack: &mut Vec<(Rc<Value>, Position)>,
@@ -342,17 +342,19 @@ impl Builtins {
         pos: Position,
     ) -> Result<(), Error>
     where
-        O: std::io::Write,
-        E: std::io::Write,
+        O: std::io::Write + Clone,
+        E: std::io::Write + Clone,
+        P: AsRef<Path> + Debug,
     {
-        let mut writer: Box<dyn std::io::Write> = if let Some(path) = path {
-            if env.borrow().get_out_lock_for_path(path.as_ref()) {
+        let write_path: Option<PathBuf> = if let Some(path) = path {
+            let write_path = path.as_ref().to_path_buf();
+            if env.borrow().get_out_lock_for_path(&path) {
                 return Err(Error::new(
                     format!("You can only have one output per file"),
                     pos));
             }
             env.borrow_mut().set_out_lock_for_path(path.as_ref());
-            Box::new(File::create(path)?)
+            Some(write_path)
         } else {
             if env.borrow().get_out_lock_for_path("/dev/stdout") {
                 return Err(Error::new(
@@ -360,7 +362,7 @@ impl Builtins {
                     pos));
             }
             env.borrow_mut().set_out_lock_for_path("/dev/stdout");
-            Box::new(std::io::stdout())
+            None
         };
         let val = stack.pop();
         if let Some((val, val_pos)) = val {
@@ -368,7 +370,15 @@ impl Builtins {
             let c_type = stack.pop();
             if let Some((c_type_val, c_type_pos)) = c_type {
                 if let &Value::P(Primitive::Str(ref c_type)) = c_type_val.as_ref() {
+                    let stdout = env.borrow().stdout();
                     if let Some(c) = env.borrow().converter_registry.get_converter(c_type) {
+                        let mut writer: Box<dyn std::io::Write> = match write_path {
+                            Some(p) => {
+                                let p = p.with_extension(c.file_ext());
+                                Box::new(File::create(&p)?)
+                            },
+                            None => Box::new(stdout),
+                        };
                         if let Err(e) = c.convert(Rc::new(val), &mut writer) {
                             return Err(Error::new(format!("{}", e), pos.clone()));
                         }
@@ -396,8 +406,8 @@ impl Builtins {
         pos: Position,
     ) -> Result<(), Error>
     where
-        O: std::io::Write,
-        E: std::io::Write,
+        O: std::io::Write + Clone,
+        E: std::io::Write + Clone,
     {
         let val = stack.pop();
         if let Some((val, val_pos)) = val {
@@ -442,8 +452,8 @@ impl Builtins {
         pos: Position,
     ) -> Result<(), Error>
     where
-        O: std::io::Write,
-        E: std::io::Write,
+        O: std::io::Write + Clone,
+        E: std::io::Write + Clone,
     {
         // get the list from the stack
         let (list, list_pos) = if let Some(list) = stack.pop() {
@@ -554,8 +564,8 @@ impl Builtins {
         pos: Position,
     ) -> Result<(), Error>
     where
-        O: std::io::Write,
-        E: std::io::Write,
+        O: std::io::Write + Clone,
+        E: std::io::Write + Clone,
     {
         // get the list from the stack
         let (list, list_pos) = if let Some(list) = stack.pop() {
@@ -700,8 +710,8 @@ impl Builtins {
         pos: Position,
     ) -> Result<(), Error>
     where
-        O: std::io::Write,
-        E: std::io::Write,
+        O: std::io::Write + Clone,
+        E: std::io::Write + Clone,
     {
         // get the list from the stack
         let (list, list_pos) = if let Some(list) = stack.pop() {
@@ -839,8 +849,8 @@ impl Builtins {
         env: Rc<RefCell<Environment<O, E>>>,
     ) -> Result<(), Error>
     where
-        O: std::io::Write,
-        E: std::io::Write,
+        O: std::io::Write + Clone,
+        E: std::io::Write + Clone,
     {
         let (val, val_pos) = if let Some(val) = stack.pop() {
             val

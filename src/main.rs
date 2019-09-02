@@ -43,12 +43,6 @@ fn do_flags<'a, 'b>() -> clap::App<'a, 'b> {
             (author: crate_authors!())
             (about: "Universal Configuration Grammar compiler.")
             (@arg nostrict: --("no-strict") "Turn off strict checking.")
-            (@subcommand eval =>
-             (about: "Evaluate an expression with an optional ucg file as context.")
-             (@arg expr: --expr -e +takes_value +required "Expression to evaluate.")
-             (@arg target: --format +takes_value "Output type. (flags, json, env, exec) defaults to json.")
-             (@arg INPUT: "ucg file to use as context for the expression.")
-            )
             (@subcommand repl =>
                 (about: "Start the ucg repl for interactive evaluation.")
             )
@@ -82,33 +76,67 @@ fn do_flags<'a, 'b>() -> clap::App<'a, 'b> {
     )
 }
 
-fn run_converter(c: &dyn traits::Converter, v: Rc<Val>, f: Option<&str>) -> traits::ConvertResult {
-    let mut file: Box<dyn std::io::Write> = match f {
-        Some(f) => {
-            let mut path_buf = PathBuf::from(f);
-            path_buf.set_extension(c.file_ext());
-            let new_path = path_buf.to_str().unwrap();
-            Box::new(File::create(&new_path)?)
-        }
-        None => Box::new(io::stdout()),
-    };
-    let result = c.convert(v, file.as_mut());
-    file.flush()?;
-    result
+struct StdoutWrapper(io::Stdout);
+
+impl StdoutWrapper {
+    fn new() -> Self {
+        Self(io::stdout())
+    }
 }
 
+impl io::Write for StdoutWrapper {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.0.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.0.flush()
+    }
+}
+
+impl Clone for StdoutWrapper {
+    fn clone(&self) -> Self {
+        Self(io::stdout())
+    }
+}
+
+struct StderrWrapper(io::Stderr);
+
+impl StderrWrapper {
+    fn new() -> Self {
+        Self(io::stderr())
+    }
+}
+
+impl io::Write for StderrWrapper {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.0.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.0.flush()
+    }
+}
+
+impl Clone for StderrWrapper {
+    fn clone(&self) -> Self {
+        Self(io::stderr())
+    }
+}
+
+// TODO(jwall): Build sharable stdout stderr providers.
 fn build_file<'a>(
     file: &'a str,
     validate: bool,
     strict: bool,
     import_paths: &'a Vec<PathBuf>,
-) -> Result<build::FileBuilder<'a, Stdout, Stderr>, Box<dyn Error>> {
+) -> Result<build::FileBuilder<'a, StdoutWrapper, StderrWrapper>, Box<dyn Error>> {
     let mut file_path_buf = PathBuf::from(file);
     if file_path_buf.is_relative() {
         file_path_buf = std::env::current_dir()?.join(file_path_buf);
     }
-    let out = std::io::stdout();
-    let err = std::io::stderr();
+    let out = StdoutWrapper::new();
+    let err = StderrWrapper::new();
     let mut builder = build::FileBuilder::new(std::env::current_dir()?, import_paths, out, err);
     // FIXME(jwall): builder.set_strict(strict);
     if validate {
@@ -215,69 +243,6 @@ fn visit_ucg_files(
         println!("{}", summary);
     }
     Ok(result)
-}
-
-fn inspect_command(matches: &clap::ArgMatches, import_paths: &Vec<PathBuf>, strict: bool) {
-    let file = matches.value_of("INPUT");
-    let sym = matches.value_of("expr");
-    let target = matches.value_of("target").unwrap_or("json");
-    let mut builder = build::FileBuilder::new(
-        std::env::current_dir().unwrap(),
-        import_paths,
-        io::stdout(),
-        io::stderr(),
-    );
-    // FIXME(jwall): builder.set_strict(strict);
-    // FIXME(jwall): Converting a value should be built into our builder?
-    //match registry.get_converter(target) {
-    //    Some(converter) => {
-    //        if let Some(file) = file {
-    //            if let Err(e) = builder.build(file) {
-    //                eprintln!("{:?}", e);
-    //                process::exit(1);
-    //            }
-    //        }
-    //        let val = match sym {
-    //            Some(sym_name) => {
-    //                let normalized = if !sym_name.ends_with(";") {
-    //                    let mut temp = sym_name.to_owned();
-    //                    temp.push_str(";");
-    //                    temp
-    //                } else {
-    //                    sym_name.to_owned()
-    //                };
-    //                let mut builder = builder.clone_builder();
-    //                match builder.eval_string(&normalized) {
-    //                    Ok(v) => Some(v.clone()),
-    //                    Err(e) => {
-    //                        eprintln!("{}", e);
-    //                        process::exit(1);
-    //                    }
-    //                }
-    //            }
-    //            None => builder.last,
-    //        };
-    //        match val {
-    //            Some(value) => {
-    //                // We use None here because we always output to stdout for an inspect.
-    //                run_converter(converter, value, None).unwrap();
-    //                println!("");
-    //                process::exit(0);
-    //            }
-    //            None => {
-    //                eprintln!("No value.");
-    //                process::exit(1);
-    //            }
-    //        }
-    //    }
-    //    None => {
-    //        eprintln!(
-    //            "No such format {}\nrun `ucg converters` to see available formats.",
-    //            target
-    //        );
-    //        process::exit(1);
-    //    }
-    //}
 }
 
 fn build_command(matches: &clap::ArgMatches, import_paths: &Vec<PathBuf>, strict: bool) {
@@ -474,8 +439,8 @@ fn do_repl(import_paths: &Vec<PathBuf>) -> std::result::Result<(), Box<dyn Error
     let mut builder = build::FileBuilder::new(
         std::env::current_dir()?,
         import_paths,
-        io::stdout(),
-        io::stderr(),
+        StdoutWrapper::new(),
+        StderrWrapper::new(),
     );
     // loop
     let mut lines = ucglib::io::StatementAccumulator::new();
@@ -575,9 +540,7 @@ fn main() {
     } else {
         true
     };
-    if let Some(matches) = app_matches.subcommand_matches("eval") {
-        inspect_command(matches, &import_paths, strict);
-    } else if let Some(matches) = app_matches.subcommand_matches("build") {
+    if let Some(matches) = app_matches.subcommand_matches("build") {
         build_command(matches, &import_paths, strict);
     } else if let Some(matches) = app_matches.subcommand_matches("test") {
         test_command(matches, &import_paths, strict);

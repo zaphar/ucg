@@ -22,6 +22,7 @@ use super::pointer::OpPointer;
 use super::Error;
 use super::Value;
 use crate::build::AssertCollector;
+use crate::build::Val;
 use crate::convert::{ConverterRegistry, ImporterRegistry};
 use crate::iter::OffsetStrIter;
 use crate::parse::parse;
@@ -29,8 +30,8 @@ use crate::parse::parse;
 // Shared Environmental between VM's for runtime usage.
 pub struct Environment<Stdout, Stderr>
 where
-    Stdout: Write,
-    Stderr: Write,
+    Stdout: Write + Clone,
+    Stderr: Write + Clone,
 {
     pub val_cache: BTreeMap<String, Rc<Value>>,
     pub op_cache: cache::Ops,
@@ -43,7 +44,7 @@ where
     pub out_lock: BTreeSet<PathBuf>,
 }
 
-impl<Stdout: Write, Stderr: Write> Environment<Stdout, Stderr> {
+impl<Stdout: Write + Clone, Stderr: Write + Clone> Environment<Stdout, Stderr> {
     pub fn new(out: Stdout, err: Stderr) -> Self {
         Self::new_with_vars(out, err, BTreeMap::new())
     }
@@ -110,5 +111,33 @@ impl<Stdout: Write, Stderr: Write> Environment<Stdout, Stderr> {
 
     pub fn reset_out_lock_for_path<P: AsRef<Path>>(&mut self, path: P) {
         self.out_lock.remove(path.as_ref());
+    }
+
+    pub fn stdout(&self) -> Stdout {
+        self.stdout.clone()
+    }
+    pub fn stderr(&self) -> Stderr {
+        self.stderr.clone()
+    }
+
+    pub fn convert_val(&mut self, typ: &str, writer: &mut dyn Write, val: Rc<Val>) -> bool {
+        match self.converter_registry.get_converter(typ) {
+            Some(c) => {
+                if let Err(e) = c.convert(val, writer) {
+                    writeln!(&mut self.stderr, "{}", e).unwrap();
+                    return false;
+                }
+            }
+            None => {
+                writeln!(
+                    &mut self.stderr,
+                    "No such format {}\nrun `ucg converters` to see available formats.",
+                    typ
+                )
+                .unwrap();
+                return false;
+            }
+        }
+        return true;
     }
 }

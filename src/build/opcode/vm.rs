@@ -43,8 +43,8 @@ fn construct_reserved_word_set() -> BTreeSet<&'static str> {
 
 pub struct VM<O, E>
 where
-    O: std::io::Write,
-    E: std::io::Write,
+    O: std::io::Write + Clone,
+    E: std::io::Write + Clone,
 {
     working_dir: PathBuf,
     stack: Vec<(Rc<Value>, Position)>,
@@ -60,8 +60,8 @@ where
 
 impl<'a, O, E> VM<O, E>
 where
-    O: std::io::Write,
-    E: std::io::Write,
+    O: std::io::Write + Clone,
+    E: std::io::Write + Clone,
 {
     pub fn new<P: Into<PathBuf>>(
         ops: Rc<PositionMap>,
@@ -88,6 +88,10 @@ where
             self_stack: Vec::new(),
             reserved_words: construct_reserved_word_set(),
         }
+    }
+
+    pub fn set_path(&mut self, path: PathBuf) {
+        self.ops.set_path(path);
     }
 
     pub fn to_new_pointer(mut self, ops: OpPointer) -> Self {
