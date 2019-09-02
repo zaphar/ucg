@@ -17,6 +17,7 @@ use std::rc::Rc;
 
 mod cache;
 mod debug;
+mod display;
 pub mod environment;
 #[macro_use]
 mod error;
@@ -55,8 +56,8 @@ impl Value {
             P(Str(_)) => "String",
             P(Bool(_)) => "Bool",
             P(Empty) => "NULL",
-            C(List(_)) => "List",
-            C(Tuple(_)) => "Tuple",
+            C(List(_, _)) => "List",
+            C(Tuple(_, _)) => "Tuple",
             F(_) => "Func",
             M(_) => "Func",
             T(_) => "Expression",
@@ -79,8 +80,8 @@ impl From<&Primitive> for String {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Composite {
-    List(Vec<Rc<Value>>),
-    Tuple(Vec<(String, Rc<Value>)>),
+    List(Vec<Rc<Value>>, Vec<Position>),
+    Tuple(Vec<(String, Rc<Value>)>, Vec<(Position, Position)>),
 }
 
 use Composite::{List, Tuple};
@@ -89,7 +90,7 @@ impl From<&Composite> for String {
     fn from(c: &Composite) -> Self {
         let mut buf = String::new();
         match c {
-            &List(ref elems) => {
+            &List(ref elems, _) => {
                 buf.push_str("[");
                 for e in elems.iter() {
                     let val: String = e.as_ref().into();
@@ -98,7 +99,7 @@ impl From<&Composite> for String {
                 }
                 buf.push_str("]");
             }
-            &Tuple(ref flds) => {
+            &Tuple(ref flds, _) => {
                 buf.push_str("{");
                 for &(ref k, ref v) in flds.iter() {
                     buf.push_str(&k);
@@ -126,6 +127,7 @@ pub struct Module {
     ptr: OpPointer,
     result_ptr: Option<usize>,
     flds: Vec<(String, Rc<Value>)>,
+    flds_pos_list: Vec<(Position, Position)>,
     pkg_ptr: Option<OpPointer>,
 }
 
@@ -245,8 +247,8 @@ impl PartialEq for Value {
     fn eq(&self, other: &Value) -> bool {
         match (self, other) {
             (P(left), P(right)) => left == right,
-            (C(List(left)), C(List(right))) => left == right,
-            (C(Tuple(left)), C(Tuple(right))) => {
+            (C(List(left, _)), C(List(right, _))) => left == right,
+            (C(Tuple(left, _)), C(Tuple(right, _))) => {
                 if left.len() != right.len() {
                     return false;
                 }
@@ -293,7 +295,7 @@ impl From<&Value> for Val {
             P(Float(f)) => Val::Float(*f),
             P(Str(s)) => Val::Str(s.clone()),
             P(Bool(b)) => Val::Boolean(*b),
-            C(Tuple(fs)) => {
+            C(Tuple(fs, _)) => {
                 let mut flds = Vec::new();
                 for &(ref k, ref v) in fs.iter() {
                     let v = v.clone();
@@ -301,7 +303,7 @@ impl From<&Value> for Val {
                 }
                 Val::Tuple(flds)
             }
-            C(List(elems)) => {
+            C(List(elems, _)) => {
                 let mut els = Vec::new();
                 for e in elems.iter() {
                     let e = e.clone();
@@ -336,30 +338,35 @@ impl From<&Val> for Value {
             Val::Empty => P(Empty),
             Val::List(els) => {
                 let mut lst = Vec::new();
+                let mut positions = Vec::new();
                 for e in els.iter() {
                     let e = e.clone();
                     lst.push(Rc::new(e.into()));
+                    positions.push(Position::new(0, 0, 0));
                 }
-                C(List(lst))
+                // TODO(jwall): This should have a set of
+                // Positions of the same length.
+                C(List(lst, positions))
             }
             Val::Tuple(flds) => {
                 let mut field_list = Vec::new();
+                let mut positions = Vec::new();
                 for &(ref key, ref val) in flds.iter() {
                     let val = val.clone();
                     field_list.push((key.clone(), Rc::new(val.into())));
+                    positions.push((Position::new(0, 0, 0), Position::new(0, 0, 0)));
                 }
-                C(Tuple(field_list))
+                C(Tuple(field_list, positions))
             }
             Val::Env(flds) => {
                 let mut field_list = Vec::new();
+                let mut positions = Vec::new();
                 for &(ref key, ref val) in flds.iter() {
                     field_list.push((key.clone(), Rc::new(P(Str(val.clone())))));
+                    positions.push((Position::new(0, 0, 0), Position::new(0, 0, 0)));
                 }
-                C(Tuple(field_list))
+                C(Tuple(field_list, positions))
             }
         }
     }
 }
-
-#[cfg(test)]
-mod test;

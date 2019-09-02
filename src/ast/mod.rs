@@ -97,7 +97,7 @@ impl<'a> From<&'a Position> for Position {
 impl std::fmt::Display for Position {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         if let Some(ref file) = self.file {
-            write!(f, "file: {}", file.to_string_lossy().to_string())?;
+            write!(f, "file: {} ", file.to_string_lossy().to_string())?;
         }
         write!(f, "line: {} column: {}", self.line, self.column)
     }

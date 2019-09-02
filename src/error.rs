@@ -112,11 +112,7 @@ impl BuildError {
                 Some(ref pb) => pb.to_string_lossy().to_string(),
                 None => "<eval>".to_string(),
             };
-            write!(
-                w,
-                "{}: {} at {} line: {}, column: {}",
-                self.err_type, self.msg, file, pos.line, pos.column
-            )?;
+            write!(w, "{}: {} at {}", self.err_type, self.msg, pos,)?;
         } else {
             write!(w, "{}: {}", self.err_type, self.msg)?;
         }

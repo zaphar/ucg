@@ -22,6 +22,7 @@ use crate::ast::Position;
 pub struct Error {
     message: String,
     pos: Option<Position>,
+    call_stack: Vec<Position>,
 }
 
 impl Error {
@@ -29,6 +30,7 @@ impl Error {
         Self {
             message: msg,
             pos: Some(pos),
+            call_stack: Vec::new(),
         }
     }
 
@@ -36,14 +38,29 @@ impl Error {
         self.pos = Some(pos);
         self
     }
+
+    pub fn push_call_stack(&mut self, pos: Position) {
+        self.call_stack.push(pos);
+    }
 }
 
 macro_rules! decorate_error {
     ($pos:expr => $result:expr) => {
         match $result {
             Ok(v) => Ok(v),
-            Err(e) => {
-                Err(e.with_pos($pos.clone()))
+            Err(e) => Err(e.with_pos($pos.clone())),
+        }
+    };
+}
+
+macro_rules! decorate_call {
+    ($pos:expr => $result:expr) => {
+        match $result {
+            Ok(v) => Ok(v),
+            Err(mut e) => {
+                dbg!(&$pos);
+                e.push_call_stack($pos.clone());
+                Err(e)
             }
         }
     };
@@ -54,6 +71,7 @@ impl From<regex::Error> for Error {
         Error {
             message: format!("{}", e),
             pos: None,
+            call_stack: Vec::new(),
         }
     }
 }
@@ -67,6 +85,7 @@ impl From<std::io::Error> for Error {
         Error {
             message: msg,
             pos: None,
+            call_stack: Vec::new(),
         }
     }
 }
@@ -74,10 +93,16 @@ impl From<std::io::Error> for Error {
 impl Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(ref pos) = self.pos {
-            write!(f, "{} at {}", self.message, pos)
+            write!(f, "{} at {}", self.message, pos)?;
         } else {
-            write!(f, "{}", self.message)
+            write!(f, "{}", self.message)?;
         }
+        if !self.call_stack.is_empty() {
+            for p in self.call_stack.iter() {
+                write!(f, "\nVIA: {}", p)?;
+            }
+        }
+        Ok(())
     }
 }
 

@@ -11,10 +11,10 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use super::cache;
@@ -40,6 +40,7 @@ where
     pub stdout: Stdout,
     pub stderr: Stderr,
     pub env_vars: BTreeMap<String, String>, // Environment Variables
+    pub out_lock: BTreeSet<PathBuf>,
 }
 
 impl<Stdout: Write, Stderr: Write> Environment<Stdout, Stderr> {
@@ -57,6 +58,7 @@ impl<Stdout: Write, Stderr: Write> Environment<Stdout, Stderr> {
             importer_registry: ImporterRegistry::make_registry(),
             stdout: out,
             stderr: err,
+            out_lock: BTreeSet::new(),
         }
     }
 
@@ -92,5 +94,17 @@ impl<Stdout: Write, Stderr: Write> Environment<Stdout, Stderr> {
 
     pub fn record_assert_result(&mut self, desc: &str, ok: bool) {
         self.assert_results.record_assert_result(desc, ok);
+    }
+
+    pub fn get_out_lock_for_path<P: AsRef<Path>>(&self, path: P) -> bool {
+        self.out_lock.contains(path.as_ref())
+    }
+
+    pub fn set_out_lock_for_path<P: Into<PathBuf>>(&mut self, path: P) {
+        self.out_lock.insert(path.into());
+    }
+
+    pub fn reset_out_lock_for_path<P: AsRef<Path>>(&mut self, path: P) {
+        self.out_lock.remove(path.as_ref());
     }
 }

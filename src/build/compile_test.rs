@@ -162,10 +162,7 @@ fn test_declarative_failures_can_with_format_expr() {
 fn test_assert_just_keyword_compile_failures() {
     assert_build_failure(
         "assert ",
-        vec![
-            Regex::new(r"Expected Tuple \{ok=<bool>, desc=<str>\} at <eval> line: 1, column: 8")
-                .unwrap(),
-        ],
+        vec![Regex::new(r"Expected Tuple \{ok=<bool>, desc=<str>\} at line: 1 column: 8").unwrap()],
     );
 }
 
@@ -174,9 +171,8 @@ fn test_assert_partial_tuple_compile_failures() {
     assert_build_failure(
         "assert {",
         vec![
-            Regex::new(r"Expected Tuple \{ok=<bool>, desc=<str>\} at <eval> line: 1, column: 8")
-                .unwrap(),
-            Regex::new(r"Expected \(\}\) but got \(\) at <eval> line: 1, column: 9").unwrap(),
+            Regex::new(r"Expected Tuple \{ok=<bool>, desc=<str>\} at line: 1 column: 8").unwrap(),
+            Regex::new(r"Expected \(\}\) but got \(\) at line: 1 column: 9").unwrap(),
         ],
     );
 }
@@ -187,7 +183,7 @@ fn test_assert_partial_tuple_missing_ok_compile_failures() {
         "assert {};",
         vec![
             Regex::new(r"0 - NOT OK: TYPE FAIL - Expected Boolean field ok in tuple \{").unwrap(),
-            Regex::new(r"line: 1, column: 8").unwrap(),
+            Regex::new(r"line: 1 column: 8").unwrap(),
         ],
     );
 }
@@ -198,7 +194,7 @@ fn test_assert_partial_tuple_bad_ok_compile_failures() {
         "assert { ok = 1, };",
         vec![
             Regex::new(r"0 - NOT OK: TYPE FAIL - Expected Boolean field ok in tuple \{").unwrap(),
-            Regex::new(r"line: 1, column: 8").unwrap(),
+            Regex::new(r"line: 1 column: 8").unwrap(),
         ],
     );
 }
@@ -209,7 +205,7 @@ fn test_assert_partial_tuple_missing_desc_compile_failures() {
         "assert { ok=true, };",
         vec![
             Regex::new(r"0 - NOT OK: TYPE FAIL - Expected String field desc in tuple \{").unwrap(),
-            Regex::new(r"line: 1, column: 8").unwrap(),
+            Regex::new(r"line: 1 column: 8").unwrap(),
         ],
     );
 }
@@ -220,7 +216,7 @@ fn test_assert_partial_tuple_bad_desc_compile_failures() {
         "assert { ok=true, desc = 1 };",
         vec![
             Regex::new(r"0 - NOT OK: TYPE FAIL - Expected String field desc in tuple \{").unwrap(),
-            Regex::new(r"line: 1, column: 8").unwrap(),
+            Regex::new(r"line: 1 column: 8").unwrap(),
         ],
     );
 }
@@ -229,7 +225,7 @@ fn test_assert_partial_tuple_bad_desc_compile_failures() {
 fn test_import_missing_path_compile_failure() {
     assert_build_failure(
         "import ;",
-        vec![Regex::new(r"Expected import path at <eval> line: 1, column: 8").unwrap()],
+        vec![Regex::new(r"Expected import path at line: 1 column: 8").unwrap()],
     )
 }
 
@@ -237,7 +233,7 @@ fn test_import_missing_path_compile_failure() {
 fn test_import_path_not_a_string_compile_failure() {
     assert_build_failure(
         "import 1;",
-        vec![Regex::new(r"Expected import path at <eval> line: 1, column: 8").unwrap()],
+        vec![Regex::new(r"Expected import path at line: 1 column: 8").unwrap()],
     )
 }
 
@@ -245,10 +241,7 @@ fn test_import_path_not_a_string_compile_failure() {
 fn test_binary_operator_missing_operand_compile_failure() {
     assert_build_failure(
         "1 +",
-        vec![
-            Regex::new(r"Missing operand for binary expression at <eval> line: 1, column: 4")
-                .unwrap(),
-        ],
+        vec![Regex::new(r"Missing operand for binary expression at line: 1 column: 4").unwrap()],
     )
 }
 
@@ -357,10 +350,10 @@ fn test_binary_eqeq_operator_wrong_type_on_rhs_compile_failure() {
     assert_build_failure(
         "1 == \"foo\";",
         vec![
-            Regex::new(
-                r"Expected numeric values of the same type but got Int\(1\) at line: 1 column: 1 and String\(foo\) at line: 1 column: 5 for expression",
-            )
-            .unwrap(),
+            Regex::new(r"Expected values of the same type").unwrap(),
+            Regex::new(r"but got Int\(1\) at line: 1 column: 1").unwrap(),
+            Regex::new(r"and String\(foo\) at line: 1 column: 6").unwrap(),
+            Regex::new(r"for expression at line: 1 column: 1").unwrap(),
             Regex::new(r"line: 1 column: 1").unwrap(),
         ],
     )
@@ -372,7 +365,7 @@ fn test_incomplete_tuple_compile_failure() {
         "{;",
         vec![
             Regex::new(r"Expected \(\}\) but got \(;\)").unwrap(),
-            Regex::new(r"at <eval> line: 1 column: 2").unwrap(),
+            Regex::new(r"at line: 1 column: 2").unwrap(),
         ],
     )
 }
@@ -383,7 +376,7 @@ fn test_incomplete_tuple_key_value_missing_eq_compile_failure() {
         "{foo",
         vec![
             Regex::new(r"Expected \(=\) but got \(\)").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 5").unwrap(),
+            Regex::new(r"at line: 1 column: 5").unwrap(),
         ],
     )
 }
@@ -394,7 +387,7 @@ fn test_incomplete_tuple_key_value_missing_value_compile_failure() {
         "{foo=",
         vec![
             Regex::new(r"Not a Bareword").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 6").unwrap(),
+            Regex::new(r"at line: 1 column: 6").unwrap(),
         ],
     )
 }
@@ -405,7 +398,7 @@ fn test_format_expr_missing_expr_compile_error() {
         "\"foo\" %",
         vec![
             Regex::new(r"Expected format arguments").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 8").unwrap(),
+            Regex::new(r"at line: 1 column: 8").unwrap(),
         ],
     )
 }
@@ -416,7 +409,7 @@ fn test_format_expr_unclosed_parens_compile_failure() {
         "\"foo\" % (1",
         vec![
             Regex::new(r"Expected \(\)\) but got \(\)").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 9").unwrap(),
+            Regex::new(r"at line: 1 column: 9").unwrap(),
         ],
     )
 }
@@ -427,7 +420,7 @@ fn test_list_unclosed_bracket_compile_failure() {
         "[1",
         vec![
             Regex::new(r"Expected \(\]\) but got \(\)").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 3").unwrap(),
+            Regex::new(r"at line: 1 column: 3").unwrap(),
         ],
     )
 }
@@ -438,7 +431,7 @@ fn test_out_missing_type_compile_failure() {
         "out",
         vec![
             Regex::new(r"Expected converter name").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 4").unwrap(),
+            Regex::new(r"at line: 1 column: 4").unwrap(),
         ],
     )
 }
@@ -449,7 +442,7 @@ fn test_out_missing_out_expr_compile_failure() {
         "out json",
         vec![
             Regex::new(r"Expected Expression to export").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 9").unwrap(),
+            Regex::new(r"at line: 1 column: 9").unwrap(),
         ],
     )
 }
@@ -460,7 +453,7 @@ fn test_out_multiple_times_compile_failure() {
         "out json {};\nout json {};",
         vec![
             Regex::new(r"You can only have one output per file").unwrap(),
-            Regex::new(r"at <eval> line: 2, column: 1").unwrap(),
+            Regex::new(r"at line: 2 column: 1").unwrap(),
         ],
     )
 }
@@ -471,7 +464,7 @@ fn test_let_missing_name_compile_failure() {
         "let ",
         vec![
             Regex::new(r"Expected name for binding").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 5").unwrap(),
+            Regex::new(r"at line: 1 column: 5").unwrap(),
         ],
     )
 }
@@ -482,7 +475,7 @@ fn test_let_missing_equal_compile_failure() {
         "let foo ",
         vec![
             Regex::new(r"Expected \(=\) but got \(\)").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 9").unwrap(),
+            Regex::new(r"at line: 1 column: 9").unwrap(),
         ],
     )
 }
@@ -493,7 +486,7 @@ fn test_let_missing_expression_compile_failure() {
         "let foo =",
         vec![
             Regex::new(r"Expected Expression to bind").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 10").unwrap(),
+            Regex::new(r"at line: 1 column: 10").unwrap(),
         ],
     )
 }
@@ -504,7 +497,7 @@ fn test_let_missing_semicolon_compile_failure() {
         "let foo = 1",
         vec![
             Regex::new(r"Expected \(;\) but got \(\)").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 12").unwrap(),
+            Regex::new(r"at line: 1 column: 12").unwrap(),
         ],
     )
 }
@@ -514,7 +507,7 @@ fn test_copy_expression_not_a_tuple_compile_failure() {
     assert_build_failure(
         "let foo = 1;\nfoo{};",
         vec![
-            Regex::new(r"Expected Tuple or Module but got \(1\)").unwrap(),
+            Regex::new(r"Expected a Tuple or Module but got Int\(1\)").unwrap(),
             Regex::new(r"line: 2 column: 1").unwrap(),
         ],
     )
@@ -525,8 +518,8 @@ fn test_copy_expression_wrong_field_type_compile_failure() {
     assert_build_failure(
         "let foo = {bar=1};\nfoo{bar=[]};",
         vec![
-            Regex::new(r"Expected type Integer for field bar but got \(List\)").unwrap(),
-            Regex::new(r"at <eval> line: 2, column: 5").unwrap(),
+            Regex::new(r"Expected type Int for field bar but got \(List\)").unwrap(),
+            Regex::new(r"at line: 2 column: 9").unwrap(),
         ],
     )
 }
@@ -537,7 +530,7 @@ fn test_func_call_wrong_argument_length_compile_failure() {
         "let foo = func() => 1;\nfoo(1);",
         vec![
             Regex::new(r"Func called with too many args").unwrap(),
-            Regex::new(r"at <eval> line: 2, column: 1").unwrap(),
+            Regex::new(r"at line: 2 column: 1").unwrap(),
         ],
     )
 }
@@ -547,10 +540,9 @@ fn test_func_call_wrong_argument_type_compile_failure() {
     assert_build_failure(
         "let foo = func(i) => 1 + i;\nfoo(\"bar\");",
         vec![
-            Regex::new(r"Func evaluation failed").unwrap(),
-            Regex::new(r"at <eval> line: 1, column: 26").unwrap(),
-            Regex::new(r"Expected Integer but got \(.bar.\)").unwrap(),
-            Regex::new(r"at <eval> line: 2, column: 1").unwrap(),
+            Regex::new(r"Expected Int but got String\(bar\)").unwrap(),
+            Regex::new(r"at line: 1 column: 26").unwrap(),
+            Regex::new(r"line: 2 column: 1").unwrap(),
         ],
     )
 }

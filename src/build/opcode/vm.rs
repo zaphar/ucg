@@ -47,12 +47,14 @@ where
 {
     stack: Vec<(Rc<Value>, Position)>,
     symbols: Stack,
+    import_stack: Vec<String>,
     runtime: runtime::Builtins,
     ops: OpPointer,
     pub env: Rc<RefCell<Environment<O, E>>>,
     pub last: Option<(Rc<Value>, Position)>,
     self_stack: Vec<(Rc<Value>, Position)>,
     reserved_words: BTreeSet<&'static str>,
+    out_lock: bool,
 }
 
 impl<'a, O, E> VM<O, E>
@@ -68,13 +70,19 @@ where
         Self {
             stack: Vec::new(),
             symbols: Stack::new(),
+            import_stack: Vec::new(),
             runtime: runtime::Builtins::new(),
             ops: ops,
             env: env,
             last: None,
             self_stack: Vec::new(),
             reserved_words: construct_reserved_word_set(),
+            out_lock: false,
         }
+    }
+    pub fn with_import_stack(mut self, imports: Vec<String>) -> Self {
+        self.import_stack = imports;
+        self
     }
 
     pub fn enable_validate_mode(&mut self) {
@@ -85,24 +93,28 @@ where
         Self {
             stack: Vec::new(),
             symbols: symbols,
+            import_stack: self.import_stack.clone(),
             runtime: self.runtime.clone(),
             ops: self.ops.clone(),
             env: self.env.clone(),
             last: self.last,
             self_stack: self.self_stack,
             reserved_words: self.reserved_words,
+            out_lock: self.out_lock,
         }
     }
 
     pub fn symbols_to_tuple(&self, include_mod: bool) -> Value {
         let mut flds = Vec::new();
+        let mut pos_list = Vec::new();
         for sym in self.symbols.symbol_list() {
             if include_mod || sym != "mod" {
-                let (val, _) = self.symbols.get(sym).unwrap().clone();
+                let (val, pos) = self.symbols.get(sym).unwrap().clone();
+                pos_list.push((pos.clone(), pos.clone()));
                 flds.push((sym.clone(), val));
             }
         }
-        return C(Tuple(flds));
+        return C(Tuple(flds, pos_list));
     }
 
     pub fn run(&mut self) -> Result<(), Error> {
@@ -132,9 +144,9 @@ where
                 Op::GtEq => self.op_gteq(pos)?,
                 Op::LtEq => self.op_lteq(pos)?,
                 // Add a Composite list value to the stack
-                Op::InitList => self.push(Rc::new(C(List(Vec::new()))), pos)?,
+                Op::InitList => self.push(Rc::new(C(List(Vec::new(), Vec::new()))), pos)?,
                 // Add a composite tuple value to the stack
-                Op::InitTuple => self.push(Rc::new(C(Tuple(Vec::new()))), pos)?,
+                Op::InitTuple => self.push(Rc::new(C(Tuple(Vec::new(), Vec::new()))), pos)?,
                 Op::Field => self.op_field()?,
                 Op::Element => self.op_element()?,
                 Op::Index => self.op_index(false, pos)?,
@@ -182,8 +194,8 @@ where
             P(Bool(_)) => "bool",
             P(Str(_)) => "str",
             P(Empty) => "null",
-            C(Tuple(_)) => "tuple",
-            C(List(_)) => "list",
+            C(Tuple(_, _)) => "tuple",
+            C(List(_, _)) => "list",
             F(_) => "func",
             M(_) => "module",
             S(_) => "sym",
@@ -308,12 +320,12 @@ where
 
     fn op_module(&'a mut self, idx: usize, jptr: i32, pos: Position) -> Result<(), Error> {
         let (mod_val, mod_val_pos) = self.pop()?;
-        let (result_ptr, flds) = match mod_val.as_ref() {
-            &C(Tuple(ref flds)) => (None, flds.clone()),
+        let (result_ptr, flds, pos_list) = match mod_val.as_ref() {
+            &C(Tuple(ref flds, ref pos_list)) => (None, flds.clone(), pos_list.clone()),
             &T(ptr) => {
                 let (tpl_val, tpl_val_pos) = self.pop()?;
-                if let &C(Tuple(ref flds)) = tpl_val.as_ref() {
-                    (Some(ptr), flds.clone())
+                if let &C(Tuple(ref flds, ref pos_list)) = tpl_val.as_ref() {
+                    (Some(ptr), flds.clone(), pos_list.clone())
                 } else {
                     return Err(Error::new(
                         format!("Expected tuple but got {:?}", tpl_val),
@@ -357,6 +369,7 @@ where
             Rc::new(M(Module {
                 ptr: ops,
                 result_ptr: result_ptr,
+                flds_pos_list: pos_list,
                 flds: flds,
                 pkg_ptr: pkg_ptr,
             })),
@@ -371,7 +384,7 @@ where
         let mut bindings = Vec::new();
         // get imported symbols from stack
         let (list_val, args_pos) = self.pop()?;
-        if let &C(List(ref elems)) = list_val.as_ref() {
+        if let &C(List(ref elems, _)) = list_val.as_ref() {
             for e in elems {
                 if let &S(ref sym) = e.as_ref() {
                     bindings.push(sym.clone());
@@ -404,6 +417,7 @@ where
         f: &Func,
         stack: &mut Vec<(Rc<Value>, Position)>,
         env: Rc<RefCell<Environment<O, E>>>,
+        import_stack: &Vec<String>,
     ) -> Result<(Rc<Value>, Position), Error> {
         let Func {
             ref ptr,
@@ -411,7 +425,9 @@ where
             ref snapshot,
         } = f;
         // use the captured scope snapshot for the function.
-        let mut vm = Self::with_pointer(ptr.clone(), env).to_scoped(snapshot.clone());
+        let mut vm = Self::with_pointer(ptr.clone(), env)
+            .to_scoped(snapshot.clone())
+            .with_import_stack(import_stack.clone());
         for nm in bindings.iter() {
             // now put each argument on our scope stack as a binding.
             // TODO(jwall): This should do a better error if there is
@@ -426,7 +442,9 @@ where
 
     fn op_new_scope(&mut self, jp: i32, ptr: OpPointer) -> Result<(), Error> {
         let scope_snapshot = self.symbols.snapshot();
-        let mut vm = Self::with_pointer(ptr, self.env.clone()).to_scoped(scope_snapshot);
+        let mut vm = Self::with_pointer(ptr, self.env.clone())
+            .to_scoped(scope_snapshot)
+            .with_import_stack(self.import_stack.clone());
         vm.run()?;
         let result = vm.pop()?;
         self.push(result.0, result.1)?;
@@ -435,9 +453,32 @@ where
     }
 
     fn op_fcall(&mut self, pos: Position) -> Result<(), Error> {
-        let (f, _) = self.pop()?;
+        let (f, f_pos) = self.pop()?;
+        let (arg_length, _) = self.pop()?;
         if let &F(ref f) = f.as_ref() {
-            let (val, _) = Self::fcall_impl(f, &mut self.stack, self.env.clone())?;
+            if let &P(Int(arg_length)) = arg_length.as_ref() {
+                let arity = f.bindings.len() as i64;
+                if arg_length > arity {
+                    return Err(Error::new(
+                        format!(
+                            "Func called with too many args expected {} args but got {}",
+                            arity, arg_length
+                        ),
+                        pos,
+                    ));
+                }
+                if arg_length < arity {
+                    return Err(Error::new(
+                        format!(
+                            "Func called with too few args expected {} args but got {}",
+                            arity, arg_length
+                        ),
+                        pos,
+                    ));
+                }
+            }
+            let (val, _) = decorate_call!(f_pos =>
+                Self::fcall_impl(f, &mut self.stack, self.env.clone(), &self.import_stack))?;
             self.push(val, pos.clone())?;
         }
         Ok(())
@@ -464,9 +505,19 @@ where
     }
 
     fn op_equal(&mut self, pos: Position) -> Result<(), Error> {
-        let (left, _) = self.pop()?;
-        let (right, _) = self.pop()?;
-        // FIXME(jwall): We need to enforce our equality rules here.
+        let (left, left_pos) = self.pop()?;
+        let (right, right_pos) = self.pop()?;
+        if left.type_name() != right.type_name()
+            && !(left.type_name() == "NULL" || right.type_name() == "NULL")
+        {
+            return Err(Error::new(
+                format!(
+                    "Expected values of the same type but got {:?} at {} and {:?} at {} for expression",
+                    left, left_pos, right, right_pos,
+                ),
+                pos,
+            ));
+        }
         self.push(Rc::new(P(Bool(left == right))), pos)?;
         Ok(())
     }
@@ -640,9 +691,9 @@ where
         // Add a Composite field value to a tuple on the stack
         // get value from stack
         //dbg!(&self.stack);
-        let (val, _) = self.pop()?;
+        let (val, val_pos) = self.pop()?;
         // get name from stack.
-        let (name_val, _) = self.pop()?;
+        let (name_val, name_pos) = self.pop()?;
         let name = if let &S(ref s) | &P(Str(ref s)) = name_val.as_ref() {
             s
         } else {
@@ -652,12 +703,20 @@ where
         };
         // get composite tuple from stack
         let (tpl, tpl_pos) = self.pop()?;
-        if let &C(Tuple(ref flds)) = tpl.as_ref() {
+        if let &C(Tuple(ref flds, ref pos_list)) = tpl.as_ref() {
             // add name and value to tuple
             let mut flds = flds.clone();
-            self.merge_field_into_tuple(&mut flds, name.clone(), val)?;
+            let mut pos_list = pos_list.clone();
+            self.merge_field_into_tuple(
+                &mut flds,
+                &mut pos_list,
+                name.clone(),
+                &name_pos,
+                val,
+                &val_pos,
+            )?;
             // place composite tuple back on stack
-            self.push(Rc::new(C(Tuple(flds))), tpl_pos)?;
+            self.push(Rc::new(C(Tuple(flds, pos_list))), tpl_pos)?;
         } else {
             unreachable!();
         };
@@ -666,15 +725,17 @@ where
 
     fn op_element(&mut self) -> Result<(), Error> {
         // get element from stack.
-        let (val, _) = self.pop()?;
+        let (val, val_pos) = self.pop()?;
         // get next value. It should be a Composite list.
         let (list, pos) = self.pop()?;
-        if let &C(List(ref elems)) = list.as_ref() {
+        if let &C(List(ref elems, ref pos_list)) = list.as_ref() {
             // add value to list
             let mut elems = elems.clone();
             elems.push(val);
+            let mut pos_list = pos_list.clone();
+            pos_list.push(val_pos);
             // Add that value to the list and put list back on stack.
-            self.push(Rc::new(C(List(elems))), pos)?;
+            self.push(Rc::new(C(List(elems, pos_list))), pos)?;
         } else {
             unreachable!();
         };
@@ -696,7 +757,7 @@ where
         let (left, _) = self.pop()?;
         match right.as_ref() {
             &P(Int(i)) => {
-                if let &C(List(ref elems)) = left.as_ref() {
+                if let &C(List(ref elems, _)) = left.as_ref() {
                     if i < (elems.len() as i64) && i >= 0 {
                         self.push(elems[i as usize].clone(), right_pos)?;
                         return Ok(());
@@ -704,7 +765,7 @@ where
                 }
             }
             &P(Str(ref s)) => {
-                if let &C(Tuple(ref flds)) = left.as_ref() {
+                if let &C(Tuple(ref flds, _)) = left.as_ref() {
                     for &(ref key, ref val) in flds.iter() {
                         if key == s {
                             self.push(val.clone(), right_pos)?;
@@ -731,7 +792,7 @@ where
         let (right, right_pos) = self.pop()?;
         let (left, left_pos) = self.pop()?;
         match left.as_ref() {
-            &C(Tuple(ref flds)) => {
+            &C(Tuple(ref flds, _)) => {
                 if let &P(Str(ref name)) = right.as_ref() {
                     for (ref nm, _) in flds {
                         if nm == name {
@@ -746,7 +807,7 @@ where
                     ));
                 }
             }
-            &C(List(ref elems)) => {
+            &C(List(ref elems, _)) => {
                 for e in elems {
                     if e == &right {
                         self.push(Rc::new(P(Bool(true))), pos)?;
@@ -773,53 +834,97 @@ where
 
     fn op_copy(&mut self, pos: Position) -> Result<(), Error> {
         // This value should always be a tuple
-        let (override_val, _) = self.pop()?;
-        // get targett value. It should be a Module or Tuple.
+        let (override_val, val_pos) = self.pop()?;
+        // get target value. It should be a Module or Tuple.
         let (tgt, tgt_pos) = self.pop()?;
-        let overrides = if let &C(Tuple(ref oflds)) = override_val.as_ref() {
-            oflds.clone()
-        } else {
-            unreachable!();
-        };
+        let (overrides, override_pos_list) =
+            if let &C(Tuple(ref oflds, ref pos_list)) = override_val.as_ref() {
+                (oflds.clone(), pos_list.clone())
+            } else {
+                unreachable!();
+            };
         match tgt.as_ref() {
-            &C(Tuple(ref flds)) => {
+            &C(Tuple(ref flds, ref pos_list)) => {
                 let mut flds = flds.clone();
+                let mut pos_list = pos_list.clone();
+                let mut counter = 0;
                 for (name, val) in overrides {
-                    self.merge_field_into_tuple(&mut flds, name, val)?;
+                    let name_pos = override_pos_list[counter].0.clone();
+                    let val_pos = override_pos_list[counter].1.clone();
+                    self.merge_field_into_tuple(
+                        &mut flds,
+                        &mut pos_list,
+                        name,
+                        &name_pos,
+                        val,
+                        &val_pos,
+                    )?;
+                    counter += 1;
                 }
                 // Put the copy on the Stack
-                self.push(Rc::new(C(Tuple(flds))), tgt_pos.clone())?;
+                self.push(Rc::new(C(Tuple(flds, pos_list))), tgt_pos.clone())?;
                 self.last = Some((tgt.clone(), tgt_pos));
             }
             &M(Module {
                 ref ptr,
                 ref result_ptr,
                 ref flds,
+                ref flds_pos_list,
                 ref pkg_ptr,
             }) => {
                 let this = M(Module {
                     ptr: ptr.clone(),
                     result_ptr: result_ptr.clone(),
                     flds: flds.clone(),
+                    flds_pos_list: flds_pos_list.clone(),
                     pkg_ptr: pkg_ptr.clone(),
                 });
 
                 let mut flds = flds.clone();
+                let mut flds_pos_list = flds_pos_list.clone();
+                let mut counter = 0;
                 for (name, val) in overrides {
-                    self.merge_field_into_tuple(&mut flds, name, val)?;
+                    let name_pos = override_pos_list[counter].0.clone();
+                    let val_pos = override_pos_list[counter].1.clone();
+                    self.merge_field_into_tuple(
+                        &mut flds,
+                        &mut flds_pos_list,
+                        name,
+                        &name_pos,
+                        val,
+                        &val_pos,
+                    )?;
+                    counter += 1;
                 }
-                self.merge_field_into_tuple(&mut flds, "this".to_owned(), Rc::new(this))?;
+                self.merge_field_into_tuple(
+                    &mut flds,
+                    &mut flds_pos_list,
+                    "this".to_owned(),
+                    &pos,
+                    Rc::new(this),
+                    &val_pos,
+                )?;
                 if let Some(ptr) = pkg_ptr {
-                    let mut pkg_vm = Self::with_pointer(ptr.clone(), self.env.clone());
+                    let mut pkg_vm = Self::with_pointer(ptr.clone(), self.env.clone())
+                        .with_import_stack(self.import_stack.clone());
                     pkg_vm.run()?;
-                    let (pkg_func, _) = pkg_vm.pop()?;
-                    self.merge_field_into_tuple(&mut flds, "pkg".to_owned(), pkg_func)?;
+                    let (pkg_func, val_pos) = pkg_vm.pop()?;
+                    self.merge_field_into_tuple(
+                        &mut flds,
+                        &mut flds_pos_list,
+                        "pkg".to_owned(),
+                        &pos,
+                        pkg_func,
+                        &val_pos,
+                    )?;
                 }
 
-                let mut vm = Self::with_pointer(ptr.clone(), self.env.clone());
+                // TODO(jwall): We should have a notion of a call stack here.
+                let mut vm = Self::with_pointer(ptr.clone(), self.env.clone())
+                    .with_import_stack(self.import_stack.clone());
                 vm.push(Rc::new(S("mod".to_owned())), pos.clone())?;
-                vm.push(Rc::new(C(Tuple(flds))), pos.clone())?;
-                vm.run()?;
+                vm.push(Rc::new(C(Tuple(flds, flds_pos_list))), pos.clone())?;
+                decorate_call!(pos => vm.run())?;
                 if let Some(ptr) = result_ptr {
                     vm.ops.jump(ptr.clone())?;
                     vm.run()?;
@@ -831,7 +936,7 @@ where
             }
             _ => {
                 return Err(Error::new(
-                    format!("Expected a Tuple or a Module but got {:?}", tgt),
+                    format!("Expected a Tuple or Module but got {:?}", tgt),
                     pos,
                 ));
             }
@@ -842,16 +947,36 @@ where
     fn merge_field_into_tuple(
         &self,
         src_fields: &'a mut Vec<(String, Rc<Value>)>,
+        pos_fields: &'a mut Vec<(Position, Position)>,
         name: String,
+        name_pos: &Position,
         value: Rc<Value>,
+        val_pos: &Position,
     ) -> Result<(), Error> {
+        let mut counter = 0;
         for fld in src_fields.iter_mut() {
             if fld.0 == name {
+                if fld.1.type_name() != value.type_name()
+                    && !(fld.1.type_name() == "NULL" || value.type_name() == "NULL")
+                {
+                    return Err(Error::new(
+                        format!(
+                            "Expected type {} for field {} but got ({})",
+                            fld.1.type_name(),
+                            name,
+                            value.type_name(),
+                        ),
+                        val_pos.clone(),
+                    ));
+                }
+                pos_fields[counter].1 = val_pos.clone();
                 fld.1 = value;
                 return Ok(());
             }
+            counter += 1;
         }
         src_fields.push((name, value));
+        pos_fields.push((name_pos.clone(), val_pos.clone()));
         Ok(())
     }
 
@@ -975,15 +1100,26 @@ where
                 ns.push_str(&ss);
                 P(Str(ns))
             }
-            (C(List(ref left_list)), C(List(ref right_list))) => {
-                let mut new_list = Vec::with_capacity(left_list.len() + right_list.len());
+            (
+                C(List(ref left_list, ref left_pos_list)),
+                C(List(ref right_list, ref right_pos_list)),
+            ) => {
+                let cap = left_list.len() + right_list.len();
+                let mut new_list = Vec::with_capacity(cap);
+                let mut new_pos_list = Vec::with_capacity(cap);
+                let mut counter = 0;
                 for v in left_list.iter() {
                     new_list.push(v.clone());
+                    new_pos_list.push(left_pos_list[counter].clone());
+                    counter += 1;
                 }
+                counter = 0;
                 for v in right_list.iter() {
                     new_list.push(v.clone());
+                    new_pos_list.push(right_pos_list[counter].clone());
+                    counter += 1;
                 }
-                C(List(new_list))
+                C(List(new_list, new_pos_list))
             }
             _ => {
                 return Err(Error::new(
@@ -1000,6 +1136,7 @@ where
             h,
             &mut self.stack,
             self.env.clone(),
+            &mut self.import_stack,
             pos,
         )
     }

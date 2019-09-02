@@ -66,6 +66,7 @@ impl Builtins {
         h: Hook,
         stack: &mut Vec<(Rc<Value>, Position)>,
         env: Rc<RefCell<Environment<O, E>>>,
+        import_stack: &mut Vec<String>,
         pos: Position,
     ) -> Result<(), Error>
     where
@@ -73,14 +74,14 @@ impl Builtins {
         E: std::io::Write,
     {
         match h {
-            Hook::Import => self.import(stack, env, pos),
+            Hook::Import => self.import(stack, env, import_stack, pos),
             Hook::Include => self.include(stack, env, pos),
             Hook::Assert => self.assert(stack, env),
             Hook::Convert => self.convert(stack, env, pos),
             Hook::Out => self.out(path, stack, env, pos),
-            Hook::Map => self.map(stack, env, pos),
-            Hook::Filter => self.filter(stack, env, pos),
-            Hook::Reduce => self.reduce(stack, env, pos),
+            Hook::Map => self.map(stack, env, import_stack, pos),
+            Hook::Filter => self.filter(stack, env, import_stack, pos),
+            Hook::Reduce => self.reduce(stack, env, import_stack, pos),
             Hook::Regex => self.regex(stack, pos),
             Hook::Range => self.range(stack, pos),
             Hook::Trace(pos) => self.trace(stack, pos, env),
@@ -135,18 +136,11 @@ impl Builtins {
         Ok(contents)
     }
 
-    // FIXME(jwall): Should probably move this to the runtime.
-    //fn detect_import_cycle(&self, path: &str) -> bool {
-    //    self.scope
-    //        .import_stack
-    //        .iter()
-    //        .find(|p| *p == path)
-    //        .is_some()
-    //}
     fn import<O, E>(
         &mut self,
         stack: &mut Vec<(Rc<Value>, Position)>,
         env: Rc<RefCell<Environment<O, E>>>,
+        import_stack: &mut Vec<String>,
         pos: Position,
     ) -> Result<(), Error>
     where
@@ -156,6 +150,15 @@ impl Builtins {
         let path = stack.pop();
         if let Some((val, path_pos)) = path {
             if let &Value::P(Str(ref path)) = val.as_ref() {
+                if import_stack
+                   .iter()
+                   .find(|p| *p == path)
+                   .is_some() {
+                       return Err(Error::new(
+                           format!("You can only have one output per file"),
+                           pos));
+                }
+                import_stack.push(path.clone());
                 let mut borrowed_env = env.borrow_mut();
                 match borrowed_env.get_cached_path_val(path) {
                     Some(v) => {
@@ -250,32 +253,46 @@ impl Builtins {
         O: std::io::Write,
         E: std::io::Write,
     {
-        let tuple = stack.pop();
-        if let Some((val, tpl_pos)) = tuple.clone() {
-            if let &Value::C(Tuple(ref tuple)) = val.as_ref() {
+        if let Some((tuple, tpl_pos)) = stack.pop() {
+            if let &Value::C(Tuple(ref tuple_flds, _)) = tuple.as_ref() {
                 // look for the description field
                 let mut desc = None;
                 // look for the ok field.
                 let mut ok = None;
-                for &(ref name, ref val) in tuple.iter() {
+                for &(ref name, ref val) in tuple_flds.iter() {
                     if name == "desc" {
-                        desc = Some(val.clone());
+                        desc = Some(val.as_ref());
                     }
                     if name == "ok" {
-                        ok = Some(val.clone());
+                        ok = Some(val.as_ref());
                     }
                 }
-                if let (Some(ok), Some(desc)) = (ok, desc) {
-                    if let (&Value::P(Bool(ref b)), &Value::P(Str(ref desc))) =
-                        (ok.as_ref(), desc.as_ref())
-                    {
-                        env.borrow_mut().record_assert_result(desc, *b);
-                        return Ok(());
-                    }
-                }
+                let ok = if let Some(&P(Bool(ref b))) = ok {
+                    *b
+                } else {
+                    let msg = format!(
+                        "TYPE FAIL - Expected Boolean field ok in tuple {} at {}\n",
+                        tuple, tpl_pos
+                    );
+                    env.borrow_mut().record_assert_result(&msg, false);
+                    return Ok(());
+                };
+
+                let desc = if let Some(&P(Str(ref desc))) = desc {
+                    desc
+                } else {
+                    let msg = format!(
+                        "TYPE FAIL - Expected String field desc in tuple {} at {}\n",
+                        tuple, tpl_pos
+                    );
+                    env.borrow_mut().record_assert_result(&msg, false);
+                    return Ok(());
+                };
+                env.borrow_mut().record_assert_result(desc, ok);
+                return Ok(());
             }
             let msg = format!(
-                "TYPE FAIL - Expected tuple with ok and desc fields got {:?} at {}\n",
+                "TYPE FAIL - Expected tuple with ok and desc fields got {} at {}\n",
                 tuple, tpl_pos
             );
             env.borrow_mut().record_assert_result(&msg, false);
@@ -297,8 +314,20 @@ impl Builtins {
         E: std::io::Write,
     {
         let mut writer: Box<dyn std::io::Write> = if let Some(path) = path {
+            if env.borrow().get_out_lock_for_path(path.as_ref()) {
+                return Err(Error::new(
+                    format!("You can only have one output per file"),
+                    pos));
+            }
+            env.borrow_mut().set_out_lock_for_path(path.as_ref());
             Box::new(File::create(path)?)
         } else {
+            if env.borrow().get_out_lock_for_path("/dev/stdout") {
+                return Err(Error::new(
+                    format!("You can only have one output per file"),
+                    pos));
+            }
+            env.borrow_mut().set_out_lock_for_path("/dev/stdout");
             Box::new(std::io::stdout())
         };
         let val = stack.pop();
@@ -306,7 +335,7 @@ impl Builtins {
             let val = val.into();
             let c_type = stack.pop();
             if let Some((c_type_val, c_type_pos)) = c_type {
-                if let &Value::S(ref c_type) = c_type_val.as_ref() {
+                if let &Value::P(Primitive::Str(ref c_type)) = c_type_val.as_ref() {
                     if let Some(c) = env.borrow().converter_registry.get_converter(c_type) {
                         if let Err(e) = c.convert(Rc::new(val), &mut writer) {
                             return Err(Error::new(format!("{}", e), pos.clone()));
@@ -377,6 +406,7 @@ impl Builtins {
         &self,
         stack: &mut Vec<(Rc<Value>, Position)>,
         env: Rc<RefCell<Environment<O, E>>>,
+        import_stack: &Vec<String>,
         pos: Position,
     ) -> Result<(), Error>
     where
@@ -403,24 +433,35 @@ impl Builtins {
         };
 
         match list.as_ref() {
-            &C(List(ref elems)) => {
+            &C(List(ref elems, ref elems_pos_list)) => {
                 let mut result_elems = Vec::new();
+                let mut pos_elems = Vec::new();
+                let mut counter = 0;
                 for e in elems.iter() {
                     // push function argument on the stack.
-                    stack.push((e.clone(), list_pos.clone()));
+                    let e_pos = elems_pos_list[counter].clone();
+                    stack.push((e.clone(), e_pos.clone()));
                     // call function and push it's result on the stack.
-                    let (result, _) = VM::fcall_impl(f, stack, env.clone())?;
+                    let (result, result_pos) = decorate_call!(pos =>
+                        VM::fcall_impl(f, stack, env.clone(), import_stack))?;
+                    pos_elems.push(result_pos);
                     result_elems.push(result);
+                    counter += 1;
                 }
-                stack.push((Rc::new(C(List(result_elems))), list_pos));
+                stack.push((Rc::new(C(List(result_elems, pos_elems))), list_pos));
             }
-            &C(Tuple(ref _flds)) => {
+            &C(Tuple(ref flds, ref flds_pos_list)) => {
                 let mut new_fields = Vec::new();
-                for (ref name, ref val) in _flds {
-                    stack.push((Rc::new(P(Str(name.clone()))), list_pos.clone()));
-                    stack.push((val.clone(), list_pos.clone()));
-                    let (result, result_pos) = VM::fcall_impl(f, stack, env.clone())?;
-                    if let &C(List(ref fval)) = result.as_ref() {
+                let mut new_flds_pos_list = Vec::new();
+                let mut counter = 0;
+                for (ref name, ref val) in flds {
+                    let name_pos = flds_pos_list[counter].0.clone();
+                    let val_pos = flds_pos_list[counter].1.clone();
+                    stack.push((Rc::new(P(Str(name.clone()))), name_pos));
+                    stack.push((val.clone(), val_pos));
+                    let (result, result_pos) = decorate_call!(pos =>
+                        VM::fcall_impl(f, stack, env.clone(), import_stack))?;
+                    if let &C(List(ref fval, _)) = result.as_ref() {
                         // we expect them to be a list of exactly 2 items.
                         if fval.len() != 2 {
                             return Err(Error::new(
@@ -437,17 +478,21 @@ impl Builtins {
                                 result_pos,
                             )),
                         };
+                        let name_pos = flds_pos_list[counter].0.clone();
+                        new_flds_pos_list.push((name_pos, result_pos));
                         new_fields.push((name, fval[1].clone()));
                     }
+                    counter += 1;
                 }
-                stack.push((Rc::new(C(Tuple(new_fields))), pos));
+                stack.push((Rc::new(C(Tuple(new_fields, new_flds_pos_list))), pos));
             }
             &P(Str(ref s)) => {
                 let mut buf = String::new();
                 for c in s.chars() {
                     stack.push((Rc::new(P(Str(c.to_string()))), list_pos.clone()));
                     // call function and push it's result on the stack.
-                    let (result, result_pos) = VM::fcall_impl(f, stack, env.clone())?;
+                    let (result, result_pos) = decorate_call!(pos =>
+                        VM::fcall_impl(f, stack, env.clone(), import_stack))?;
                     if let &P(Str(ref s)) = result.as_ref() {
                         buf.push_str(s);
                     } else {
@@ -473,6 +518,7 @@ impl Builtins {
         &self,
         stack: &mut Vec<(Rc<Value>, Position)>,
         env: Rc<RefCell<Environment<O, E>>>,
+        import_stack: &Vec<String>,
         pos: Position,
     ) -> Result<(), Error>
     where
@@ -499,47 +545,65 @@ impl Builtins {
         };
 
         match list.as_ref() {
-            &C(List(ref elems)) => {
+            &C(List(ref elems, ref elems_pos_list)) => {
                 let mut result_elems = Vec::new();
+                let mut pos_elems = Vec::new();
+                let mut counter = 0;
                 for e in elems.iter() {
                     // push function argument on the stack.
-                    stack.push((e.clone(), list_pos.clone()));
+                    let e_pos = elems_pos_list[counter].clone();
+                    stack.push((e.clone(), e_pos.clone()));
                     // call function and push it's result on the stack.
-                    let (condition, _) = VM::fcall_impl(f, stack, env.clone())?;
+                    let (condition, _) = decorate_call!(pos =>
+                        VM::fcall_impl(f, stack, env.clone(), import_stack))?;
                     // Check for empty or boolean results and only push e back in
                     // if they are non empty and true
+                    counter += 1;
                     match condition.as_ref() {
                         &P(Empty) | &P(Bool(false)) => {
                             continue;
                         }
-                        _ => result_elems.push(e.clone()),
+                        _ => {
+                            result_elems.push(e.clone());
+                            pos_elems.push(e_pos);
+                        },
                     }
                 }
-                stack.push((Rc::new(C(List(result_elems))), pos));
+                stack.push((Rc::new(C(List(result_elems, pos_elems))), pos));
             }
-            &C(Tuple(ref _flds)) => {
+            &C(Tuple(ref flds, ref pos_list)) => {
                 let mut new_fields = Vec::new();
-                for (ref name, ref val) in _flds {
-                    stack.push((Rc::new(P(Str(name.clone()))), list_pos.clone()));
-                    stack.push((val.clone(), list_pos.clone()));
-                    let (condition, _) = VM::fcall_impl(f, stack, env.clone())?;
+                let mut new_flds_pos_list = Vec::new();
+                let mut counter = 0;
+                for (ref name, ref val) in flds {
+                    let name_pos = pos_list[counter].0.clone();
+                    let val_pos = pos_list[counter].1.clone();
+                    stack.push((Rc::new(P(Str(name.clone()))), name_pos.clone()));
+                    stack.push((val.clone(), val_pos.clone()));
+                    let (condition, _) = decorate_call!(pos =>
+                        VM::fcall_impl(f, stack, env.clone(), import_stack))?;
                     // Check for empty or boolean results and only push e back in
                     // if they are non empty and true
+                    counter += 1;
                     match condition.as_ref() {
                         &P(Empty) | &P(Bool(false)) => {
                             continue;
                         }
-                        _ => new_fields.push((name.clone(), val.clone())),
+                        _ => {
+                            new_fields.push((name.clone(), val.clone()));
+                            new_flds_pos_list.push((name_pos, val_pos));
+                        },
                     }
                 }
-                stack.push((Rc::new(C(Tuple(new_fields))), pos));
+                stack.push((Rc::new(C(Tuple(new_fields, new_flds_pos_list))), pos));
             }
             &P(Str(ref s)) => {
                 let mut buf = String::new();
                 for c in s.chars() {
                     stack.push((Rc::new(P(Str(c.to_string()))), list_pos.clone()));
                     // call function and push it's result on the stack.
-                    let (condition, _) = VM::fcall_impl(f, stack, env.clone())?;
+                    let (condition, _) = decorate_call!(pos =>
+                        VM::fcall_impl(f, stack, env.clone(), import_stack))?;
                     // Check for empty or boolean results and only push c back in
                     // if they are non empty and true
                     match condition.as_ref() {
@@ -600,6 +664,7 @@ impl Builtins {
         &self,
         stack: &mut Vec<(Rc<Value>, Position)>,
         env: Rc<RefCell<Environment<O, E>>>,
+        import_stack: &Vec<String>,
         pos: Position,
     ) -> Result<(), Error>
     where
@@ -632,36 +697,46 @@ impl Builtins {
         };
 
         match list.as_ref() {
-            &C(List(ref elems)) => {
+            &C(List(ref elems, ref elems_pos_list)) => {
+                let mut counter = 0;
                 for e in elems.iter() {
+                    let e_pos = elems_pos_list[counter].clone();
                     // push function arguments on the stack.
                     stack.push((acc.clone(), acc_pos.clone()));
-                    stack.push((e.clone(), list_pos.clone()));
+                    stack.push((e.clone(), e_pos.clone()));
                     // call function and push it's result on the stack.
-                    let (new_acc, new_acc_pos) = VM::fcall_impl(f, stack, env.clone())?;
+                    let (new_acc, new_acc_pos) = decorate_call!(pos =>
+                        VM::fcall_impl(f, stack, env.clone(), import_stack))?;
                     acc = new_acc;
                     acc_pos = new_acc_pos;
+                    counter += 1;
                 }
             }
-            &C(Tuple(ref _flds)) => {
+            &C(Tuple(ref _flds, ref flds_pos_list)) => {
+                let mut counter = 0;
                 for (ref name, ref val) in _flds.iter() {
+                    let name_pos = flds_pos_list[counter].0.clone();
+                    let val_pos = flds_pos_list[counter].1.clone();
                     // push function arguments on the stack.
                     stack.push((acc.clone(), acc_pos.clone()));
-                    stack.push((Rc::new(P(Str(name.clone()))), list_pos.clone()));
-                    stack.push((val.clone(), list_pos.clone()));
+                    stack.push((Rc::new(P(Str(name.clone()))), name_pos));
+                    stack.push((val.clone(), val_pos));
                     // call function and push it's result on the stack.
-                    let (new_acc, new_acc_pos) = VM::fcall_impl(f, stack, env.clone())?;
+                    let (new_acc, new_acc_pos) = decorate_call!(pos =>
+                        VM::fcall_impl(f, stack, env.clone(), import_stack))?;
                     acc = new_acc;
                     acc_pos = new_acc_pos;
+                    counter += 1;
                 }
             }
-            &P(Str(ref _s)) => {
-                for c in _s.chars() {
+            &P(Str(ref s)) => {
+                for c in s.chars() {
                     // push function arguments on the stack.
                     stack.push((acc.clone(), acc_pos.clone()));
                     stack.push((Rc::new(P(Str(c.to_string()))), list_pos.clone()));
                     // call function and push it's result on the stack.
-                    let (new_acc, new_acc_pos) = VM::fcall_impl(f, stack, env.clone())?;
+                    let (new_acc, new_acc_pos) = decorate_call!(pos => 
+                        VM::fcall_impl(f, stack, env.clone(), import_stack))?;
                     acc = new_acc;
                     acc_pos = new_acc_pos;
                 }
@@ -701,6 +776,7 @@ impl Builtins {
         };
 
         let mut elems = Vec::new();
+        let mut pos_list = Vec::new();
         match (start.as_ref(), step.as_ref(), end.as_ref()) {
             (&P(Int(start)), &P(Int(step)), &P(Int(end))) => {
                 let mut num = start;
@@ -709,6 +785,7 @@ impl Builtins {
                         break;
                     }
                     elems.push(Rc::new(P(Int(num))));
+                    pos_list.push(pos.clone());
                     num += step;
                 }
             }
@@ -719,7 +796,7 @@ impl Builtins {
                 ));
             }
         }
-        stack.push((Rc::new(C(List(elems))), pos));
+        stack.push((Rc::new(C(List(elems, pos_list))), pos));
         Ok(())
     }
 

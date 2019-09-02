@@ -21,32 +21,32 @@ use Composite::{List, Tuple};
 use Primitive::{Bool, Empty, Float, Int, Str};
 use Value::{C, F, M, P, S, T};
 
-impl fmt::Debug for Value {
+impl fmt::Display for Value {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            P(Bool(v)) => write!(w, "Bool({})", v),
-            P(Int(v)) => write!(w, "Int({})", v),
-            P(Float(v)) => write!(w, "Float({})", v),
-            P(Str(v)) => write!(w, "String({})", v),
+            P(Bool(v)) => write!(w, "{}", v),
+            P(Int(v)) => write!(w, "{}", v),
+            P(Float(v)) => write!(w, "{}", v),
+            P(Str(v)) => write!(w, "\"{}\"", v.replace("\"", "\\\"")),
             P(Empty) => write!(w, "NULL"),
             C(List(ref els, _)) => {
-                write!(w, "List[")?;
+                write!(w, "[")?;
                 for e in els {
-                    write!(w, "{:?},", e)?;
+                    write!(w, "{},", e)?;
                 }
                 write!(w, "]")
             }
             C(Tuple(ref flds, _)) => {
-                write!(w, "Tuple(")?;
+                write!(w, "{{")?;
                 for (k, v) in flds {
-                    write!(w, "\"{}\"={:?},", k, v)?;
+                    write!(w, "\"{}\"={},\n", k, v)?;
                 }
-                write!(w, ")")
+                write!(w, "}}")
             }
             F(_) => write!(w, "<Func>"),
             M(_) => write!(w, "<Module>"),
             T(_) => write!(w, "<Expression>"),
-            S(v) => write!(w, "Symbol({})", v),
+            S(v) => write!(w, "{}", v),
         }
     }
 }

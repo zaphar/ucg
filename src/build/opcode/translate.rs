@@ -206,12 +206,12 @@ impl AST {
                         ops.push(Op::Exist, def.pos.clone());
                     }
                     BinaryExprType::DOT => {
-                        // Dot expressions expect the left side to be pushed first
-                        Self::translate_expr(*def.left, &mut ops, root);
                         // Symbols on the right side should be converted to strings to satisfy
                         // the Index operation contract.
                         match *def.right {
                             Expression::Copy(copy_def) => {
+                                // Dot expressions expect the left side to be pushed first
+                                Self::translate_expr(*def.left, &mut ops, root);
                                 // first handle the selector
                                 match copy_def.selector {
                                     Value::Str(sym) | Value::Symbol(sym) => {
@@ -228,9 +228,13 @@ impl AST {
                             }
                             Expression::Call(call_def) => {
                                 // first push our arguments.
+                                let count = call_def.arglist.len() as i64;
                                 for e in call_def.arglist {
                                     Self::translate_expr(e, &mut ops, root);
                                 }
+                                ops.push(Op::Val(Primitive::Int(count)), call_def.pos.clone());
+                                // Dot expressions expect the left side to be pushed first
+                                Self::translate_expr(*def.left, &mut ops, root);
                                 // then handle the selector
                                 let func_pos = call_def.funcref.pos().clone();
                                 match call_def.funcref {
@@ -247,6 +251,8 @@ impl AST {
                                 return;
                             }
                             Expression::Simple(Value::Symbol(name)) => {
+                                // Dot expressions expect the left side to be pushed first
+                                Self::translate_expr(*def.left, &mut ops, root);
                                 Self::translate_expr(
                                     Expression::Simple(Value::Str(name)),
                                     &mut ops,
@@ -254,6 +260,8 @@ impl AST {
                                 );
                             }
                             expr => {
+                                // Dot expressions expect the left side to be pushed first
+                                Self::translate_expr(*def.left, &mut ops, root);
                                 Self::translate_expr(expr, &mut ops, root);
                             }
                         }
@@ -484,14 +492,15 @@ impl AST {
                     ops.replace(i, Op::Jump(idx as i32));
                 }
             }
-            Expression::Call(def) => {
-                // first push our arguments.
-                for e in def.arglist {
+            Expression::Call(call_def) => {
+                let count = call_def.arglist.len() as i64;
+                for e in call_def.arglist {
                     Self::translate_expr(e, &mut ops, root);
                 }
+                ops.push(Op::Val(Primitive::Int(count)), call_def.pos.clone());
                 // then push the func reference
-                let func_pos = def.funcref.pos().clone();
-                Self::translate_value(def.funcref, &mut ops, root);
+                let func_pos = call_def.funcref.pos().clone();
+                Self::translate_value(call_def.funcref, &mut ops, root);
                 ops.push(Op::FCall, func_pos);
             }
             Expression::Copy(def) => {
