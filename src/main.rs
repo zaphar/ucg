@@ -22,8 +22,8 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs::File;
 use std::io;
-use std::io::{Stdout, Stderr};
 use std::io::Read;
+use std::io::{Stderr, Stdout};
 use std::path::{Path, PathBuf};
 use std::process;
 use std::rc::Rc;
@@ -109,34 +109,28 @@ fn build_file<'a>(
     }
     let out = std::io::stdout();
     let err = std::io::stderr();
-    let mut builder =
-        build::FileBuilder::new(std::env::current_dir()?, import_paths, out, err);
+    let mut builder = build::FileBuilder::new(std::env::current_dir()?, import_paths, out, err);
     // FIXME(jwall): builder.set_strict(strict);
     if validate {
         builder.enable_validate_mode();
     }
     builder.build(file_path_buf)?;
     if validate {
-        // FIXME(jwall): println!("{}", builder.assert_collector.summary);
+        println!("{}", builder.assert_summary());
     }
     Ok(builder)
 }
 
-fn do_validate(
-    file: &str,
-    strict: bool,
-    import_paths: &Vec<PathBuf>,
-) -> bool {
+fn do_validate(file: &str, strict: bool, import_paths: &Vec<PathBuf>) -> bool {
     println!("Validating {}", file);
     match build_file(file, true, strict, import_paths) {
         Ok(b) => {
-            // FIXM(jwall): assert collector access. 
-            //if b.assert_collector.success {
-            //    println!("File {} Pass\n", file);
-            //} else {
-            //    println!("File {} Fail\n", file);
+            if b.assert_results() {
+                println!("File {} Pass\n", file);
+            } else {
+                println!("File {} Fail\n", file);
                 return false;
-            //}
+            }
         }
         Err(msg) => {
             eprintln!("Err: {}", msg);
@@ -146,35 +140,7 @@ fn do_validate(
     return true;
 }
 
-fn process_output(
-    output: &Option<(String, Rc<Val>)>,
-    file: Option<&str>,
-) -> bool {
-    let (typ, val) = match output {
-        Some((ref typ, ref val)) => (typ, val.clone()),
-        None => {
-            return false;
-        }
-    };
-    // FIXME(jwall): Is this function even still necessary?
-    //match registry.get_converter(typ) {
-    //    Some(converter) => {
-    //        run_converter(converter, val, file).unwrap();
-    //        eprintln!("\nConversion successful");
-    //        return true;
-    //    }
-    //    None => {
-    //        eprintln!("No such converter {}", typ);
-            return false;
-    //    }
-    //}
-}
-
-fn do_compile(
-    file: &str,
-    strict: bool,
-    import_paths: &Vec<PathBuf>,
-) -> bool {
+fn do_compile(file: &str, strict: bool, import_paths: &Vec<PathBuf>) -> bool {
     println!("Building {}", file);
     let builder = match build_file(file, false, strict, import_paths) {
         Ok(builder) => builder,
@@ -186,7 +152,6 @@ fn do_compile(
     if builder.out.is_none() {
         eprintln!("Build results in no artifacts.");
     }
-    // FIXME(jwall): tuple? process_output(&builder.out, Some(file))
     return false;
 }
 
@@ -213,34 +178,21 @@ fn visit_ucg_files(
             let next_path = next_item.path();
             let path_as_string = String::from(next_path.to_string_lossy());
             if next_path.is_dir() && recurse {
-                if let Err(e) = visit_ucg_files(
-                    &next_path,
-                    recurse,
-                    validate,
-                    strict,
-                    import_paths,
-                ) {
+                if let Err(e) = visit_ucg_files(&next_path, recurse, validate, strict, import_paths)
+                {
                     eprintln!("{}", e);
                     result = false;
                 }
             } else {
                 if validate && path_as_string.ends_with("_test.ucg") {
-                    if !do_validate(
-                        &path_as_string,
-                        strict,
-                        import_paths,
-                    ) {
+                    if !do_validate(&path_as_string, strict, import_paths) {
                         result = false;
                         summary.push_str(format!("{} - FAIL\n", path_as_string).as_str())
                     } else {
                         summary.push_str(format!("{} - PASS\n", path_as_string).as_str())
                     }
                 } else if !validate && path_as_string.ends_with(".ucg") {
-                    if !do_compile(
-                        &path_as_string,
-                        strict,
-                        import_paths,
-                    ) {
+                    if !do_compile(&path_as_string, strict, import_paths) {
                         result = false;
                     }
                 }
@@ -265,11 +217,7 @@ fn visit_ucg_files(
     Ok(result)
 }
 
-fn inspect_command(
-    matches: &clap::ArgMatches,
-    import_paths: &Vec<PathBuf>,
-    strict: bool,
-) {
+fn inspect_command(matches: &clap::ArgMatches, import_paths: &Vec<PathBuf>, strict: bool) {
     let file = matches.value_of("INPUT");
     let sym = matches.value_of("expr");
     let target = matches.value_of("target").unwrap_or("json");
@@ -332,23 +280,13 @@ fn inspect_command(
     //}
 }
 
-fn build_command(
-    matches: &clap::ArgMatches,
-    import_paths: &Vec<PathBuf>,
-    strict: bool,
-) {
+fn build_command(matches: &clap::ArgMatches, import_paths: &Vec<PathBuf>, strict: bool) {
     let files = matches.values_of("INPUT");
     let recurse = matches.is_present("recurse");
     let mut ok = true;
     if files.is_none() {
         let curr_dir = std::env::current_dir().unwrap();
-        let ok = visit_ucg_files(
-            curr_dir.as_path(),
-            recurse,
-            false,
-            strict,
-            import_paths,
-        );
+        let ok = visit_ucg_files(curr_dir.as_path(), recurse, false, strict, import_paths);
         if let Ok(false) = ok {
             process::exit(1)
         }
@@ -356,13 +294,7 @@ fn build_command(
     }
     for file in files.unwrap() {
         let pb = PathBuf::from(file);
-        if let Ok(false) = visit_ucg_files(
-            &pb,
-            recurse,
-            false,
-            strict,
-            import_paths,
-        ) {
+        if let Ok(false) = visit_ucg_files(&pb, recurse, false, strict, import_paths) {
             ok = false;
         }
     }
@@ -434,22 +366,12 @@ fn fmt_command(matches: &clap::ArgMatches) -> std::result::Result<(), Box<dyn Er
     Ok(())
 }
 
-fn test_command(
-    matches: &clap::ArgMatches,
-    import_paths: &Vec<PathBuf>,
-    strict: bool,
-) {
+fn test_command(matches: &clap::ArgMatches, import_paths: &Vec<PathBuf>, strict: bool) {
     let files = matches.values_of("INPUT");
     let recurse = matches.is_present("recurse");
     if files.is_none() {
         let curr_dir = std::env::current_dir().unwrap();
-        let ok = visit_ucg_files(
-            curr_dir.as_path(),
-            recurse,
-            true,
-            strict,
-            import_paths,
-        );
+        let ok = visit_ucg_files(curr_dir.as_path(), recurse, true, strict, import_paths);
         if let Ok(false) = ok {
             process::exit(1)
         }
@@ -458,13 +380,7 @@ fn test_command(
         for file in files.unwrap() {
             let pb = PathBuf::from(file);
             //if pb.is_dir() {
-            if let Ok(false) = visit_ucg_files(
-                pb.as_path(),
-                recurse,
-                true,
-                strict,
-                import_paths,
-            ) {
+            if let Ok(false) = visit_ucg_files(pb.as_path(), recurse, true, strict, import_paths) {
                 ok = false;
             }
         }
@@ -523,9 +439,7 @@ fn print_repl_help() {
     println!(include_str!("help/repl.txt"));
 }
 
-fn do_repl(
-    import_paths: &Vec<PathBuf>,
-) -> std::result::Result<(), Box<dyn Error>> {
+fn do_repl(import_paths: &Vec<PathBuf>) -> std::result::Result<(), Box<dyn Error>> {
     let config = rustyline::Config::builder();
     let mut editor = rustyline::Editor::<()>::with_config(
         config
@@ -557,8 +471,12 @@ fn do_repl(
             }
         }
     }
-    let mut builder =
-        build::FileBuilder::new(std::env::current_dir()?, import_paths, io::stdout(), io::stderr());
+    let mut builder = build::FileBuilder::new(
+        std::env::current_dir()?,
+        import_paths,
+        io::stdout(),
+        io::stderr(),
+    );
     // loop
     let mut lines = ucglib::io::StatementAccumulator::new();
     println!("Welcome to the UCG repl. Ctrl-D to exit");
@@ -608,7 +526,6 @@ fn do_repl(
                     Err(e) => eprintln!("{}", e),
                     Ok(v) => {
                         if builder.out.is_some() {
-                            // FIXME(jwall): process_output(&builder.out, None);
                             builder.out = None;
                         } else {
                             println!("{}", v);
@@ -626,9 +543,7 @@ fn do_repl(
     }
 }
 
-fn repl(
-    import_paths: &Vec<PathBuf>,
-) {
+fn repl(import_paths: &Vec<PathBuf>) {
     if let Err(e) = do_repl(import_paths) {
         eprintln!("{}", e);
         process::exit(1);

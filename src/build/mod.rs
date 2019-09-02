@@ -250,6 +250,14 @@ where
         }
         return None;
     }
+
+    pub fn assert_results(&self) -> bool {
+        self.environment.borrow().assert_results.success
+    }
+
+    pub fn assert_summary(&self) -> String {
+        self.environment.borrow().assert_results.summary.clone()
+    }
 }
 
 #[cfg(test)]
