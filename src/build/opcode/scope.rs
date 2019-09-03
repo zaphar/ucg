@@ -33,6 +33,10 @@ impl Stack {
         self.curr.get(name).cloned()
     }
 
+    pub fn remove_symbol(&mut self, name: &str) -> Option<(Rc<Value>, Position)> {
+        self.curr.remove(name)
+    }
+
     pub fn is_bound(&self, name: &str) -> bool {
         self.curr.get(name).is_some()
     }

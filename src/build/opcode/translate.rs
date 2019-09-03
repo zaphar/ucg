@@ -31,6 +31,13 @@ pub struct PositionMap {
 }
 
 impl PositionMap {
+    pub fn new() -> Self {
+        PositionMap {
+            ops: Vec::new(),
+            pos: Vec::new(),
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.ops.len()
     }
@@ -47,10 +54,7 @@ impl PositionMap {
 
 impl AST {
     pub fn translate<P: AsRef<Path>>(stmts: Vec<Statement>, root: &P) -> PositionMap {
-        let mut ops = PositionMap {
-            ops: Vec::new(),
-            pos: Vec::new(),
-        };
+        let mut ops = PositionMap::new();
         Self::translate_stmts(stmts, &mut ops, root.as_ref());
         return ops;
     }

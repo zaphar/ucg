@@ -24,6 +24,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use simple_error;
+use rustyline;
 
 use crate::ast::*;
 use crate::error;
@@ -33,6 +34,8 @@ use crate::parse::parse;
 use crate::build::opcode::translate;
 use crate::build::opcode::Environment;
 use crate::build::opcode::VM;
+use crate::build::opcode::pointer::OpPointer;
+use crate::build::opcode::translate::PositionMap;
 
 pub mod assets;
 pub mod format;
@@ -202,6 +205,78 @@ where
         Ok(())
     }
 
+    pub fn repl(&mut self, mut editor: rustyline::Editor<()>, config_home: PathBuf) -> BuildResult {
+        // loop
+        let mut lines = crate::io::StatementAccumulator::new();
+        println!("Welcome to the UCG repl. Ctrl-D to exit");
+        println!("Type '#help' for help.");
+        println!("");
+        // Initialize VM with an empty OpPointer
+        let mut vm = VM::new(Rc::new(PositionMap::new()), self.environment.clone(), &self.working_dir);
+        loop {
+            // print prompt
+            let line = editor.readline(&format!("{}> ", lines.next_line()))?;
+            // repl commands are only valid while not accumulating a statement;
+            let trimmed = line.trim();
+            if trimmed.starts_with("#") {
+                // handle the various commands.
+                if trimmed.starts_with("#help") {
+                    println!(include_str!("../help/repl.txt"));
+                } else if trimmed.starts_with("#del") {
+                    // remove a named binding from the builder output.
+                    let args: Vec<&str> = trimmed.split(" ").skip(1).collect();
+                    if args.len() != 1 {
+                        // print usage of the #del command
+                        eprintln!("The '#del' command expects a single argument specifying \nthe binding to delete.");
+                    } else {
+                        let key = args[0].to_string();
+                        if let None = vm.remove_symbol(&key) {
+                            eprintln!("No such binding {}", key);
+                        }
+                    }
+                } else {
+                    eprintln!("Invalid repl command...");
+                    eprintln!("");
+                    println!(include_str!("../help/repl.txt"));
+                }
+                continue;
+            }
+            lines.push(line);
+            // check to see if that line is a statement
+            loop {
+                // read a statement
+                if let Some(stmt) = lines.get_statement() {
+                    // if it is then
+                    // eval statement
+                    let stmts = parse(OffsetStrIter::new(&stmt), None)?;
+                    let ops = translate::AST::translate(stmts, &self.working_dir);
+                    vm = vm.to_new_pointer(OpPointer::new(Rc::new(ops)));
+                    match vm.run() {
+                        // print the result
+                        Err(e) => eprintln!("{}", e),
+                        Ok(_) => {
+                            match vm.last {
+                                Some((ref val, _)) => {
+                                    println!("{}", val);
+                                    vm.last = None;
+                                }
+                                None => {
+                                }
+                            }
+                            editor.history_mut().add(stmt);
+                            editor.save_history(&config_home)?;
+                        }
+                    }
+                    // start loop over at prompt.
+                    break;
+                }
+                // if not then keep accumulating lines without a prompt
+                lines.push(editor.readline(&format!("{}> ", lines.next_line()))?);
+            }
+        }
+    }
+
+    // TODO(jwall): The repl is going to have to be in here.
     pub fn eval_input(
         &mut self,
         input: OffsetStrIter,

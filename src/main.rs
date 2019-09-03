@@ -400,10 +400,6 @@ fn env_help() {
     );
 }
 
-fn print_repl_help() {
-    println!(include_str!("help/repl.txt"));
-}
-
 fn do_repl(import_paths: &Vec<PathBuf>) -> std::result::Result<(), Box<dyn Error>> {
     let config = rustyline::Config::builder();
     let mut editor = rustyline::Editor::<()>::with_config(
@@ -442,70 +438,9 @@ fn do_repl(import_paths: &Vec<PathBuf>) -> std::result::Result<(), Box<dyn Error
         StdoutWrapper::new(),
         StderrWrapper::new(),
     );
-    // loop
-    let mut lines = ucglib::io::StatementAccumulator::new();
-    println!("Welcome to the UCG repl. Ctrl-D to exit");
-    println!("Type '#help' for help.");
-    println!("");
-    loop {
-        // print prompt
-        let line = editor.readline(&format!("{}> ", lines.next_line()))?;
-        // repl commands are only valid while not accumulating a statement;
-        let trimmed = line.trim();
-        if trimmed.starts_with("#") {
-            // handle the various commands.
-            if trimmed.starts_with("#help") {
-                print_repl_help();
-            } else if trimmed.starts_with("#del") {
-                // remove a named binding from the builder output.
-                let args: Vec<&str> = trimmed.split(" ").skip(1).collect();
-                if args.len() != 1 {
-                    // print usage of the #del command
-                    eprintln!("The '#del' command expects a single argument specifying \nthe binding to delete.");
-                } else {
-                    let key = ucglib::ast::PositionedItem {
-                        pos: ucglib::ast::Position::new(0, 0, 0),
-                        val: args[0].to_string(),
-                    };
-                    // FIXME(jwall): handle this in an actual repl driver?
-                    //if let None = builder.scope_mut().build_output.remove(&key) {
-                    //    eprintln!("No such binding {}", key.val);
-                    //}
-                }
-            } else {
-                eprintln!("Invalid repl command...");
-                eprintln!("");
-                print_repl_help();
-            }
-            continue;
-        }
-        lines.push(line);
-        // check to see if that line is a statement
-        loop {
-            // read a statement
-            if let Some(stmt) = lines.get_statement() {
-                // if it is then
-                // eval statement
-                match builder.eval_string(&stmt) {
-                    // print the result
-                    Err(e) => eprintln!("{}", e),
-                    Ok(v) => {
-                        if builder.out.is_some() {
-                            builder.out = None;
-                        } else {
-                            println!("{}", v);
-                            editor.history_mut().add(stmt);
-                            editor.save_history(&config_home)?;
-                        }
-                    }
-                }
-                // start loop over at prompt.
-                break;
-            }
-            // if not then keep accumulating lines without a prompt
-            lines.push(editor.readline(&format!("{}> ", lines.next_line()))?);
-        }
-    }
+
+    builder.repl(editor, config_home)?;
+    Ok(())
 }
 
 fn repl(import_paths: &Vec<PathBuf>) {

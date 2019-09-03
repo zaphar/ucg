@@ -23,8 +23,8 @@ use std::rc::Rc;
 
 fn test_expr_to_val<'a, O, E>(mut cases: Vec<(Expression, Val)>, mut b: FileBuilder<'a, O, E>)
 where
-    O: std::io::Write,
-    E: std::io::Write,
+    O: std::io::Write + Clone,
+    E: std::io::Write + Clone,
 {
     for tpl in cases.drain(0..) {
         assert_eq!(b.eval_expr(tpl.0).unwrap(), Rc::new(tpl.1));
