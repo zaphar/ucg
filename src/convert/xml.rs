@@ -153,7 +153,7 @@ impl XmlConverter {
         Ok(())
     }
 
-    fn write(&self, v: &Val, w: &mut Write) -> ConvertResult {
+    fn write(&self, v: &Val, w: &mut dyn Write) -> ConvertResult {
         if let Val::Tuple(ref fs) = v {
             let mut version: Option<&str> = None;
             let mut encoding: Option<&str> = None;
@@ -223,7 +223,7 @@ impl XmlConverter {
 }
 
 impl Converter for XmlConverter {
-    fn convert(&self, v: Rc<Val>, mut w: &mut Write) -> ConvertResult {
+    fn convert(&self, v: Rc<Val>, mut w: &mut dyn Write) -> ConvertResult {
         self.write(&v, &mut w)
     }
 

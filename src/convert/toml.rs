@@ -26,7 +26,7 @@ use crate::convert::traits::{ConvertResult, Converter, ImportResult, Importer};
 
 pub struct TomlConverter {}
 
-type Result = std::result::Result<toml::Value, Box<error::Error>>;
+type Result = std::result::Result<toml::Value, Box<dyn error::Error>>;
 
 impl TomlConverter {
     pub fn new() -> Self {
@@ -107,7 +107,7 @@ impl TomlConverter {
         })
     }
 
-    fn write(&self, v: &Val, w: &mut Write) -> ConvertResult {
+    fn write(&self, v: &Val, w: &mut dyn Write) -> ConvertResult {
         let toml_val = self.convert_value(v)?;
         let toml_bytes = toml::ser::to_string_pretty(&toml_val)?;
         write!(w, "{}", toml_bytes)?;
@@ -116,7 +116,7 @@ impl TomlConverter {
 }
 
 impl Converter for TomlConverter {
-    fn convert(&self, v: Rc<Val>, mut w: &mut Write) -> ConvertResult {
+    fn convert(&self, v: Rc<Val>, mut w: &mut dyn Write) -> ConvertResult {
         self.write(&v, &mut w)
     }
 

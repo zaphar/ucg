@@ -55,15 +55,15 @@ impl ConverterRegistry {
         registry
     }
 
-    pub fn register<S: Into<String>>(&mut self, typ: S, converter: Box<traits::Converter>) {
+    pub fn register<S: Into<String>>(&mut self, typ: S, converter: Box<dyn traits::Converter>) {
         self.converters.insert(typ.into(), converter);
     }
 
-    pub fn get_converter(&self, typ: &str) -> Option<&traits::Converter> {
+    pub fn get_converter(&self, typ: &str) -> Option<&dyn traits::Converter> {
         self.converters.get(typ).map(|c| c.as_ref())
     }
 
-    pub fn get_converter_list(&self) -> Vec<(&String, &Box<traits::Converter>)> {
+    pub fn get_converter_list(&self) -> Vec<(&String, &Box<dyn traits::Converter>)> {
         self.converters.iter().collect()
     }
 }

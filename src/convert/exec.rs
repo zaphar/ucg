@@ -37,7 +37,7 @@ impl ExecConverter {
     }
 
     #[allow(unused_assignments)]
-    fn write(&self, v: &Val, w: &mut Write) -> ConvertResult {
+    fn write(&self, v: &Val, w: &mut dyn Write) -> ConvertResult {
         // We always expect the Val to be a Tuple.
         if let &Tuple(ref fields) = v {
             // We expect no more than three fields in our exec tuple.
@@ -173,7 +173,7 @@ impl ExecConverter {
 }
 
 impl Converter for ExecConverter {
-    fn convert(&self, v: Rc<Val>, mut w: &mut Write) -> ConvertResult {
+    fn convert(&self, v: Rc<Val>, mut w: &mut dyn Write) -> ConvertResult {
         self.write(&v, &mut w)
     }
 

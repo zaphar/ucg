@@ -124,9 +124,9 @@ pub trait Walker {
 
 // TODO this would be better implemented as a Trait I think.
 pub struct AstWalker<'a> {
-    handle_value: Option<&'a Fn(&mut Value)>,
-    handle_expression: Option<&'a Fn(&mut Expression)>,
-    handle_statment: Option<&'a Fn(&mut Statement)>,
+    handle_value: Option<&'a dyn Fn(&mut Value)>,
+    handle_expression: Option<&'a dyn Fn(&mut Expression)>,
+    handle_statment: Option<&'a dyn Fn(&mut Statement)>,
 }
 
 impl<'a> AstWalker<'a> {
@@ -138,17 +138,17 @@ impl<'a> AstWalker<'a> {
         }
     }
 
-    pub fn with_value_handler(mut self, h: &'a Fn(&mut Value)) -> Self {
+    pub fn with_value_handler(mut self, h: &'a dyn Fn(&mut Value)) -> Self {
         self.handle_value = Some(h);
         self
     }
 
-    pub fn with_expr_handler(mut self, h: &'a Fn(&mut Expression)) -> Self {
+    pub fn with_expr_handler(mut self, h: &'a dyn Fn(&mut Expression)) -> Self {
         self.handle_expression = Some(h);
         self
     }
 
-    pub fn with_stmt_handler(mut self, h: &'a Fn(&mut Statement)) -> Self {
+    pub fn with_stmt_handler(mut self, h: &'a dyn Fn(&mut Statement)) -> Self {
         self.handle_statment = Some(h);
         self
     }

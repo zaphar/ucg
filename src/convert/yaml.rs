@@ -139,7 +139,7 @@ impl YamlConverter {
         })
     }
 
-    fn write(&self, v: &Val, w: &mut Write) -> ConvertResult {
+    fn write(&self, v: &Val, w: &mut dyn Write) -> ConvertResult {
         let jsn_val = self.convert_value(v)?;
         serde_yaml::to_writer(w, &jsn_val)?;
         Ok(())
@@ -147,7 +147,7 @@ impl YamlConverter {
 }
 
 impl Converter for YamlConverter {
-    fn convert(&self, v: Rc<Val>, mut w: &mut Write) -> ConvertResult {
+    fn convert(&self, v: Rc<Val>, mut w: &mut dyn Write) -> ConvertResult {
         self.write(&v, &mut w)
     }
 

@@ -116,7 +116,7 @@ impl JsonConverter {
         })
     }
 
-    fn write(&self, v: &Val, w: &mut Write) -> ConvertResult {
+    fn write(&self, v: &Val, w: &mut dyn Write) -> ConvertResult {
         let jsn_val = self.convert_value(v)?;
         serde_json::to_writer_pretty(w, &jsn_val)?;
         Ok(())
@@ -124,7 +124,7 @@ impl JsonConverter {
 }
 
 impl Converter for JsonConverter {
-    fn convert(&self, v: Rc<Val>, mut w: &mut Write) -> ConvertResult {
+    fn convert(&self, v: Rc<Val>, mut w: &mut dyn Write) -> ConvertResult {
         self.write(&v, &mut w)
     }
 

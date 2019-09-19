@@ -36,7 +36,7 @@ impl FlagConverter {
         self
     }
 
-    fn write_flag_name(&self, pfx: &str, name: &str, w: &mut Write) -> ConvertResult {
+    fn write_flag_name(&self, pfx: &str, name: &str, w: &mut dyn Write) -> ConvertResult {
         if name.chars().count() > 1 || pfx.chars().count() > 0 {
             write!(w, "--{}{} ", pfx, name)?;
         } else {
@@ -50,7 +50,7 @@ impl FlagConverter {
         pfx: &str,
         name: &str,
         def: &Vec<Rc<Val>>,
-        w: &mut Write,
+        w: &mut dyn Write,
     ) -> ConvertResult {
         // first of all we need to make sure that each &Val is only a primitive type.
         for v in def.iter() {
@@ -68,7 +68,7 @@ impl FlagConverter {
         return Ok(());
     }
 
-    fn write_simple_value(&self, v: &Val, w: &mut Write) -> ConvertResult {
+    fn write_simple_value(&self, v: &Val, w: &mut dyn Write) -> ConvertResult {
         match v {
             &Val::Empty => {
                 // Empty is a noop.
@@ -94,7 +94,7 @@ impl FlagConverter {
         Ok(())
     }
 
-    fn write(&self, pfx: &str, flds: &Vec<(String, Rc<Val>)>, w: &mut Write) -> ConvertResult {
+    fn write(&self, pfx: &str, flds: &Vec<(String, Rc<Val>)>, w: &mut dyn Write) -> ConvertResult {
         for &(ref name, ref val) in flds.iter() {
             if let &Val::Empty = val.as_ref() {
                 self.write_flag_name(pfx, name, w)?;
@@ -118,7 +118,7 @@ impl FlagConverter {
 }
 
 impl Converter for FlagConverter {
-    fn convert(&self, v: Rc<Val>, mut w: &mut Write) -> ConvertResult {
+    fn convert(&self, v: Rc<Val>, mut w: &mut dyn Write) -> ConvertResult {
         if let &Val::Tuple(ref flds) = v.as_ref() {
             self.write("", flds, &mut w)
         } else {

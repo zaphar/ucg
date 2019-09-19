@@ -28,7 +28,7 @@ impl EnvConverter {
         EnvConverter {}
     }
 
-    fn convert_tuple(&self, flds: &Vec<(String, Rc<Val>)>, w: &mut IOWrite) -> ConvertResult {
+    fn convert_tuple(&self, flds: &Vec<(String, Rc<Val>)>, w: &mut dyn IOWrite) -> ConvertResult {
         for &(ref name, ref val) in flds.iter() {
             if val.is_tuple() {
                 eprintln!("Skipping embedded tuple...");
@@ -44,12 +44,12 @@ impl EnvConverter {
         Ok(())
     }
 
-    fn convert_list(&self, _items: &Vec<Rc<Val>>, _w: &mut IOWrite) -> ConvertResult {
+    fn convert_list(&self, _items: &Vec<Rc<Val>>, _w: &mut dyn IOWrite) -> ConvertResult {
         eprintln!("Skipping List...");
         Ok(())
     }
 
-    fn write(&self, v: &Val, w: &mut IOWrite) -> ConvertResult {
+    fn write(&self, v: &Val, w: &mut dyn IOWrite) -> ConvertResult {
         match v {
             &Val::Empty => {
                 // Empty is a noop.
@@ -91,7 +91,7 @@ impl EnvConverter {
 }
 
 impl Converter for EnvConverter {
-    fn convert(&self, v: Rc<Val>, mut w: &mut IOWrite) -> ConvertResult {
+    fn convert(&self, v: Rc<Val>, mut w: &mut dyn IOWrite) -> ConvertResult {
         self.write(&v, &mut w)
     }
 

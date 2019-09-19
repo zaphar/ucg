@@ -80,8 +80,8 @@ fn do_flags<'a, 'b>() -> clap::App<'a, 'b> {
     )
 }
 
-fn run_converter(c: &traits::Converter, v: Rc<Val>, f: Option<&str>) -> traits::ConvertResult {
-    let mut file: Box<std::io::Write> = match f {
+fn run_converter(c: &dyn traits::Converter, v: Rc<Val>, f: Option<&str>) -> traits::ConvertResult {
+    let mut file: Box<dyn std::io::Write> = match f {
         Some(f) => {
             let mut path_buf = PathBuf::from(f);
             path_buf.set_extension(c.file_ext());

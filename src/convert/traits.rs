@@ -27,7 +27,7 @@ pub type ImportResult = result::Result<Rc<Val>, Box<dyn Error>>;
 /// The trait that Converters from Val to different output formats for the
 /// final conversion stage of the ucg compiler.
 pub trait Converter {
-    fn convert(&self, vs: Rc<Val>, w: &mut Write) -> ConvertResult;
+    fn convert(&self, vs: Rc<Val>, w: &mut dyn Write) -> ConvertResult;
     fn file_ext(&self) -> String;
     fn description(&self) -> String;
     fn help(&self) -> String;
