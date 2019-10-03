@@ -66,6 +66,7 @@ fn do_flags<'a, 'b>() -> clap::App<'a, 'b> {
              (@arg recurse: -r "Whether we should recurse or not.")
              (@arg indent: -i --indent "How many spaces to indent by. Defaults to 4")
              (@arg INPUT: ... "Input ucg files or directories to format")
+             (@arg write: -w --overwrite "Whether to overwrite the with the formatted form")
             )
             (@subcommand converters =>
              (about: "list the available converters")
@@ -386,15 +387,23 @@ fn build_command<C: Cache>(
     }
 }
 
-fn fmt_file(p: &Path, indent: usize) -> std::result::Result<(), Box<dyn Error>> {
-    let mut f = File::open(p)?;
+fn fmt_file(p: &Path, indent: usize, overwrite: bool) -> std::result::Result<(), Box<dyn Error>> {
     let mut contents = String::new();
-    f.read_to_string(&mut contents)?;
+    {
+        let mut f = File::open(p)?;
+        f.read_to_string(&mut contents)?;
+    }
     let mut comment_map = BTreeMap::new();
     let stmts = parse(OffsetStrIter::new(&contents), Some(&mut comment_map))?;
-    let mut printer = ucglib::ast::printer::AstPrinter::new(indent, std::io::stdout())
-        .with_comment_map(&comment_map);
-    printer.render(&stmts)?;
+    if overwrite {
+        let mut printer = ucglib::ast::printer::AstPrinter::new(indent, File::create(p)?)
+            .with_comment_map(&comment_map);
+        printer.render(&stmts)?;
+    } else {
+        let mut printer = ucglib::ast::printer::AstPrinter::new(indent, std::io::stdout())
+            .with_comment_map(&comment_map);
+        printer.render(&stmts)?;
+    }
     Ok(())
 }
 
@@ -408,7 +417,7 @@ fn fmt_dir(p: &Path, recurse: bool, indent: usize) -> std::result::Result<(), Bo
         if path.is_dir() && recurse {
             fmt_dir(&path, recurse, indent)?;
         } else {
-            fmt_file(&path, indent)?;
+            fmt_file(&path, indent, true)?;
         }
     }
     Ok(())
@@ -417,6 +426,7 @@ fn fmt_dir(p: &Path, recurse: bool, indent: usize) -> std::result::Result<(), Bo
 fn fmt_command(matches: &clap::ArgMatches) -> std::result::Result<(), Box<dyn Error>> {
     let files = matches.values_of("INPUT");
     let recurse = matches.is_present("recurse");
+    let overwrite = matches.is_present("write");
     let indent = match matches.value_of("indent") {
         Some(s) => s.parse::<usize>()?,
         None => 4,
@@ -434,7 +444,7 @@ fn fmt_command(matches: &clap::ArgMatches) -> std::result::Result<(), Box<dyn Er
         if p.is_dir() {
             fmt_dir(&p, recurse, indent)?;
         } else {
-            fmt_file(&p, indent)?;
+            fmt_file(&p, indent, overwrite)?;
         }
     }
     Ok(())
