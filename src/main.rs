@@ -693,6 +693,7 @@ fn main() {
     } else if let Some(matches) = app_matches.subcommand_matches("fmt") {
         if let Err(e) = fmt_command(matches) {
             eprintln!("{}", e);
+            process::exit(1);
         }
     } else {
         app.print_help().unwrap();
