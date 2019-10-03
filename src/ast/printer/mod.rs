@@ -473,9 +473,11 @@ where
                 write!(self.w, "{{\n")?;
                 self.curr_indent += self.indent_size;
                 let indent = self.make_indent();
+                let mut prefix_newline = false;
                 for stmt in _def.statements.iter() {
                     write!(self.w, "{}", indent)?;
-                    self.render_stmt(stmt)?;
+                    self.render_stmt(stmt, prefix_newline)?;
+                    prefix_newline = true;
                 }
                 self.curr_indent -= self.indent_size;
                 write!(self.w, "}}")?;
@@ -532,8 +534,11 @@ where
         Ok(())
     }
 
-    pub fn render_stmt(&mut self, stmt: &Statement) -> std::io::Result<()> {
+    pub fn render_stmt(&mut self, stmt: &Statement, prefix_newline: bool) -> std::io::Result<()> {
         // All statements start at the beginning of a line.
+        if prefix_newline {
+            write!(self.w, "\n")?;
+        }
         let line = stmt.pos().line;
         self.render_comment_if_needed(line)?;
         match stmt {
@@ -557,14 +562,16 @@ where
                 self.render_expr(&_expr)?;
             }
         };
-        write!(self.w, ";\n\n")?;
+        write!(self.w, ";\n")?;
         self.last_line = line;
         Ok(())
     }
 
     pub fn render(&mut self, stmts: &Vec<Statement>) -> std::io::Result<()> {
+        let mut prefix_newline = false;
         for v in stmts {
-            self.render_stmt(v)?;
+            self.render_stmt(v, prefix_newline)?;
+            prefix_newline = true;
         }
         let comment_line = self.comment_group_lines.first().cloned();
         if let Some(last_comment_line) = comment_line {
