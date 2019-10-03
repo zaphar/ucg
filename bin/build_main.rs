@@ -17,17 +17,18 @@ fn generate_rust_module() -> String {
         let path = entry.into_path();
         // We only include files that are not test files.
         let path_str = path.to_string_lossy().to_string();
+        let fixed_path_str = path_str.replace(std::path::MAIN_SEPARATOR, "/");
         if path.is_file() && !path_str.ends_with("_test.ucg") {
             println!("Adding lib file: {}", path_str);
-            let out_path = PathBuf::from(format!("{}/{}", out_dir, path_str));
+            let out_path = PathBuf::from(format!("{}{}{}", out_dir, std::path::MAIN_SEPARATOR, path_str));
             // We have to copy the file into out out directory to ensure that we
             // have a reliable way for the stdlib.rs module file to include them
             // from.
             std::fs::create_dir_all(out_path.parent().unwrap()).unwrap();
             std::fs::copy(&path_str, &out_path).unwrap();
             let include = format!(
-                "\tstdlib.insert(\n\t\t\"{}\".to_string(),\n\t\tinclude_str!(\"{}/{}\"));\n",
-                path_str, out_dir, path_str
+                "\tstdlib.insert(\n\t\tr\"{}\".to_string(),\n\t\tinclude_str!(r\"{}{}{}\"));\n",
+                fixed_path_str, out_dir,  std::path::MAIN_SEPARATOR, path_str
             );
             rust_lib.push_str(&include);
             rust_lib.push_str("\n");
