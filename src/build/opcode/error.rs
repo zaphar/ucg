@@ -77,8 +77,8 @@ impl From<regex::Error> for Error {
 
 impl From<std::io::Error> for Error {
     fn from(e: std::io::Error) -> Self {
-        let msg = match e.kind() {
-            io::ErrorKind::NotFound => format!("OSError: Path not found: {}", e),
+        let msg = match dbg!(e.kind()) {
+            io::ErrorKind::NotFound | io::ErrorKind::Other => format!("OSError: Path not found: {}", e),
             _ => format!("{}", e),
         };
         Error {
