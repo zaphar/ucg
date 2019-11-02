@@ -38,7 +38,7 @@ let equal = module{
     (mod.desc != NULL) || fail "description can't be null";
 
     let ok = mod.left == mod.right;
-    let desc = select (mod.desc == ""), "@ == @" % (mod.left, mod.right), {
+    let desc = select ((mod.desc == ""), "@ == @" % (mod.left, mod.right)) => {
         false = mod.desc,
     };
 };
@@ -54,7 +54,7 @@ let not_equal = module{
     (mod.desc != NULL) || fail "description can't be null";
 
     let ok = mod.left != mod.right;
-    let desc = select (mod.desc == ""), "@ != @" % (mod.left, mod.right), {
+    let desc = select ((mod.desc == ""), "@ != @" % (mod.left, mod.right)) => {
         false = mod.desc,
     };
 };

@@ -12,14 +12,14 @@ let base_types = [
 ];
 
 // Computes the base type of a value.
-let base_type_of = func (val) => reduce(func (acc, f) => select (acc.val is f), f, {
+let base_type_of = func (val) => reduce(func (acc, f) => select ((acc.val is f), f) => {
     true = acc{typ = f},
     false = acc,
 }, {val=val, typ="null"}, base_types).typ;
 
 // Turns any schema check module into a compile failure.
 // The module must export the computed value as the result field.
-let must = func (m, msg) => select m, fail msg, {
+let must = func (m, msg) => select (m, fail msg) => {
     true = m,
 };
 
@@ -97,13 +97,13 @@ let shaped = module {
     let simple_handler = func (val, shape) => val is schema.base_type_of(shape);
 
     let tuple_handler = func (acc, name, value) => acc{
-        ok = select (name) in acc.shape, mod.partial, {
+        ok = select ((name) in acc.shape, mod.partial) => {
             true = this{val=value, shape=acc.shape.(name), partial=mod.partial},
         },
     };
 
     let shape_tuple_handler = func (acc, field_name, value) => acc{
-        ok = select (field_name) in acc.val, false, {
+        ok = select ((field_name) in acc.val, false) => {
             true = this{val=value, shape=acc.val.(field_name), partial=false},
         },
     };
@@ -118,7 +118,7 @@ let shaped = module {
         ok = acc.ok && schema.any{val=value, types=acc.shape},
     };
 
-    let result = select schema.base_type_of(mod.val), false, {
+    let result = select (schema.base_type_of(mod.val), false) => {
         str = simple_handler(mod.val, mod.shape),
         int = simple_handler(mod.val, mod.shape),
         float = simple_handler(mod.val, mod.shape),
@@ -127,7 +127,7 @@ let shaped = module {
         tuple = (mod.shape is "tuple") &&
                 match_shape_fields(mod.val, mod.shape) &&
                 match_tuple_fields(mod.val, mod.shape), 
-        list = (mod.shape is "list") && select mod.shape == [], true, {
+        list = (mod.shape is "list") && select (mod.shape == [], true) => {
             false = reduce(list_handler, {shape=mod.shape, ok=true}, mod.val).ok,
         },
         func = simple_handler(mod.val, mod.shape),

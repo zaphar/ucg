@@ -1,67 +1,67 @@
-let asserts = import "std/testing.ucg";
+let t = import "std/testing.ucg";
 
-let not_equal_result = asserts.not_equal{
+let not_equal_result = t.not_equal{
     left=1,
     right=2,
 };
 assert not_equal_result;
-assert asserts.equal{
+assert t.equal{
     left=not_equal_result.desc,
     right="1 != 2",
 };
 
-let bad_not_equal_result = asserts.not_equal{
+let bad_not_equal_result = t.not_equal{
     left=1,
     right=1,
 };
-assert asserts.not_ok{test=bad_not_equal_result.ok};
-assert asserts.equal{
+assert t.not_ok{test=bad_not_equal_result.ok};
+assert t.equal{
     left=bad_not_equal_result.desc,
     right="1 != 1",
 };
 
 
-let equal_result = asserts.equal{
+let equal_result = t.equal{
     left=1,
     right=1,
 };
 assert equal_result;
-assert asserts.equal{
+assert t.equal{
     left=equal_result.desc,
     right="1 == 1",
 };
 
-let bad_equal_result = asserts.equal{
+let bad_equal_result = t.equal{
     left=1,
     right=2,
 };
-assert asserts.equal{
+assert t.equal{
     left=bad_equal_result.desc,
     right="1 == 2",
 };
 
-let ok_result = asserts.ok{
+let ok_result = t.ok{
     test=true,
 };
 assert ok_result;
-assert asserts.equal{
+assert t.equal{
     left=ok_result.desc,
     right="TODO description",
 };
 
-let bad_ok_result = asserts.ok{
+let bad_ok_result = t.ok{
     test=false,
 };
-assert asserts.equal{
+assert t.equal{
     left=bad_ok_result.desc,
     right="TODO description",
 };
 
-let not_ok_result = asserts.not_ok{
+let not_ok_result = t.not_ok{
     test=false,
 };
 assert not_ok_result;
-assert asserts.equal{
+assert t.equal{
     left=not_ok_result.desc,
     right="TODO description",
 };

@@ -4,7 +4,7 @@ let list1 = [1, 2, 3, 4];
 let list2 = ["foo", "bar", "foo", "bar"];
 
 let mapper = func (item) => item + 1;
-let filtrator = func (item) =>  select item, NULL, {
+let filtrator = func (item) =>  select (item, NULL) => {
         foo = item,
 };
 
@@ -84,7 +84,7 @@ assert {
     desc = "map(identity_tpl_mapper, test_tpl) == test_tpl",
 };
 
-let tpl_mapper = func (name, val) => select name, [name, val], {
+let tpl_mapper = func (name, val) => select (name, [name, val]) => {
     "foo" = ["foo", "barbar"],
     quux = ["cute", "pygmy"],
 };

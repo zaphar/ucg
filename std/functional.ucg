@@ -18,11 +18,11 @@ let maybe = module{
 } => ({do=do, is_null=is_null, or=or, unwrap=unwrap, expect=expect}) {
     let this = mod.this;
 
-    let do = func (op) =>  select (mod.val != NULL), this{val=NULL}, {
+    let do = func (op) =>  select ((mod.val != NULL), this{val=NULL}) => {
         true = this{val=op(mod.val)},
     };
 
-    let or = func (op) => select (mod.val == NULL), this{val=mod.val}, {
+    let or = func (op) => select ((mod.val == NULL), this{val=mod.val}) => {
         true = this{val=op()},
     };
 
@@ -30,7 +30,7 @@ let maybe = module{
     
     let unwrap = func() => mod.val;
 
-    let expect = func(msg) => select mod.val != NULL, fail msg, {
+    let expect = func(msg) => select (mod.val != NULL, fail msg) => {
         true = mod.val,
     };
 };

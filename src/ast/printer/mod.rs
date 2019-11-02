@@ -516,12 +516,13 @@ where
                     }
                 }
                 write!(self.w, "select ")?;
+                write!(self.w, "(")?;
                 self.render_expr(&_def.val)?;
-                write!(self.w, ", ")?;
                 if let Some(ref e) = _def.default {
-                    self.render_expr(e)?;
                     write!(self.w, ", ")?;
+                    self.render_expr(e)?;
                 }
+                write!(self.w, ") => ")?;
                 self.render_tuple_def(&_def.tuple)?;
             }
             Expression::Simple(ref _def) => {
