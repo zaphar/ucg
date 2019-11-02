@@ -33,7 +33,7 @@ let embedded_mod = module {
     deep_value = "None",
     environ = "None",
 } => {
-    let env_name = select mod.environ, "qa", {
+    let env_name = select (mod.environ, "qa") => {
         None = "qa",
         prod = "prod",
         qa = "qa",
@@ -113,7 +113,7 @@ assert t.equal{
 
 let recursive_module = module {start=1, end=10} => (result) {
     let this = mod.this;
-    let result = select mod.start != mod.end, mod.start, {
+    let result = select (mod.start != mod.end, mod.start) => {
         true = this{start=mod.start + 1, end=mod.end},
     };
 };

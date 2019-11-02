@@ -49,6 +49,7 @@ import_keyword: "import" ;
 include_keyword: "include" ; 
 as_keyword: "as" ;
 func_keyword: "func" ;
+select_keyword: "select" ;
 map_keyword: "map" ;
 reduce_keyword: "map" ;
 filter_keyword: "filter" ;
@@ -109,6 +110,12 @@ literal: str | integer | float | list | tuple | null_keyword;
 
 ```
 grouped: lparen, expr, rparen ;
+```
+
+#### Select expressions
+
+```
+select_expr: select_keyword, lparen, expr, [comma, expr], fatcomma, tuple ;
 ```
 
 #### Function Definition
@@ -189,6 +196,7 @@ trace_expr: trace_keyword, expr ;
 ```
 non_operator_expr: literal
                    | grouped
+                   | select_def
                    | import_expr
                    | funcdef
                    | module_def

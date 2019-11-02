@@ -121,8 +121,8 @@ assert {
 };
 let want = "foo";
 assert {
-    ok = select want, 1, { foo=2, } == 2,
-    desc = "select want, 1, { foo=2, } == 2",
+    ok = select (want, 1) => { foo=2, } == 2,
+    desc = "select (want, 1) => { foo=2, } == 2",
 };
 
 // Contains comparison operators.

@@ -6,7 +6,7 @@ let validate_ns = func(ns) => schema.any{val=ns, types=["", {prefix="", uri=""}]
 
 // Constructs an xml namespace for use in an xml tag or document root.
 // Use NULL for the uri argument to use just the prefix.
-let ns = func(prefix, uri) => select uri != NULL, {
+let ns = func(prefix, uri) => select (uri != NULL) => {
     true = {
         prefix = prefix,
         uri = uri,
@@ -30,9 +30,9 @@ let tag = module{
         children = mod.children,
     };
 
-    let result = select mod.ns == NULL, {
+    let result = select (mod.ns == NULL) => {
         true = base,
-        false = select pkg.validate_ns(mod.ns), {
+        false = select (pkg.validate_ns(mod.ns)) => {
            true = base{ns=mod.ns},
            false = fail "XML Tag namespaces must be a string or tuple of {prefix=, uri=} but is @" % (mod.ns),
         },
@@ -49,7 +49,7 @@ let validate_node = func(node) => schema.any{val=node, types=["", {name = ""}], 
 //
 // The root node must be a valid xml node. Either a text or an
 // xml node.
-let doc = func(root) => select validate_node(root), {
+let doc = func(root) => select (validate_node(root)) => {
     true = {
         root = root,
     },

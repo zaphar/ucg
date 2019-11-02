@@ -550,10 +550,10 @@ fn test_func_call_wrong_argument_type_compile_failure() {
 #[test]
 fn test_select_missed_case_string_no_default_compile_failure() {
     assert_build_failure(
-        "select \"a\", { b = 1, };",
+        "select (\"a\") => { b = 1, };",
         vec![
             Regex::new(r"Unhandled select case with no default").unwrap(),
-            Regex::new(r"line: 1 column: 8").unwrap(),
+            Regex::new(r"line: 1 column: 9").unwrap(),
         ],
     )
 }
@@ -561,10 +561,10 @@ fn test_select_missed_case_string_no_default_compile_failure() {
 #[test]
 fn test_select_missed_case_boolean_no_default_compile_failure() {
     assert_build_failure(
-        "select true, { false = 1, };",
+        "select (true) => { false = 1, };",
         vec![
             Regex::new(r"Unhandled select case with no default").unwrap(),
-            Regex::new(r"line: 1 column: 8").unwrap(),
+            Regex::new(r"line: 1 column: 9").unwrap(),
         ],
     )
 }
