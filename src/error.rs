@@ -108,11 +108,6 @@ impl BuildError {
 
     fn render(&self, w: &mut fmt::Formatter) -> fmt::Result {
         if let Some(ref pos) = self.pos {
-            // FIXME(jwall): we should still be printing the file here.
-            let file = match pos.file {
-                Some(ref pb) => pb.to_string_lossy().to_string(),
-                None => "<eval>".to_string(),
-            };
             write!(w, "{}: {} at {}", self.err_type, self.msg, pos,)?;
         } else {
             write!(w, "{}: {}", self.err_type, self.msg)?;

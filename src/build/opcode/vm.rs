@@ -842,7 +842,7 @@ where
             }
             &C(List(ref elems, _)) => {
                 for e in elems {
-                    if dbg!(e) == dbg!(&right) {
+                    if dbg!(e) == &right {
                         self.push(Rc::new(P(Bool(true))), pos)?;
                         return Ok(());
                     }

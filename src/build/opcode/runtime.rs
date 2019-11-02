@@ -177,7 +177,12 @@ impl Builtins {
             if let &Value::P(Str(ref path)) = val.as_ref() {
                 // TODO(jwall): A bit hacky we should probably change import stacks to be pathbufs.
                 let normalized = decorate_error!(path_pos => self.normalize_path(base_path, false, path))?;
+                // first we chack the cache
                 let path = normalized.to_string_lossy().to_string();
+                if let Some(val) = env.borrow().get_cached_path_val(&path) {
+                    stack.push((val, path_pos));
+                    return Ok(());
+                }
                 if import_stack
                    .iter()
                    .find(|p| *p == &path)
@@ -197,13 +202,15 @@ impl Builtins {
                         let op_pointer =
                             decorate_error!(path_pos => env.borrow_mut().get_ops_for_path(&normalized))?;
                         // TODO(jwall): What if we don't have a base path?
-                        let mut vm = VM::with_pointer(op_pointer, env.clone(), normalized.parent().unwrap());
+                        let mut vm = VM::with_pointer(op_pointer, env.clone(), normalized.parent().unwrap())
+                            .with_import_stack(import_stack.clone());
                         vm.run()?;
                         let result = Rc::new(vm.symbols_to_tuple(true));
                         env.borrow_mut().update_path_val(&path, result.clone());
                         stack.push((result, pos));
                     }
                 }
+                import_stack.push(path.clone());
                 return Ok(());
             }
             return Err(Error::new(format!("Invalid Path {:?}", val), pos));
