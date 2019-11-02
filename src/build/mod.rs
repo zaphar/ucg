@@ -47,11 +47,6 @@ mod stdlib;
 
 pub use self::ir::Val;
 
-enum ProcessingOpType {
-    Map,
-    Filter,
-}
-
 /// The result of a build.
 type BuildResult = Result<(), Box<dyn Error>>;
 

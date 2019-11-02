@@ -23,15 +23,12 @@ use std::error::Error;
 use std::fs::File;
 use std::io;
 use std::io::Read;
-use std::io::{Stderr, Stdout};
 use std::path::{Path, PathBuf};
 use std::process;
 use std::rc::Rc;
 
 use ucglib::build;
-use ucglib::build::assets::{Cache, MemoryCache};
-use ucglib::build::Val;
-use ucglib::convert::traits;
+use ucglib::build::assets::{MemoryCache};
 use ucglib::convert::{ConverterRegistry, ImporterRegistry};
 use ucglib::iter::OffsetStrIter;
 use ucglib::parse::parse;

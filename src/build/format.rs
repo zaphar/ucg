@@ -110,7 +110,7 @@ impl ExpressionTemplate {
         let i = SliceIter::new(&toks);
         match parse::expression(i) {
             ParseResult::Complete(_, expr) => Ok(expr),
-            ParseResult::Abort(e) | ParseResult::Fail(e) => {
+            ParseResult::Abort(_e) | ParseResult::Fail(_e) => {
                 panic!("TODO(jwall): make this not a thing")
             }
             ParseResult::Incomplete(_ei) => panic!("TODO(jwall): make this not a thing"),

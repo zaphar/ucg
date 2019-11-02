@@ -11,14 +11,10 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
-use super::assets;
-use super::assets::MemoryCache;
-use super::{FileBuilder, SelectDef, Val};
+use super::{FileBuilder, Val};
 use crate::ast::*;
-use crate::convert::ConverterRegistry;
 
 use std;
-use std::cell::RefCell;
 use std::rc::Rc;
 
 fn test_expr_to_val<'a, O, E>(mut cases: Vec<(Expression, Val)>, mut b: FileBuilder<'a, O, E>)
@@ -35,8 +31,6 @@ where
 #[should_panic(expected = "Expected Float")]
 fn test_eval_div_expr_fail() {
     let i_paths = Vec::new();
-    let cache = Rc::new(RefCell::new(MemoryCache::new()));
-    let registry = ConverterRegistry::make_registry();
     let out: Vec<u8> = Vec::new();
     let err: Vec<u8> = Vec::new();
     let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, out, err);

@@ -6,7 +6,6 @@ use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use std::string::ToString;
 
-use crate::ast::*;
 use crate::error;
 
 /// The Intermediate representation of a compiled UCG AST.

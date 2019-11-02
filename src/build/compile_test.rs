@@ -12,9 +12,6 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use regex::Regex;
 
 //TODO(jwall): use super::assets::MemoryCache;
