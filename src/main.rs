@@ -180,7 +180,7 @@ fn do_compile(file: &str, strict: bool, import_paths: &Vec<PathBuf>) -> bool {
     if builder.out.is_none() {
         eprintln!("Build results in no artifacts.");
     }
-    return false;
+    return true;
 }
 
 fn visit_ucg_files(

@@ -441,26 +441,6 @@ fn func_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expressi
     }
 }
 
-fn tuple_to_select<'a>(
-    input: SliceIter<'a, Token>,
-    e1: Expression,
-    e2: Option<Expression>,
-    val: Value,
-) -> ConvertResult<'a, Expression> {
-    match val {
-        Value::Tuple(v) => Ok(Expression::Select(SelectDef {
-            val: Box::new(e1),
-            default: e2.map(|e| Box::new(e)),
-            tuple: v.val,
-            pos: (&input).into(),
-        })),
-        val => Err(Error::new(
-            format!("Expected Tuple Got {:?}", val),
-            Box::new(input.clone()),
-        )),
-    }
-}
-
 make_fn!(
     alt_select_expression<SliceIter<Token>, Expression>,
     do_each!(
