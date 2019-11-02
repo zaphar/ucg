@@ -1,5 +1,5 @@
 // Assert that a value is a tuple. Generate a compile failure if it is not.
-let assert_tuple = func (tpl) => select tpl is "tuple", NULL, {
+let assert_tuple = func (tpl) => select (tpl is "tuple", NULL) => {
     false = fail "@ is not a tuple" % (tpl),
 };
 
@@ -91,12 +91,12 @@ let field_type = module{
     pkg.assert_tuple(mod.tpl);
 
     // Next we assert that mod.field is a string.
-    select mod.field is "str", NULL, {
+    select (mod.field is "str", NULL) => {
         false = fail "@ is not a string" % (mod.field),
     };
 
     // and finally that mod.type is a string
-    select mod.type is "str", NULL, {
+    select (mod.type is "str", NULL) => {
         false = fail "@ is not a string" % (mod.type),
     };
 
@@ -104,7 +104,7 @@ let field_type = module{
     let it = pkg.iter{tpl=mod.tpl};
 
     // The reducer function used to check the field's types if it exists. 
-    let reducer = func (acc, l) => acc && (select l.0 == mod.field, NULL, {
+    let reducer = func (acc, l) => acc && (select (l.0 == mod.field, NULL) => {
         true = l.1 is mod.type, // if this is the field then we propagate if it's the right type.
         false = true, // if this isn't the field then we propagate true
     });

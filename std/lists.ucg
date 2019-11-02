@@ -9,7 +9,7 @@ let str_join = module{
     list=NULL,
 } => (result) {
     // The function used by reduce to join the list into a string.
-    let joiner = func (acc, item) =>  select (acc.out == ""), NULL, {
+    let joiner = func (acc, item) =>  select ((acc.out == ""), NULL) => {
         true = acc{
             out="@@" % (acc.out,item),
         },
@@ -32,7 +32,7 @@ let reverse = func(list) => reduce(func (acc, item) =>  [item] + acc, [], list);
 // head returns the first item in a list as a list of one item.
 // This function is safe for empty list inputs but is not safe
 // for NULL inputs.
-let head = func(list) => select len(list) > 0, [], {
+let head = func(list) => select (len(list) > 0, []) => {
     true = [list.0],
 };
 
@@ -40,7 +40,7 @@ let head = func(list) => select len(list) > 0, [], {
 // This function is safe for empty lists but is not safe
 // for NULL inputs.
 let tail = func(list) => reduce(
-    func (acc, item) => select acc.count > 0, acc{count=1, tail=[]}, {
+    func (acc, item) => select (acc.count > 0, acc{count=1, tail=[]}) => {
         true = acc{count = acc.count + 1, tail = acc.tail + [item]},
     },
     {count=0},
@@ -81,7 +81,7 @@ let slice = module {
 
     let list_len = list.len(mod.list);
 
-    let end = select mod.end is "null", mod.end, {
+    let end = select (mod.end is "null", mod.end) => {
         true = list_len,
     };
 
@@ -92,7 +92,7 @@ let slice = module {
 
     let reducer = func(acc, item) => acc{
         count = acc.count + 1,
-        list = select (acc.count >= mod.start) && (acc.count <= end), acc.list, {
+        list = select ((acc.count >= mod.start) && (acc.count <= end), acc.list) => {
             true = acc.list + [item],
         },
     };
@@ -118,7 +118,7 @@ let zip = module{
     let len2 = len(mod.list2);
 
     // Compute the min range of the two lists.
-    let rng = select (len1 >= len2), NULL, {
+    let rng = select ((len1 >= len2), NULL) => {
         true = 0:(len1 - 1),
         false = 0:(len2 - 1),
     };

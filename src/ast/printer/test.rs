@@ -149,13 +149,13 @@ fn test_out_expr_printing() {
 
 #[test]
 fn test_select_expr_no_default_printing() {
-    let input = "select true, {\n  true = 1,\n  false = 2,\n};";
+    let input = "select (true) => {\n  true = 1,\n  false = 2,\n};";
     assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 
 #[test]
 fn test_select_expr_with_default_printing() {
-    let input = "select true, 3, {\n  true = 1,\n  false = 2,\n};";
+    let input = "select (true, 3) => {\n  true = 1,\n  false = 2,\n};";
     assert_eq!(print_to_buffer(input), format!("{}\n", input));
 }
 

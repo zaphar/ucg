@@ -1,54 +1,54 @@
 let strings = import "std/strings.ucg";
-let asserts = import "std/testing.ucg";
+let t = import "std/testing.ucg";
 
 let str_class = strings.ops{str="foo bar"};
 
-assert asserts.equal{
+assert t.equal{
     left = str_class.split_on{},
     right = ["foo", "bar"],
 };
 
-assert asserts.equal{
+assert t.equal{
     left = strings.ops{str="foo"}.split_on{},
     right = ["foo"],
 };
 
-assert asserts.equal{
+assert t.equal{
     left = strings.ops{str=""}.split_on{},
     right = [""],
 };
 
-assert asserts.equal{
+assert t.equal{
     left = strings.ops{str="foo=>bar=>quux"}.split_on{on="=>"},
     right = ["foo", "bar", "quux"],
 };
 
-assert asserts.equal{
+assert t.equal{
     left = str_class.split_at(3),
     right = {left="foo", right=" bar"},
 };
 
-assert asserts.equal{
+assert t.equal{
     left = str_class.len,
     right = 7,
 };
 
-assert asserts.equal{
+assert t.equal{
     left = str_class.chars,
     right = ["f", "o", "o", " ", "b", "a", "r"],
 };
 
-assert asserts.equal{
+assert t.equal{
     left = str_class.substr{start=1}.str,
     right = "oo bar",
 };
 
-assert asserts.equal{
+assert t.equal{
     left = str_class.substr{end=5}.str,
     right = "foo ba",
 };
 
-assert asserts.equal{
+assert t.equal{
     left = str_class.substr{end=8}.str,
     right = "foo bar",
 };

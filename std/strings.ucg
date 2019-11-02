@@ -48,12 +48,12 @@ let ops = module {
             let maybe_prefix = check_str.substr{end=split_str.len - 1};
             let maybe_suffix = check_str.substr{start=split_str.len};
 
-            let result = select maybe_prefix.len == 0, {
+            let result = select (maybe_prefix.len == 0) => {
                 // terminal condition
                 true = mod.acc + [mod.buf],
                 //true = mod,
                 // recurse condition.
-                false = select maybe_prefix.str == mod.sep, {
+                false = select (maybe_prefix.str == mod.sep) => {
                     true = this{ // this is a match to our separator
                         str=maybe_suffix.str,
                         sep=mod.sep,
@@ -77,10 +77,10 @@ let ops = module {
         reduce(
             func(acc, char) => acc{
                 counter = acc.counter + 1,
-                left = select acc.counter < idx, acc.left, {
+                left = select (acc.counter < idx, acc.left) => {
                     true = acc.left + char,
                 },
-                right = select acc.counter >= idx, acc.right, {
+                right = select (acc.counter >= idx, acc.right) => {
                     true = acc.right + char,
                 },
             },
@@ -97,7 +97,7 @@ let ops = module {
         let pkg = mod.pkg();
         let reducer = func(acc, char) => acc{
             counter = acc.counter + 1,
-            str = select ((acc.counter >= mod.start) && (acc.counter <= mod.end)), acc.str, {
+            str = select ((acc.counter >= mod.start) && (acc.counter <= mod.end), acc.str) => {
                 true = acc.str + char,
             },
         };
