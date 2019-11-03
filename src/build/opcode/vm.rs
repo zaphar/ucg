@@ -140,7 +140,7 @@ where
         }
         return C(Tuple(flds, pos_list));
     }
-    
+
     pub fn remove_symbol(&mut self, sym: &str) -> Option<(Rc<Value>, Position)> {
         self.symbols.remove_symbol(sym)
     }

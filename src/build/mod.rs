@@ -23,19 +23,19 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use simple_error;
 use rustyline;
+use simple_error;
 
 use crate::ast::*;
 use crate::error;
 use crate::iter::OffsetStrIter;
 use crate::parse::parse;
 
+use crate::build::opcode::pointer::OpPointer;
 use crate::build::opcode::translate;
+use crate::build::opcode::translate::PositionMap;
 use crate::build::opcode::Environment;
 use crate::build::opcode::VM;
-use crate::build::opcode::pointer::OpPointer;
-use crate::build::opcode::translate::PositionMap;
 
 pub mod assets;
 pub mod format;
@@ -207,7 +207,11 @@ where
         println!("Type '#help' for help.");
         println!("");
         // Initialize VM with an empty OpPointer
-        let mut vm = VM::new(Rc::new(PositionMap::new()), self.environment.clone(), &self.working_dir);
+        let mut vm = VM::new(
+            Rc::new(PositionMap::new()),
+            self.environment.clone(),
+            &self.working_dir,
+        );
         loop {
             // print prompt
             let line = editor.readline(&format!("{}> ", lines.next_line()))?;
@@ -255,8 +259,7 @@ where
                                     println!("{}", val);
                                     vm.last = None;
                                 }
-                                None => {
-                                }
+                                None => {}
                             }
                             editor.history_mut().add(stmt);
                             editor.save_history(&config_home)?;

@@ -472,50 +472,50 @@ make_fn!(
 );
 
 //fn select_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expression> {
-    //let parsed = do_each!(input,
-        //_ => word!("select"),
-        //val => do_each!(
-            //expr => wrap_err!(
-                        //trace_parse!(must!(expression)),
-                        //"Did you forget a comma after your selector value?"),
-            //_ => must!(punct!(",")),
-            //(expr)
-        //),
-        //default_and_map => either!(
-            //do_each!(
-                //default => do_each!(
-                    //expr => trace_parse!(expression),
-                    //_ => punct!(","),
-                    //(expr)
-                //),
-                //map => trace_parse!(must!(tuple)),
-                //(Some(default), map)
-            //),
-            //do_each!(
-                //map => wrap_err!(
-                    //trace_parse!(must!(tuple)),
-                    //"Did you forget a comma after your default value?"
-                //),
-                //(None, map)
-            //)
-        //),
-        //(val, default_and_map.0, default_and_map.1)
-    //);
-    //match parsed {
-        //Result::Abort(e) => Result::Abort(e),
-        //Result::Fail(e) => Result::Fail(e),
-        //Result::Incomplete(offset) => Result::Incomplete(offset),
-        //Result::Complete(rest, (val, default, map)) => {
-            //match tuple_to_select(input.clone(), val, default, map) {
-                //Ok(expr) => Result::Complete(rest, expr),
-                //Err(e) => Result::Fail(Error::caused_by(
-                    //"Invalid Select Expression",
-                    //Box::new(e),
-                    //Box::new(rest.clone()),
-                //)),
-            //}
-        //}
-    //}
+//let parsed = do_each!(input,
+//_ => word!("select"),
+//val => do_each!(
+//expr => wrap_err!(
+//trace_parse!(must!(expression)),
+//"Did you forget a comma after your selector value?"),
+//_ => must!(punct!(",")),
+//(expr)
+//),
+//default_and_map => either!(
+//do_each!(
+//default => do_each!(
+//expr => trace_parse!(expression),
+//_ => punct!(","),
+//(expr)
+//),
+//map => trace_parse!(must!(tuple)),
+//(Some(default), map)
+//),
+//do_each!(
+//map => wrap_err!(
+//trace_parse!(must!(tuple)),
+//"Did you forget a comma after your default value?"
+//),
+//(None, map)
+//)
+//),
+//(val, default_and_map.0, default_and_map.1)
+//);
+//match parsed {
+//Result::Abort(e) => Result::Abort(e),
+//Result::Fail(e) => Result::Fail(e),
+//Result::Incomplete(offset) => Result::Incomplete(offset),
+//Result::Complete(rest, (val, default, map)) => {
+//match tuple_to_select(input.clone(), val, default, map) {
+//Ok(expr) => Result::Complete(rest, expr),
+//Err(e) => Result::Fail(Error::caused_by(
+//"Invalid Select Expression",
+//Box::new(e),
+//Box::new(rest.clone()),
+//)),
+//}
+//}
+//}
 //}
 
 make_fn!(

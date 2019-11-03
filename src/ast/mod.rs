@@ -578,7 +578,12 @@ impl ModuleDef {
         let rewrite_import = |e: &mut Expression| {
             let main_separator = format!("{}", std::path::MAIN_SEPARATOR);
             if let Expression::Include(ref mut def) = e {
-                let path = PathBuf::from(&def.path.fragment.replace("/", &main_separator).replace("\\", &main_separator));
+                let path = PathBuf::from(
+                    &def.path
+                        .fragment
+                        .replace("/", &main_separator)
+                        .replace("\\", &main_separator),
+                );
                 if path.is_relative() {
                     def.path.fragment = base
                         .join(path)
@@ -589,7 +594,12 @@ impl ModuleDef {
                 }
             }
             if let Expression::Import(ref mut def) = e {
-                let path = PathBuf::from(&def.path.fragment.replace("/", &main_separator).replace("\\", &main_separator));
+                let path = PathBuf::from(
+                    &def.path
+                        .fragment
+                        .replace("/", &main_separator)
+                        .replace("\\", &main_separator),
+                );
                 // std/ paths are special and do not get made into absolute paths.
                 if path.starts_with(format!("std{}", main_separator)) {
                     return;

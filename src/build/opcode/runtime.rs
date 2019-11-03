@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use std::cell::RefCell;
+use std::fmt::Debug;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use std::fmt::Debug;
 
 use regex::Regex;
 
@@ -123,11 +123,11 @@ impl Builtins {
         // The canonicalize method on windows is not what we want so we'll
         // do something a little different on windows that we would do on
         // other Operating Systems.
-        #[cfg(target_os="windows")]
+        #[cfg(target_os = "windows")]
         {
             Ok(dbg!(normalized))
         }
-        #[cfg(not(target_os="windows"))]
+        #[cfg(not(target_os = "windows"))]
         {
             Ok(dbg!(normalized.canonicalize()?))
         }
@@ -156,7 +156,12 @@ impl Builtins {
         }
     }
 
-    fn get_file_as_string<P: Into<PathBuf>>(&self, base_path: P, path: &str, pos: Position) -> Result<String, Error> {
+    fn get_file_as_string<P: Into<PathBuf>>(
+        &self,
+        base_path: P,
+        path: &str,
+        pos: Position,
+    ) -> Result<String, Error> {
         let sep = format!("{}", std::path::MAIN_SEPARATOR);
         let raw_path = path.replace("/", &sep);
         // FIXME(jwall): import paths?
@@ -180,40 +185,37 @@ impl Builtins {
     where
         O: std::io::Write + Clone,
         E: std::io::Write + Clone,
-        P: Into<PathBuf> + Clone + Debug, 
+        P: Into<PathBuf> + Clone + Debug,
     {
         let path = stack.pop();
         if let Some((val, path_pos)) = path {
             if let &Value::P(Str(ref path)) = val.as_ref() {
                 // TODO(jwall): A bit hacky we should probably change import stacks to be pathbufs.
-                let normalized = decorate_error!(path_pos => self.normalize_path(base_path, false, dbg!(path)))?;
+                let normalized =
+                    decorate_error!(path_pos => self.normalize_path(base_path, false, dbg!(path)))?;
                 // first we chack the cache
                 let path = dbg!(normalized.to_string_lossy().to_string());
                 if let Some(val) = env.borrow().get_cached_path_val(&path) {
                     stack.push((val, path_pos));
                     return Ok(());
                 }
-                if import_stack
-                   .iter()
-                   .find(|p| *p == &path)
-                   .is_some() {
-                       return Err(Error::new(
-                           format!("Import cycle detected: {} in {:?}", path, import_stack),
-                           pos));
+                if import_stack.iter().find(|p| *p == &path).is_some() {
+                    return Err(Error::new(
+                        format!("Import cycle detected: {} in {:?}", path, import_stack),
+                        pos,
+                    ));
                 }
-                let val = {
-                    env.borrow_mut().get_cached_path_val(&path)
-                };
+                let val = { env.borrow_mut().get_cached_path_val(&path) };
                 match val {
                     Some(v) => {
                         stack.push((v, path_pos));
                     }
                     None => {
-                        let op_pointer =
-                            decorate_error!(path_pos => env.borrow_mut().get_ops_for_path(&normalized))?;
+                        let op_pointer = decorate_error!(path_pos => env.borrow_mut().get_ops_for_path(&normalized))?;
                         // TODO(jwall): What if we don't have a base path?
-                        let mut vm = VM::with_pointer(op_pointer, env.clone(), normalized.parent().unwrap())
-                            .with_import_stack(import_stack.clone());
+                        let mut vm =
+                            VM::with_pointer(op_pointer, env.clone(), normalized.parent().unwrap())
+                                .with_import_stack(import_stack.clone());
                         vm.run()?;
                         let result = Rc::new(vm.symbols_to_tuple(true));
                         env.borrow_mut().update_path_val(&path, result.clone());
@@ -265,7 +267,11 @@ impl Builtins {
         };
         if typ == "str" {
             stack.push((
-                Rc::new(P(Str(self.get_file_as_string(base_path, &path, pos.clone())?))),
+                Rc::new(P(Str(self.get_file_as_string(
+                    base_path,
+                    &path,
+                    pos.clone(),
+                )?))),
                 pos.clone(),
             ));
         } else {
@@ -368,7 +374,8 @@ impl Builtins {
             if env.borrow().get_out_lock_for_path(&path) {
                 return Err(Error::new(
                     format!("You can only have one output per file"),
-                    pos));
+                    pos,
+                ));
             }
             env.borrow_mut().set_out_lock_for_path(path.as_ref());
             Some(write_path)
@@ -376,7 +383,8 @@ impl Builtins {
             if env.borrow().get_out_lock_for_path("/dev/stdout") {
                 return Err(Error::new(
                     format!("You can only have one output per file"),
-                    pos));
+                    pos,
+                ));
             }
             env.borrow_mut().set_out_lock_for_path("/dev/stdout");
             None
@@ -393,7 +401,7 @@ impl Builtins {
                             Some(p) => {
                                 let p = p.with_extension(c.file_ext());
                                 Box::new(File::create(&p)?)
-                            },
+                            }
                             None => Box::new(stdout),
                         };
                         if let Err(e) = c.convert(Rc::new(val), &mut writer) {
@@ -625,7 +633,7 @@ impl Builtins {
                         _ => {
                             result_elems.push(e.clone());
                             pos_elems.push(e_pos);
-                        },
+                        }
                     }
                 }
                 stack.push((Rc::new(C(List(result_elems, pos_elems))), pos));
@@ -651,7 +659,7 @@ impl Builtins {
                         _ => {
                             new_fields.push((name.clone(), val.clone()));
                             new_flds_pos_list.push((name_pos, val_pos));
-                        },
+                        }
                     }
                 }
                 stack.push((Rc::new(C(Tuple(new_fields, new_flds_pos_list))), pos));

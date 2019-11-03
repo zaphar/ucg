@@ -165,11 +165,7 @@ impl Scope {
                         }
                     }
                 }
-                Val::Boolean(_)
-                | Val::Empty
-                | Val::Float(_)
-                | Val::Int(_)
-                | Val::Str(_) => {
+                Val::Boolean(_) | Val::Empty | Val::Float(_) | Val::Int(_) | Val::Str(_) => {
                     // noop
                 }
             };

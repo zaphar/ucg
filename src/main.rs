@@ -28,7 +28,7 @@ use std::process;
 use std::rc::Rc;
 
 use ucglib::build;
-use ucglib::build::assets::{MemoryCache};
+use ucglib::build::assets::MemoryCache;
 use ucglib::convert::{ConverterRegistry, ImporterRegistry};
 use ucglib::iter::OffsetStrIter;
 use ucglib::parse::parse;

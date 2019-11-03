@@ -46,9 +46,7 @@ impl<'a> Entry<'a> {
         path: P,
     ) -> Result<OpPointer, Error> {
         let cached = match self.0 {
-            btree_map::Entry::Occupied(e) => {
-                e.get().clone()
-            }
+            btree_map::Entry::Occupied(e) => e.get().clone(),
             btree_map::Entry::Vacant(e) => {
                 let v = Rc::new(f()?);
                 e.insert(v.clone());
