@@ -120,7 +120,17 @@ impl Builtins {
         } else {
             normalized = path;
         }
-        Ok(normalized.canonicalize()?)
+        // The canonicalize method on windows is not what we want so we'll
+        // do something a little different on windows that we would do on
+        // other Operating Systems.
+        #[cfg(target_os="windows")]
+        {
+            Ok(dbg!(normalized))
+        }
+        #[cfg(not(target_os="windows"))]
+        {
+            Ok(dbg!(normalized.canonicalize()?))
+        }
     }
 
     fn find_file<P, BP>(
@@ -176,9 +186,9 @@ impl Builtins {
         if let Some((val, path_pos)) = path {
             if let &Value::P(Str(ref path)) = val.as_ref() {
                 // TODO(jwall): A bit hacky we should probably change import stacks to be pathbufs.
-                let normalized = decorate_error!(path_pos => self.normalize_path(base_path, false, path))?;
+                let normalized = decorate_error!(path_pos => self.normalize_path(base_path, false, dbg!(path)))?;
                 // first we chack the cache
-                let path = normalized.to_string_lossy().to_string();
+                let path = dbg!(normalized.to_string_lossy().to_string());
                 if let Some(val) = env.borrow().get_cached_path_val(&path) {
                     stack.push((val, path_pos));
                     return Ok(());
