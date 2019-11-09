@@ -37,7 +37,6 @@ use crate::build::opcode::translate::PositionMap;
 use crate::build::opcode::Environment;
 use crate::build::opcode::VM;
 
-pub mod assets;
 pub mod format;
 pub mod ir;
 pub mod opcode;

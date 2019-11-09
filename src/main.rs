@@ -17,7 +17,6 @@ extern crate dirs;
 extern crate rustyline;
 extern crate ucglib;
 
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs::File;
@@ -25,10 +24,8 @@ use std::io;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process;
-use std::rc::Rc;
 
 use ucglib::build;
-use ucglib::build::assets::MemoryCache;
 use ucglib::convert::{ConverterRegistry, ImporterRegistry};
 use ucglib::iter::OffsetStrIter;
 use ucglib::parse::parse;
@@ -451,7 +448,6 @@ fn main() {
     let mut app = do_flags();
     let app_matches = app.clone().get_matches();
     // FIXME(jwall): Do we want these to be shared or not?
-    let cache = Rc::new(RefCell::new(MemoryCache::new()));
     let registry = ConverterRegistry::make_registry();
     let mut import_paths = Vec::new();
     if let Some(mut p) = dirs::home_dir() {
