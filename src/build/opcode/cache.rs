@@ -48,7 +48,7 @@ impl<'a> Entry<'a> {
         let cached = match self.0 {
             btree_map::Entry::Occupied(e) => e.get().clone(),
             btree_map::Entry::Vacant(e) => {
-            // TODO(jwall) Check a file cache for the opcodes before
+                // TODO(jwall) Check a file cache for the opcodes before
                 let v = Rc::new(f()?);
                 e.insert(v.clone());
                 v

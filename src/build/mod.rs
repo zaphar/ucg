@@ -90,6 +90,7 @@ where
 {
     pub environment: Rc<RefCell<Environment<Stdout, Stderr>>>,
     working_dir: PathBuf,
+    strict: bool,
     // FIXME(jwall): These need to be compiled and added to the op cache.
     // specifically in the environment.
     std: Rc<HashMap<String, &'static str>>,
@@ -114,6 +115,7 @@ where
         let environment = Environment::new_with_vars(stdout, stderr, env::vars().collect());
         FileBuilder {
             environment: Rc::new(RefCell::new(environment)),
+            strict: false,
             // Our import stack is initialized with ourself.
             working_dir: working_dir.into(),
             std: Rc::new(stdlib::get_libs()),
@@ -127,6 +129,7 @@ where
     pub fn clone_builder(&self) -> Self {
         FileBuilder {
             environment: self.environment.clone(),
+            strict: self.strict,
             working_dir: self.working_dir.clone(),
             std: self.std.clone(),
             import_path: self.import_path,
@@ -134,6 +137,10 @@ where
             last: None,
             validate_mode: self.validate_mode,
         }
+    }
+
+    pub fn set_strict(&mut self, strict: bool) {
+        self.strict = strict;
     }
 
     /// Builds a ucg file at the named path.
@@ -187,7 +194,12 @@ where
     pub fn eval_stmts(&mut self, ast: Vec<Statement>, path: Option<PathBuf>) -> BuildResult {
         // We should probably stash this in an op_cache somewhere?
         let ops = translate::AST::translate(ast, &self.working_dir);
-        let mut vm = VM::new(Rc::new(ops), self.environment.clone(), &self.working_dir);
+        let mut vm = VM::new(
+            self.strict,
+            Rc::new(ops),
+            self.environment.clone(),
+            &self.working_dir,
+        );
         if path.is_some() {
             vm.set_path(path.unwrap());
         }
@@ -207,6 +219,7 @@ where
         println!("");
         // Initialize VM with an empty OpPointer
         let mut vm = VM::new(
+            self.strict,
             Rc::new(PositionMap::new()),
             self.environment.clone(),
             &self.working_dir,
@@ -307,6 +320,7 @@ where
             &self.working_dir,
         );
         let mut vm = VM::new(
+            self.strict,
             Rc::new(ops_map),
             self.environment.clone(),
             &self.working_dir,

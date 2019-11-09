@@ -132,7 +132,7 @@ fn build_file<'a>(
     let out = StdoutWrapper::new();
     let err = StderrWrapper::new();
     let mut builder = build::FileBuilder::new(std::env::current_dir()?, import_paths, out, err);
-    // FIXME(jwall): builder.set_strict(strict);
+    builder.set_strict(strict);
     if validate {
         builder.enable_validate_mode();
     }
@@ -394,7 +394,7 @@ fn env_help() {
     );
 }
 
-fn do_repl(import_paths: &Vec<PathBuf>) -> std::result::Result<(), Box<dyn Error>> {
+fn do_repl(import_paths: &Vec<PathBuf>, strict: bool) -> std::result::Result<(), Box<dyn Error>> {
     let config = rustyline::Config::builder();
     let mut editor = rustyline::Editor::<()>::with_config(
         config
@@ -432,13 +432,14 @@ fn do_repl(import_paths: &Vec<PathBuf>) -> std::result::Result<(), Box<dyn Error
         StdoutWrapper::new(),
         StderrWrapper::new(),
     );
+    builder.set_strict(strict);
 
     builder.repl(editor, config_home)?;
     Ok(())
 }
 
-fn repl(import_paths: &Vec<PathBuf>) {
-    if let Err(e) = do_repl(import_paths) {
+fn repl(import_paths: &Vec<PathBuf>, strict: bool) {
+    if let Err(e) = do_repl(import_paths, strict) {
         eprintln!("{}", e);
         process::exit(1);
     }
@@ -480,7 +481,7 @@ fn main() {
     } else if let Some(_) = app_matches.subcommand_matches("env") {
         env_help()
     } else if let Some(_) = app_matches.subcommand_matches("repl") {
-        repl(&import_paths)
+        repl(&import_paths, strict)
     } else if let Some(matches) = app_matches.subcommand_matches("fmt") {
         if let Err(e) = fmt_command(matches) {
             eprintln!("{}", e);

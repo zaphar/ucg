@@ -64,14 +64,16 @@ where
     E: std::io::Write + Clone,
 {
     pub fn new<P: Into<PathBuf>>(
+        strict: bool,
         ops: Rc<PositionMap>,
         env: Rc<RefCell<Environment<O, E>>>,
         working_dir: P,
     ) -> Self {
-        Self::with_pointer(OpPointer::new(ops), env, working_dir)
+        Self::with_pointer(strict, OpPointer::new(ops), env, working_dir)
     }
 
     pub fn with_pointer<P: Into<PathBuf>>(
+        strict: bool,
         ops: OpPointer,
         env: Rc<RefCell<Environment<O, E>>>,
         working_dir: P,
@@ -81,7 +83,7 @@ where
             stack: Vec::new(),
             symbols: Stack::new(),
             import_stack: Vec::new(),
-            runtime: runtime::Builtins::new(),
+            runtime: runtime::Builtins::new(strict),
             ops: ops,
             env: env,
             last: None,
@@ -177,7 +179,7 @@ where
                 Op::InitTuple => self.push(Rc::new(C(Tuple(Vec::new(), Vec::new()))), pos)?,
                 Op::Field => self.op_field()?,
                 Op::Element => self.op_element()?,
-                Op::Index => self.op_index(false, pos)?,
+                Op::Index => self.op_index(!self.runtime.strict, pos)?,
                 Op::SafeIndex => self.op_index(true, pos)?,
                 Op::Exist => self.op_exist(pos)?,
                 Op::Cp => self.op_copy(pos)?,
@@ -446,6 +448,7 @@ where
 
     pub fn fcall_impl(
         f: &Func,
+        strict: bool,
         stack: &mut Vec<(Rc<Value>, Position)>,
         env: Rc<RefCell<Environment<O, E>>>,
         import_stack: &Vec<String>,
@@ -456,7 +459,7 @@ where
             ref snapshot,
         } = f;
         // use the captured scope snapshot for the function.
-        let mut vm = Self::with_pointer(ptr.clone(), env, std::env::current_dir()?)
+        let mut vm = Self::with_pointer(strict, ptr.clone(), env, std::env::current_dir()?)
             .to_scoped(snapshot.clone())
             .with_import_stack(import_stack.clone());
         for nm in bindings.iter() {
@@ -511,7 +514,7 @@ where
                 }
             }
             let (val, _) = decorate_call!(f_pos =>
-                Self::fcall_impl(f, &mut self.stack, self.env.clone(), &self.import_stack))?;
+                Self::fcall_impl(f, self.runtime.strict, &mut self.stack, self.env.clone(), &self.import_stack))?;
             self.push(val, pos.clone())?;
         }
         Ok(())
