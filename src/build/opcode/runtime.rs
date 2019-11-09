@@ -128,7 +128,7 @@ impl Builtins {
         // other Operating Systems.
         #[cfg(target_os = "windows")]
         {
-            Ok(dbg!(normalized))
+            Ok(normalized)
         }
         #[cfg(not(target_os = "windows"))]
         {
@@ -195,9 +195,9 @@ impl Builtins {
             if let &Value::P(Str(ref path)) = val.as_ref() {
                 // TODO(jwall): A bit hacky we should probably change import stacks to be pathbufs.
                 let normalized =
-                    decorate_error!(path_pos => self.normalize_path(base_path, false, dbg!(path)))?;
+                    decorate_error!(path_pos => self.normalize_path(base_path, false, path))?;
                 // first we chack the cache
-                let path = dbg!(normalized.to_string_lossy().to_string());
+                let path = normalized.to_string_lossy().to_string();
                 if let Some(val) = env.borrow().get_cached_path_val(&path) {
                     stack.push((val, path_pos));
                     return Ok(());
