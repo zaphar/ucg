@@ -381,14 +381,21 @@ where
         } else {
             normalized = path;
         }
-        match normalized.canonicalize() {
-            Ok(p) => Ok(p),
-            Err(e) => Err(error::BuildError::new(
-                format!("Path not found {}", normalized.to_string_lossy()),
-                error::ErrorType::OSError,
-            )
-            .wrap_cause(Box::new(e))
-            .to_boxed()),
+        #[cfg(windows)]
+        {
+            Ok(normalized)
+        }
+        #[cfg(not(windows))]
+        {
+            match normalized.canonicalize() {
+                Ok(p) => Ok(p),
+                Err(e) => Err(error::BuildError::new(
+                    format!("Path not found {}", normalized.to_string_lossy()),
+                    error::ErrorType::OSError,
+                )
+                .wrap_cause(Box::new(e))
+                .to_boxed()),
+            }
         }
     }
 
