@@ -16,9 +16,6 @@ use std::io::Write;
 use crate::ast::*;
 use crate::parse::CommentMap;
 
-// TODO(jwall): We really need a way to preserve comments for these.
-// Perhaps for code formatting we actually want to work on the token stream instead?
-
 pub struct AstPrinter<'a, W>
 where
     W: Write,
