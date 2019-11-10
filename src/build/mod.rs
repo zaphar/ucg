@@ -17,6 +17,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::env;
+use std::process;
 use std::error::Error;
 use std::fs::File;
 use std::io::Read;
@@ -24,13 +25,13 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use rustyline;
+use rustyline::error::ReadlineError;
 use simple_error;
 
 use crate::ast::*;
 use crate::error;
 use crate::iter::OffsetStrIter;
 use crate::parse::parse;
-
 use crate::build::opcode::pointer::OpPointer;
 use crate::build::opcode::translate;
 use crate::build::opcode::translate::PositionMap;
@@ -214,7 +215,7 @@ where
     pub fn repl(&mut self, mut editor: rustyline::Editor<()>, config_home: PathBuf) -> BuildResult {
         // loop
         let mut lines = crate::io::StatementAccumulator::new();
-        println!("Welcome to the UCG repl. Ctrl-D to exit");
+        println!("Welcome to the UCG repl. Ctrl-D to exit, Ctrl-C to abort expression.");
         println!("Type '#help' for help.");
         println!("");
         // Initialize VM with an empty OpPointer
@@ -226,7 +227,23 @@ where
         );
         loop {
             // print prompt
-            let line = editor.readline(&format!("{}> ", lines.next_line()))?;
+            let line = match editor.readline(&format!("{}> ", lines.next_line())) {
+                Ok(l) => l,
+                Err(e) => {
+                    if let ReadlineError::Eof = e {
+                        eprintln!("Recieved EOF Exiting...");
+                        process::exit(0);
+                    }
+                    if let ReadlineError::Interrupted = e {
+                        // Reset our lines and start over again
+                        eprintln!("Interrupted!");
+                        lines.reset();
+                        continue;
+                    }
+                    eprintln!("Error: {}", e);
+                    process::exit(1);
+                }
+            };
             // repl commands are only valid while not accumulating a statement;
             let trimmed = line.trim();
             if trimmed.starts_with("#") {
@@ -245,6 +262,8 @@ where
                             eprintln!("No such binding {}", key);
                         }
                     }
+                } else if trimmed.starts_with("#exit") {
+                    process::exit(0);
                 } else {
                     eprintln!("Invalid repl command...");
                     eprintln!("");

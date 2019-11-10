@@ -575,22 +575,27 @@ impl ModuleDef {
     }
 
     pub fn imports_to_absolute(&mut self, base: PathBuf) {
+        &base;
         let rewrite_import = |e: &mut Expression| {
             let main_separator = format!("{}", std::path::MAIN_SEPARATOR);
             if let Expression::Include(ref mut def) = e {
-                let path = PathBuf::from(
-                    &def.path
-                        .fragment
-                        .replace("/", &main_separator)
-                        .replace("\\", &main_separator),
-                );
-                if path.is_relative() {
-                    def.path.fragment = base
-                        .join(path)
-                        .canonicalize()
-                        .unwrap()
-                        .to_string_lossy()
-                        .to_string();
+                let path = PathBuf::from(&def.path.fragment);
+                #[cfg(not(windows))]
+                {
+                    if path.is_relative() {
+                        def.path.fragment = base
+                            .join(path)
+                            .canonicalize()
+                            .unwrap()
+                            .to_string_lossy()
+                            .to_string();
+                    }
+                }
+                #[cfg(windows)]
+                {
+                    if path.is_relative() {
+                        def.path.fragment = base.join(path).to_string_lossy().to_string();
+                    }
                 }
             }
             if let Expression::Import(ref mut def) = e {
@@ -604,13 +609,22 @@ impl ModuleDef {
                 if path.starts_with(format!("std{}", main_separator)) {
                     return;
                 }
-                if path.is_relative() {
-                    def.path.fragment = base
-                        .join(path)
-                        .canonicalize()
-                        .unwrap()
-                        .to_string_lossy()
-                        .to_string();
+                #[cfg(not(windows))]
+                {
+                    if path.is_relative() {
+                        def.path.fragment = base
+                            .join(path)
+                            .canonicalize()
+                            .unwrap()
+                            .to_string_lossy()
+                            .to_string();
+                    }
+                }
+                #[cfg(windows)]
+                {
+                    if path.is_relative() {
+                        def.path.fragment = base.join(path).to_string_lossy().to_string();
+                    }
                 }
             }
         };
