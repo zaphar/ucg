@@ -726,15 +726,12 @@ where
     fn op_field(&mut self) -> Result<(), Error> {
         // Add a Composite field value to a tuple on the stack
         // get value from stack
-        //dbg!(&self.stack);
         let (val, val_pos) = self.pop()?;
         // get name from stack.
         let (name_val, name_pos) = self.pop()?;
         let name = if let &S(ref s) | &P(Str(ref s)) = name_val.as_ref() {
             s
         } else {
-            dbg!(name_val);
-            dbg!(val);
             unreachable!();
         };
         // get composite tuple from stack
@@ -845,7 +842,7 @@ where
             }
             &C(List(ref elems, _)) => {
                 for e in elems {
-                    if dbg!(e) == &right {
+                    if e == &right {
                         self.push(Rc::new(P(Bool(true))), pos)?;
                         return Ok(());
                     }

@@ -132,7 +132,7 @@ impl Builtins {
         }
         #[cfg(not(target_os = "windows"))]
         {
-            Ok(dbg!(normalized.canonicalize()?))
+            Ok(normalized.canonicalize()?)
         }
     }
 
