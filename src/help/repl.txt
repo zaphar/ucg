@@ -15,4 +15,7 @@ Currently supported commands are:
 
 * #del <name>
   - deletes a previously created named binding
+
+* #exit
+  - Exits the repl.
   

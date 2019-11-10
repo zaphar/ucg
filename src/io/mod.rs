@@ -24,6 +24,10 @@ impl StatementAccumulator {
         Self { acc: Vec::new() }
     }
 
+    pub fn reset(&mut self) {
+        self.acc = Vec::new();
+    }
+
     pub fn next_line(&self) -> usize {
         self.acc.len() + 1
     }
