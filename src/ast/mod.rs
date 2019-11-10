@@ -586,12 +586,12 @@ impl ModuleDef {
                 #[cfg(windows)]
                 {
                     if path.is_relative() {
-                        def.path.fragment = dbg!(base.join(path).to_string_lossy().to_string());
+                        def.path.fragment = base.join(path).to_string_lossy().to_string();
                     }
                 }
             }
             if let Expression::Import(ref mut def) = e {
-                let path = dbg!(PathBuf::from(&def.path.fragment));
+                let path = PathBuf::from(&def.path.fragment);
                 // std/ paths are special and do not get made into absolute paths.
                 if path.starts_with("std/") {
                     return;

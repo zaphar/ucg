@@ -61,19 +61,16 @@ fn escapequoted<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Strin
         if escape {
             match c as char {
                 'n' => {
-                    eprintln!("Pushing new line onto string");
                     frag.push('\n');
                     escape = false;
                     continue;
                 }
                 'r' => {
-                    eprintln!("Pushing carriage return onto string");
                     frag.push('\r');
                     escape = false;
                     continue;
                 }
                 't' => {
-                    eprintln!("Pushing tab onto string");
                     frag.push('\t');
                     escape = false;
                     continue;

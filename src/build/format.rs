@@ -69,7 +69,6 @@ impl<V: Into<String> + Clone> FormatRenderer for SimpleFormatter<V> {
                 count += 1;
                 should_escape = false;
             } else if c == '\\' && !should_escape {
-                eprintln!("found an escape char {}", self.tmpl);
                 should_escape = true;
             } else {
                 buf.push(c);
