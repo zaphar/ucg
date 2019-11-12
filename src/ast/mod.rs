@@ -318,6 +318,38 @@ pub struct CallDef {
     pub pos: Position,
 }
 
+/// The allowable types to which you can perform a primitive cast.
+#[derive(PartialEq, Debug, Clone)]
+pub enum CastType {
+    Int,
+    Float,
+    Str,
+    Bool,
+}
+
+impl fmt::Display for CastType {
+    fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            w,
+            "{}",
+            match self {
+                CastType::Int => "int",
+                CastType::Float => "float",
+                CastType::Bool => "bool",
+                CastType::Str => "str",
+            }
+        )
+    }
+}
+
+/// Represents a cast of a target to a primitive type.
+#[derive(PartialEq, Debug, Clone)]
+pub struct CastDef {
+    pub cast_type: CastType,
+    pub target: Box<Expression>,
+    pub pos: Position,
+}
+
 /// Encodes a select expression in the UCG AST.
 #[derive(PartialEq, Debug, Clone)]
 pub struct SelectDef {
@@ -694,6 +726,7 @@ pub enum Expression {
     Include(IncludeDef),
     Import(ImportDef),
     Call(CallDef),
+    Cast(CastDef),
     Func(FuncDef),
     Select(SelectDef),
     FuncOp(FuncOpDef),
@@ -716,6 +749,7 @@ impl Expression {
             &Expression::Grouped(_, ref pos) => pos,
             &Expression::Format(ref def) => &def.pos,
             &Expression::Call(ref def) => &def.pos,
+            &Expression::Cast(ref def) => &def.pos,
             &Expression::Func(ref def) => &def.pos,
             &Expression::Module(ref def) => &def.pos,
             &Expression::Select(ref def) => &def.pos,
@@ -754,7 +788,10 @@ impl fmt::Display for Expression {
                 write!(w, "<Format Expr>")?;
             }
             &Expression::Call(_) => {
-                write!(w, "<MacroCall>")?;
+                write!(w, "<FuncCall>")?;
+            }
+            &Expression::Cast(_) => {
+                write!(w, "<Cast>")?;
             }
             &Expression::Func(_) => {
                 write!(w, "<Func>")?;

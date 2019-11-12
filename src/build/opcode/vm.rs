@@ -13,10 +13,11 @@
 // limitations under the License.
 use std::cell::RefCell;
 use std::collections::BTreeSet;
+use std::convert::TryInto;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use crate::ast::Position;
+use crate::ast::{CastType, Position};
 
 use super::environment::Environment;
 use super::pointer::OpPointer;
@@ -158,6 +159,7 @@ where
             let idx = self.ops.idx()?;
             match op {
                 Op::Val(p) => self.push(Rc::new(P(p.clone())), pos)?,
+                Op::Cast(t) => self.op_cast(t)?,
                 Op::Sym(s) => self.push(Rc::new(S(s.clone())), pos)?,
                 Op::DeRef(s) => self.op_deref(s.clone(), &pos)?,
                 Op::Add => self.op_add(pos)?,
@@ -215,6 +217,22 @@ where
         }
         if let Some(p) = self.ops.path.as_ref() {
             self.import_stack.push(p.to_string_lossy().to_string());
+        }
+        Ok(())
+    }
+
+    fn op_cast(&mut self, t: CastType) -> Result<(), Error> {
+        let (val, pos) = self.pop()?;
+        if let Value::P(ref p) = val.as_ref() {
+            self.push(
+                Rc::new(match t {
+                    CastType::Str => Value::P(Primitive::Str(format!("{}", p))),
+                    CastType::Int => Value::P(Primitive::Int(p.try_into()?)),
+                    CastType::Float => Value::P(Primitive::Float(p.try_into()?)),
+                    CastType::Bool => Value::P(Primitive::Bool(p.try_into()?)),
+                }),
+                pos,
+            )?;
         }
         Ok(())
     }

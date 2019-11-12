@@ -42,6 +42,9 @@ pub trait Walker {
                     self.walk_expression(expr);
                 }
             }
+            Expression::Cast(ref mut def) => {
+                self.walk_expression(&mut def.target);
+            }
             Expression::Copy(ref mut def) => {
                 self.walk_fieldset(&mut def.fields);
             }

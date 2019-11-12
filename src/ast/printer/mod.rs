@@ -258,6 +258,13 @@ where
                 }
                 self.render_expr(&_def.right)?;
             }
+            Expression::Cast(def) => {
+                self.w.write(format!("{}", def.cast_type).as_bytes())?;
+                self.w.write("(".as_bytes())?;
+                self.render_comment_if_needed(def.target.pos().line)?;
+                self.render_expr(&def.target)?;
+                self.w.write(")".as_bytes())?;
+            }
             Expression::Call(_def) => {
                 self.render_value(&_def.funcref)?;
                 self.w.write("(".as_bytes())?;

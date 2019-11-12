@@ -24,11 +24,7 @@ use Value::{C, F, M, P, S, T};
 impl fmt::Display for Value {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            P(Bool(v)) => write!(w, "{}", v),
-            P(Int(v)) => write!(w, "{}", v),
-            P(Float(v)) => write!(w, "{}", v),
-            P(Str(v)) => write!(w, "\"{}\"", v.replace("\"", "\\\"")),
-            P(Empty) => write!(w, "NULL"),
+            P(p) => write!(w, "{}", p),
             C(List(ref els, _)) => {
                 write!(w, "[")?;
                 for e in els {
@@ -47,6 +43,18 @@ impl fmt::Display for Value {
             M(_) => write!(w, "<Module>"),
             T(_) => write!(w, "<Expression>"),
             S(v) => write!(w, "{}", v),
+        }
+    }
+}
+
+impl fmt::Display for Primitive {
+    fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Bool(v) => write!(w, "{}", v),
+            Int(v) => write!(w, "{}", v),
+            Float(v) => write!(w, "{}", v),
+            Str(v) => write!(w, "\"{}\"", v.replace("\"", "\\\"")),
+            Empty => write!(w, "NULL"),
         }
     }
 }

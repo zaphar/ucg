@@ -17,6 +17,7 @@ use std::fmt::Display;
 use std::io;
 
 use crate::ast::Position;
+use crate::build::opcode::convert;
 
 #[derive(Debug)]
 pub struct Error {
@@ -85,6 +86,16 @@ impl From<std::io::Error> for Error {
         };
         Error {
             message: msg,
+            pos: None,
+            call_stack: Vec::new(),
+        }
+    }
+}
+
+impl From<convert::Error> for Error {
+    fn from(e: convert::Error) -> Self {
+        Error {
+            message: e.message(),
             pos: None,
             call_stack: Vec::new(),
         }

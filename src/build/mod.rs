@@ -17,28 +17,28 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::env;
-use std::process;
 use std::error::Error;
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
+use std::process;
 use std::rc::Rc;
 
-use rustyline;
-use rustyline::error::ReadlineError;
 use atty;
 use atty::Stream;
+use rustyline;
+use rustyline::error::ReadlineError;
 use simple_error;
 
 use crate::ast::*;
-use crate::error;
-use crate::iter::OffsetStrIter;
-use crate::parse::parse;
 use crate::build::opcode::pointer::OpPointer;
 use crate::build::opcode::translate;
 use crate::build::opcode::translate::PositionMap;
 use crate::build::opcode::Environment;
 use crate::build::opcode::VM;
+use crate::error;
+use crate::iter::OffsetStrIter;
+use crate::parse::parse;
 
 pub mod format;
 pub mod ir;
@@ -216,12 +216,12 @@ where
 
     pub fn repl(&mut self, mut editor: rustyline::Editor<()>, config_home: PathBuf) -> BuildResult {
         // loop
-		let mut lines = crate::io::StatementAccumulator::new();
-		if atty::is(Stream::Stdin) {
-        	println!("Welcome to the UCG repl. Ctrl-D to exit, Ctrl-C to abort expression.");
-        	println!("Type '#help' for help.");
-        	println!("");
-		}
+        let mut lines = crate::io::StatementAccumulator::new();
+        if atty::is(Stream::Stdin) {
+            println!("Welcome to the UCG repl. Ctrl-D to exit, Ctrl-C to abort expression.");
+            println!("Type '#help' for help.");
+            println!("");
+        }
         // Initialize VM with an empty OpPointer
         let mut vm = VM::new(
             self.strict,

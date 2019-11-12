@@ -81,3 +81,33 @@ assert t.ok{
     test = foo_string in ["foo"],
     desc = "List presence checks work",
 };
+
+assert t.ok{
+    test = int("1") == 1,
+    desc = "You can cast a string into an int",
+};
+
+assert t.ok{
+    test = str(1) == "1",
+    desc = "You can cast an int into a string",
+};
+
+assert t.ok{
+    test = bool("true") == true,
+    desc = "You can cast an string into true",
+};
+
+assert t.ok{
+    test = bool("false") == false,
+    desc = "You can cast a string into false",
+};
+
+assert t.ok{
+    test = str(true) == "true",
+    desc = "You can cast true into a string",
+};
+
+assert t.ok{
+    test = str(false) == "false",
+    desc = "You can cast true into a string",
+};

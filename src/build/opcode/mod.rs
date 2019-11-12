@@ -19,6 +19,7 @@ mod display;
 pub mod environment;
 #[macro_use]
 mod error;
+mod convert;
 pub mod pointer;
 mod runtime;
 pub mod scope;
@@ -29,10 +30,9 @@ pub use environment::Environment;
 pub use error::Error;
 pub use vm::VM;
 
+use crate::ast::{CastType, Position};
 use pointer::OpPointer;
 use scope::Stack;
-
-use crate::ast::Position;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Primitive {
@@ -60,18 +60,6 @@ impl Value {
             M(_) => "Func",
             T(_) => "Expression",
             S(_) => "Symbol",
-        }
-    }
-}
-
-impl From<&Primitive> for String {
-    fn from(p: &Primitive) -> Self {
-        match p {
-            Int(i) => format!("{}", i),
-            Float(f) => format!("{}", f),
-            Str(s) => format!("{}", s),
-            Bool(b) => format!("{}", b),
-            Empty => "NULL".to_owned(),
         }
     }
 }
@@ -198,6 +186,8 @@ pub enum Op {
     Not,
     // Primitive Types ops
     Val(Primitive),
+    // Primitive casts
+    Cast(CastType),
     // A bareword for use in bindings or lookups
     Sym(String),
     // Reference a binding on the heap
@@ -274,6 +264,7 @@ impl PartialEq for Value {
     }
 }
 
+// TODO(jwall): Move all of this into the convert module.
 impl From<Rc<Value>> for Val {
     fn from(val: Rc<Value>) -> Val {
         val.as_ref().into()

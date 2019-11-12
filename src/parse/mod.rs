@@ -538,6 +538,32 @@ fn tuple_to_call<'a>(
     }
 }
 
+make_fn!(
+    cast_expression<SliceIter<Token>, Expression>,
+    do_each!(
+        typ => either!(
+            word!("int"),
+            word!("float"),
+            word!("str"),
+            word!("bool")
+        ),
+        _ => punct!("("),
+        expr => expression,
+        _ => punct!(")"),
+        (Expression::Cast(CastDef{
+            cast_type: match typ.fragment.as_str() {
+                "int" => CastType::Int,
+                "float" => CastType::Float,
+                "str" => CastType::Str,
+                "bool" => CastType::Bool,
+                _ => unreachable!(),
+            },
+            target: Box::new(expr),
+            pos: typ.pos,
+        }))
+    )
+);
+
 fn call_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expression> {
     let parsed = do_each!(input.clone(),
         callee_name => trace_parse!(symbol),
@@ -717,6 +743,8 @@ fn unprefixed_expression(input: SliceIter<Token>) -> ParseResult<Expression> {
         trace_parse!(format_expression),
         trace_parse!(range_expression),
         trace_parse!(simple_expression),
+        // cast parse attempts must happen before call parse attempts.
+        trace_parse!(cast_expression),
         trace_parse!(call_expression),
         trace_parse!(copy_expression)
     )

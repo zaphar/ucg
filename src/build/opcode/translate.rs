@@ -530,6 +530,10 @@ impl AST {
                 Self::translate_value(call_def.funcref, &mut ops, root);
                 ops.push(Op::FCall, func_pos);
             }
+            Expression::Cast(cast_def) => {
+                Self::translate_expr(*cast_def.target, &mut ops, root);
+                ops.push(Op::Cast(cast_def.cast_type), cast_def.pos);
+            }
             Expression::Copy(def) => {
                 Self::translate_value(def.selector, &mut ops, root);
                 Self::translate_copy(ops, def.fields, def.pos, root);
