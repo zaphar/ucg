@@ -809,7 +809,7 @@ impl Builtins {
                     stack.push((acc.clone(), acc_pos.clone()));
                     stack.push((Rc::new(P(Str(c.to_string()))), list_pos.clone()));
                     // call function and push it's result on the stack.
-                    let (new_acc, new_acc_pos) = decorate_call!(pos => 
+                    let (new_acc, new_acc_pos) = decorate_call!(pos =>
                         VM::fcall_impl(f, self.strict, stack, env.clone(), import_stack))?;
                     acc = new_acc;
                     acc_pos = new_acc_pos;
