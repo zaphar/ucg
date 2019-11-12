@@ -221,9 +221,8 @@ where
         Ok(())
     }
 
-    fn op_cast(&mut self, t: CastType) -> Result<(), Error> {
-        let (val, pos) = self.pop()?;
-        if let Value::P(ref p) = val.as_ref() {
+    fn do_cast(&mut self, t: CastType, val: &Value, pos: Position) -> Result<(), Error> {
+        if let Value::P(ref p) = val {
             self.push(
                 Rc::new(match t {
                     CastType::Str => Value::P(Primitive::Str(format!("{}", p))),
@@ -235,6 +234,10 @@ where
             )?;
         }
         Ok(())
+    }
+    fn op_cast(&mut self, t: CastType) -> Result<(), Error> {
+        let (val, pos) = self.pop()?;
+        decorate_error!(pos => self.do_cast(t, &val, pos.clone()))
     }
 
     fn op_typ(&mut self) -> Result<(), Error> {
