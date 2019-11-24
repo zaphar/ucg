@@ -20,6 +20,7 @@ let ops = module {
        split_on=split_on,
        split_at=split_at,
        substr=substr,
+       parse_int=parse_int,
       }) {
     let len = import "std/lists.ucg".len(mod.str);
     let str = mod.str;
@@ -88,6 +89,36 @@ let ops = module {
             mod.str
         )
     );
+
+    let parse_int = module{
+        str = mod.str,
+        start = 0,
+        end = len,
+    } => (f.maybe{val=result}) {
+        let pkg = mod.pkg();
+        let f = import "std/functional.ucg";
+
+        let reducer = func(acc, char) => acc{
+            str = select (char, acc.str) => {
+                "1" = acc.str + char,
+                "2" = acc.str + char,
+                "3" = acc.str + char,
+                "4" = acc.str + char,
+                "5" = acc.str + char,
+                "6" = acc.str + char,
+                "7" = acc.str + char,
+                "8" = acc.str + char,
+                "9" = acc.str + char,
+                "0" = acc.str + char,
+            },
+        };
+        let num = reduce(
+            reducer, {counter = 0, str = ""}, mod.str).str;
+        let result = select (num != "", NULL) => {
+            true = int(num),
+            false = NULL,
+        };
+    };
 
     let substr = module{
         str = mod.str,

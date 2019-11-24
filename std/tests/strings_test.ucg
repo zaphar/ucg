@@ -52,3 +52,14 @@ assert t.equal{
     left = str_class.substr{end=8}.str,
     right = "foo bar",
 };
+
+assert t.equal{
+    left = strings.ops{str="123"}.parse_int{}.unwrap(),
+    right = 123,
+};
+
+let str_int = strings.ops{str="123"};
+assert t.equal{
+    left = strings.ops{str="123 "}.parse_int{}.unwrap(),
+    right = 123,
+};
