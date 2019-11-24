@@ -1,7 +1,7 @@
 let strings = import "std/strings.ucg";
 let t = import "std/testing.ucg";
 
-let str_class = strings.ops{str="foo bar"};
+let str_class = strings.wrap("foo bar");
 
 assert t.equal{
     left = str_class.split_on{},
@@ -9,17 +9,17 @@ assert t.equal{
 };
 
 assert t.equal{
-    left = strings.ops{str="foo"}.split_on{},
+    left = strings.wrap("foo").split_on{},
     right = ["foo"],
 };
 
 assert t.equal{
-    left = strings.ops{str=""}.split_on{},
+    left = strings.wrap("").split_on{},
     right = [""],
 };
 
 assert t.equal{
-    left = strings.ops{str="foo=>bar=>quux"}.split_on{on="=>"},
+    left = strings.wrap("foo=>bar=>quux").split_on{on="=>"},
     right = ["foo", "bar", "quux"],
 };
 
@@ -54,12 +54,12 @@ assert t.equal{
 };
 
 assert t.equal{
-    left = strings.ops{str="123"}.parse_int{}.unwrap(),
+    left = strings.wrap("123").parse_int().unwrap(),
     right = 123,
 };
 
-let str_int = strings.ops{str="123"};
+let str_int = strings.wrap("123");
 assert t.equal{
-    left = strings.ops{str="123 "}.parse_int{}.unwrap(),
+    left = strings.wrap("123 ").parse_int().unwrap(),
     right = 123,
 };

@@ -20,9 +20,10 @@ let ops = module {
        split_on=split_on,
        split_at=split_at,
        substr=substr,
-       parse_int=parse_int,
+       parse_int=parse_int_func,
       }) {
-    let len = import "std/lists.ucg".len(mod.str);
+    let lists = import "std/lists.ucg";
+    let len = lists.len(mod.str);
     let str = mod.str;
     let chars = reduce(func(acc, char) => acc + [char], [], mod.str);
 
@@ -91,34 +92,35 @@ let ops = module {
     );
 
     let parse_int = module{
-        str = mod.str,
-        start = 0,
-        end = len,
+        chars = [],
+        acc = "",
     } => (f.maybe{val=result}) {
-        let pkg = mod.pkg();
+        let this = mod.this;
         let f = import "std/functional.ucg";
+        let lists = import "std/lists.ucg";
 
-        let reducer = func(acc, char) => acc{
-            str = select (char, acc.str) => {
-                "1" = acc.str + char,
-                "2" = acc.str + char,
-                "3" = acc.str + char,
-                "4" = acc.str + char,
-                "5" = acc.str + char,
-                "6" = acc.str + char,
-                "7" = acc.str + char,
-                "8" = acc.str + char,
-                "9" = acc.str + char,
-                "0" = acc.str + char,
+        let is_int = func(c) => select (c, false) => {
+                "0" = true,
+                "1" = true,
+                "2" = true,
+                "3" = true,
+                "4" = true,
+                "5" = true,
+                "6" = true,
+                "7" = true,
+                "8" = true,
+                "9" = true,
+        };
+        
+        let result = select (lists.len(mod.chars) == 0, mod.acc) => {
+            false = select (is_int(mod.chars.0), mod.acc) => {
+                true = this{chars=lists.tail(mod.chars), acc=mod.acc+mod.chars.0}.unwrap(),
             },
         };
-        let num = reduce(
-            reducer, {counter = 0, str = ""}, mod.str).str;
-        let result = select (num != "", NULL) => {
-            true = int(num),
-            false = NULL,
-        };
+
     };
+
+    let parse_int_func = func() => parse_int{chars=chars}.do(func(s) => int(s));
 
     let substr = module{
         str = mod.str,
@@ -136,3 +138,5 @@ let ops = module {
             reducer, {counter = 0, str = ""}, mod.str).str};
     };
 };
+
+let wrap = func(str) => ops{str=str};
