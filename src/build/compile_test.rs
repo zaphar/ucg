@@ -576,3 +576,14 @@ fn test_bad_import_path_compile_failure() {
         ],
     )
 }
+
+#[test]
+fn test_invalid_call_selector() {
+    assert_build_failure(
+        "let tpl = { f = {}}; tpl.f();",
+        vec![
+            Regex::new(r"Not a function").unwrap(),
+            Regex::new(r"line: 1 column: 26").unwrap(),
+        ],
+    )
+}

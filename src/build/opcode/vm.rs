@@ -510,7 +510,7 @@ where
     }
 
     fn op_fcall(&mut self, pos: Position) -> Result<(), Error> {
-        let (f, f_pos) = self.pop()?;
+        let (f, f_pos) = dbg!(self.pop())?;
         let (arg_length, _) = self.pop()?;
         if let &F(ref f) = f.as_ref() {
             if let &P(Int(arg_length)) = arg_length.as_ref() {
@@ -537,6 +537,8 @@ where
             let (val, _) = decorate_call!(f_pos =>
                 Self::fcall_impl(f, self.runtime.strict, &mut self.stack, self.env.clone(), &self.import_stack))?;
             self.push(val, pos.clone())?;
+        } else {
+            return Err(Error::new(format!("Not a function! {:?}", f,), pos));
         }
         Ok(())
     }
@@ -807,7 +809,7 @@ where
 
     fn op_index(&mut self, safe: bool, pos: Position) -> Result<(), Error> {
         // left and then right
-        let (right, right_pos) = self.pop()?;
+        let (right, right_pos) = dbg!(self.pop())?;
         let (left, _) = self.pop()?;
         match right.as_ref() {
             &P(Int(i)) => {
@@ -822,7 +824,7 @@ where
                 if let &C(Tuple(ref flds, _)) = left.as_ref() {
                     for &(ref key, ref val) in flds.iter() {
                         if key == s {
-                            self.push(val.clone(), right_pos)?;
+                            self.push(dbg!(val).clone(), right_pos)?;
                             return Ok(());
                         }
                     }
