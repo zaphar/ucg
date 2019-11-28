@@ -82,25 +82,21 @@ let slice = module {
     let list_len = list.len(mod.list);
 
     let end = select (mod.end is "null", mod.end) => {
-        true = list_len,
+        true = list_len - 1,
     };
+    let start = mod.start;
 
     // ensure some invariants
-    (mod.start >= 0) || fail "Slice must be positive";
-    (mod.start <= list_len) || fail "Slice start cannot be larger than the list len of @" % (list_len);
+    (start >= 0) || fail "Slice must be positive";
+    (start <= list_len) || fail "Slice start cannot be larger than the list len of @" % (list_len);
     (end <= list_len) || fail "Slice end cannot be larger than list len of @" % (list_len);
 
-    let reducer = func(acc, item) => acc{
-        count = acc.count + 1,
-        list = select ((acc.count >= mod.start) && (acc.count <= end), acc.list) => {
-            true = acc.list + [item],
-        },
-    };
+    let reducer = func(acc, item) => acc + [mod.list.(item)];
 
     let result = reduce(
         reducer,
-        {count=mod.start, list=[]},
-        mod.list).list;
+        [],
+        start:end);
 };
 
 // zips two lists together.
