@@ -213,6 +213,16 @@ The type must be a string literal matching one of:
 ("foo" is "str") == true;
 ```
 
+Casting
+-------
+
+UCG can cast primitive types to other primitive types. UCG is very conservative in
+the casts it allows however and a failed cast is a compile error. The allowed casts
+are `int(expr)`, `float(expr)`, `str(expr)`, and `bool(expr)`. Casts are not function
+calls even though they look like them and as a result you can not define your own
+functions with the same name as a cast. If the expressions do not resolve to a primitive
+type that is castable to the desired type then a compile error will occur.
+
 Copy Expressions
 ----------------
 
