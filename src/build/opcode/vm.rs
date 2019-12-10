@@ -510,7 +510,7 @@ where
     }
 
     fn op_fcall(&mut self, pos: Position) -> Result<(), Error> {
-        let (f, f_pos) = dbg!(self.pop())?;
+        let (f, f_pos) = self.pop()?;
         let (arg_length, _) = self.pop()?;
         if let &F(ref f) = f.as_ref() {
             if let &P(Int(arg_length)) = arg_length.as_ref() {
@@ -809,7 +809,7 @@ where
 
     fn op_index(&mut self, safe: bool, pos: Position) -> Result<(), Error> {
         // left and then right
-        let (right, right_pos) = dbg!(self.pop())?;
+        let (right, right_pos) = self.pop()?;
         let (left, _) = self.pop()?;
         match right.as_ref() {
             &P(Int(i)) => {
@@ -824,7 +824,7 @@ where
                 if let &C(Tuple(ref flds, _)) = left.as_ref() {
                     for &(ref key, ref val) in flds.iter() {
                         if key == s {
-                            self.push(dbg!(val).clone(), right_pos)?;
+                            self.push(val.clone(), right_pos)?;
                             return Ok(());
                         }
                     }

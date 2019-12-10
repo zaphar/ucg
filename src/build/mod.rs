@@ -45,7 +45,7 @@ pub mod ir;
 pub mod opcode;
 pub mod scope;
 
-mod stdlib;
+pub mod stdlib;
 
 pub use self::ir::Val;
 
@@ -115,7 +115,8 @@ where
         stdout: Stdout,
         stderr: Stderr,
     ) -> Self {
-        let environment = Environment::new_with_vars(stdout, stderr, env::vars().collect());
+        let mut environment = Environment::new_with_vars(stdout, stderr, env::vars().collect());
+        environment.populate_stdlib();
         FileBuilder {
             environment: Rc::new(RefCell::new(environment)),
             strict: false,

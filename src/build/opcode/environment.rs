@@ -21,6 +21,7 @@ use super::cache;
 use super::pointer::OpPointer;
 use super::Error;
 use super::Value;
+use crate::build::stdlib;
 use crate::build::AssertCollector;
 use crate::build::Val;
 use crate::convert::{ConverterRegistry, ImporterRegistry};
@@ -95,6 +96,35 @@ impl<Stdout: Write + Clone, Stderr: Write + Clone> Environment<Stdout, Stderr> {
             },
             path_copy,
         )
+    }
+
+    fn add_ops_for_path_and_content<P>(&mut self, path: P, contents: &str) -> Result<(), Error>
+    where
+        P: Into<PathBuf> + Clone,
+    {
+        let path_copy = path.clone();
+        self.op_cache.entry(path.clone()).get_pointer_or_else(
+            || {
+                let p = path.into();
+                let root = p.parent().unwrap();
+                let iter = OffsetStrIter::new(contents).with_src_file(&p);
+                // FIXME(jwall): Unify BuildError and our other Error
+                let stmts = parse(iter, None).unwrap();
+                // then we create an ops from it
+                let ops = super::translate::AST::translate(stmts, &root);
+                Ok(ops)
+            },
+            path_copy,
+        )?;
+        Ok(())
+    }
+
+    pub fn populate_stdlib(&mut self) {
+        for (p, s) in stdlib::get_libs().drain() {
+            // We unwrap the error here since we expect stdlibs to
+            // always compile.
+            self.add_ops_for_path_and_content(p, s).unwrap();
+        }
     }
 
     pub fn record_assert_result(&mut self, desc: &str, ok: bool) {

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use std::cell::RefCell;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -101,7 +101,7 @@ impl Builtins {
         // Try a relative path first.
         let path = path.into();
         // stdlib paths are special
-        if path.starts_with("std/") {
+        if path.starts_with(format!("std{}", std::path::MAIN_SEPARATOR)) {
             return Ok(path);
         }
         let mut normalized = base_path.into();
@@ -144,18 +144,19 @@ impl Builtins {
         pos: Position,
     ) -> Result<PathBuf, Error>
     where
-        P: Into<PathBuf>,
+        P: Into<PathBuf> + Display + Clone,
         BP: Into<PathBuf>,
     {
-        // Try a relative path first.
         // FIXME(jwall): Use import paths if desired.
-        let normalized = self.normalize_path(base_path, use_import_path, path)?;
-        match normalized.canonicalize() {
+        match self.normalize_path(base_path, use_import_path, path.clone()) {
             Ok(p) => Ok(p),
-            Err(_e) => Err(Error::new(
-                format!("Invalid path: {}", normalized.to_string_lossy()),
-                pos.clone(),
-            )),
+            Err(e) => {
+                //panic!(format!("Error finding path {}: {}", path, e));
+                Err(Error::new(
+                    format!("Error finding path {}: {}", path, e),
+                    pos,
+                ))
+            }
         }
     }
 
