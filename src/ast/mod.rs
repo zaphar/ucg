@@ -639,7 +639,6 @@ impl ModuleDef {
                 );
                 // std/ paths are special and do not get made into absolute paths.
                 if path.starts_with(format!("std{}", main_separator)) {
-                    dbg!(&path);
                     return;
                 }
                 #[cfg(not(windows))]
