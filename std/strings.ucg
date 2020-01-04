@@ -9,6 +9,8 @@
 //
 // * split_at - function splits the wrapped string at an character index.
 //
+// * parse_int - function that parses an integer from the beginning of a string.
+//
 // * substr - module that returns a substr of the wrapped string.
 //   - `start` field is the index at which the substr starts (defaults to 0)
 //   -  `end` field is the index at which the substr ends (defaults to end of string)
@@ -117,7 +119,6 @@ let ops = module {
                 true = this{chars=lists.tail(mod.chars), acc=mod.acc+mod.chars.0}.unwrap(),
             },
         };
-
     };
 
     let parse_int_func = func() => parse_int{chars=chars}.do(func(s) => int(s));
