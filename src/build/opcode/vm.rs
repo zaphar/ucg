@@ -42,41 +42,30 @@ fn construct_reserved_word_set() -> BTreeSet<&'static str> {
     words
 }
 
-pub struct VM<O, E>
-where
-    O: std::io::Write + Clone,
-    E: std::io::Write + Clone,
-{
+pub struct VM {
     working_dir: PathBuf,
     stack: Vec<(Rc<Value>, Position)>,
     symbols: Stack,
     import_stack: Vec<String>,
     runtime: runtime::Builtins,
     ops: OpPointer,
-    pub env: Rc<RefCell<Environment<O, E>>>,
     pub last: Option<(Rc<Value>, Position)>,
     self_stack: Vec<(Rc<Value>, Position)>,
     reserved_words: BTreeSet<&'static str>,
 }
 
-impl<'a, O, E> VM<O, E>
-where
-    O: std::io::Write + Clone,
-    E: std::io::Write + Clone,
-{
+impl VM {
     pub fn new<P: Into<PathBuf>>(
         strict: bool,
         ops: Rc<PositionMap>,
-        env: Rc<RefCell<Environment<O, E>>>,
         working_dir: P,
     ) -> Self {
-        Self::with_pointer(strict, OpPointer::new(ops), env, working_dir)
+        Self::with_pointer(strict, OpPointer::new(ops), working_dir)
     }
 
     pub fn with_pointer<P: Into<PathBuf>>(
         strict: bool,
         ops: OpPointer,
-        env: Rc<RefCell<Environment<O, E>>>,
         working_dir: P,
     ) -> Self {
         Self {
@@ -86,7 +75,6 @@ where
             import_stack: Vec::new(),
             runtime: runtime::Builtins::new(strict),
             ops: ops,
-            env: env,
             last: None,
             self_stack: Vec::new(),
             reserved_words: construct_reserved_word_set(),
@@ -119,7 +107,6 @@ where
             import_stack: Vec::new(),
             runtime: self.runtime.clone(),
             ops: self.ops.clone(),
-            env: self.env.clone(),
             last: None,
             self_stack: self.self_stack.clone(),
             reserved_words: self.reserved_words.clone(),
@@ -148,7 +135,11 @@ where
         self.symbols.remove_symbol(sym)
     }
 
-    pub fn run(&mut self) -> Result<(), Error> {
+    pub fn run<'a, O, E>(&mut self, env: &'a RefCell<Environment<O, E>>) -> Result<(), Error>
+    where
+        O: std::io::Write + Clone,
+        E: std::io::Write + Clone,
+    {
         loop {
             let op = if let Some(op) = self.ops.next() {
                 op.clone()
@@ -184,7 +175,7 @@ where
                 Op::Index => self.op_index(!self.runtime.strict, pos)?,
                 Op::SafeIndex => self.op_index(true, pos)?,
                 Op::Exist => self.op_exist(pos)?,
-                Op::Cp => self.op_copy(pos)?,
+                Op::Cp => self.op_copy(pos, env)?,
                 //FIXME(jwall): Should this take a user provided message?
                 Op::Bang => self.op_bang()?,
                 Op::InitThunk(jp) => self.op_thunk(idx, jp, pos)?,
@@ -199,8 +190,8 @@ where
                 Op::Or(jp) => self.op_or(jp, pos)?,
                 Op::Module(mptr) => self.op_module(idx, mptr, pos)?,
                 Op::Func(jptr) => self.op_func(idx, jptr, pos)?,
-                Op::FCall => self.op_fcall(pos)?,
-                Op::NewScope(jp) => self.op_new_scope(jp, self.ops.clone())?,
+                Op::FCall => self.op_fcall(pos, env)?,
+                Op::NewScope(jp) => self.op_new_scope(jp, self.ops.clone(), env)?,
                 Op::Return => {
                     &self.stack;
                     return Ok(());
@@ -209,7 +200,7 @@ where
                     self.pop()?;
                 }
                 Op::Typ => self.op_typ()?,
-                Op::Runtime(h) => self.op_runtime(h, pos)?,
+                Op::Runtime(h) => self.op_runtime(h, pos, env)?,
                 Op::Render => self.op_render()?,
                 Op::PushSelf => self.op_push_self()?,
                 Op::PopSelf => self.op_pop_self()?,
@@ -345,7 +336,7 @@ where
         Ok(())
     }
 
-    fn op_select_jump(&'a mut self, jp: i32) -> Result<(), Error> {
+    fn op_select_jump(&mut self, jp: i32) -> Result<(), Error> {
         // pop field value off
         let (field_name, _) = self.pop()?;
         // pop search value off
@@ -372,7 +363,7 @@ where
         Ok(())
     }
 
-    fn op_module(&'a mut self, idx: usize, jptr: i32, pos: Position) -> Result<(), Error> {
+    fn op_module(&mut self, idx: usize, jptr: i32, pos: Position) -> Result<(), Error> {
         let (mod_val, mod_val_pos) = self.pop()?;
         let (result_ptr, flds, pos_list) = match mod_val.as_ref() {
             &C(Tuple(ref flds, ref pos_list)) => (None, flds.clone(), pos_list.clone()),
@@ -467,20 +458,24 @@ where
         self.op_jump(jptr)
     }
 
-    pub fn fcall_impl(
+    pub fn fcall_impl<'a, O, E>(
         f: &Func,
         strict: bool,
         stack: &mut Vec<(Rc<Value>, Position)>,
-        env: Rc<RefCell<Environment<O, E>>>,
+        env: &'a RefCell<Environment<O, E>>,
         import_stack: &Vec<String>,
-    ) -> Result<(Rc<Value>, Position), Error> {
+    ) -> Result<(Rc<Value>, Position), Error>
+    where
+        O: std::io::Write + Clone,
+        E: std::io::Write + Clone,
+    {
         let Func {
             ref ptr,
             ref bindings,
             ref snapshot,
         } = f;
         // use the captured scope snapshot for the function.
-        let mut vm = Self::with_pointer(strict, ptr.clone(), env, std::env::current_dir()?)
+        let mut vm = Self::with_pointer(strict, ptr.clone(), std::env::current_dir()?)
             .to_scoped(snapshot.clone())
             .with_import_stack(import_stack.clone());
         for nm in bindings.iter() {
@@ -491,25 +486,33 @@ where
             vm.binding_push(nm.clone(), val, false, &pos, &pos)?;
         }
         // proceed to the function body
-        vm.run()?;
+        vm.run(env)?;
         return vm.pop();
     }
 
-    fn op_new_scope(&mut self, jp: i32, ptr: OpPointer) -> Result<(), Error> {
+    fn op_new_scope<O, E>(&mut self, jp: i32, ptr: OpPointer, env: &RefCell<Environment<O, E>>) -> Result<(), Error>
+    where
+        O: std::io::Write + Clone,
+        E: std::io::Write + Clone,
+    {
         let scope_snapshot = self.symbols.snapshot();
         let mut vm = self
             .clean_copy()
             .to_new_pointer(ptr)
             .to_scoped(scope_snapshot)
             .with_import_stack(self.import_stack.clone());
-        vm.run()?;
+        vm.run(env)?;
         let result = vm.pop()?;
         self.push(result.0, result.1)?;
         self.op_jump(jp)?;
         Ok(())
     }
 
-    fn op_fcall(&mut self, pos: Position) -> Result<(), Error> {
+    fn op_fcall<O, E>(&mut self, pos: Position, env: &RefCell<Environment<O, E>>) -> Result<(), Error>
+    where
+        O: std::io::Write + Clone,
+        E: std::io::Write + Clone,
+    {
         let (f, f_pos) = self.pop()?;
         let (arg_length, _) = self.pop()?;
         if let &F(ref f) = f.as_ref() {
@@ -535,7 +538,7 @@ where
                 }
             }
             let (val, _) = decorate_call!(f_pos =>
-                Self::fcall_impl(f, self.runtime.strict, &mut self.stack, self.env.clone(), &self.import_stack))?;
+                Self::fcall_impl(f, self.runtime.strict, &mut self.stack, env.clone(), &self.import_stack))?;
             self.push(val, pos.clone())?;
         } else {
             return Err(Error::new(format!("Not a function! {:?}", f,), pos));
@@ -888,7 +891,11 @@ where
         Ok(())
     }
 
-    fn op_copy(&mut self, pos: Position) -> Result<(), Error> {
+    fn op_copy<O, E>(&mut self, pos: Position, env: &RefCell<Environment<O, E>>) -> Result<(), Error>
+    where
+        O: std::io::Write + Clone,
+        E: std::io::Write + Clone,
+    {
         // This value should always be a tuple
         let (override_val, val_pos) = self.pop()?;
         // get target value. It should be a Module or Tuple.
@@ -965,7 +972,7 @@ where
                         .clean_copy()
                         .to_new_pointer(ptr.clone())
                         .with_import_stack(self.import_stack.clone());
-                    pkg_vm.run()?;
+                    pkg_vm.run(env)?;
                     let (pkg_func, val_pos) = pkg_vm.pop()?;
                     self.merge_field_into_tuple(
                         &mut flds,
@@ -983,10 +990,10 @@ where
                     .with_import_stack(self.import_stack.clone());
                 vm.push(Rc::new(S("mod".to_owned())), pos.clone())?;
                 vm.push(Rc::new(C(Tuple(flds, flds_pos_list))), pos.clone())?;
-                decorate_call!(pos => vm.run())?;
+                decorate_call!(pos => vm.run(env))?;
                 if let Some(ptr) = result_ptr {
                     vm.ops.jump(ptr.clone())?;
-                    vm.run()?;
+                    vm.run(env)?;
                     let (result_val, result_pos) = vm.pop()?;
                     self.push(result_val, result_pos)?;
                 } else {
@@ -1005,8 +1012,8 @@ where
 
     fn merge_field_into_tuple(
         &self,
-        src_fields: &'a mut Vec<(String, Rc<Value>)>,
-        pos_fields: &'a mut Vec<(Position, Position)>,
+        src_fields: &mut Vec<(String, Rc<Value>)>,
+        pos_fields: &mut Vec<(Position, Position)>,
         name: String,
         name_pos: &Position,
         value: Rc<Value>,
@@ -1069,7 +1076,7 @@ where
     }
 
     pub fn get_binding(
-        &'a self,
+        &self,
         name: &str,
         pos: &Position,
     ) -> Result<(Rc<Value>, Position), Error> {
@@ -1189,12 +1196,16 @@ where
         })
     }
 
-    fn op_runtime(&mut self, h: Hook, pos: Position) -> Result<(), Error> {
+    fn op_runtime<O, E>(&mut self, h: Hook, pos: Position, env: &RefCell<Environment<O, E>>) -> Result<(), Error>
+    where
+        O: std::io::Write + Clone,
+        E: std::io::Write + Clone,
+    {
         self.runtime.handle(
             self.ops.path.as_ref(),
             h,
             &mut self.stack,
-            self.env.clone(),
+            env,
             &mut self.import_stack,
             &self.working_dir,
             pos,

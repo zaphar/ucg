@@ -51,7 +51,7 @@ impl<Stdout: Write + Clone, Stderr: Write + Clone> Environment<Stdout, Stderr> {
     }
 
     pub fn new_with_vars(out: Stdout, err: Stderr, vars: BTreeMap<String, String>) -> Self {
-        Self {
+        let mut me = Self {
             val_cache: BTreeMap::new(),
             env_vars: vars,
             op_cache: cache::Ops::new(),
@@ -61,7 +61,9 @@ impl<Stdout: Write + Clone, Stderr: Write + Clone> Environment<Stdout, Stderr> {
             stdout: out,
             stderr: err,
             out_lock: BTreeSet::new(),
-        }
+        };
+        me.populate_stdlib();
+        return me
     }
 
     pub fn get_cached_path_val(&self, path: &String) -> Option<Rc<Value>> {
@@ -119,7 +121,7 @@ impl<Stdout: Write + Clone, Stderr: Write + Clone> Environment<Stdout, Stderr> {
         Ok(())
     }
 
-    pub fn populate_stdlib(&mut self) {
+    fn populate_stdlib(&mut self) {
         for (p, s) in stdlib::get_libs().drain() {
             // We unwrap the error here since we expect stdlibs to
             // always compile.

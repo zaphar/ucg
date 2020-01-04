@@ -17,6 +17,7 @@ extern crate dirs;
 extern crate rustyline;
 extern crate ucglib;
 
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs::File;
@@ -26,6 +27,7 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 use ucglib::build;
+use ucglib::build::opcode::Environment;
 use ucglib::convert::{ConverterRegistry, ImporterRegistry};
 use ucglib::iter::OffsetStrIter;
 use ucglib::parse::parse;
@@ -124,14 +126,13 @@ fn build_file<'a>(
     validate: bool,
     strict: bool,
     import_paths: &'a Vec<PathBuf>,
+    env: &'a RefCell<Environment<StdoutWrapper, StderrWrapper>>,
 ) -> Result<build::FileBuilder<'a, StdoutWrapper, StderrWrapper>, Box<dyn Error>> {
     let mut file_path_buf = PathBuf::from(file);
     if file_path_buf.is_relative() {
         file_path_buf = std::env::current_dir()?.join(file_path_buf);
     }
-    let out = StdoutWrapper::new();
-    let err = StderrWrapper::new();
-    let mut builder = build::FileBuilder::new(std::env::current_dir()?, import_paths, out, err);
+let mut builder = build::FileBuilder::new(std::env::current_dir()?, import_paths, env);
     builder.set_strict(strict);
     if validate {
         builder.enable_validate_mode();
@@ -143,9 +144,14 @@ fn build_file<'a>(
     Ok(builder)
 }
 
-fn do_validate(file: &str, strict: bool, import_paths: &Vec<PathBuf>) -> bool {
+fn do_validate<'a>(
+    file: &'a str,
+    strict: bool,
+    import_paths: &'a Vec<PathBuf>,
+    env: &'a RefCell<Environment<StdoutWrapper, StderrWrapper>>,
+) -> bool {
     println!("Validating {}", file);
-    match build_file(file, true, strict, import_paths) {
+    match build_file(file, true, strict, import_paths, env) {
         Ok(b) => {
             if b.assert_results() {
                 println!("File {} Pass\n", file);
@@ -162,9 +168,14 @@ fn do_validate(file: &str, strict: bool, import_paths: &Vec<PathBuf>) -> bool {
     return true;
 }
 
-fn do_compile(file: &str, strict: bool, import_paths: &Vec<PathBuf>) -> bool {
+fn do_compile<'a>(
+    file: &'a str,
+    strict: bool,
+    import_paths: &'a Vec<PathBuf>,
+    env: &'a RefCell<Environment<StdoutWrapper, StderrWrapper>>,
+) -> bool {
     println!("Building {}", file);
-    let builder = match build_file(file, false, strict, import_paths) {
+    let builder = match build_file(file, false, strict, import_paths, env) {
         Ok(builder) => builder,
         Err(err) => {
             eprintln!("{}", err);
@@ -183,6 +194,7 @@ fn visit_ucg_files(
     validate: bool,
     strict: bool,
     import_paths: &Vec<PathBuf>,
+    env: &RefCell<Environment<StdoutWrapper, StderrWrapper>>,
 ) -> Result<bool, Box<dyn Error>> {
     let our_path = String::from(path.to_string_lossy());
     let mut result = true;
@@ -200,35 +212,35 @@ fn visit_ucg_files(
             let next_path = next_item.path();
             let path_as_string = String::from(next_path.to_string_lossy());
             if next_path.is_dir() && recurse {
-                if let Err(e) = visit_ucg_files(&next_path, recurse, validate, strict, import_paths)
+                if let Err(e) = visit_ucg_files(&next_path, recurse, validate, strict, import_paths, env)
                 {
                     eprintln!("{}", e);
                     result = false;
                 }
             } else {
                 if validate && path_as_string.ends_with("_test.ucg") {
-                    if !do_validate(&path_as_string, strict, import_paths) {
+                    if !do_validate(&path_as_string, strict, import_paths, env) {
                         result = false;
                         summary.push_str(format!("{} - FAIL\n", path_as_string).as_str())
                     } else {
                         summary.push_str(format!("{} - PASS\n", path_as_string).as_str())
                     }
                 } else if !validate && path_as_string.ends_with(".ucg") {
-                    if !do_compile(&path_as_string, strict, import_paths) {
+                    if !do_compile(&path_as_string, strict, import_paths, env) {
                         result = false;
                     }
                 }
             }
         }
     } else if validate && our_path.ends_with("_test.ucg") {
-        if !do_validate(&our_path, strict, import_paths) {
+        if !do_validate(&our_path, strict, import_paths, env) {
             result = false;
             summary.push_str(format!("{} - FAIL\n", our_path).as_str());
         } else {
             summary.push_str(format!("{} - PASS\n", &our_path).as_str());
         }
     } else if !validate {
-        if !do_compile(&our_path, strict, import_paths) {
+        if !do_compile(&our_path, strict, import_paths, env) {
             result = false;
         }
     }
@@ -239,13 +251,18 @@ fn visit_ucg_files(
     Ok(result)
 }
 
-fn build_command(matches: &clap::ArgMatches, import_paths: &Vec<PathBuf>, strict: bool) {
+fn build_command(
+    matches: &clap::ArgMatches,
+    import_paths: &Vec<PathBuf>,
+    strict: bool,
+    env: &RefCell<Environment<StdoutWrapper, StderrWrapper>>,
+) {
     let files = matches.values_of("INPUT");
     let recurse = matches.is_present("recurse");
     let mut ok = true;
     if files.is_none() {
         let curr_dir = std::env::current_dir().unwrap();
-        let ok = visit_ucg_files(curr_dir.as_path(), recurse, false, strict, import_paths);
+        let ok = visit_ucg_files(curr_dir.as_path(), recurse, false, strict, import_paths, env);
         if let Ok(false) = ok {
             process::exit(1)
         }
@@ -253,7 +270,7 @@ fn build_command(matches: &clap::ArgMatches, import_paths: &Vec<PathBuf>, strict
     }
     for file in files.unwrap() {
         let pb = PathBuf::from(file);
-        if let Ok(false) = visit_ucg_files(&pb, recurse, false, strict, import_paths) {
+        if let Ok(false) = visit_ucg_files(&pb, recurse, false, strict, import_paths, env) {
             ok = false;
         }
     }
@@ -325,12 +342,17 @@ fn fmt_command(matches: &clap::ArgMatches) -> std::result::Result<(), Box<dyn Er
     Ok(())
 }
 
-fn test_command(matches: &clap::ArgMatches, import_paths: &Vec<PathBuf>, strict: bool) {
+fn test_command(
+    matches: &clap::ArgMatches,
+    import_paths: &Vec<PathBuf>,
+    strict: bool,
+    env: &RefCell<Environment<StdoutWrapper, StderrWrapper>>,
+) {
     let files = matches.values_of("INPUT");
     let recurse = matches.is_present("recurse");
     if files.is_none() {
         let curr_dir = std::env::current_dir().unwrap();
-        let ok = visit_ucg_files(curr_dir.as_path(), recurse, true, strict, import_paths);
+        let ok = visit_ucg_files(curr_dir.as_path(), recurse, true, strict, import_paths, env);
         if let Ok(false) = ok {
             process::exit(1)
         }
@@ -339,7 +361,7 @@ fn test_command(matches: &clap::ArgMatches, import_paths: &Vec<PathBuf>, strict:
         for file in files.unwrap() {
             let pb = PathBuf::from(file);
             //if pb.is_dir() {
-            if let Ok(false) = visit_ucg_files(pb.as_path(), recurse, true, strict, import_paths) {
+            if let Ok(false) = visit_ucg_files(pb.as_path(), recurse, true, strict, import_paths, env) {
                 ok = false;
             }
         }
@@ -426,11 +448,11 @@ fn do_repl(import_paths: &Vec<PathBuf>, strict: bool) -> std::result::Result<(),
             }
         }
     }
+    let env = std::cell::RefCell::new(build::opcode::Environment::new(StdoutWrapper::new(), StderrWrapper::new()));
     let mut builder = build::FileBuilder::new(
         std::env::current_dir()?,
         import_paths,
-        StdoutWrapper::new(),
-        StderrWrapper::new(),
+        &env,
     );
     builder.set_strict(strict);
 
@@ -451,6 +473,7 @@ fn main() {
     // FIXME(jwall): Do we want these to be shared or not?
     let registry = ConverterRegistry::make_registry();
     let mut import_paths = Vec::new();
+    let env = RefCell::new(Environment::new(StdoutWrapper::new(), StderrWrapper::new()));
     if let Some(mut p) = dirs::home_dir() {
         p.push(".ucg");
         // Attempt to create directory if it doesn't exist.
@@ -470,9 +493,9 @@ fn main() {
         true
     };
     if let Some(matches) = app_matches.subcommand_matches("build") {
-        build_command(matches, &import_paths, strict);
+        build_command(matches, &import_paths, strict, &env);
     } else if let Some(matches) = app_matches.subcommand_matches("test") {
-        test_command(matches, &import_paths, strict);
+        test_command(matches, &import_paths, strict, &env);
     } else if let Some(matches) = app_matches.subcommand_matches("converters") {
         converters_command(matches, &registry)
     } else if let Some(_) = app_matches.subcommand_matches("importers") {

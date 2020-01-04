@@ -193,9 +193,12 @@ impl Converter for ExecConverter {
 
 #[cfg(test)]
 mod exec_test {
+    use std::cell::RefCell;
+    
     use super::*;
     use crate::build::FileBuilder;
     use crate::convert::traits::Converter;
+    use crate::build::opcode::Environment;
 
     use std;
     use std::io::Cursor;
@@ -205,7 +208,8 @@ mod exec_test {
         let i_paths = Vec::new();
         let out: Vec<u8> = Vec::new();
         let err: Vec<u8> = Vec::new();
-        let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, out, err);
+        let env = RefCell::new(Environment::new(out, err));
+        let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, &env);
         let conv = ExecConverter::new();
         b.eval_string(
             "let script = {
@@ -228,7 +232,8 @@ mod exec_test {
         let i_paths = Vec::new();
         let out: Vec<u8> = Vec::new();
         let err: Vec<u8> = Vec::new();
-        let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, out, err);
+        let env = RefCell::new(Environment::new(out, err));
+        let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, &env);
         let conv = ExecConverter::new();
         b.eval_string(
             "let script = {
@@ -258,7 +263,8 @@ mod exec_test {
         let i_paths = Vec::new();
         let out: Vec<u8> = Vec::new();
         let err: Vec<u8> = Vec::new();
-        let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, out, err);
+        let env = RefCell::new(Environment::new(out, err));
+        let mut b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, &env);
         let conv = ExecConverter::new();
         b.eval_string(
             "let script = {

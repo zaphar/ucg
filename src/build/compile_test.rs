@@ -12,16 +12,20 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
+use std::cell::RefCell;
+
 use regex::Regex;
 
 //TODO(jwall): use super::assets::MemoryCache;
 use super::FileBuilder;
+use crate::build::opcode::Environment;
 
 fn assert_build(input: &str) {
     let i_paths = Vec::new();
     let out_buffer: Vec<u8> = Vec::new();
     let err_buffer: Vec<u8> = Vec::new();
-    let mut b = FileBuilder::new("<Eval>", &i_paths, out_buffer, err_buffer);
+    let env = RefCell::new(Environment::new(out_buffer, err_buffer));
+    let mut b = FileBuilder::new("<Eval>", &i_paths, &env);
     b.enable_validate_mode();
     b.eval_string(input).unwrap();
     let env = b.environment.borrow();
@@ -34,7 +38,8 @@ fn assert_build_failure(input: &str, expect: Vec<Regex>) {
     let i_paths = Vec::new();
     let out_buffer: Vec<u8> = Vec::new();
     let err_buffer: Vec<u8> = Vec::new();
-    let mut b = FileBuilder::new("<Eval>", &i_paths, out_buffer, err_buffer);
+    let env = RefCell::new(Environment::new(out_buffer, err_buffer));
+    let mut b = FileBuilder::new("<Eval>", &i_paths, &env);
     b.enable_validate_mode();
     let err = b.eval_string(input);
     match err {

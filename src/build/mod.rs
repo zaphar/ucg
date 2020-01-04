@@ -16,7 +16,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::TryInto;
-use std::env;
 use std::error::Error;
 use std::fs::File;
 use std::io::Read;
@@ -91,7 +90,7 @@ where
     Stdout: std::io::Write + Clone,
     Stderr: std::io::Write + Clone,
 {
-    pub environment: Rc<RefCell<Environment<Stdout, Stderr>>>,
+    pub environment: &'a RefCell<Environment<Stdout, Stderr>>,
     working_dir: PathBuf,
     strict: bool,
     // FIXME(jwall): These need to be compiled and added to the op cache.
@@ -112,13 +111,10 @@ where
     pub fn new<P: Into<PathBuf>>(
         working_dir: P,
         import_paths: &'a Vec<PathBuf>,
-        stdout: Stdout,
-        stderr: Stderr,
+        environment: &'a RefCell<Environment<Stdout, Stderr>>,
     ) -> Self {
-        let mut environment = Environment::new_with_vars(stdout, stderr, env::vars().collect());
-        environment.populate_stdlib();
         FileBuilder {
-            environment: Rc::new(RefCell::new(environment)),
+            environment: environment,
             strict: false,
             // Our import stack is initialized with ourself.
             working_dir: working_dir.into(),
@@ -201,7 +197,6 @@ where
         let mut vm = VM::new(
             self.strict,
             Rc::new(ops),
-            self.environment.clone(),
             &self.working_dir,
         );
         if path.is_some() {
@@ -210,7 +205,7 @@ where
         if self.validate_mode {
             vm.enable_validate_mode();
         }
-        vm.run()?;
+        vm.run(self.environment)?;
         self.out = Some(Rc::new(vm.symbols_to_tuple(false).into()));
         Ok(())
     }
@@ -227,7 +222,6 @@ where
         let mut vm = VM::new(
             self.strict,
             Rc::new(PositionMap::new()),
-            self.environment.clone(),
             &self.working_dir,
         );
         loop {
@@ -286,7 +280,7 @@ where
                     let stmts = parse(OffsetStrIter::new(&stmt), None)?;
                     let ops = translate::AST::translate(stmts, &self.working_dir);
                     vm = vm.to_new_pointer(OpPointer::new(Rc::new(ops)));
-                    match vm.run() {
+                    match vm.run(self.environment) {
                         // print the result
                         Err(e) => eprintln!("{}", e),
                         Ok(_) => {
@@ -346,13 +340,12 @@ where
         let mut vm = VM::new(
             self.strict,
             Rc::new(ops_map),
-            self.environment.clone(),
             &self.working_dir,
         );
         if self.validate_mode {
             vm.enable_validate_mode();
         }
-        vm.run()?;
+        vm.run(self.environment)?;
         if let Some((val, _)) = vm.last.clone() {
             return Ok(Rc::new(val.try_into()?));
         }

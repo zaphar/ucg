@@ -57,12 +57,12 @@ impl Builtins {
         self.validate_mode = true;
     }
 
-    pub fn handle<P, WP, O, E>(
+    pub fn handle<'a, P, WP, O, E>(
         &mut self,
         path: Option<P>,
         h: Hook,
         stack: &mut Vec<(Rc<Value>, Position)>,
-        env: Rc<RefCell<Environment<O, E>>>,
+        env: &'a RefCell<Environment<O, E>>,
         import_stack: &mut Vec<String>,
         working_dir: WP,
         pos: Position,
@@ -178,11 +178,11 @@ impl Builtins {
         Ok(contents)
     }
 
-    fn import<P, O, E>(
+    fn import<'a, P, O, E>(
         &mut self,
         base_path: P,
         stack: &mut Vec<(Rc<Value>, Position)>,
-        env: Rc<RefCell<Environment<O, E>>>,
+        env: &'a RefCell<Environment<O, E>>,
         import_stack: &mut Vec<String>,
         pos: Position,
     ) -> Result<(), Error>
@@ -220,11 +220,10 @@ impl Builtins {
                         let mut vm = VM::with_pointer(
                             self.strict,
                             op_pointer,
-                            env.clone(),
                             normalized.parent().unwrap(),
                         )
                         .with_import_stack(import_stack.clone());
-                        vm.run()?;
+                        vm.run(env)?;
                         let result = Rc::new(vm.symbols_to_tuple(true));
                         env.borrow_mut().update_path_val(&path, result.clone());
                         stack.push((result, pos));
@@ -238,11 +237,11 @@ impl Builtins {
         unreachable!();
     }
 
-    fn include<P, O, E>(
+    fn include<'a, P, O, E>(
         &self,
         base_path: P,
         stack: &mut Vec<(Rc<Value>, Position)>,
-        env: Rc<RefCell<Environment<O, E>>>,
+        env: &'a RefCell<Environment<O, E>>,
         pos: Position,
     ) -> Result<(), Error>
     where
@@ -307,10 +306,10 @@ impl Builtins {
         Ok(())
     }
 
-    fn assert<O, E>(
+    fn assert<'a, O, E>(
         &mut self,
         stack: &mut Vec<(Rc<Value>, Position)>,
-        env: Rc<RefCell<Environment<O, E>>>,
+        env: &'a RefCell<Environment<O, E>>,
     ) -> Result<(), Error>
     where
         O: std::io::Write + Clone,
@@ -365,11 +364,11 @@ impl Builtins {
         return Ok(());
     }
 
-    fn out<P, O, E>(
+    fn out<'a, P, O, E>(
         &self,
         path: Option<P>,
         stack: &mut Vec<(Rc<Value>, Position)>,
-        env: Rc<RefCell<Environment<O, E>>>,
+        env: &'a RefCell<Environment<O, E>>,
         pos: Position,
     ) -> Result<(), Error>
     where
@@ -432,10 +431,10 @@ impl Builtins {
         unreachable!();
     }
 
-    fn convert<O, E>(
+    fn convert<'a, O, E>(
         &self,
         stack: &mut Vec<(Rc<Value>, Position)>,
-        env: Rc<RefCell<Environment<O, E>>>,
+        env: &'a RefCell<Environment<O, E>>,
         pos: Position,
     ) -> Result<(), Error>
     where
@@ -477,10 +476,10 @@ impl Builtins {
         unreachable!()
     }
 
-    fn map<O, E>(
+    fn map<'a, O, E>(
         &self,
         stack: &mut Vec<(Rc<Value>, Position)>,
-        env: Rc<RefCell<Environment<O, E>>>,
+        env: &'a RefCell<Environment<O, E>>,
         import_stack: &Vec<String>,
         pos: Position,
     ) -> Result<(), Error>
@@ -589,10 +588,10 @@ impl Builtins {
         Ok(())
     }
 
-    fn filter<O, E>(
+    fn filter<'a, O, E>(
         &self,
         stack: &mut Vec<(Rc<Value>, Position)>,
-        env: Rc<RefCell<Environment<O, E>>>,
+        env: &'a RefCell<Environment<O, E>>,
         import_stack: &Vec<String>,
         pos: Position,
     ) -> Result<(), Error>
@@ -735,10 +734,10 @@ impl Builtins {
         Ok(())
     }
 
-    fn reduce<O, E>(
+    fn reduce<'a, O, E>(
         &self,
         stack: &mut Vec<(Rc<Value>, Position)>,
-        env: Rc<RefCell<Environment<O, E>>>,
+        env: &'a RefCell<Environment<O, E>>,
         import_stack: &Vec<String>,
         pos: Position,
     ) -> Result<(), Error>
@@ -875,11 +874,11 @@ impl Builtins {
         Ok(())
     }
 
-    fn trace<O, E>(
+    fn trace<'a, O, E>(
         &mut self,
         stack: &mut Vec<(Rc<Value>, Position)>,
         pos: Position,
-        env: Rc<RefCell<Environment<O, E>>>,
+        env: &'a RefCell<Environment<O, E>>,
     ) -> Result<(), Error>
     where
         O: std::io::Write + Clone,

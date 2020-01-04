@@ -11,11 +11,13 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
-use super::{FileBuilder, Val};
-use crate::ast::*;
-
 use std;
 use std::rc::Rc;
+use std::cell::RefCell;
+
+use super::{FileBuilder, Val};
+use crate::ast::*;
+use crate::build::Environment;
 
 fn test_expr_to_val<'a, O, E>(mut cases: Vec<(Expression, Val)>, mut b: FileBuilder<'a, O, E>)
 where
@@ -33,7 +35,8 @@ fn test_eval_div_expr_fail() {
     let i_paths = Vec::new();
     let out: Vec<u8> = Vec::new();
     let err: Vec<u8> = Vec::new();
-    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, out, err);
+    let env = RefCell::new(Environment::new(out, err));
+    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, &env);
     test_expr_to_val(
         vec![(
             Expression::Binary(BinaryOpDef {
@@ -60,7 +63,8 @@ fn test_eval_mul_expr_fail() {
     let i_paths = Vec::new();
     let out: Vec<u8> = Vec::new();
     let err: Vec<u8> = Vec::new();
-    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, out, err);
+    let env = RefCell::new(Environment::new(out, err));
+    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, &env);
     test_expr_to_val(
         vec![(
             Expression::Binary(BinaryOpDef {
@@ -87,7 +91,8 @@ fn test_eval_subtract_expr_fail() {
     let i_paths = Vec::new();
     let out: Vec<u8> = Vec::new();
     let err: Vec<u8> = Vec::new();
-    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, out, err);
+    let env = RefCell::new(Environment::new(out, err));
+    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, &env);
     test_expr_to_val(
         vec![(
             Expression::Binary(BinaryOpDef {
@@ -113,7 +118,8 @@ fn test_eval_add_expr_fail() {
     let i_paths = Vec::new();
     let out: Vec<u8> = Vec::new();
     let err: Vec<u8> = Vec::new();
-    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, out, err);
+    let env = RefCell::new(Environment::new(out, err));
+    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, &env);
     test_expr_to_val(
         vec![(
             Expression::Binary(BinaryOpDef {
@@ -141,7 +147,8 @@ fn test_expr_copy_no_such_tuple() {
     let i_paths = Vec::new();
     let out: Vec<u8> = Vec::new();
     let err: Vec<u8> = Vec::new();
-    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, out, err);
+    let env = RefCell::new(Environment::new(out, err));
+    let b = FileBuilder::new(std::env::current_dir().unwrap(), &i_paths, &env);
     test_expr_to_val(
         vec![(
             Expression::Copy(CopyDef {
