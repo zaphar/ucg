@@ -1080,14 +1080,13 @@ impl VM {
         name: &str,
         pos: &Position,
     ) -> Result<(Rc<Value>, Position), Error> {
-        if name == "self" {
-            if let Some((val, pos)) = self.self_stack.last() {
-                return Ok((val.clone(), pos.clone()));
-            }
-            return Err(Error::new(format!("No such binding {}", name), pos.clone()));
-        }
-        match self.symbols.get(name) {
-            Some((ref v, ref pos)) => Ok((v.clone(), pos.clone())),
+        let tpl = if name == "self" {
+            self.self_stack.last().cloned()
+        } else {
+            self.symbols.get(name)
+        };
+        match tpl {
+            Some((v, pos)) => Ok((v, pos)),
             None => {
                 return Err(Error::new(format!("No such binding {}", name), pos.clone()));
             }
