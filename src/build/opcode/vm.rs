@@ -193,7 +193,6 @@ impl VM {
                 Op::FCall => self.op_fcall(pos, env)?,
                 Op::NewScope(jp) => self.op_new_scope(jp, self.ops.clone(), env)?,
                 Op::Return => {
-                    &self.stack;
                     return Ok(());
                 }
                 Op::Pop => {
