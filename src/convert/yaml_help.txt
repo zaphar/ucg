@@ -8,3 +8,7 @@ They are transformed into toml using the following rules:
 - Float becomes a Float
 - Strings become Strings.
 - Functions and Modules are ignored.
+
+If you are using the yamlmulti conversion type then a list will get transformed
+into a yaml document per list item. All other types will get treated as a single
+document.
