@@ -92,7 +92,7 @@ fn test_comparisons() {
 
 #[test]
 fn test_funcs() {
-    assert_build(include_str!("../../integration_tests/macros_test.ucg"));
+    assert_build(include_str!("../../integration_tests/func_test.ucg"));
 }
 
 #[test]
