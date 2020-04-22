@@ -404,12 +404,6 @@ fn module_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expres
             if let Some(expr) = out_expr {
                 def.set_out_expr(expr);
             }
-            //eprintln!(
-            //    "module def at: {:?} arg_typle len {} stmts len {}",
-            //    def.pos,
-            //    def.arg_set.len(),
-            //    def.statements.len()
-            //);
             Result::Complete(rest, Expression::Module(def))
         }
     }
