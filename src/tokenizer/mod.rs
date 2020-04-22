@@ -271,6 +271,10 @@ make_fn!(semicolontok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, ";")
 );
 
+make_fn!(doublecolontok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, "::")
+);
+
 make_fn!(colontok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, ":")
 );
@@ -459,6 +463,7 @@ fn token<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Token> {
         fatcommatok, // Note fatcommatok must come before equaltok
         equaltok,
         semicolontok,
+        doublecolontok,
         colontok,
         leftsquarebracket,
         rightsquarebracket,

@@ -216,6 +216,7 @@ make_fn!(
     do_each!(
             field => wrap_err!(either!(match_type!(BOOLEAN), match_type!(BAREWORD), match_type!(STR)),
                                "Field names must be a bareword or a string."),
+            _ => optional!(shape_suffix),
             _ => must!(punct!("=")),
             value => must!(expression),
             (field, value)
@@ -285,6 +286,15 @@ make_fn!(
         trace_parse!(empty_value),
         trace_parse!(number),
         trace_parse!(quoted_value)
+    )
+);
+
+make_fn!(
+    shape_suffix<SliceIter<Token>, Value>,
+    do_each!(
+        _ => punct!("::"),
+        shape => value,
+        (dbg!(shape))
     )
 );
 
@@ -370,7 +380,11 @@ fn tuple_to_func<'a>(
 
 make_fn!(
     arglist<SliceIter<Token>, Vec<Value>>,
-    separated!(punct!(","), symbol)
+    separated!(punct!(","), do_each!(
+        sym => symbol,
+        _ => optional!(shape_suffix),
+        (sym)
+    ))
 );
 
 fn module_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expression> {
@@ -385,7 +399,12 @@ fn module_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expres
         out_expr => optional!(
             do_each!(
                 _ => punct!("("),
-                expr => must!(expression),
+                expr => must!(do_each!(
+                        expr => expression,
+                        _ => optional!(shape_suffix),
+                        (expr)
+                    )
+                ),
                 _ => must!(punct!(")")),
                 (expr)
             )
@@ -418,6 +437,7 @@ fn func_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expressi
         _ => must!(punct!(")")),
         _ => must!(punct!("=>")),
         map =>  trace_parse!(expression),
+        _ => optional!(shape_suffix),
         (pos, arglist, map)
     );
     match parsed {
@@ -788,6 +808,7 @@ make_fn!(
     do_each!(
         pos => pos,
         name => wrap_err!(match_type!(BAREWORD), "Expected name for binding"),
+        _ => optional!(trace_parse!(shape_suffix)),
         _ => punct!("="),
         val => trace_parse!(wrap_err!(expression, "Expected Expression to bind")),
         _ => punct!(";"),
