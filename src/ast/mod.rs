@@ -19,7 +19,7 @@ use std::cmp::Eq;
 use std::cmp::Ordering;
 use std::cmp::PartialEq;
 use std::cmp::PartialOrd;
-use std::convert::Into;
+use std::convert::{Into, TryFrom, TryInto};
 use std::fmt;
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -30,6 +30,7 @@ use abortable_parser;
 
 use crate::build::scope::Scope;
 use crate::build::Val;
+use crate::error::BuildError;
 
 pub mod printer;
 pub mod walk;
@@ -218,20 +219,57 @@ macro_rules! make_expr {
 /// This is usually used as the body of a tuple in the UCG AST.
 pub type FieldList = Vec<(Token, Expression)>; // Token is expected to be a symbol
 
-/// Represents a Value in the UCG parsed AST.
-#[derive(Debug, PartialEq, Clone)]
-pub enum Value {
-    // Constant Values
-    Empty(Position),
-    Boolean(PositionedItem<bool>),
-    Int(PositionedItem<i64>),
-    Float(PositionedItem<f64>),
-    Str(PositionedItem<String>),
-    Symbol(PositionedItem<String>),
-    // Complex Values
-    Tuple(PositionedItem<FieldList>),
-    List(ListDef),
+pub type ShapeTuple = Vec<(Token, Shape)>;
+pub type ShapeList = Vec<Shape>;
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct FuncShapeDef {
+    args: Vec<Shape>,
+    ret: Box<Shape>,
 }
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct ModuleShapeDef {
+    items: ShapeTuple,
+    ret: Box<Shape>,
+}
+
+macro_rules! value_enum {
+    ($doc:meta $i:tt, $t:ty, $l:ty, $($extra:tt)*) => {
+        #[$doc]
+        #[derive(PartialEq, Debug, Clone)]
+        pub enum $i {
+            // Simple Values
+            Empty(Position),
+            Boolean(PositionedItem<bool>),
+            Int(PositionedItem<i64>),
+            Float(PositionedItem<f64>),
+            Str(PositionedItem<String>),
+            Symbol(PositionedItem<String>),
+            // Complex Values
+            Tuple(PositionedItem<$t>),
+            List($l),
+            // Extra items
+            $( $extra )*
+        }
+    }
+}
+
+value_enum!(
+    doc="Value types represent the Values that UCG can have."
+    Value,
+    FieldList,
+    ListDef,
+);
+
+value_enum!(
+    doc="Shapes represent the types that UCG values or expressions can have."
+    Shape,
+    ShapeTuple,
+    PositionedItem<ShapeList>,
+    Func(FuncShapeDef),
+    Module(ModuleShapeDef),
+);
 
 impl Value {
     /// Returns the type name of the Value it is called on as a string.
@@ -306,6 +344,43 @@ impl Value {
             &Value::Tuple(_),
             &Value::List(_)
         )
+    }
+
+    fn derive_shape(&self) -> Result<Shape, BuildError> {
+        let shape = match self {
+            Value::Empty(p) => Shape::Empty(p.clone()),
+            Value::Boolean(p) => Shape::Boolean(p.clone()),
+            Value::Int(p) => Shape::Int(p.clone()),
+            Value::Float(p) => Shape::Float(p.clone()),
+            Value::Str(p) => Shape::Str(p.clone()),
+            // Symbols in a shape are placeholder. They allow a form of genericity
+            // in the shape. They can be any type and are only refined down.
+            // by their presence in an expression.
+            Value::Symbol(p) => Shape::Symbol(p.clone()),
+            Value::Tuple(flds) => {
+                let mut field_shapes = Vec::new();
+                for &(ref tok, ref expr) in &flds.val {
+                    field_shapes.push((tok.clone(), expr.try_into()?));
+                }
+                Shape::Tuple(PositionedItem::new(field_shapes, flds.pos.clone()))
+            }
+            Value::List(flds) => {
+                let mut field_shapes = Vec::new();
+                for f in &flds.elems {
+                    field_shapes.push(f.try_into()?);
+                }
+                Shape::List(PositionedItem::new(field_shapes, flds.pos.clone()))
+            }
+        };
+        Ok(shape)
+    }
+}
+
+impl TryFrom<&Value> for Shape {
+    type Error = crate::error::BuildError;
+
+    fn try_from(v: &Value) -> Result<Self, Self::Error> {
+        v.derive_shape()
     }
 }
 
@@ -769,6 +844,28 @@ impl Expression {
             &Expression::Debug(ref def) => &def.pos,
         }
     }
+
+    fn derive_shape(&self) -> Result<Shape, BuildError> {
+        // FIXME(jwall): Implement this
+        let shape = match self {
+            Expression::Simple(ref v) => v.try_into()?,
+            Expression::Format(def) => {
+                Shape::Str(PositionedItem::new("".to_owned(), def.pos.clone()))
+            }
+            Expression::Not(def) => Shape::Boolean(PositionedItem::new(true, def.pos.clone())),
+            Expression::Grouped(v, _pos) => v.as_ref().try_into()?,
+            _ => Shape::Empty(Position::new(0, 0, 0)),
+        };
+        Ok(shape)
+    }
+}
+
+impl TryFrom<&Expression> for Shape {
+    type Error = crate::error::BuildError;
+
+    fn try_from(e: &Expression) -> Result<Self, Self::Error> {
+        e.derive_shape()
+    }
 }
 
 impl fmt::Display for Expression {
@@ -868,3 +965,6 @@ impl Statement {
         }
     }
 }
+
+#[cfg(test)]
+mod test;

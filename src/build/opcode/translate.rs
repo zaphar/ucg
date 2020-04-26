@@ -402,6 +402,8 @@ impl AST {
             Expression::Func(def) => {
                 ops.push(Op::InitList, def.pos.clone());
                 for b in def.argdefs {
+                    // FIXME(jwall): if there is a projection
+                    // then add the projection check here?
                     ops.push(Op::Sym(b.val), b.pos.clone());
                     ops.push(Op::Element, b.pos);
                 }
@@ -460,6 +462,8 @@ impl AST {
                 // Init our module tuple bindings
                 ops.push(Op::InitTuple, def.pos.clone());
                 for (t, e) in argset {
+                    // FIXME(jwall): if there is a projection
+                    // then add the projection check here?
                     ops.push(Op::Sym(t.fragment), t.pos.clone());
                     Self::translate_expr(e, &mut ops, root);
                     ops.push(Op::Field, t.pos);
