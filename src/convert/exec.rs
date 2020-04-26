@@ -194,11 +194,11 @@ impl Converter for ExecConverter {
 #[cfg(test)]
 mod exec_test {
     use std::cell::RefCell;
-    
+
     use super::*;
+    use crate::build::opcode::Environment;
     use crate::build::FileBuilder;
     use crate::convert::traits::Converter;
-    use crate::build::opcode::Environment;
 
     use std;
     use std::io::Cursor;

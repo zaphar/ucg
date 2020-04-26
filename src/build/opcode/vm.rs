@@ -55,19 +55,11 @@ pub struct VM {
 }
 
 impl VM {
-    pub fn new<P: Into<PathBuf>>(
-        strict: bool,
-        ops: Rc<PositionMap>,
-        working_dir: P,
-    ) -> Self {
+    pub fn new<P: Into<PathBuf>>(strict: bool, ops: Rc<PositionMap>, working_dir: P) -> Self {
         Self::with_pointer(strict, OpPointer::new(ops), working_dir)
     }
 
-    pub fn with_pointer<P: Into<PathBuf>>(
-        strict: bool,
-        ops: OpPointer,
-        working_dir: P,
-    ) -> Self {
+    pub fn with_pointer<P: Into<PathBuf>>(strict: bool, ops: OpPointer, working_dir: P) -> Self {
         Self {
             working_dir: working_dir.into(),
             stack: Vec::new(),
@@ -489,7 +481,12 @@ impl VM {
         return vm.pop();
     }
 
-    fn op_new_scope<O, E>(&mut self, jp: i32, ptr: OpPointer, env: &RefCell<Environment<O, E>>) -> Result<(), Error>
+    fn op_new_scope<O, E>(
+        &mut self,
+        jp: i32,
+        ptr: OpPointer,
+        env: &RefCell<Environment<O, E>>,
+    ) -> Result<(), Error>
     where
         O: std::io::Write + Clone,
         E: std::io::Write + Clone,
@@ -507,7 +504,11 @@ impl VM {
         Ok(())
     }
 
-    fn op_fcall<O, E>(&mut self, pos: Position, env: &RefCell<Environment<O, E>>) -> Result<(), Error>
+    fn op_fcall<O, E>(
+        &mut self,
+        pos: Position,
+        env: &RefCell<Environment<O, E>>,
+    ) -> Result<(), Error>
     where
         O: std::io::Write + Clone,
         E: std::io::Write + Clone,
@@ -890,7 +891,11 @@ impl VM {
         Ok(())
     }
 
-    fn op_copy<O, E>(&mut self, pos: Position, env: &RefCell<Environment<O, E>>) -> Result<(), Error>
+    fn op_copy<O, E>(
+        &mut self,
+        pos: Position,
+        env: &RefCell<Environment<O, E>>,
+    ) -> Result<(), Error>
     where
         O: std::io::Write + Clone,
         E: std::io::Write + Clone,
@@ -1074,11 +1079,7 @@ impl VM {
         Ok(())
     }
 
-    pub fn get_binding(
-        &self,
-        name: &str,
-        pos: &Position,
-    ) -> Result<(Rc<Value>, Position), Error> {
+    pub fn get_binding(&self, name: &str, pos: &Position) -> Result<(Rc<Value>, Position), Error> {
         let tpl = if name == "self" {
             self.self_stack.last().cloned()
         } else {
@@ -1194,7 +1195,12 @@ impl VM {
         })
     }
 
-    fn op_runtime<O, E>(&mut self, h: Hook, pos: Position, env: &RefCell<Environment<O, E>>) -> Result<(), Error>
+    fn op_runtime<O, E>(
+        &mut self,
+        h: Hook,
+        pos: Position,
+        env: &RefCell<Environment<O, E>>,
+    ) -> Result<(), Error>
     where
         O: std::io::Write + Clone,
         E: std::io::Write + Clone,

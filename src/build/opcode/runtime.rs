@@ -217,12 +217,9 @@ impl Builtins {
                     None => {
                         let op_pointer = decorate_error!(path_pos => env.borrow_mut().get_ops_for_path(&normalized))?;
                         // TODO(jwall): What if we don't have a base path?
-                        let mut vm = VM::with_pointer(
-                            self.strict,
-                            op_pointer,
-                            normalized.parent().unwrap(),
-                        )
-                        .with_import_stack(import_stack.clone());
+                        let mut vm =
+                            VM::with_pointer(self.strict, op_pointer, normalized.parent().unwrap())
+                                .with_import_stack(import_stack.clone());
                         vm.run(env)?;
                         let result = Rc::new(vm.symbols_to_tuple(true));
                         env.borrow_mut().update_path_val(&path, result.clone());

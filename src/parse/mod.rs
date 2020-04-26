@@ -380,11 +380,14 @@ fn tuple_to_func<'a>(
 
 make_fn!(
     arglist<SliceIter<Token>, Vec<Value>>,
-    separated!(punct!(","), do_each!(
-        sym => symbol,
-        _ => optional!(shape_suffix),
-        (sym)
-    ))
+    separated!(
+        punct!(","),
+        do_each!(
+            sym => symbol,
+            _ => optional!(shape_suffix),
+            (sym)
+        )
+    )
 );
 
 fn module_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expression> {

@@ -132,7 +132,7 @@ fn build_file<'a>(
     if file_path_buf.is_relative() {
         file_path_buf = std::env::current_dir()?.join(file_path_buf);
     }
-let mut builder = build::FileBuilder::new(std::env::current_dir()?, import_paths, env);
+    let mut builder = build::FileBuilder::new(std::env::current_dir()?, import_paths, env);
     builder.set_strict(strict);
     if validate {
         builder.enable_validate_mode();
@@ -212,7 +212,8 @@ fn visit_ucg_files(
             let next_path = next_item.path();
             let path_as_string = String::from(next_path.to_string_lossy());
             if next_path.is_dir() && recurse {
-                if let Err(e) = visit_ucg_files(&next_path, recurse, validate, strict, import_paths, env)
+                if let Err(e) =
+                    visit_ucg_files(&next_path, recurse, validate, strict, import_paths, env)
                 {
                     eprintln!("{}", e);
                     result = false;
@@ -262,7 +263,14 @@ fn build_command(
     let mut ok = true;
     if files.is_none() {
         let curr_dir = std::env::current_dir().unwrap();
-        let ok = visit_ucg_files(curr_dir.as_path(), recurse, false, strict, import_paths, env);
+        let ok = visit_ucg_files(
+            curr_dir.as_path(),
+            recurse,
+            false,
+            strict,
+            import_paths,
+            env,
+        );
         if let Ok(false) = ok {
             process::exit(1)
         }
@@ -361,7 +369,9 @@ fn test_command(
         for file in files.unwrap() {
             let pb = PathBuf::from(file);
             //if pb.is_dir() {
-            if let Ok(false) = visit_ucg_files(pb.as_path(), recurse, true, strict, import_paths, env) {
+            if let Ok(false) =
+                visit_ucg_files(pb.as_path(), recurse, true, strict, import_paths, env)
+            {
                 ok = false;
             }
         }
@@ -448,12 +458,11 @@ fn do_repl(import_paths: &Vec<PathBuf>, strict: bool) -> std::result::Result<(),
             }
         }
     }
-    let env = std::cell::RefCell::new(build::opcode::Environment::new(StdoutWrapper::new(), StderrWrapper::new()));
-    let mut builder = build::FileBuilder::new(
-        std::env::current_dir()?,
-        import_paths,
-        &env,
-    );
+    let env = std::cell::RefCell::new(build::opcode::Environment::new(
+        StdoutWrapper::new(),
+        StderrWrapper::new(),
+    ));
+    let mut builder = build::FileBuilder::new(std::env::current_dir()?, import_paths, &env);
     builder.set_strict(strict);
 
     builder.repl(editor, config_home)?;

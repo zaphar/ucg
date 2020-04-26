@@ -194,11 +194,7 @@ where
     pub fn eval_stmts(&mut self, ast: Vec<Statement>, path: Option<PathBuf>) -> BuildResult {
         // We should probably stash this in an op_cache somewhere?
         let ops = translate::AST::translate(ast, &self.working_dir);
-        let mut vm = VM::new(
-            self.strict,
-            Rc::new(ops),
-            &self.working_dir,
-        );
+        let mut vm = VM::new(self.strict, Rc::new(ops), &self.working_dir);
         if path.is_some() {
             vm.set_path(path.unwrap());
         }
@@ -219,11 +215,7 @@ where
             println!("");
         }
         // Initialize VM with an empty OpPointer
-        let mut vm = VM::new(
-            self.strict,
-            Rc::new(PositionMap::new()),
-            &self.working_dir,
-        );
+        let mut vm = VM::new(self.strict, Rc::new(PositionMap::new()), &self.working_dir);
         loop {
             // print prompt
             let line = match editor.readline(&format!("{}> ", lines.next_line())) {
@@ -337,11 +329,7 @@ where
             &mut ops_map,
             &self.working_dir,
         );
-        let mut vm = VM::new(
-            self.strict,
-            Rc::new(ops_map),
-            &self.working_dir,
-        );
+        let mut vm = VM::new(self.strict, Rc::new(ops_map), &self.working_dir);
         if self.validate_mode {
             vm.enable_validate_mode();
         }

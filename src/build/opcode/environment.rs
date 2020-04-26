@@ -63,7 +63,7 @@ impl<Stdout: Write + Clone, Stderr: Write + Clone> Environment<Stdout, Stderr> {
             out_lock: BTreeSet::new(),
         };
         me.populate_stdlib();
-        return me
+        return me;
     }
 
     pub fn get_cached_path_val(&self, path: &String) -> Option<Rc<Value>> {
