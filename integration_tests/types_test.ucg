@@ -112,13 +112,15 @@ assert t.ok{
     desc = "You can cast true into a string",
 };
 
+// Shapes and their specifiers
+
 let mystr::"" = "a string";
 
 let struct_shape = {
     foo :: "" = "",
 };
 
-let func_shape = func(arg :: "", arg2 :: "") => arg + arg2 :: "";
+let func_shape = func(arg :: "", arg2 :: "") => arg + arg2;
 
 let module_shape = module{self={}} => (result :: {}) {
     let result :: {} = self;

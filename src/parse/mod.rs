@@ -437,7 +437,6 @@ fn func_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expressi
         _ => must!(punct!(")")),
         _ => must!(punct!("=>")),
         map =>  trace_parse!(expression),
-        _ => optional!(shape_suffix),
         (pos, arglist, map)
     );
     match parsed {
