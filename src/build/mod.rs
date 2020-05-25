@@ -27,7 +27,6 @@ use rustyline::error::ReadlineError;
 use simple_error;
 
 use crate::ast::*;
-#[macro_use]
 use crate::build::opcode::pointer::OpPointer;
 use crate::build::opcode::translate;
 use crate::build::opcode::translate::OpsMap;

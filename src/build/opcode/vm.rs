@@ -1210,7 +1210,6 @@ impl VM {
             &mut self.stack,
             env,
             &mut self.import_stack,
-            &self.working_dir,
             pos,
         )
     }

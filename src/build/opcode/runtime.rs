@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use std::cell::RefCell;
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -57,25 +57,23 @@ impl Builtins {
         self.validate_mode = true;
     }
 
-    pub fn handle<'a, P, WP, O, E>(
+    pub fn handle<'a, P, O, E>(
         &mut self,
         path: Option<P>,
         h: Hook,
         stack: &mut Vec<(Rc<Value>, Position)>,
         env: &'a RefCell<Environment<O, E>>,
         import_stack: &mut Vec<String>,
-        working_dir: WP,
         pos: Position,
     ) -> Result<(), Error>
     where
         P: AsRef<Path> + Debug,
-        WP: Into<PathBuf> + Clone + Debug,
         O: std::io::Write + Clone,
         E: std::io::Write + Clone,
     {
         match h {
-            Hook::Import => self.import(working_dir, stack, env, import_stack, pos),
-            Hook::Include => self.include(working_dir, stack, env, pos),
+            Hook::Import => self.import(stack, env, import_stack, pos),
+            Hook::Include => self.include(stack, env, pos),
             Hook::Assert => self.assert(stack, env),
             Hook::Convert => self.convert(stack, env, pos),
             Hook::Out => self.out(path, stack, env, pos),
@@ -88,99 +86,16 @@ impl Builtins {
         }
     }
 
-    fn normalize_path<P, BP>(
-        &self,
-        base_path: BP,
-        use_import_path: bool,
-        path: P,
-    ) -> Result<PathBuf, Error>
-    where
-        BP: Into<PathBuf>,
-        P: Into<PathBuf>,
-    {
-        // Try a relative path first.
-        let path = path.into();
-        // stdlib paths are special
-        if path.starts_with(format!("std{}", std::path::MAIN_SEPARATOR)) {
-            return Ok(path);
-        }
-        let mut normalized = base_path.into();
-        if path.is_relative() {
-            normalized.push(&path);
-            // First see if the normalized file exists or not.
-            if !normalized.exists() && use_import_path {
-                // TODO(jwall): Support importing from a zip file in this
-                // import_path?
-                // If it does not then look for it in the list of import_paths
-                for mut p in self.import_path.iter().cloned() {
-                    p.push(&path);
-                    if p.exists() {
-                        normalized = p;
-                        break;
-                    }
-                }
-            }
-        } else {
-            normalized = path;
-        }
-        // The canonicalize method on windows is not what we want so we'll
-        // do something a little different on windows that we would do on
-        // other Operating Systems.
-        #[cfg(target_os = "windows")]
-        {
-            Ok(normalized)
-        }
-        #[cfg(not(target_os = "windows"))]
-        {
-            Ok(normalized.canonicalize()?)
-        }
-    }
-
-    fn find_file<P, BP>(
-        &self,
-        base_path: BP,
-        path: P,
-        use_import_path: bool,
-        pos: Position,
-    ) -> Result<PathBuf, Error>
-    where
-        P: Into<PathBuf> + Display + Clone,
-        BP: Into<PathBuf>,
-    {
-        // FIXME(jwall): Use import paths if desired.
-        match self.normalize_path(base_path, use_import_path, path.clone()) {
-            Ok(p) => Ok(p),
-            Err(e) => {
-                //panic!(format!("Error finding path {}: {}", path, e));
-                Err(Error::new(
-                    format!("Error finding path {}: {}", path, e),
-                    pos,
-                ))
-            }
-        }
-    }
-
-    fn get_file_as_string<P: Into<PathBuf>>(
-        &self,
-        base_path: P,
-        path: &str,
-        pos: Position,
-    ) -> Result<String, Error> {
-        let sep = format!("{}", std::path::MAIN_SEPARATOR);
-        let raw_path = path.replace("/", &sep);
-        // FIXME(jwall): import paths?
-        let normalized = self.find_file(base_path, raw_path, false, pos)?;
-        // TODO(jwall): Proper error here
-        let mut f = File::open(normalized)?;
+    fn get_file_as_string(&self, path: &str) -> Result<String, Error> {
+        let mut f = File::open(path)?;
         let mut contents = String::new();
         // TODO(jwall): Proper error here
         f.read_to_string(&mut contents)?;
         Ok(contents)
     }
 
-    fn import<'a, P, O, E>(
+    fn import<'a, O, E>(
         &mut self,
-        base_path: P,
         stack: &mut Vec<(Rc<Value>, Position)>,
         env: &'a RefCell<Environment<O, E>>,
         import_stack: &mut Vec<String>,
@@ -189,23 +104,17 @@ impl Builtins {
     where
         O: std::io::Write + Clone,
         E: std::io::Write + Clone,
-        P: Into<PathBuf> + Clone + Debug,
     {
         let path = stack.pop();
         if let Some((val, path_pos)) = path {
             if let &Value::P(Str(ref path)) = val.as_ref() {
-                // FIXME(jwall): Most of this is no longer necessary since
-                //   we do it before hand at the linker step.
                 // TODO(jwall): A bit hacky we should probably change import stacks to be pathbufs.
-                let normalized =
-                    decorate_error!(path_pos => self.normalize_path(base_path, false, path))?;
                 // first we chack the cache
-                let path = normalized.to_string_lossy().to_string();
                 if let Some(val) = env.borrow().get_cached_path_val(&path) {
                     stack.push((val, path_pos));
                     return Ok(());
                 }
-                if import_stack.iter().find(|p| *p == &path).is_some() {
+                if import_stack.iter().find(|p| *p == path).is_some() {
                     return Err(Error::new(
                         format!("Import cycle detected: {} in {:?}", path, import_stack),
                         pos,
@@ -217,10 +126,12 @@ impl Builtins {
                         stack.push((v, path_pos));
                     }
                     None => {
-                        let op_pointer = decorate_error!(path_pos => env.borrow_mut().get_ops_for_path(&normalized))?;
+                        let path_buf = PathBuf::from(path);
+                        let op_pointer =
+                            decorate_error!(path_pos => env.borrow_mut().get_ops_for_path(&path))?;
                         // TODO(jwall): What if we don't have a base path?
                         let mut vm =
-                            VM::with_pointer(self.strict, op_pointer, normalized.parent().unwrap())
+                            VM::with_pointer(self.strict, op_pointer, path_buf.parent().unwrap())
                                 .with_import_stack(import_stack.clone());
                         vm.run(env)?;
                         let result = Rc::new(vm.symbols_to_tuple(true));
@@ -236,9 +147,8 @@ impl Builtins {
         unreachable!();
     }
 
-    fn include<'a, P, O, E>(
+    fn include<'a, O, E>(
         &self,
-        base_path: P,
         stack: &mut Vec<(Rc<Value>, Position)>,
         env: &'a RefCell<Environment<O, E>>,
         pos: Position,
@@ -246,7 +156,6 @@ impl Builtins {
     where
         O: std::io::Write + Clone,
         E: std::io::Write + Clone,
-        P: Into<PathBuf> + Clone + Debug,
     {
         let path = stack.pop();
         let typ = stack.pop();
@@ -273,18 +182,14 @@ impl Builtins {
         };
         if typ == "str" {
             stack.push((
-                Rc::new(P(Str(self.get_file_as_string(
-                    base_path,
-                    &path,
-                    pos.clone(),
-                )?))),
+                Rc::new(P(Str(self.get_file_as_string(&path)?))),
                 pos.clone(),
             ));
         } else {
             stack.push((
                 Rc::new(match env.borrow().importer_registry.get_importer(&typ) {
                     Some(importer) => {
-                        let contents = self.get_file_as_string(base_path, &path, pos.clone())?;
+                        let contents = self.get_file_as_string(&path)?;
                         if contents.len() == 0 {
                             eprintln!("including an empty file. Use NULL as the result");
                             P(Empty)
