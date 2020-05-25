@@ -11,10 +11,37 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use crate::ast::{
-    Expression, FormatArgs, FormatDef, ListDef, NotDef, Position, PositionedItem, Shape, Token,
-    TokenType, Value,
-};
+use abortable_parser::iter::SliceIter;
+use abortable_parser::Result as ParseResult;
+
+use crate::ast::{Expression, ListDef, Position, PositionedItem, Shape, Token, TokenType, Value};
+use crate::iter::OffsetStrIter;
+use crate::parse::expression;
+use crate::tokenizer::tokenize;
+
+macro_rules! assert_shape {
+    ($input:expr => $shape:expr) => {{
+        let iter = OffsetStrIter::new($input);
+        let tokenized = match tokenize(iter, None) {
+            Ok(toks) => toks,
+            Err(err) => panic!(format!("failed to parse {} with error {}", $input, err)),
+        };
+        let toks = SliceIter::new(&tokenized);
+        if let ParseResult::Complete(_, ref expr) = expression(toks) {
+            assert_eq!(
+                match expr.derive_shape() {
+                    Ok(shape) => shape,
+                    Err(err) => {
+                        panic!(format!("failed to parse {} with error {}", $input, err))
+                    }
+                },
+                $shape
+            );
+        } else {
+            assert!(false, format!("failed to parse expression! {:?}", $input));
+        };
+    }};
+}
 
 #[test]
 fn derive_shape_values() {
@@ -89,40 +116,47 @@ fn derive_shape_values() {
 fn derive_shape_expressions() {
     let expr_cases = vec![
         (
-            Expression::Simple(Value::Int(PositionedItem::new(3, Position::new(0, 0, 0)))),
+            "3;",
             Shape::Int(PositionedItem::new(3, Position::new(0, 0, 0))),
         ),
         (
-            Expression::Grouped(
-                Box::new(Expression::Simple(Value::Int(PositionedItem::new(
-                    3,
-                    Position::new(0, 0, 0),
-                )))),
-                Position::new(0, 0, 0),
-            ),
+            "(3);",
             Shape::Int(PositionedItem::new(3, Position::new(0, 0, 0))),
         ),
         (
-            Expression::Format(FormatDef {
-                template: "".to_owned(),
-                args: FormatArgs::List(Vec::new()),
-                pos: Position::new(0, 0, 0),
-            }),
+            "\"foo {}\" % (1);",
             Shape::Str(PositionedItem::new("".to_owned(), Position::new(0, 0, 0))),
         ),
         (
-            Expression::Not(NotDef {
-                expr: Box::new(Expression::Simple(Value::Boolean(PositionedItem::new(
-                    true,
-                    Position::new(0, 0, 0),
-                )))),
-                pos: Position::new(1, 0, 0),
-            }),
-            Shape::Boolean(PositionedItem::new(true, Position::new(1, 0, 0))),
+            "not true;",
+            Shape::Boolean(PositionedItem::new(false, Position::new(1, 0, 0))),
+        ),
+        (
+            "0:1;",
+            Shape::List(PositionedItem::new(
+                vec![Shape::Int(PositionedItem::new(0, Position::new(0, 0, 0)))],
+                Position::new(0, 0, 0),
+            )),
+        ),
+        (
+            "int(\"1\");",
+            Shape::Int(PositionedItem::new(0, Position::new(0, 0, 0))),
+        ),
+        (
+            "float(1);",
+            Shape::Float(PositionedItem::new(0.0, Position::new(0, 0, 0))),
+        ),
+        (
+            "str(1);",
+            Shape::Str(PositionedItem::new("".to_owned(), Position::new(0, 0, 0))),
+        ),
+        (
+            "bool(\"true\");",
+            Shape::Boolean(PositionedItem::new(true, Position::new(0, 0, 0))),
         ),
     ];
 
     for (expr, shape) in expr_cases {
-        assert_eq!(expr.derive_shape().unwrap(), shape);
+        assert_shape!(expr => shape);
     }
 }

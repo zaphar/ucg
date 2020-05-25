@@ -30,7 +30,7 @@ use abortable_parser;
 
 use crate::build::scope::Scope;
 use crate::build::Val;
-use crate::error::BuildError;
+use crate::error::{BuildError, ErrorType::TypeFail};
 
 pub mod printer;
 pub mod walk;
@@ -353,7 +353,7 @@ impl Value {
             Value::Int(p) => Shape::Int(p.clone()),
             Value::Float(p) => Shape::Float(p.clone()),
             Value::Str(p) => Shape::Str(p.clone()),
-            // Symbols in a shape are placeholder. They allow a form of genericity
+            // Symbols in a shape are placeholders. They allow a form of genericity
             // in the shape. They can be any type and are only refined down.
             // by their presence in an expression.
             Value::Symbol(p) => Shape::Symbol(p.clone()),
@@ -826,12 +826,43 @@ impl Expression {
     fn derive_shape(&self) -> Result<Shape, BuildError> {
         // FIXME(jwall): Implement this
         let shape = match self {
-            Expression::Simple(ref v) => v.try_into()?,
+            Expression::Simple(v) => v.try_into()?,
             Expression::Format(def) => {
                 Shape::Str(PositionedItem::new("".to_owned(), def.pos.clone()))
             }
-            Expression::Not(def) => Shape::Boolean(PositionedItem::new(true, def.pos.clone())),
+            Expression::Not(def) => {
+                let shape = def.expr.as_ref().try_into()?;
+                if let Shape::Boolean(b) = shape {
+                    Shape::Boolean(PositionedItem::new(!b.val, def.pos.clone()))
+                } else {
+                    // TODO(jwall): Display implementations for shapes.
+                    return Err(BuildError::new(
+                        format!(
+                            "Expected Boolean value in Not expression but got: {:?}",
+                            shape
+                        ),
+                        TypeFail,
+                    ));
+                }
+            }
             Expression::Grouped(v, _pos) => v.as_ref().try_into()?,
+            Expression::Range(def) => Shape::List(PositionedItem::new(
+                vec![Shape::Int(PositionedItem::new(0, def.start.pos().clone()))],
+                def.pos.clone(),
+            )),
+            Expression::Cast(def) => match def.cast_type {
+                CastType::Int => Shape::Int(PositionedItem::new(0, def.pos.clone())),
+                CastType::Str => Shape::Str(PositionedItem::new("".to_owned(), def.pos.clone())),
+                CastType::Float => Shape::Float(PositionedItem::new(0.0, def.pos.clone())),
+                CastType::Bool => Shape::Boolean(PositionedItem::new(true, def.pos.clone())),
+            },
+            Expression::Import(def) => {
+                // FIXME(jwall): What should this do?
+                Shape::Symbol(PositionedItem::new(
+                    def.path.fragment.clone(),
+                    def.path.pos.clone(),
+                ))
+            }
             _ => Shape::Empty(Position::new(0, 0, 0)),
         };
         Ok(shape)
