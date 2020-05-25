@@ -29,7 +29,7 @@ pub struct AST();
 pub struct OpsMap {
     pub ops: Vec<Op>,
     pub pos: Vec<Position>,
-    pub links: BTreeMap<String, usize>,
+    pub links: BTreeMap<String, Position>,
 }
 
 impl OpsMap {
@@ -47,8 +47,8 @@ impl OpsMap {
         self
     }
 
-    pub fn add_link(&mut self, path: String) {
-        self.links.insert(path, self.len() - 1);
+    pub fn add_link(&mut self, path: String, pos: Position) {
+        self.links.insert(path, pos);
     }
 
     pub fn len(&self) -> usize {
@@ -444,9 +444,9 @@ impl AST {
             }
             Expression::Import(def) => {
                 let link_path = def.path.fragment.clone();
+                ops.add_link(link_path, def.path.pos.clone());
                 ops.push(Op::Val(Primitive::Str(def.path.fragment)), def.path.pos);
                 ops.push(Op::Runtime(Hook::Import), def.pos);
-                ops.add_link(link_path);
             }
             Expression::Include(def) => {
                 ops.push(Op::Val(Primitive::Str(def.typ.fragment)), def.typ.pos);

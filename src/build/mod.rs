@@ -14,8 +14,7 @@
 
 //! The build stage of the ucg compiler.
 use std::cell::RefCell;
-use std::collections::HashMap;
-use std::convert::TryInto;
+use std::collections::{BTreeSet, HashMap};
 use std::error::Error;
 use std::path::PathBuf;
 use std::process;
@@ -28,6 +27,7 @@ use rustyline::error::ReadlineError;
 use simple_error;
 
 use crate::ast::*;
+#[macro_use]
 use crate::build::opcode::pointer::OpPointer;
 use crate::build::opcode::translate;
 use crate::build::opcode::translate::OpsMap;
@@ -168,7 +168,34 @@ where
         self.validate_mode = true;
     }
 
+    fn link_ops(&self, ops: &OpPointer) -> BuildResult {
+        let mut links = Vec::new();
+        for (link, pos) in &ops.pos_map.links {
+            links.push((link.clone(), pos.clone()));
+        }
+        let mut found = BTreeSet::new();
+        loop {
+            let (link, path_pos) = match links.pop() {
+                Some(t) => t,
+                None => break,
+            };
+            if found.contains(&link) {
+                continue;
+            }
+            let ops = match self.environment.borrow_mut().get_ops_for_path(link.clone()) {
+                Ok(ops) => ops,
+                Err(e) => return Err(Box::new(e.with_pos(path_pos))),
+            };
+            found.insert(link);
+            for (link, pos) in &ops.pos_map.links {
+                links.push((link.clone(), pos.clone()));
+            }
+        }
+        Ok(())
+    }
+
     fn eval_ops(&mut self, ops: OpPointer, path: Option<PathBuf>) -> BuildResult {
+        self.link_ops(&ops)?;
         let mut vm = VM::with_pointer(self.strict, ops, &self.working_dir);
         if path.is_some() {
             vm.set_path(path.unwrap());
@@ -303,13 +330,12 @@ where
     pub fn eval_expr(&mut self, expr: Expression) -> Result<Rc<Val>, Box<dyn Error>> {
         let ops_map =
             translate::AST::translate(vec![Statement::Expression(expr)], &self.working_dir);
-        let mut vm = VM::new(self.strict, Rc::new(ops_map), &self.working_dir);
-        if self.validate_mode {
-            vm.enable_validate_mode();
-        }
-        vm.run(self.environment)?;
-        if let Some((val, _)) = vm.last.clone() {
-            return Ok(Rc::new(val.try_into()?));
+        self.eval_ops(
+            OpPointer::new(Rc::new(ops_map)),
+            Some(self.working_dir.clone()),
+        )?;
+        if let Some(val) = &self.last {
+            return Ok(val.clone());
         }
         unreachable!();
     }

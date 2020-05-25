@@ -18,7 +18,7 @@ mod debug;
 mod display;
 pub mod environment;
 #[macro_use]
-mod error;
+pub mod error;
 mod convert;
 pub mod pointer;
 mod runtime;

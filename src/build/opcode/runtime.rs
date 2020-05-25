@@ -194,6 +194,8 @@ impl Builtins {
         let path = stack.pop();
         if let Some((val, path_pos)) = path {
             if let &Value::P(Str(ref path)) = val.as_ref() {
+                // FIXME(jwall): Most of this is no longer necessary since
+                //   we do it before hand at the linker step.
                 // TODO(jwall): A bit hacky we should probably change import stacks to be pathbufs.
                 let normalized =
                     decorate_error!(path_pos => self.normalize_path(base_path, false, path))?;
