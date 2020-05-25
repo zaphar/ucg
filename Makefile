@@ -32,7 +32,7 @@ integration:
 	cargo run -- test -r integration_tests
 
 stdlibtest:
-	cargo run -- test -r std/tests
+	cargo run -- test -r std$(pathchar)tests
 
 install: test
 	cargo install --path . --force
