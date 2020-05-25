@@ -142,23 +142,30 @@ pub trait Walker {
         }
     }
 
-    fn visit_import(&mut self, i: &mut ImportDef) {
+    // TODO(jwall): Should this have exit versions as well?
+    fn visit_import(&mut self, _i: &mut ImportDef) {
         // noop by default;
     }
 
-    fn visit_include(&mut self, i: &mut IncludeDef) {
+    fn visit_include(&mut self, _i: &mut IncludeDef) {
         // noop by default;
     }
 
-    fn visit_fail(&mut self, f: &mut FailDef) {
+    fn visit_fail(&mut self, _f: &mut FailDef) {
         // noop by default;
     }
 
-    fn visit_value(&mut self, val: &mut Value);
+    fn visit_value(&mut self, _val: &mut Value) {
+        // noop by default
+    }
 
-    fn visit_expression(&mut self, expr: &mut Expression);
+    fn visit_expression(&mut self, _expr: &mut Expression) {
+        // noop by default
+    }
 
-    fn visit_statement(&mut self, stmt: &mut Statement);
+    fn visit_statement(&mut self, _stmt: &mut Statement) {
+        // noop by default
+    }
 }
 
 // TODO this would be better implemented as a Trait I think.

@@ -90,8 +90,6 @@ where
     pub environment: &'a RefCell<Environment<Stdout, Stderr>>,
     working_dir: PathBuf,
     strict: bool,
-    // FIXME(jwall): These need to be compiled and added to the op cache.
-    // specifically in the environment.
     std: Rc<HashMap<String, &'static str>>,
     import_path: &'a Vec<PathBuf>,
     pub last: Option<Rc<Val>>,
@@ -303,12 +301,8 @@ where
     }
 
     pub fn eval_expr(&mut self, expr: Expression) -> Result<Rc<Val>, Box<dyn Error>> {
-        let mut ops_map = translate::OpsMap::new();
-        translate::AST::translate_stmt(
-            Statement::Expression(expr),
-            &mut ops_map,
-            &self.working_dir,
-        );
+        let ops_map =
+            translate::AST::translate(vec![Statement::Expression(expr)], &self.working_dir);
         let mut vm = VM::new(self.strict, Rc::new(ops_map), &self.working_dir);
         if self.validate_mode {
             vm.enable_validate_mode();

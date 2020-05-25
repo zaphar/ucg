@@ -14,11 +14,11 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use crate::ast::walk::Walker;
 use crate::ast::{
-    BinaryExprType, BinaryOpDef, Expression, FormatArgs, Position, PositionedItem, SelectDef,
-    Statement, Token, TokenType, Value,
+    BinaryExprType, BinaryOpDef, Expression, FormatArgs, FuncOpDef, Position, PositionedItem,
+    Rewriter, SelectDef, Statement, TemplatePart, Token, TokenType, Value,
 };
-use crate::ast::{FuncOpDef, TemplatePart};
 use crate::build::format::{ExpressionTemplate, SimpleTemplate, TemplateParser};
 use crate::build::opcode::Primitive;
 use crate::build::opcode::{Hook, Op};
@@ -66,13 +66,16 @@ impl OpsMap {
 }
 
 impl AST {
-    pub fn translate<P: AsRef<Path>>(stmts: Vec<Statement>, root: &P) -> OpsMap {
+    pub fn translate<P: AsRef<Path>>(mut stmts: Vec<Statement>, root: &P) -> OpsMap {
+        let mut rewriter = Rewriter::new(root.as_ref());
+        let mut_stmts = stmts.iter_mut().collect();
+        rewriter.walk_statement_list(mut_stmts);
         let mut ops = OpsMap::new();
         Self::translate_stmts(stmts, &mut ops, root.as_ref());
         return ops;
     }
 
-    pub fn translate_stmt(stmt: Statement, mut ops: &mut OpsMap, root: &Path) {
+    fn translate_stmt(stmt: Statement, mut ops: &mut OpsMap, root: &Path) {
         match stmt {
             Statement::Expression(expr) => {
                 let expr_pos = expr.pos().clone();
@@ -210,7 +213,6 @@ impl AST {
                         Self::translate_expr(*def.right.clone(), &mut ops, root);
                         // Symbols on the left side should be converted to strings to satisfy
                         // the Index operation contract.
-                        // FIXME(jwall): List checks should not use symbol translation.
                         match *def.left.clone() {
                             Expression::Simple(Value::Symbol(name)) => {
                                 // We really just want an expression that turns a symbol
@@ -451,8 +453,7 @@ impl AST {
                 ops.push(Op::Val(Primitive::Str(def.path.fragment)), def.path.pos);
                 ops.push(Op::Runtime(Hook::Include), def.pos);
             }
-            Expression::Module(mut def) => {
-                def.imports_to_absolute(root.to_path_buf());
+            Expression::Module(def) => {
                 let argset = def.arg_set;
                 let out_expr = def.out_expr;
                 let stmts = def.statements;
