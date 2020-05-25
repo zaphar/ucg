@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use crate::ast::{
@@ -25,17 +26,29 @@ use crate::build::opcode::{Hook, Op};
 pub struct AST();
 
 #[derive(Debug, PartialEq)]
-pub struct PositionMap {
+pub struct OpsMap {
     pub ops: Vec<Op>,
     pub pos: Vec<Position>,
+    pub links: BTreeMap<String, usize>,
 }
 
-impl PositionMap {
+impl OpsMap {
     pub fn new() -> Self {
-        PositionMap {
+        OpsMap {
             ops: Vec::new(),
             pos: Vec::new(),
+            links: BTreeMap::new(),
         }
+    }
+
+    pub fn with_ops(mut self, ops: Vec<Op>, pos: Vec<Position>) -> Self {
+        self.ops = ops;
+        self.pos = pos;
+        self
+    }
+
+    pub fn add_link(&mut self, path: String) {
+        self.links.insert(path, self.len() - 1);
     }
 
     pub fn len(&self) -> usize {
@@ -53,13 +66,13 @@ impl PositionMap {
 }
 
 impl AST {
-    pub fn translate<P: AsRef<Path>>(stmts: Vec<Statement>, root: &P) -> PositionMap {
-        let mut ops = PositionMap::new();
+    pub fn translate<P: AsRef<Path>>(stmts: Vec<Statement>, root: &P) -> OpsMap {
+        let mut ops = OpsMap::new();
         Self::translate_stmts(stmts, &mut ops, root.as_ref());
         return ops;
     }
 
-    pub fn translate_stmt(stmt: Statement, mut ops: &mut PositionMap, root: &Path) {
+    pub fn translate_stmt(stmt: Statement, mut ops: &mut OpsMap, root: &Path) {
         match stmt {
             Statement::Expression(expr) => {
                 let expr_pos = expr.pos().clone();
@@ -90,13 +103,13 @@ impl AST {
         }
     }
 
-    fn translate_stmts(stmts: Vec<Statement>, mut ops: &mut PositionMap, root: &Path) {
+    fn translate_stmts(stmts: Vec<Statement>, mut ops: &mut OpsMap, root: &Path) {
         for stmt in stmts {
             Self::translate_stmt(stmt, &mut ops, root);
         }
     }
 
-    fn translate_expr(expr: Expression, mut ops: &mut PositionMap, root: &Path) {
+    fn translate_expr(expr: Expression, mut ops: &mut OpsMap, root: &Path) {
         match expr {
             Expression::Simple(v) => {
                 Self::translate_value(v, &mut ops, root);
@@ -428,8 +441,10 @@ impl AST {
                 }
             }
             Expression::Import(def) => {
+                let link_path = def.path.fragment.clone();
                 ops.push(Op::Val(Primitive::Str(def.path.fragment)), def.path.pos);
                 ops.push(Op::Runtime(Hook::Import), def.pos);
+                ops.add_link(link_path);
             }
             Expression::Include(def) => {
                 ops.push(Op::Val(Primitive::Str(def.typ.fragment)), def.typ.pos);
@@ -556,7 +571,7 @@ impl AST {
         pos: Position,
         part: TemplatePart,
         elems: &mut EI,
-        mut ops: &mut PositionMap,
+        mut ops: &mut OpsMap,
         place_holder: bool,
         root: &Path,
     ) {
@@ -585,7 +600,7 @@ impl AST {
     }
 
     fn translate_copy(
-        mut ops: &mut PositionMap,
+        mut ops: &mut OpsMap,
         flds: Vec<(Token, Expression)>,
         pos: Position,
         root: &Path,
@@ -601,7 +616,7 @@ impl AST {
         ops.push(Op::PopSelf, pos);
     }
 
-    fn translate_value(value: Value, mut ops: &mut PositionMap, root: &Path) {
+    fn translate_value(value: Value, mut ops: &mut OpsMap, root: &Path) {
         match value {
             Value::Int(i) => ops.push(Op::Val(Primitive::Int(i.val)), i.pos),
             Value::Float(f) => ops.push(Op::Val(Primitive::Float(f.val)), f.pos),

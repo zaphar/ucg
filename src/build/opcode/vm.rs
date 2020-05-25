@@ -23,7 +23,7 @@ use super::environment::Environment;
 use super::pointer::OpPointer;
 use super::runtime;
 use super::scope::Stack;
-use super::translate::PositionMap;
+use super::translate::OpsMap;
 use super::Composite::{List, Tuple};
 use super::Hook;
 use super::Primitive::{Bool, Empty, Float, Int, Str};
@@ -55,7 +55,7 @@ pub struct VM {
 }
 
 impl VM {
-    pub fn new<P: Into<PathBuf>>(strict: bool, ops: Rc<PositionMap>, working_dir: P) -> Self {
+    pub fn new<P: Into<PathBuf>>(strict: bool, ops: Rc<OpsMap>, working_dir: P) -> Self {
         Self::with_pointer(strict, OpPointer::new(ops), working_dir)
     }
 
@@ -394,10 +394,9 @@ impl VM {
                 pkg_pos.clone(),
                 pkg_pos,
             ];
-            Some(OpPointer::new(Rc::new(PositionMap {
-                ops: pkg_ops,
-                pos: pos_list,
-            })))
+            Some(OpPointer::new(Rc::new(
+                OpsMap::new().with_ops(pkg_ops, pos_list),
+            )))
         } else {
             None
         };

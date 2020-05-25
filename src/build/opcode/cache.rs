@@ -16,13 +16,13 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use super::translate::PositionMap;
+use super::translate::OpsMap;
 use super::Error;
 use super::OpPointer;
 
 /// A Cache of Op codes.
 pub struct Ops {
-    ops: BTreeMap<PathBuf, Rc<PositionMap>>,
+    ops: BTreeMap<PathBuf, Rc<OpsMap>>,
 }
 
 impl Ops {
@@ -37,10 +37,10 @@ impl Ops {
     }
 }
 
-pub struct Entry<'a>(btree_map::Entry<'a, PathBuf, Rc<PositionMap>>);
+pub struct Entry<'a>(btree_map::Entry<'a, PathBuf, Rc<OpsMap>>);
 
 impl<'a> Entry<'a> {
-    pub fn get_pointer_or_else<F: FnOnce() -> Result<PositionMap, Error>, P: Into<PathBuf>>(
+    pub fn get_pointer_or_else<F: FnOnce() -> Result<OpsMap, Error>, P: Into<PathBuf>>(
         self,
         f: F,
         path: P,

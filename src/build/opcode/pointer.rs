@@ -16,18 +16,18 @@ use std::rc::Rc;
 
 use crate::ast::Position;
 
-use super::translate::PositionMap;
+use super::translate::OpsMap;
 use super::{Error, Op};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct OpPointer {
-    pub pos_map: Rc<PositionMap>,
+    pub pos_map: Rc<OpsMap>,
     pub ptr: Option<usize>,
     pub path: Option<PathBuf>,
 }
 
 impl OpPointer {
-    pub fn new(ops: Rc<PositionMap>) -> Self {
+    pub fn new(ops: Rc<OpsMap>) -> Self {
         // If we load an empty program what happens?
         Self {
             pos_map: ops,

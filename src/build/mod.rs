@@ -17,8 +17,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::error::Error;
-use std::fs::File;
-use std::io::Read;
 use std::path::PathBuf;
 use std::process;
 use std::rc::Rc;
@@ -32,10 +30,9 @@ use simple_error;
 use crate::ast::*;
 use crate::build::opcode::pointer::OpPointer;
 use crate::build::opcode::translate;
-use crate::build::opcode::translate::PositionMap;
+use crate::build::opcode::translate::OpsMap;
 use crate::build::opcode::Environment;
 use crate::build::opcode::VM;
-use crate::error;
 use crate::iter::OffsetStrIter;
 use crate::parse::parse;
 
@@ -147,15 +144,11 @@ where
     pub fn build<P: Into<PathBuf>>(&mut self, file: P) -> BuildResult {
         let file = file.into();
         self.working_dir = file.parent().unwrap().to_path_buf();
-        let mut f = self.open_file(&Position::new(0, 0, 0), &file)?;
-        let mut s = String::new();
-        f.read_to_string(&mut s)?;
-        let input = OffsetStrIter::new(&s).with_src_file(file.clone());
-        // TODO(jwall): Pass in the file name?
-        let eval_result = self.eval_input(input, Some(file.clone()));
+        let ptr = self.environment.borrow_mut().get_ops_for_path(&file)?;
+        let eval_result = self.eval_ops(ptr, Some(file.clone()));
         match eval_result {
-            Ok(v) => {
-                self.last = Some(v);
+            Ok(_) => {
+                self.last = self.out.clone();
                 Ok(())
             }
             Err(e) => {
@@ -169,19 +162,6 @@ where
         }
     }
 
-    fn open_file<P: Into<PathBuf>>(&self, pos: &Position, path: P) -> Result<File, Box<dyn Error>> {
-        let path = path.into();
-        match File::open(&path) {
-            Ok(f) => Ok(f),
-            Err(e) => Err(error::BuildError::with_pos(
-                format!("Error opening file {} {}", path.to_string_lossy(), e),
-                error::ErrorType::TypeFail,
-                pos.clone(),
-            )
-            .to_boxed()),
-        }
-    }
-
     /// Puts the builder in validation mode.
     ///
     /// Among other things this means that assertions will be evaluated and their results
@@ -190,11 +170,8 @@ where
         self.validate_mode = true;
     }
 
-    /// Builds a list of parsed UCG Statements.
-    pub fn eval_stmts(&mut self, ast: Vec<Statement>, path: Option<PathBuf>) -> BuildResult {
-        // We should probably stash this in an op_cache somewhere?
-        let ops = translate::AST::translate(ast, &self.working_dir);
-        let mut vm = VM::new(self.strict, Rc::new(ops), &self.working_dir);
+    fn eval_ops(&mut self, ops: OpPointer, path: Option<PathBuf>) -> BuildResult {
+        let mut vm = VM::with_pointer(self.strict, ops, &self.working_dir);
         if path.is_some() {
             vm.set_path(path.unwrap());
         }
@@ -206,6 +183,13 @@ where
         Ok(())
     }
 
+    /// Builds a list of parsed UCG Statements.
+    pub fn eval_stmts(&mut self, ast: Vec<Statement>, path: Option<PathBuf>) -> BuildResult {
+        // We should probably stash this in an op_cache somewhere?
+        let ops = translate::AST::translate(ast, &self.working_dir);
+        self.eval_ops(OpPointer::new(Rc::new(ops)), path)
+    }
+
     pub fn repl(&mut self, mut editor: rustyline::Editor<()>, config_home: PathBuf) -> BuildResult {
         // loop
         let mut lines = crate::io::StatementAccumulator::new();
@@ -215,7 +199,7 @@ where
             println!("");
         }
         // Initialize VM with an empty OpPointer
-        let mut vm = VM::new(self.strict, Rc::new(PositionMap::new()), &self.working_dir);
+        let mut vm = VM::new(self.strict, Rc::new(OpsMap::new()), &self.working_dir);
         loop {
             // print prompt
             let line = match editor.readline(&format!("{}> ", lines.next_line())) {
@@ -296,7 +280,6 @@ where
         }
     }
 
-    // TODO(jwall): The repl is going to have to be in here.
     pub fn eval_input(
         &mut self,
         input: OffsetStrIter,
@@ -320,10 +303,7 @@ where
     }
 
     pub fn eval_expr(&mut self, expr: Expression) -> Result<Rc<Val>, Box<dyn Error>> {
-        let mut ops_map = translate::PositionMap {
-            ops: Vec::new(),
-            pos: Vec::new(),
-        };
+        let mut ops_map = translate::OpsMap::new();
         translate::AST::translate_stmt(
             Statement::Expression(expr),
             &mut ops_map,
