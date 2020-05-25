@@ -104,10 +104,17 @@ pub trait Walker {
                 self.walk_fieldset(&mut def.tuple);
             }
             Expression::Simple(ref mut val) => {
-                self.visit_value(val);
+                self.walk_value(val);
             }
-            Expression::Import(_) | Expression::Include(_) | Expression::Fail(_) => {
-                //noop
+
+            Expression::Import(i) => {
+                self.visit_import(i);
+            }
+            Expression::Include(i) => {
+                self.visit_include(i);
+            }
+            Expression::Fail(f) => {
+                self.visit_fail(f);
             }
             Expression::Not(ref mut def) => {
                 self.walk_expression(def.expr.as_mut());
@@ -116,6 +123,35 @@ pub trait Walker {
                 self.walk_expression(&mut def.expr);
             }
         }
+    }
+
+    fn walk_value(&mut self, val: &mut Value) {
+        match val {
+            Value::Empty(_)
+            | Value::Symbol(_)
+            | Value::Boolean(_)
+            | Value::Int(_)
+            | Value::Float(_)
+            | Value::Str(_) => self.visit_value(val),
+            Value::Tuple(fs) => self.walk_fieldset(&mut fs.val),
+            Value::List(vs) => {
+                for e in &mut vs.elems {
+                    self.walk_expression(e);
+                }
+            }
+        }
+    }
+
+    fn visit_import(&mut self, i: &mut ImportDef) {
+        // noop by default;
+    }
+
+    fn visit_include(&mut self, i: &mut IncludeDef) {
+        // noop by default;
+    }
+
+    fn visit_fail(&mut self, f: &mut FailDef) {
+        // noop by default;
     }
 
     fn visit_value(&mut self, val: &mut Value);
