@@ -32,23 +32,8 @@ impl Visitor for Rewriter {
         let main_separator = format!("{}", std::path::MAIN_SEPARATOR);
         if let Expression::Include(ref mut def) = expr {
             let path = PathBuf::from(&def.path.fragment);
-            #[cfg(not(windows))]
-            {
-                if path.is_relative() {
-                    def.path.fragment = self
-                        .base
-                        .join(path)
-                        .canonicalize()
-                        .unwrap()
-                        .to_string_lossy()
-                        .to_string();
-                }
-            }
-            #[cfg(windows)]
-            {
-                if path.is_relative() {
-                    def.path.fragment = self.base.join(path).to_string_lossy().to_string();
-                }
+            if path.is_relative() {
+                def.path.fragment = self.base.join(path).to_string_lossy().to_string();
             }
         }
         if let Expression::Import(ref mut def) = expr {
@@ -62,23 +47,8 @@ impl Visitor for Rewriter {
             if path.starts_with(format!("std{}", main_separator)) {
                 return;
             }
-            #[cfg(not(windows))]
-            {
-                if path.is_relative() {
-                    def.path.fragment = self
-                        .base
-                        .join(path)
-                        .canonicalize()
-                        .unwrap()
-                        .to_string_lossy()
-                        .to_string();
-                }
-            }
-            #[cfg(windows)]
-            {
-                if path.is_relative() {
-                    def.path.fragment = self.base.join(path).to_string_lossy().to_string();
-                }
+            if path.is_relative() {
+                def.path.fragment = self.base.join(path).to_string_lossy().to_string();
             }
         }
     }
