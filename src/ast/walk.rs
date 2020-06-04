@@ -1,6 +1,33 @@
 use crate::ast::*;
 
-pub trait Walker {
+pub trait Visitor {
+    // TODO(jwall): Should this have exit versions as well?
+    fn visit_import(&mut self, _i: &mut ImportDef) {
+        // noop by default;
+    }
+
+    fn visit_include(&mut self, _i: &mut IncludeDef) {
+        // noop by default;
+    }
+
+    fn visit_fail(&mut self, _f: &mut FailDef) {
+        // noop by default;
+    }
+
+    fn visit_value(&mut self, _val: &mut Value) {
+        // noop by default
+    }
+
+    fn visit_expression(&mut self, _expr: &mut Expression) {
+        // noop by default
+    }
+
+    fn visit_statement(&mut self, _stmt: &mut Statement) {
+        // noop by default
+    }
+}
+
+pub trait Walker: Visitor {
     fn walk_statement_list(&mut self, stmts: Vec<&mut Statement>) {
         for v in stmts {
             self.walk_statement(v);
@@ -141,81 +168,60 @@ pub trait Walker {
             }
         }
     }
-
-    // TODO(jwall): Should this have exit versions as well?
-    fn visit_import(&mut self, _i: &mut ImportDef) {
-        // noop by default;
-    }
-
-    fn visit_include(&mut self, _i: &mut IncludeDef) {
-        // noop by default;
-    }
-
-    fn visit_fail(&mut self, _f: &mut FailDef) {
-        // noop by default;
-    }
-
-    fn visit_value(&mut self, _val: &mut Value) {
-        // noop by default
-    }
-
-    fn visit_expression(&mut self, _expr: &mut Expression) {
-        // noop by default
-    }
-
-    fn visit_statement(&mut self, _stmt: &mut Statement) {
-        // noop by default
-    }
 }
 
-// TODO this would be better implemented as a Trait I think.
-pub struct AstWalker<'a> {
-    handle_value: Option<&'a dyn Fn(&mut Value)>,
-    handle_expression: Option<&'a dyn Fn(&mut Expression)>,
-    handle_statment: Option<&'a dyn Fn(&mut Statement)>,
+pub struct ChainedWalk<Visitor1, Visitor2> {
+    pub visitor_1: Visitor1,
+    pub visitor_2: Visitor2,
 }
 
-impl<'a> AstWalker<'a> {
-    pub fn new() -> Self {
-        AstWalker {
-            handle_value: None,
-            handle_expression: None,
-            handle_statment: None,
+impl<Visitor1, Visitor2> ChainedWalk<Visitor1, Visitor2>
+where
+    Visitor1: Visitor,
+    Visitor2: Visitor,
+{
+    pub fn new(visitor_1: Visitor1, visitor_2: Visitor2) -> Self {
+        Self {
+            visitor_1,
+            visitor_2,
         }
     }
-
-    pub fn with_value_handler(mut self, h: &'a dyn Fn(&mut Value)) -> Self {
-        self.handle_value = Some(h);
-        self
-    }
-
-    pub fn with_expr_handler(mut self, h: &'a dyn Fn(&mut Expression)) -> Self {
-        self.handle_expression = Some(h);
-        self
-    }
-
-    pub fn with_stmt_handler(mut self, h: &'a dyn Fn(&mut Statement)) -> Self {
-        self.handle_statment = Some(h);
-        self
-    }
 }
 
-impl<'a> Walker for AstWalker<'a> {
+impl<Visitor1, Visitor2> Visitor for ChainedWalk<Visitor1, Visitor2>
+where
+    Visitor1: Visitor,
+    Visitor2: Visitor,
+{
+    fn visit_import(&mut self, i: &mut ImportDef) {
+        self.visitor_1.visit_import(i);
+        self.visitor_2.visit_import(i);
+    }
+    fn visit_include(&mut self, i: &mut IncludeDef) {
+        self.visitor_1.visit_include(i);
+        self.visitor_2.visit_include(i);
+    }
+    fn visit_fail(&mut self, f: &mut FailDef) {
+        self.visitor_1.visit_fail(f);
+        self.visitor_2.visit_fail(f);
+    }
     fn visit_value(&mut self, val: &mut Value) {
-        if let Some(h) = self.handle_value {
-            h(val);
-        }
+        self.visitor_1.visit_value(val);
+        self.visitor_2.visit_value(val);
     }
-
     fn visit_expression(&mut self, expr: &mut Expression) {
-        if let Some(h) = self.handle_expression {
-            h(expr);
-        }
+        self.visitor_1.visit_expression(expr);
+        self.visitor_2.visit_expression(expr);
     }
-
     fn visit_statement(&mut self, stmt: &mut Statement) {
-        if let Some(h) = self.handle_statment {
-            h(stmt);
-        }
+        self.visitor_1.visit_statement(stmt);
+        self.visitor_2.visit_statement(stmt);
     }
+}
+
+impl<Visitor1, Visitor2> Walker for ChainedWalk<Visitor1, Visitor2>
+where
+    Visitor1: Visitor,
+    Visitor2: Visitor,
+{
 }

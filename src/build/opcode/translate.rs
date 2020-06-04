@@ -14,10 +14,11 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use crate::ast::rewrite::Rewriter;
 use crate::ast::walk::Walker;
 use crate::ast::{
     BinaryExprType, BinaryOpDef, Expression, FormatArgs, FuncOpDef, Position, PositionedItem,
-    Rewriter, SelectDef, Statement, TemplatePart, Token, TokenType, Value,
+    SelectDef, Statement, TemplatePart, Token, TokenType, Value,
 };
 use crate::build::format::{ExpressionTemplate, SimpleTemplate, TemplateParser};
 use crate::build::opcode::Primitive;
