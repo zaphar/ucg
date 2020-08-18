@@ -271,6 +271,81 @@ value_enum!(
     Module(ModuleShapeDef),
 );
 
+impl Shape {
+    pub fn merge(&self, compare: &Shape) -> Option<Self> {
+        match (self, compare) {
+            (Shape::Str(_), Shape::Str(_))
+            | (Shape::Symbol(_), Shape::Symbol(_))
+            | (Shape::Boolean(_), Shape::Boolean(_))
+            | (Shape::Empty(_), Shape::Empty(_))
+            | (Shape::Int(_), Shape::Int(_))
+            | (Shape::Float(_), Shape::Float(_)) => Some(self.clone()),
+            (Shape::List(left_slist), Shape::List(right_slist)) => {
+                // TODO
+                unimplemented!("Can't merge these yet.")
+            }
+            (Shape::Tuple(left_slist), Shape::Tuple(right_slist)) => {
+                // TODO
+                unimplemented!("Can't merge these yet.")
+            }
+            (Shape::Func(left_opshape), Shape::Func(right_opshape)) => {
+                // TODO
+                unimplemented!("Can't merge these yet.")
+            }
+            (Shape::Module(left_opshape), Shape::Module(right_opshape)) => {
+                // TODO
+                unimplemented!("Can't merge these yet.")
+            }
+            _ => None,
+        }
+    }
+
+    pub fn type_name(&self) -> &'static str {
+        match self {
+            Shape::Str(s) => "str",
+            Shape::Symbol(s) => "symbol",
+            Shape::Int(s) => "int",
+            Shape::Float(s) => "float",
+            Shape::Boolean(b) => "boolean",
+            Shape::Empty(p) => "nil",
+            // TODO(jwall): make these type names account for what they contain.
+            Shape::List(lst) => "list",
+            Shape::Tuple(flds) => "tuple",
+            Shape::Func(_) => "func",
+            Shape::Module(_) => "module",
+        }
+    }
+
+    pub fn pos(&self) -> &Position {
+        match self {
+            Shape::Str(s) => &s.pos,
+            Shape::Symbol(s) => &s.pos,
+            Shape::Int(s) => &s.pos,
+            Shape::Float(s) => &s.pos,
+            Shape::Boolean(b) => &b.pos,
+            Shape::Empty(p) => p,
+            Shape::List(lst) => &lst.pos,
+            Shape::Tuple(flds) => &flds.pos,
+            Shape::Func(def) => def.ret.pos(),
+            Shape::Module(def) => def.ret.pos(),
+        }
+    }
+
+    pub fn with_pos(self, pos: Position) -> Self {
+        match self {
+            Shape::Str(s) => Shape::Str(PositionedItem::new(s.val, pos)),
+            Shape::Symbol(s) => Shape::Symbol(PositionedItem::new(s.val, pos)),
+            Shape::Int(s) => Shape::Int(PositionedItem::new(s.val, pos)),
+            Shape::Float(s) => Shape::Float(PositionedItem::new(s.val, pos)),
+            Shape::Boolean(b) => Shape::Boolean(PositionedItem::new(b.val, pos)),
+            Shape::Empty(p) => Shape::Empty(pos),
+            Shape::List(lst) => Shape::List(PositionedItem::new(lst.val, pos)),
+            Shape::Tuple(flds) => Shape::Tuple(PositionedItem::new(flds.val, pos)),
+            Shape::Func(_) | Shape::Module(_) => self.clone(),
+        }
+    }
+}
+
 impl Value {
     /// Returns the type name of the Value it is called on as a string.
     pub fn type_name(&self) -> String {
