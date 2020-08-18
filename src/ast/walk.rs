@@ -1,20 +1,35 @@
 use crate::ast::*;
 
 pub trait Visitor {
-    // TODO(jwall): Should this have exit versions as well?
     fn visit_import(&mut self, _i: &mut ImportDef) {
         // noop by default;
+    }
+
+    fn leave_import(&mut self) {
+        // noop by default
     }
 
     fn visit_include(&mut self, _i: &mut IncludeDef) {
         // noop by default;
     }
 
+    fn leave_include(&mut self) {
+        // noop by default
+    }
+
     fn visit_fail(&mut self, _f: &mut FailDef) {
         // noop by default;
     }
 
+    fn leave_fail(&mut self) {
+        // noop by default
+    }
+
     fn visit_value(&mut self, _val: &mut Value) {
+        // noop by default
+    }
+
+    fn leave_value(&mut self, _val: &Value) {
         // noop by default
     }
 
@@ -22,7 +37,15 @@ pub trait Visitor {
         // noop by default
     }
 
+    fn leave_expression(&mut self, _expr: &Expression) {
+        // noop by default
+    }
+
     fn visit_statement(&mut self, _stmt: &mut Statement) {
+        // noop by default
+    }
+
+    fn leave_statement(&mut self, _stmt: &Statement) {
         // noop by default
     }
 }
@@ -53,6 +76,7 @@ pub trait Walker: Visitor {
                 self.walk_expression(expr);
             }
         }
+        self.leave_statement(stmt);
     }
 
     fn walk_fieldset(&mut self, fs: &mut FieldList) {
@@ -136,12 +160,15 @@ pub trait Walker: Visitor {
 
             Expression::Import(i) => {
                 self.visit_import(i);
+                self.leave_import();
             }
             Expression::Include(i) => {
                 self.visit_include(i);
+                self.leave_include();
             }
             Expression::Fail(f) => {
                 self.visit_fail(f);
+                self.leave_fail();
             }
             Expression::Not(ref mut def) => {
                 self.walk_expression(def.expr.as_mut());
@@ -150,6 +177,7 @@ pub trait Walker: Visitor {
                 self.walk_expression(&mut def.expr);
             }
         }
+        self.leave_expression(expr);
     }
 
     fn walk_value(&mut self, val: &mut Value) {
@@ -159,7 +187,10 @@ pub trait Walker: Visitor {
             | Value::Boolean(_)
             | Value::Int(_)
             | Value::Float(_)
-            | Value::Str(_) => self.visit_value(val),
+            | Value::Str(_) => {
+                self.visit_value(val);
+                self.leave_value(val);
+            }
             Value::Tuple(fs) => self.walk_fieldset(&mut fs.val),
             Value::List(vs) => {
                 for e in &mut vs.elems {
@@ -169,6 +200,8 @@ pub trait Walker: Visitor {
         }
     }
 }
+
+impl<T> Walker for T where T: Visitor {}
 
 pub struct ChainedWalk<Visitor1, Visitor2> {
     pub visitor_1: Visitor1,
@@ -197,31 +230,53 @@ where
         self.visitor_1.visit_import(i);
         self.visitor_2.visit_import(i);
     }
+    fn leave_import(&mut self) {
+        self.visitor_1.leave_import();
+        self.visitor_2.leave_import();
+    }
+
     fn visit_include(&mut self, i: &mut IncludeDef) {
         self.visitor_1.visit_include(i);
         self.visitor_2.visit_include(i);
     }
+    fn leave_include(&mut self) {
+        self.visitor_1.leave_include();
+        self.visitor_2.leave_include();
+    }
+
     fn visit_fail(&mut self, f: &mut FailDef) {
         self.visitor_1.visit_fail(f);
         self.visitor_2.visit_fail(f);
     }
+    fn leave_fail(&mut self) {
+        self.visitor_1.leave_fail();
+        self.visitor_2.leave_fail();
+    }
+
     fn visit_value(&mut self, val: &mut Value) {
         self.visitor_1.visit_value(val);
         self.visitor_2.visit_value(val);
     }
+    fn leave_value(&mut self, val: &Value) {
+        self.visitor_1.leave_value(val);
+        self.visitor_2.leave_value(val);
+    }
+
     fn visit_expression(&mut self, expr: &mut Expression) {
         self.visitor_1.visit_expression(expr);
         self.visitor_2.visit_expression(expr);
     }
+    fn leave_expression(&mut self, expr: &Expression) {
+        self.visitor_1.leave_expression(expr);
+        self.visitor_2.leave_expression(expr);
+    }
+
     fn visit_statement(&mut self, stmt: &mut Statement) {
         self.visitor_1.visit_statement(stmt);
         self.visitor_2.visit_statement(stmt);
     }
-}
-
-impl<Visitor1, Visitor2> Walker for ChainedWalk<Visitor1, Visitor2>
-where
-    Visitor1: Visitor,
-    Visitor2: Visitor,
-{
+    fn leave_statement(&mut self, stmt: &Statement) {
+        self.visitor_1.leave_statement(stmt);
+        self.visitor_2.leave_statement(stmt);
+    }
 }

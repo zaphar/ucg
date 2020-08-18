@@ -53,5 +53,3 @@ impl Visitor for Rewriter {
         }
     }
 }
-
-impl Walker for Rewriter {}
