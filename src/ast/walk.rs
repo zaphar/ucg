@@ -181,6 +181,7 @@ pub trait Walker: Visitor {
     }
 
     fn walk_value(&mut self, val: &mut Value) {
+        self.visit_value(val);
         match val {
             Value::Empty(_)
             | Value::Symbol(_)
@@ -188,8 +189,7 @@ pub trait Walker: Visitor {
             | Value::Int(_)
             | Value::Float(_)
             | Value::Str(_) => {
-                self.visit_value(val);
-                self.leave_value(val);
+                // noop
             }
             Value::Tuple(fs) => self.walk_fieldset(&mut fs.val),
             Value::List(vs) => {
@@ -198,6 +198,7 @@ pub trait Walker: Visitor {
                 }
             }
         }
+        self.leave_value(val);
     }
 }
 
