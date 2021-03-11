@@ -489,9 +489,12 @@ fn main() {
         if !p.exists() {
             if let Err(e) = std::fs::create_dir(&p) {
                 eprintln!("Unable to create .ucg directory {}", e);
+            } else {
+                import_paths.push(p);
             }
+        } else {
+            import_paths.push(p);
         }
-        import_paths.push(p);
     }
     if let Ok(path_list_str) = std::env::var("UCG_IMPORT_PATH") {
         for p in std::env::split_paths(&path_list_str) {
