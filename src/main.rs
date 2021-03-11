@@ -487,7 +487,9 @@ fn main() {
         p.push(".ucg");
         // Attempt to create directory if it doesn't exist.
         if !p.exists() {
-            std::fs::create_dir(&p).unwrap();
+            if let Err(e) = std::fs::create_dir(&p) {
+                eprintln!("Unable to create .ucg directory {}", e);
+            }
         }
         import_paths.push(p);
     }
