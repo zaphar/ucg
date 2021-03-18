@@ -550,7 +550,7 @@ checksum = "535c204ee4d8434478593480b8f86ab45ec9aae0e83c568ca81abf0fd0e88f86"
 
 [[package]]
 name = "ucg"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "abortable_parser",
  "atty",
