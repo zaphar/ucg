@@ -13,6 +13,7 @@
 //  limitations under the License.
 
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 
 use regex::Regex;
 
@@ -24,7 +25,9 @@ fn assert_build(input: &str) {
     let i_paths = Vec::new();
     let out_buffer: Vec<u8> = Vec::new();
     let err_buffer: Vec<u8> = Vec::new();
-    let env = RefCell::new(Environment::new(out_buffer, err_buffer));
+    let mut env_vars = BTreeMap::new();
+    env_vars.insert("FOO".to_owned(), "bar".to_owned());
+    let env = RefCell::new(Environment::new_with_vars(out_buffer, err_buffer, env_vars));
     let mut b = FileBuilder::new("<Eval>", &i_paths, &env);
     b.enable_validate_mode();
     b.eval_string(input).unwrap();
@@ -146,6 +149,47 @@ fn test_format() {
 #[test]
 fn test_type_checks() {
     assert_build(include_str!("../../integration_tests/types_test.ucg"));
+}
+
+#[test]
+fn test_environment_variable_exists() {
+    assert_build("assert { ok = env.FOO == \"bar\", desc = \"env var $FOO is bar\"};");
+}
+// TODO(jwall): that shadowing the env variable is not allowed?
+
+#[test]
+fn test_env_as_field_name_works() {
+    assert_build(
+        "let tpl = { env = \"quux\" };
+assert {
+    ok = env.FOO == \"bar\",
+    desc = \"env var $FOO is bar\",
+};
+assert {
+    ok = tpl.env == \"quux\",
+    desc = \"tpl.env is quux\",
+};
+
+let tpl2 = { env = { bar = 2 } };
+assert {
+    ok = tpl2.env.bar == 2,
+    desc = \"tpl2.env.bar is 2\",
+};
+",
+    );
+}
+// TODO(jwall): tests for missing values.
+
+#[test]
+fn test_env_is_not_a_valid_binding() {
+    assert_build_failure(
+        "let env = 1;",
+        vec![
+            Regex::new("Cannot use binding env").unwrap(),
+            Regex::new("It is a reserved word").unwrap(),
+            Regex::new("at line: 1 column: 5").unwrap(),
+        ],
+    );
 }
 
 #[test]

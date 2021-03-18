@@ -805,11 +805,33 @@ make_fn!(
     )
 );
 
+/// Verify binding is not a reserved word.
+macro_rules! match_binding_name {
+    ($i:expr,) => {{
+        use abortable_parser::{Error, Result};
+        let mut _i = $i.clone();
+        match match_type!(_i, BAREWORD) {
+            Result::Complete(i, t) => {
+                if t.fragment == "env" {
+                    return Result::Abort(Error::new(
+                        format!("Cannot use binding {}. It is a reserved word.", t.fragment),
+                        Box::new($i.clone()),
+                    ));
+                }
+                Result::Complete(i, t)
+            }
+            Result::Incomplete(i) => Result::Incomplete(i),
+            Result::Fail(e) => Result::Fail(e),
+            Result::Abort(e) => Result::Abort(e),
+        }
+    }};
+}
+
 make_fn!(
     let_stmt_body<SliceIter<Token>, Statement>,
     do_each!(
         pos => pos,
-        name => wrap_err!(match_type!(BAREWORD), "Expected name for binding"),
+        name => wrap_err!(match_binding_name!(), "Expected name for binding"),
         _ => optional!(trace_parse!(shape_suffix)),
         _ => punct!("="),
         val => trace_parse!(wrap_err!(expression, "Expected Expression to bind")),

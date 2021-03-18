@@ -17,16 +17,16 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-use super::cache;
 use super::pointer::OpPointer;
 use super::Error;
-use super::Value;
-use crate::build::stdlib;
+use super::{cache, Primitive};
+use super::{Composite, Value};
 use crate::build::AssertCollector;
 use crate::build::Val;
 use crate::convert::{ConverterRegistry, ImporterRegistry};
 use crate::iter::OffsetStrIter;
 use crate::parse::parse;
+use crate::{ast::Position, build::stdlib};
 
 // Shared Environmental between VM's for runtime usage.
 pub struct Environment<Stdout, Stderr>
@@ -47,6 +47,7 @@ where
 
 impl<Stdout: Write + Clone, Stderr: Write + Clone> Environment<Stdout, Stderr> {
     pub fn new(out: Stdout, err: Stderr) -> Self {
+        // TODO(jwall): populate this with environment variables?
         Self::new_with_vars(out, err, BTreeMap::new())
     }
 
@@ -64,6 +65,16 @@ impl<Stdout: Write + Clone, Stderr: Write + Clone> Environment<Stdout, Stderr> {
         };
         me.populate_stdlib();
         return me;
+    }
+
+    pub fn get_env_vars_tuple(&self) -> Value {
+        let mut fields = Vec::new();
+        let mut positions = Vec::new();
+        for (key, val) in self.env_vars.iter() {
+            fields.push((key.clone(), Rc::new(Value::P(Primitive::Str(val.clone())))));
+            positions.push((Position::new(0, 0, 0), Position::new(0, 0, 0)));
+        }
+        Value::C(Composite::Tuple(fields, positions))
     }
 
     pub fn get_cached_path_val(&self, path: &String) -> Option<Rc<Value>> {

@@ -144,7 +144,7 @@ impl VM {
                 Op::Val(p) => self.push(Rc::new(P(p.clone())), pos)?,
                 Op::Cast(t) => self.op_cast(t)?,
                 Op::Sym(s) => self.push(Rc::new(S(s.clone())), pos)?,
-                Op::DeRef(s) => self.op_deref(s.clone(), &pos)?,
+                Op::DeRef(s) => self.op_deref(s.clone(), env, &pos)?,
                 Op::Add => self.op_add(pos)?,
                 Op::Mod => self.op_mod(pos)?,
                 Op::Sub => self.op_sub(pos)?,
@@ -242,8 +242,17 @@ impl VM {
         Ok(())
     }
 
-    fn op_deref(&mut self, name: String, pos: &Position) -> Result<(), Error> {
-        let (val, _) = self.get_binding(&name, pos)?.clone();
+    fn op_deref<O, E>(
+        &mut self,
+        name: String,
+        env: &RefCell<Environment<O, E>>,
+        pos: &Position,
+    ) -> Result<(), Error>
+    where
+        O: std::io::Write + Clone,
+        E: std::io::Write + Clone,
+    {
+        let (val, _) = self.get_binding(&name, env, pos)?.clone();
         self.push(val, pos.clone())
     }
 
@@ -1078,9 +1087,29 @@ impl VM {
         Ok(())
     }
 
-    pub fn get_binding(&self, name: &str, pos: &Position) -> Result<(Rc<Value>, Position), Error> {
+    pub fn get_binding<O, E>(
+        &self,
+        name: &str,
+        env: &RefCell<Environment<O, E>>,
+        pos: &Position,
+    ) -> Result<(Rc<Value>, Position), Error>
+    where
+        O: std::io::Write + Clone,
+        E: std::io::Write + Clone,
+    {
+        // TODO(jwall): Handle environment variables here?
         let tpl = if name == "self" {
             self.self_stack.last().cloned()
+        } else if name == "env" {
+            let candidate = self.symbols.get(name);
+            if candidate.is_some() {
+                candidate
+            } else {
+                Some((
+                    Rc::new(env.borrow().get_env_vars_tuple()),
+                    Position::new(0, 0, 0),
+                ))
+            }
         } else {
             self.symbols.get(name)
         };
