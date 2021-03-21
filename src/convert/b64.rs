@@ -13,11 +13,10 @@ pub struct Base64Importer {
 
 impl Importer for Base64Importer {
     fn import(&self, bytes: &[u8]) -> Result<Rc<Val>, Box<dyn Error>> {
-        let bslice = bytes.into();
         return if self.url_safe {
-            Ok(Rc::new(Val::Str(encode(bslice))))
+            Ok(Rc::new(Val::Str(encode(bytes))))
         } else {
-            Ok(Rc::new(Val::Str(encode_config(bslice, URL_SAFE))))
+            Ok(Rc::new(Val::Str(encode_config(bytes, URL_SAFE))))
         };
     }
 }
