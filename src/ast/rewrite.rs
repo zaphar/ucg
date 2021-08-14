@@ -13,7 +13,7 @@
 // limitations under the License.
 use std::path::PathBuf;
 
-use crate::ast::walk::{Visitor, Walker};
+use crate::ast::walk::Visitor;
 use crate::ast::Expression;
 
 pub struct Rewriter {
