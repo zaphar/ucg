@@ -154,6 +154,10 @@ fn derive_shape_expressions() {
             "bool(\"true\");",
             Shape::Boolean(PositionedItem::new(true, Position::new(0, 0, 0))),
         ),
+        (
+            "1 + 1;",
+            Shape::Int(PositionedItem::new(1, Position::new(1, 1, 0))),
+        ),
     ];
 
     for (expr, shape) in expr_cases {

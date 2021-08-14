@@ -18,7 +18,7 @@ use crate::ast::rewrite::Rewriter;
 use crate::ast::walk::Walker;
 use crate::ast::{
     BinaryExprType, BinaryOpDef, Expression, FormatArgs, FuncOpDef, Position, PositionedItem,
-    SelectDef, Statement, TemplatePart, Token, TokenType, Value,
+    SelectDef, Shape, Statement, TemplatePart, Token, TokenType, Value,
 };
 use crate::build::format::{ExpressionTemplate, SimpleTemplate, TemplateParser};
 use crate::build::opcode::Primitive;
@@ -30,6 +30,7 @@ pub struct AST();
 pub struct OpsMap {
     pub ops: Vec<Op>,
     pub pos: Vec<Position>,
+    pub shape_map: BTreeMap<String, Shape>,
     pub links: BTreeMap<String, Position>,
 }
 
@@ -38,6 +39,8 @@ impl OpsMap {
         OpsMap {
             ops: Vec::new(),
             pos: Vec::new(),
+            // TODO(jwall): Populate shapes when translating into opcodes.
+            shape_map: BTreeMap::new(),
             links: BTreeMap::new(),
         }
     }
