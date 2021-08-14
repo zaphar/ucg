@@ -32,6 +32,8 @@ use crate::build::scope::Scope;
 use crate::build::Val;
 use crate::error::{BuildError, ErrorType::TypeFail};
 
+use self::walk::Walker;
+
 pub mod printer;
 pub mod rewrite;
 pub mod typecheck;
@@ -272,8 +274,8 @@ value_enum!(
 );
 
 impl Shape {
-    pub fn merge(&self, compare: &Shape) -> Option<Self> {
-        match (self, compare) {
+    pub fn merge(&self, right: &Shape) -> Option<Self> {
+        match (self, right) {
             (Shape::Str(_), Shape::Str(_))
             | (Shape::Symbol(_), Shape::Symbol(_))
             | (Shape::Boolean(_), Shape::Boolean(_))
@@ -775,7 +777,7 @@ fn normalize_path(p: PathBuf) -> PathBuf {
     return normalized;
 }
 
-impl walk::Walker for Rewriter {
+impl Walker for Rewriter {
     fn walk_statement_list(&mut self, stmts: Vec<&mut Statement>) {
         for v in stmts {
             self.walk_statement(v);
@@ -1046,12 +1048,26 @@ impl Expression {
                 CastType::Float => Shape::Float(PositionedItem::new(0.0, def.pos.clone())),
                 CastType::Bool => Shape::Boolean(PositionedItem::new(true, def.pos.clone())),
             },
-            Expression::Import(def) => {
-                // FIXME(jwall): What should this do?
-                Shape::Symbol(PositionedItem::new(
-                    def.path.fragment.clone(),
-                    def.path.pos.clone(),
-                ))
+            Expression::Import(def) => Shape::Symbol(PositionedItem::new(
+                def.path.fragment.clone(),
+                def.path.pos.clone(),
+            )),
+            Expression::Binary(def) => {
+                let left_shape = def.left.derive_shape()?;
+                let right_shape = def.right.derive_shape()?;
+                match left_shape.merge(&right_shape) {
+                    Some(shape) => shape,
+                    None => {
+                        return Err(BuildError::new(
+                            format!(
+                                "Expected {} value on right hand side of expression but got: {}",
+                                left_shape.type_name(),
+                                right_shape.type_name()
+                            ),
+                            TypeFail,
+                        ));
+                    }
+                }
             }
             _ => Shape::Empty(Position::new(0, 0, 0)),
         };

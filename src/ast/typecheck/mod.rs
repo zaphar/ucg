@@ -13,7 +13,7 @@
 // limitations under the License.
 
 //! Implements typechecking for the parsed ucg AST.
-
+// FIXME(jwall): This probably just needs to disappear now.
 use std::collections::BTreeMap;
 
 use crate::ast::walk::Visitor;

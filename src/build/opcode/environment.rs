@@ -35,6 +35,7 @@ where
     Stderr: Write + Clone,
 {
     pub val_cache: BTreeMap<String, Rc<Value>>,
+    // TODO implement a shape cache here.
     pub op_cache: cache::Ops,
     pub converter_registry: ConverterRegistry,
     pub importer_registry: ImporterRegistry,
