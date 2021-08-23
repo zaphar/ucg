@@ -1,0 +1,8 @@
+let t = import "std/testing.ucg";
+
+let mod_under_test = import "./pkg_func_module.ucg";
+
+assert t.equal{
+    left = mod_under_test.pkg_func_mod{arg="foo"}.value,
+    right = "foo",
+};
