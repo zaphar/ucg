@@ -21,14 +21,19 @@
         overlays = [ rust-overlay.overlay ];
         pkgs = import nixpkgs { inherit system overlays; };
         naersk-lib = naersk.lib."${system}";
-    in
-    {
-        defaultPackage = with pkgs;
+        ucg = with pkgs;
             naersk-lib.buildPackage rec {
                 pname = "ucg";
                 version = "0.7.2";
                 src = ./.;
                 cargoBuildOptions = opts: opts ++ ["-p" "${pname}" ];
             };
+    in
+    {
+        defaultPackage = ucg;
+        defaultApp = {
+            type = "app";
+            program = "${ucg}/bin/ucg";
+        };
     });
 }
