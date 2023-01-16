@@ -24,7 +24,7 @@ macro_rules! assert_shape {
         let iter = OffsetStrIter::new($input);
         let tokenized = match tokenize(iter, None) {
             Ok(toks) => toks,
-            Err(err) => panic!(format!("failed to parse {} with error {}", $input, err)),
+            Err(err) => panic!("failed to parse {} with error {}", $input, err),
         };
         let toks = SliceIter::new(&tokenized);
         if let ParseResult::Complete(_, ref expr) = expression(toks) {
@@ -32,7 +32,7 @@ macro_rules! assert_shape {
                 match expr.derive_shape() {
                     Ok(shape) => shape,
                     Err(err) => {
-                        panic!(format!("failed to parse {} with error {}", $input, err))
+                        panic!("failed to parse {} with error {}", $input, err)
                     }
                 },
                 $shape
