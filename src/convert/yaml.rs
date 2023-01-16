@@ -77,8 +77,10 @@ impl YamlConverter {
                 serde_yaml::Value::Null => "null".to_string(),
                 serde_yaml::Value::Number(n) => n.to_string(),
                 serde_yaml::Value::String(s) => s.clone(),
-                serde_yaml::Value::Sequence(_) | serde_yaml::Value::Mapping(_) => {
-                    eprintln!("Unsupported key type in yaml import skipping");
+                serde_yaml::Value::Sequence(_)
+                | serde_yaml::Value::Mapping(_)
+                | serde_yaml::Value::Tagged(_) => {
+                    eprintln!("Unsupported key type in yaml map key import skipping");
                     continue;
                 }
             };
@@ -126,6 +128,12 @@ impl YamlConverter {
                 }
                 collapsed.reverse();
                 Val::Tuple(collapsed)
+            }
+            serde_yaml::Value::Tagged(_) => {
+                eprintln!(
+                    "Tagged value types are not supported in yaml imports. Replacing with Empty..."
+                );
+                Val::Empty
             }
         })
     }
