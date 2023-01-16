@@ -9,10 +9,7 @@ use crate::iter::OffsetStrIter;
 #[test]
 fn test_empty_token() {
     let result = emptytok(OffsetStrIter::new("NULL "));
-    assert!(
-        result.is_complete(),
-        format!("result {:?} is not done", result)
-    );
+    assert!(result.is_complete(), "result {:?} is not done", result);
     if let Result::Complete(_, tok) = result {
         assert_eq!(tok.fragment, "NULL");
         assert_eq!(tok.typ, TokenType::EMPTY);
@@ -22,10 +19,7 @@ fn test_empty_token() {
 #[test]
 fn test_assert_token() {
     let result = asserttok(OffsetStrIter::new("assert "));
-    assert!(
-        result.is_complete(),
-        format!("result {:?} is not done", result)
-    );
+    assert!(result.is_complete(), "result {:?} is not done", result);
     if let Result::Complete(_, tok) = result {
         assert_eq!(tok.fragment, "assert");
         assert_eq!(tok.typ, TokenType::BAREWORD);
@@ -35,10 +29,7 @@ fn test_assert_token() {
 #[test]
 fn test_out_token() {
     let result = outtok(OffsetStrIter::new("out "));
-    assert!(
-        result.is_complete(),
-        format!("result {:?} is not done", result)
-    );
+    assert!(result.is_complete(), "result {:?} is not done", result);
     if let Result::Complete(_, tok) = result {
         assert_eq!(tok.fragment, "out");
         assert_eq!(tok.typ, TokenType::BAREWORD);
@@ -48,10 +39,7 @@ fn test_out_token() {
 #[test]
 fn test_out_token_with_comment() {
     let result = outtok(OffsetStrIter::new("out//comment"));
-    assert!(
-        result.is_complete(),
-        format!("result {:?} is not done", result)
-    );
+    assert!(result.is_complete(), "result {:?} is not done", result);
     if let Result::Complete(_, tok) = result {
         assert_eq!(tok.fragment, "out");
         assert_eq!(tok.typ, TokenType::BAREWORD);
@@ -61,16 +49,13 @@ fn test_out_token_with_comment() {
 #[test]
 fn test_not_out_token() {
     let result = outtok(OffsetStrIter::new("output"));
-    assert!(result.is_fail(), format!("result {:?} is not fail", result));
+    assert!(result.is_fail(), "result {:?} is not fail", result);
 }
 
 #[test]
 fn test_escape_quoted() {
     let result = escapequoted(OffsetStrIter::new("foo \\\"bar\""));
-    assert!(
-        result.is_complete(),
-        format!("result {:?} is not ok", result)
-    );
+    assert!(result.is_complete(), "result {:?} is not ok", result);
     if let Result::Complete(_rest, frag) = result {
         assert_eq!(frag, "foo \"bar");
     }
@@ -79,10 +64,7 @@ fn test_escape_quoted() {
 #[test]
 fn test_string_with_escaping() {
     let result = strtok(OffsetStrIter::new("\"foo \\\\ \\\"bar\""));
-    assert!(
-        result.is_complete(),
-        format!("result {:?} is not ok", result)
-    );
+    assert!(result.is_complete(), "result {:?} is not ok", result);
     if let Result::Complete(_, tok) = result {
         assert_eq!(tok.fragment, "foo \\ \"bar".to_string());
     }
@@ -92,7 +74,7 @@ fn test_string_with_escaping() {
 fn test_tokenize_bareword_with_dash() {
     let input = OffsetStrIter::new("foo-bar ");
     let result = tokenize(input.clone(), None);
-    assert!(result.is_ok(), format!("result {:?} is not ok", result));
+    assert!(result.is_ok(), "result {:?} is not ok", result);
     if let Ok(toks) = result {
         assert_eq!(toks.len(), 2);
         assert_eq!(toks[0].fragment, "foo-bar");
@@ -104,7 +86,9 @@ macro_rules! assert_token {
         let result = token(OffsetStrIter::new($input));
         assert!(
             result.is_complete(),
-            format!("result {:?} is not a {}", result, $msg)
+            "result {:?} is not a {}",
+            result,
+            $msg
         );
         if let Result::Complete(_, tok) = result {
             assert_eq!(tok.typ, $typ);
@@ -160,7 +144,7 @@ fn test_tokenize_one_of_each() {
          + - . ( ) , 1 . foo \"bar\" // comment\n ; true false == < > <= >= !=",
     );
     let result = tokenize(input.clone(), None);
-    assert!(result.is_ok(), format!("result {:?} is not ok", result));
+    assert!(result.is_ok(), "result {:?} is not ok", result);
     let v = result.unwrap();
     for (i, t) in v.iter().enumerate() {
         println!("{}: {:?}", i, t);
@@ -177,7 +161,7 @@ fn test_tokenize_one_of_each_comment_map_path() {
     );
     let mut comment_map = BTreeMap::new();
     let result = tokenize(input.clone(), Some(&mut comment_map));
-    assert!(result.is_ok(), format!("result {:?} is not ok", result));
+    assert!(result.is_ok(), "result {:?} is not ok", result);
     let v = result.unwrap();
     for (i, t) in v.iter().enumerate() {
         println!("{}: {:?}", i, t);
@@ -282,7 +266,7 @@ fn test_match_word() {
     let result = word!(SliceIter::new(input.as_slice()), "foo");
     match result {
         Result::Complete(_, tok) => assert_eq!(tok, input[0]),
-        res => assert!(false, format!("Fail: {:?}", res)),
+        res => assert!(false, "Fail: {:?}", res),
     }
 }
 
@@ -324,7 +308,7 @@ fn test_match_punct() {
     let result = punct!(SliceIter::new(input.as_slice()), "!");
     match result {
         Result::Complete(_, tok) => assert_eq!(tok, input[0]),
-        res => assert!(false, format!("Fail: {:?}", res)),
+        res => assert!(false, "Fail: {:?}", res),
     }
 }
 
@@ -343,7 +327,7 @@ fn test_match_type() {
     let result = match_type!(SliceIter::new(input.as_slice()), BAREWORD);
     match result {
         Result::Complete(_, tok) => assert_eq!(tok, input[0]),
-        res => assert!(false, format!("Fail: {:?}", res)),
+        res => assert!(false, "Fail: {:?}", res),
     }
 }
 
@@ -352,7 +336,7 @@ fn test_tokenize_builds_comment_map() {
     let input = OffsetStrIter::new("// comment 1\n\n//comment 2");
     let mut comment_map = BTreeMap::new();
     let result = tokenize(input.clone(), Some(&mut comment_map));
-    assert!(result.is_ok(), format!("result {:?} is not ok", result));
+    assert!(result.is_ok(), "result {:?} is not ok", result);
 
     assert_eq!(comment_map.len(), 2);
 }
@@ -362,7 +346,7 @@ fn test_tokenize_builds_comment_map_groups() {
     let input = OffsetStrIter::new("// first part\n// comment 1\n\n//comment 2");
     let mut comment_map = BTreeMap::new();
     let result = tokenize(input.clone(), Some(&mut comment_map));
-    assert!(result.is_ok(), format!("result {:?} is not ok", result));
+    assert!(result.is_ok(), "result {:?} is not ok", result);
 
     assert_eq!(comment_map.len(), 2);
     assert_eq!(comment_map[&2].len(), 2);

@@ -1,5 +1,5 @@
 [package]
-edition     = "2018"
+edition     = "2021"
 name        = "ucg"
 version     = "0.7.2"
 authors     = ["Jeremy Wall <jeremy@marzhillstudios.com>"]

@@ -33,7 +33,7 @@ fn assert_build(input: &str) {
     b.eval_string(input).unwrap();
     let env = b.environment.borrow();
     if !env.assert_results.success {
-        assert!(false, env.assert_results.failures.clone());
+        assert!(false, "{}", env.assert_results.failures.clone());
     }
 }
 
