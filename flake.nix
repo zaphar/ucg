@@ -18,18 +18,29 @@
     outputs = {self, nixpkgs, flake-utils, rust-overlay, naersk, flake-compat}:
     flake-utils.lib.eachDefaultSystem (system:
     let
-        overlays = [ rust-overlay.overlay ];
+        overlays = [ rust-overlay.overlays.default ];
         pkgs = import nixpkgs { inherit system overlays; };
-        naersk-lib = naersk.lib."${system}";
+        rust-bin = pkgs.rust-bin.stable."1.64.0".default.override {
+            extensions = [ "rust-src" ];
+            # Add wasm32 as an extra target besides the native target.
+            targets = [ "wasm32-unknown-unknown" ];
+        };
+        naersk-lib = pkgs.callPackage naersk {
+            rustc = rust-bin;
+            cargo = rust-bin;
+        };
         ucg = with pkgs;
             naersk-lib.buildPackage rec {
                 pname = "ucg";
-                version = "0.7.2";
+                version = "0.7.3";
                 src = ./.;
                 cargoBuildOptions = opts: opts ++ ["-p" "${pname}" ];
             };
     in
     {
+        packages = {
+            inherit ucg;
+        };
         defaultPackage = ucg;
         defaultApp = {
             type = "app";
