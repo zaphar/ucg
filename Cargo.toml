@@ -30,7 +30,7 @@ base64 = "0.13.0"
 regex = "1"
 dirs = "4.0.0"
 unicode-segmentation = "1.2.1"
-rustyline = "8.0.0"
+rustyline = "10.1.0"
 atty = "0.2"
 
 [build-dependencies]

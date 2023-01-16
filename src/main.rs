@@ -437,7 +437,8 @@ fn do_repl(
             .history_ignore_space(true)
             .history_ignore_dups(false)
             .build(),
-    );
+    )
+    .expect("Unable to start line editor");
     let path_home = dirs::home_dir().unwrap_or(std::env::temp_dir());
     let config_home = std::env::var("XDG_CACHE_HOME")
         .unwrap_or_else(|_| format!("{}/.cache", path_home.to_string_lossy()));
