@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 // Copyright 2020 Jeremy Wall
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,30 +20,6 @@ use crate::ast::{Expression, ListDef, Position, PositionedItem, Shape, Token, To
 use crate::iter::OffsetStrIter;
 use crate::parse::expression;
 use crate::tokenizer::tokenize;
-
-macro_rules! assert_shape {
-    ($input:expr => $shape:expr) => {{
-        let iter = OffsetStrIter::new($input);
-        let tokenized = match tokenize(iter, None) {
-            Ok(toks) => toks,
-            Err(err) => panic!("failed to parse {} with error {}", $input, err),
-        };
-        let toks = SliceIter::new(&tokenized);
-        if let ParseResult::Complete(_, ref expr) = expression(toks) {
-            assert_eq!(
-                match expr.derive_shape() {
-                    Ok(shape) => shape,
-                    Err(err) => {
-                        panic!("failed to parse {} with error {}", $input, err)
-                    }
-                },
-                $shape
-            );
-        } else {
-            assert!(false, format!("failed to parse expression! {:?}", $input));
-        };
-    }};
-}
 
 #[test]
 fn derive_shape_values() {
@@ -108,7 +86,7 @@ fn derive_shape_values() {
     ];
 
     for (val, shape) in value_cases {
-        assert_eq!(val.derive_shape(), shape);
+        assert_eq!(val.derive_shape(&mut BTreeMap::new()), shape);
     }
 }
 
@@ -161,6 +139,18 @@ fn derive_shape_expressions() {
     ];
 
     for (expr, shape) in expr_cases {
-        assert_shape!(expr => shape);
+        {
+            let iter = OffsetStrIter::new(expr);
+            let tokenized = match tokenize(iter, None) {
+                Ok(toks) => toks,
+                Err(err) => panic!("failed to parse {} with error {}", expr, err),
+            };
+            let toks = SliceIter::new(&tokenized);
+            if let ParseResult::Complete(_, ref expr) = expression(toks) {
+                assert_eq!(expr.derive_shape(&mut BTreeMap::new()), shape);
+            } else {
+                assert!(false, "failed to parse expression! {:?}", expr);
+            };
+        };
     }
 }

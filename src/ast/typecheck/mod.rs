@@ -106,48 +106,15 @@ impl Visitor for Checker {
     }
 
     fn leave_expression(&mut self, expr: &Expression) {
-        match expr {
-            Expression::Binary(_) => {
-                // Collapse the two shapes in the stack into one shape for this expression.
-                if let Some(right) = self.shape_stack.pop() {
-                    if let Some(left) = self.shape_stack.pop() {
-                        if let Some(shape) = left.resolve(&right) {
-                            // Then give them a new position
-                            self.shape_stack.push(shape.with_pos(expr.pos().clone()));
-                        } else {
-                            self.err_stack.push(BuildError::with_pos(
-                                format!(
-                                    "Expected {} but got {}",
-                                    left.type_name(),
-                                    right.type_name()
-                                ),
-                                ErrorType::TypeFail,
-                                right.pos().clone(),
-                            ));
-                        }
-                    }
-                }
-            }
-            Simple(val) => self.shape_stack.push(val.derive_shape()),
-            Not(def) => {
-                // TODO(jwall): We expect the result of def.expr to be boolean.
-                // If it isn't then we have a problem
-                todo!();
-            },
-            Copy(_) => todo!(),
-            Range(_) => todo!(),
-            Grouped(_, _) => todo!(),
-            Format(_) => todo!(),
-            Include(_) => todo!(),
-            Import(_) => todo!(),
-            Call(_) => todo!(),
-            Cast(_) => todo!(),
-            Func(_) => todo!(),
-            Select(_) => todo!(),
-            FuncOp(_) => todo!(),
-            Module(_) => todo!(),
-            Fail(_) => todo!(),
-            Debug(_) => todo!(),
+        let shape = expr.derive_shape(&mut self.symbol_table);
+        if let Shape::TypeErr(pos, msg) = &shape {
+            self.err_stack.push(BuildError::with_pos(
+                msg.clone(),
+                ErrorType::TypeFail,
+                pos.clone(),
+            ));
+        } else {
+            self.shape_stack.push(shape);
         }
     }
 
