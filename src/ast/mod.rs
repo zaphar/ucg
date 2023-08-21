@@ -221,7 +221,7 @@ macro_rules! make_expr {
 /// This is usually used as the body of a tuple in the UCG AST.
 pub type FieldList = Vec<(Token, Expression)>; // Token is expected to be a symbol
 
-pub type ShapeTuple = Vec<(Token, Shape)>;
+pub type TupleShape = Vec<(Token, Shape)>;
 pub type ShapeList = Vec<Shape>;
 
 #[derive(PartialEq, Debug, Clone)]
@@ -232,7 +232,7 @@ pub struct FuncShapeDef {
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct ModuleShapeDef {
-    items: ShapeTuple,
+    items: TupleShape,
     ret: Box<Shape>,
 }
 
@@ -249,6 +249,12 @@ pub enum Value {
     List(ListDef),
 }
 
+#[derive(PartialEq, Debug, Clone)]
+pub enum ImportShape {
+    Resolved(TupleShape),
+    Unresolved(PositionedItem<String>)
+}
+
 #[doc = "Shapes represent the types that UCG values or expressions can have."]
 #[derive(PartialEq, Debug, Clone)]
 pub enum Shape {
@@ -257,22 +263,25 @@ pub enum Shape {
     Int(PositionedItem<i64>),
     Float(PositionedItem<f64>),
     Str(PositionedItem<String>),
-    Symbol(PositionedItem<String>),
-    Tuple(PositionedItem<ShapeTuple>),
+    Tuple(PositionedItem<TupleShape>),
     List(PositionedItem<ShapeList>),
     Func(FuncShapeDef),
     Module(ModuleShapeDef),
+    Hole(PositionedItem<String>), // A type hole We don't know what this type is yet.
+    Import(ImportShape), // A type hole We don't know what this type is yet.
+    TypeErr(pos, BuildError), // A type hole We don't know what this type is yet.
 }
 
 impl Shape {
-    pub fn merge(&self, right: &Shape) -> Option<Self> {
-        match (self, right) {
+    pub fn resolve(&self, right: &Shape) -> Option<Self> {
+        Some(match (self, right) {
             (Shape::Str(_), Shape::Str(_))
-            | (Shape::Symbol(_), Shape::Symbol(_))
             | (Shape::Boolean(_), Shape::Boolean(_))
             | (Shape::Empty(_), Shape::Empty(_))
             | (Shape::Int(_), Shape::Int(_))
-            | (Shape::Float(_), Shape::Float(_)) => Some(self.clone()),
+            | (Shape::Float(_), Shape::Float(_)) => self.clone(),
+            (Shape::Hole(_), other)
+            | (other, Shape::Hole(_)) => other.clone(),
             (Shape::List(left_slist), Shape::List(right_slist)) => {
                 // TODO
                 unimplemented!("Can't merge these yet.")
@@ -289,14 +298,13 @@ impl Shape {
                 // TODO
                 unimplemented!("Can't merge these yet.")
             }
-            _ => None,
-        }
+            _ => return None,
+        })
     }
 
     pub fn type_name(&self) -> &'static str {
         match self {
             Shape::Str(s) => "str",
-            Shape::Symbol(s) => "symbol",
             Shape::Int(s) => "int",
             Shape::Float(s) => "float",
             Shape::Boolean(b) => "boolean",
@@ -306,13 +314,13 @@ impl Shape {
             Shape::Tuple(flds) => "tuple",
             Shape::Func(_) => "func",
             Shape::Module(_) => "module",
+            Shape::Hole(_) => "type-hole",
         }
     }
 
     pub fn pos(&self) -> &Position {
         match self {
             Shape::Str(s) => &s.pos,
-            Shape::Symbol(s) => &s.pos,
             Shape::Int(s) => &s.pos,
             Shape::Float(s) => &s.pos,
             Shape::Boolean(b) => &b.pos,
@@ -321,13 +329,13 @@ impl Shape {
             Shape::Tuple(flds) => &flds.pos,
             Shape::Func(def) => def.ret.pos(),
             Shape::Module(def) => def.ret.pos(),
+            Shape::Hole(pi) => &pi.pos,
         }
     }
 
     pub fn with_pos(self, pos: Position) -> Self {
         match self {
             Shape::Str(s) => Shape::Str(PositionedItem::new(s.val, pos)),
-            Shape::Symbol(s) => Shape::Symbol(PositionedItem::new(s.val, pos)),
             Shape::Int(s) => Shape::Int(PositionedItem::new(s.val, pos)),
             Shape::Float(s) => Shape::Float(PositionedItem::new(s.val, pos)),
             Shape::Boolean(b) => Shape::Boolean(PositionedItem::new(b.val, pos)),
@@ -335,6 +343,7 @@ impl Shape {
             Shape::List(lst) => Shape::List(PositionedItem::new(lst.val, pos)),
             Shape::Tuple(flds) => Shape::Tuple(PositionedItem::new(flds.val, pos)),
             Shape::Func(_) | Shape::Module(_) => self.clone(),
+            Shape::Hole(_) => Shape::Hole(pos),
         }
     }
 }
@@ -414,7 +423,7 @@ impl Value {
         )
     }
 
-    fn derive_shape(&self) -> Result<Shape, BuildError> {
+    fn derive_shape(&self) -> Shape {
         let shape = match self {
             Value::Empty(p) => Shape::Empty(p.clone()),
             Value::Boolean(p) => Shape::Boolean(p.clone()),
@@ -424,23 +433,23 @@ impl Value {
             // Symbols in a shape are placeholders. They allow a form of genericity
             // in the shape. They can be any type and are only refined down.
             // by their presence in an expression.
-            Value::Symbol(p) => Shape::Symbol(p.clone()),
+            Value::Symbol(p) => Shape::Hole(p.clone()),
             Value::Tuple(flds) => {
                 let mut field_shapes = Vec::new();
                 for &(ref tok, ref expr) in &flds.val {
-                    field_shapes.push((tok.clone(), expr.try_into()?));
+                    field_shapes.push((tok.clone(), expr.derive_shape()));
                 }
                 Shape::Tuple(PositionedItem::new(field_shapes, flds.pos.clone()))
             }
             Value::List(flds) => {
                 let mut field_shapes = Vec::new();
                 for f in &flds.elems {
-                    field_shapes.push(f.try_into()?);
+                    field_shapes.push(f.derive_shape());
                 }
                 Shape::List(PositionedItem::new(field_shapes, flds.pos.clone()))
             }
         };
-        Ok(shape)
+        shape
     }
 }
 
@@ -448,7 +457,7 @@ impl TryFrom<&Value> for Shape {
     type Error = crate::error::BuildError;
 
     fn try_from(v: &Value) -> Result<Self, Self::Error> {
-        v.derive_shape()
+        Ok(v.derive_shape())
     }
 }
 
@@ -750,165 +759,12 @@ impl ModuleDef {
     }
 }
 
-pub struct Rewriter {
-    base: PathBuf,
-}
-
-impl Rewriter {
-    pub fn new<P: Into<PathBuf>>(base: P) -> Self {
-        Self { base: base.into() }
-    }
-}
-
 fn normalize_path(p: PathBuf) -> PathBuf {
     let mut normalized = PathBuf::new();
     for segment in p.components() {
         normalized.push(segment);
     }
     return normalized;
-}
-
-impl Walker for Rewriter {
-    fn walk_statement_list(&mut self, stmts: Vec<&mut Statement>) {
-        for v in stmts {
-            self.walk_statement(v);
-        }
-    }
-
-    fn walk_statement(&mut self, stmt: &mut Statement) {
-        self.visit_statement(stmt);
-        match stmt {
-            Statement::Let(ref mut def) => {
-                self.walk_expression(&mut def.value);
-            }
-            Statement::Expression(ref mut expr) => {
-                self.walk_expression(expr);
-            }
-            Statement::Assert(_, ref mut expr) => {
-                self.walk_expression(expr);
-            }
-            Statement::Output(_, _, ref mut expr) => {
-                self.walk_expression(expr);
-            }
-            Statement::Print(_, _, ref mut expr) => {
-                self.walk_expression(expr);
-            }
-        }
-    }
-
-    fn walk_fieldset(&mut self, fs: &mut FieldList) {
-        for &mut (_, ref mut expr) in fs.iter_mut() {
-            self.walk_expression(expr);
-        }
-    }
-
-    fn walk_expression(&mut self, expr: &mut Expression) {
-        self.visit_expression(expr);
-        match expr {
-            Expression::Call(ref mut def) => {
-                for expr in def.arglist.iter_mut() {
-                    self.walk_expression(expr);
-                }
-            }
-            Expression::Cast(ref mut def) => {
-                self.walk_expression(&mut def.target);
-            }
-            Expression::Copy(ref mut def) => {
-                self.walk_fieldset(&mut def.fields);
-            }
-            Expression::Format(ref mut def) => match def.args {
-                FormatArgs::List(ref mut args) => {
-                    for expr in args.iter_mut() {
-                        self.walk_expression(expr);
-                    }
-                }
-                FormatArgs::Single(ref mut expr) => {
-                    self.walk_expression(expr);
-                }
-            },
-            Expression::FuncOp(ref mut def) => match def {
-                FuncOpDef::Reduce(ref mut def) => {
-                    self.walk_expression(def.target.as_mut());
-                    self.walk_expression(def.acc.as_mut())
-                }
-                FuncOpDef::Map(ref mut def) => {
-                    self.walk_expression(def.target.as_mut());
-                }
-                FuncOpDef::Filter(ref mut def) => {
-                    self.walk_expression(def.target.as_mut());
-                }
-            },
-            Expression::Binary(ref mut def) => {
-                self.walk_expression(def.left.as_mut());
-                self.walk_expression(def.right.as_mut());
-            }
-            Expression::Grouped(ref mut expr, _) => {
-                self.walk_expression(expr);
-            }
-            Expression::Func(ref mut def) => self.walk_expression(def.fields.as_mut()),
-            Expression::Module(ref mut def) => {
-                self.walk_fieldset(&mut def.arg_set);
-                for stmt in def.statements.iter_mut() {
-                    self.walk_statement(stmt);
-                }
-            }
-            Expression::Range(ref mut def) => {
-                self.walk_expression(def.start.as_mut());
-                self.walk_expression(def.end.as_mut());
-                if let Some(ref mut expr) = def.step {
-                    self.walk_expression(expr.as_mut());
-                }
-            }
-            Expression::Select(ref mut def) => {
-                match def.default {
-                    Some(ref mut e) => {
-                        self.walk_expression(e.as_mut());
-                    }
-                    None => {
-                        // noop;
-                    }
-                };
-                self.walk_expression(def.val.as_mut());
-                self.walk_fieldset(&mut def.tuple);
-            }
-            Expression::Simple(ref mut val) => {
-                self.walk_value(val);
-            }
-
-            Expression::Import(i) => {
-                self.visit_import(i);
-            }
-            Expression::Include(i) => {
-                self.visit_include(i);
-            }
-            Expression::Fail(f) => {
-                self.visit_fail(f);
-            }
-            Expression::Not(ref mut def) => {
-                self.walk_expression(def.expr.as_mut());
-            }
-            Expression::Debug(ref mut def) => {
-                self.walk_expression(&mut def.expr);
-            }
-        }
-    }
-
-    fn walk_value(&mut self, val: &mut Value) {
-        match val {
-            Value::Empty(_)
-            | Value::Symbol(_)
-            | Value::Boolean(_)
-            | Value::Int(_)
-            | Value::Float(_)
-            | Value::Str(_) => self.visit_value(val),
-            Value::Tuple(fs) => self.walk_fieldset(&mut fs.val),
-            Value::List(vs) => {
-                for e in &mut vs.elems {
-                    self.walk_expression(e);
-                }
-            }
-        }
-    }
 }
 
 /// RangeDef defines a range with optional step.
@@ -1006,20 +862,20 @@ impl Expression {
         }
     }
 
-    fn derive_shape(&self) -> Result<Shape, BuildError> {
+    fn derive_shape(&self) -> Shape {
         // FIXME(jwall): Implement this
         let shape = match self {
-            Expression::Simple(v) => v.try_into()?,
+            Expression::Simple(v) => v.derive_shape(),
             Expression::Format(def) => {
                 Shape::Str(PositionedItem::new("".to_owned(), def.pos.clone()))
             }
             Expression::Not(def) => {
-                let shape = def.expr.as_ref().try_into()?;
+                let shape = def.expr.as_ref().derive_shape();
                 if let Shape::Boolean(b) = shape {
                     Shape::Boolean(PositionedItem::new(!b.val, def.pos.clone()))
                 } else {
                     // TODO(jwall): Display implementations for shapes.
-                    return Err(BuildError::new(
+                    return Shape::TypeErr(def.pos.clone(), BuildError::new(
                         format!(
                             "Expected Boolean value in Not expression but got: {:?}",
                             shape
@@ -1028,7 +884,7 @@ impl Expression {
                     ));
                 }
             }
-            Expression::Grouped(v, _pos) => v.as_ref().try_into()?,
+            Expression::Grouped(v, _pos) => v.as_ref().derive_shape(),
             Expression::Range(def) => Shape::List(PositionedItem::new(
                 vec![Shape::Int(PositionedItem::new(0, def.start.pos().clone()))],
                 def.pos.clone(),
@@ -1039,17 +895,17 @@ impl Expression {
                 CastType::Float => Shape::Float(PositionedItem::new(0.0, def.pos.clone())),
                 CastType::Bool => Shape::Boolean(PositionedItem::new(true, def.pos.clone())),
             },
-            Expression::Import(def) => Shape::Symbol(PositionedItem::new(
+            Expression::Import(def) => Shape::Import(ImportShape::Unresolved(PositionedItem::new(
                 def.path.fragment.clone(),
                 def.path.pos.clone(),
-            )),
+            ))),
             Expression::Binary(def) => {
-                let left_shape = def.left.derive_shape()?;
-                let right_shape = def.right.derive_shape()?;
-                match left_shape.merge(&right_shape) {
+                let left_shape = def.left.derive_shape();
+                let right_shape = def.right.derive_shape();
+                match left_shape.resolve(&right_shape) {
                     Some(shape) => shape,
                     None => {
-                        return Err(BuildError::new(
+                        return Shape::TypeErr(def.pos.clone(), BuildError::new(
                             format!(
                                 "Expected {} value on right hand side of expression but got: {}",
                                 left_shape.type_name(),
@@ -1060,9 +916,41 @@ impl Expression {
                     }
                 }
             }
-            _ => Shape::Empty(Position::new(0, 0, 0)),
+            Expression::Copy(def) => {
+                let base_shape = def.selector.derive_shape();
+                match base_shape {
+                    Shape::TypeErr(_, _) => base_shape,
+                    Shape::Empty(_)
+                    | Shape::Boolean(_)
+                    | Shape::Int(_)
+                    | Shape::Float(_)
+                    | Shape::Str(_)
+                    | Shape::List(_)
+                    | Shape::Func(_) => Shape::TypeErr(def.pos.clone(), BuildError::new(format!("Not a Copyable type {}", base_shape.type_name()), TypeFail)),
+                    // This is an interesting one. Do we assume tuple or module here?
+                    // TODO(jwall): Maybe we want a Shape::Narrowed?
+                    Shape::Hole(_) => todo!(),
+                    // These have understandable ways to resolve the type.
+                    Shape::Module(_) => todo!(),
+                    Shape::Tuple(t_def) => {
+                        let mut base_fields = t_def.clone();
+                        base_fields.val.extend(def.fields.iter().map(|(tok, expr) | (tok.clone(), expr.derive_shape())));
+                        Shape::Tuple(base_fields).with_pos(def.pos.clone())
+                    },
+                    Shape::Import(_) => todo!(),
+
+                }
+            },
+            Expression::Include(_) => todo!(),
+            Expression::Call(_) => todo!(),
+            Expression::Func(_) => todo!(),
+            Expression::Select(_) => todo!(),
+            Expression::FuncOp(_) => todo!(),
+            Expression::Module(_) => todo!(),
+            Expression::Fail(_) => todo!(),
+            Expression::Debug(_) => todo!(),
         };
-        Ok(shape)
+        shape
     }
 }
 
@@ -1070,7 +958,7 @@ impl TryFrom<&Expression> for Shape {
     type Error = crate::error::BuildError;
 
     fn try_from(e: &Expression) -> Result<Self, Self::Error> {
-        e.derive_shape()
+        Ok(e.derive_shape())
     }
 }
 

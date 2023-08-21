@@ -108,7 +108,7 @@ fn derive_shape_values() {
     ];
 
     for (val, shape) in value_cases {
-        assert_eq!(val.derive_shape().unwrap(), shape);
+        assert_eq!(val.derive_shape(), shape);
     }
 }
 
