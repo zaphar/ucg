@@ -77,7 +77,6 @@ impl Visitor for Checker {
     }
 
     fn visit_value(&mut self, val: &mut Value) {
-        // noop by default
         // TODO(jwall): Some values can contain expressions. Handle those here.
         match val {
             Value::Empty(p) => self.shape_stack.push(Shape::Empty(p.clone())),
@@ -88,7 +87,7 @@ impl Visitor for Checker {
             // Symbols in a shape are placeholders. They allow a form of genericity
             // in the shape. They can be any type and are only refined down.
             // by their presence in an expression.
-            Value::Symbol(p) => self.shape_stack.push(Shape::Symbol(p.clone())),
+            Value::Symbol(p) => self.shape_stack.push(Shape::Hole(p.clone())),
             Value::List(_) => {
                 // noop
             }
@@ -112,7 +111,7 @@ impl Visitor for Checker {
                 // Collapse the two shapes in the stack into one shape for this expression.
                 if let Some(right) = self.shape_stack.pop() {
                     if let Some(left) = self.shape_stack.pop() {
-                        if let Some(shape) = left.merge(&right) {
+                        if let Some(shape) = left.resolve(&right) {
                             // Then give them a new position
                             self.shape_stack.push(shape.with_pos(expr.pos().clone()));
                         } else {
@@ -129,9 +128,26 @@ impl Visitor for Checker {
                     }
                 }
             }
-            _ => {
-                // TODO
-            }
+            Simple(val) => self.shape_stack.push(val.derive_shape()),
+            Not(def) => {
+                // TODO(jwall): We expect the result of def.expr to be boolean.
+                // If it isn't then we have a problem
+                todo!();
+            },
+            Copy(_) => todo!(),
+            Range(_) => todo!(),
+            Grouped(_, _) => todo!(),
+            Format(_) => todo!(),
+            Include(_) => todo!(),
+            Import(_) => todo!(),
+            Call(_) => todo!(),
+            Cast(_) => todo!(),
+            Func(_) => todo!(),
+            Select(_) => todo!(),
+            FuncOp(_) => todo!(),
+            Module(_) => todo!(),
+            Fail(_) => todo!(),
+            Debug(_) => todo!(),
         }
     }
 
