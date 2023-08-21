@@ -532,6 +532,7 @@ dependencies = [
  "dirs",
  "regex",
  "rustyline",
+ "serde",
  "serde_json",
  "serde_yaml",
  "simple-error",
