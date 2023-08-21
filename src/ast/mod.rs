@@ -236,42 +236,33 @@ pub struct ModuleShapeDef {
     ret: Box<Shape>,
 }
 
-macro_rules! value_enum {
-    ($doc:meta $i:tt, $t:ty, $l:ty, $($extra:tt)*) => {
-        #[$doc]
-        #[derive(PartialEq, Debug, Clone)]
-        pub enum $i {
-            // Simple Values
-            Empty(Position),
-            Boolean(PositionedItem<bool>),
-            Int(PositionedItem<i64>),
-            Float(PositionedItem<f64>),
-            Str(PositionedItem<String>),
-            Symbol(PositionedItem<String>),
-            // Complex Values
-            Tuple(PositionedItem<$t>),
-            List($l),
-            // Extra items
-            $( $extra )*
-        }
-    }
+#[doc = "Value types represent the Values that UCG can have."]
+#[derive(PartialEq, Debug, Clone)]
+pub enum Value {
+    Empty(Position),
+    Boolean(PositionedItem<bool>),
+    Int(PositionedItem<i64>),
+    Float(PositionedItem<f64>),
+    Str(PositionedItem<String>),
+    Symbol(PositionedItem<String>),
+    Tuple(PositionedItem<FieldList>),
+    List(ListDef),
 }
 
-value_enum!(
-    doc="Value types represent the Values that UCG can have."
-    Value,
-    FieldList,
-    ListDef,
-);
-
-value_enum!(
-    doc="Shapes represent the types that UCG values or expressions can have."
-    Shape,
-    ShapeTuple,
-    PositionedItem<ShapeList>,
+#[doc = "Shapes represent the types that UCG values or expressions can have."]
+#[derive(PartialEq, Debug, Clone)]
+pub enum Shape {
+    Empty(Position),
+    Boolean(PositionedItem<bool>),
+    Int(PositionedItem<i64>),
+    Float(PositionedItem<f64>),
+    Str(PositionedItem<String>),
+    Symbol(PositionedItem<String>),
+    Tuple(PositionedItem<ShapeTuple>),
+    List(PositionedItem<ShapeList>),
     Func(FuncShapeDef),
     Module(ModuleShapeDef),
-);
+}
 
 impl Shape {
     pub fn merge(&self, right: &Shape) -> Option<Self> {
