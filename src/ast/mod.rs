@@ -19,7 +19,8 @@ use std::cmp::Eq;
 use std::cmp::Ordering;
 use std::cmp::PartialEq;
 use std::cmp::PartialOrd;
-use std::convert::{Into, TryFrom, TryInto};
+use std::collections::BTreeMap;
+use std::convert::{Into, TryFrom};
 use std::fmt;
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -30,9 +31,6 @@ use abortable_parser;
 
 use crate::build::scope::Scope;
 use crate::build::Val;
-use crate::error::{BuildError, ErrorType::TypeFail};
-
-use self::walk::Walker;
 
 pub mod printer;
 pub mod rewrite;
@@ -79,9 +77,9 @@ impl Position {
     pub fn new(line: usize, column: usize, offset: usize) -> Self {
         Position {
             file: None,
-            line: line,
-            column: column,
-            offset: offset,
+            line,
+            column,
+            offset,
         }
     }
 
@@ -140,9 +138,9 @@ impl Token {
     // Constructs a new Token with a type and a Position.
     pub fn new_with_pos<S: Into<String>>(f: S, typ: TokenType, pos: Position) -> Self {
         Token {
-            typ: typ,
+            typ,
             fragment: f.into(),
-            pos: pos,
+            pos,
         }
     }
 }
@@ -231,7 +229,7 @@ pub struct FuncShapeDef {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub struct ModuleShapeDef {
+pub struct ModuleShape {
     items: TupleShape,
     ret: Box<Shape>,
 }
@@ -251,8 +249,8 @@ pub enum Value {
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum ImportShape {
-    Resolved(TupleShape),
-    Unresolved(PositionedItem<String>)
+    Resolved(Position, TupleShape),
+    Unresolved(PositionedItem<String>),
 }
 
 #[doc = "Shapes represent the types that UCG values or expressions can have."]
@@ -266,39 +264,43 @@ pub enum Shape {
     Tuple(PositionedItem<TupleShape>),
     List(PositionedItem<ShapeList>),
     Func(FuncShapeDef),
-    Module(ModuleShapeDef),
+    Module(ModuleShape),
     Hole(PositionedItem<String>), // A type hole We don't know what this type is yet.
-    Import(ImportShape), // A type hole We don't know what this type is yet.
-    TypeErr(pos, BuildError), // A type hole We don't know what this type is yet.
+    Narrowed(PositionedItem<Vec<Shape>>), // A narrowed type. We know *some* of the possible options.
+    Import(ImportShape),                  // A type hole We don't know what this type is yet.
+    TypeErr(Position, String),            // A type hole We don't know what this type is yet.
 }
 
 impl Shape {
-    pub fn resolve(&self, right: &Shape) -> Option<Self> {
-        Some(match (self, right) {
+    pub fn narrow(&self, right: &Shape) -> Self {
+        dbg!((self, right));
+        dbg!(match (self, right) {
             (Shape::Str(_), Shape::Str(_))
             | (Shape::Boolean(_), Shape::Boolean(_))
             | (Shape::Empty(_), Shape::Empty(_))
             | (Shape::Int(_), Shape::Int(_))
             | (Shape::Float(_), Shape::Float(_)) => self.clone(),
-            (Shape::Hole(_), other)
-            | (other, Shape::Hole(_)) => other.clone(),
+            (Shape::Hole(_), other) | (other, Shape::Hole(_)) => other.clone(),
             (Shape::List(left_slist), Shape::List(right_slist)) => {
                 // TODO
-                unimplemented!("Can't merge these yet.")
+                unimplemented!("Can't merge these yet.");
             }
             (Shape::Tuple(left_slist), Shape::Tuple(right_slist)) => {
                 // TODO
-                unimplemented!("Can't merge these yet.")
+                unimplemented!("Can't merge these yet.");
             }
             (Shape::Func(left_opshape), Shape::Func(right_opshape)) => {
                 // TODO
-                unimplemented!("Can't merge these yet.")
+                unimplemented!("Can't merge these yet.");
             }
             (Shape::Module(left_opshape), Shape::Module(right_opshape)) => {
                 // TODO
-                unimplemented!("Can't merge these yet.")
+                unimplemented!("Can't merge these yet.");
             }
-            _ => return None,
+            _ => Shape::TypeErr(
+                right.pos().clone(),
+                format!("Expected {} but got {}", self.type_name(), right.type_name()),
+            ),
         })
     }
 
@@ -314,7 +316,10 @@ impl Shape {
             Shape::Tuple(flds) => "tuple",
             Shape::Func(_) => "func",
             Shape::Module(_) => "module",
+            Shape::Narrowed(_) => "narrowed",
+            Shape::Import(_) => "import",
             Shape::Hole(_) => "type-hole",
+            Shape::TypeErr(_, _) => "type-error",
         }
     }
 
@@ -329,7 +334,11 @@ impl Shape {
             Shape::Tuple(flds) => &flds.pos,
             Shape::Func(def) => def.ret.pos(),
             Shape::Module(def) => def.ret.pos(),
+            Shape::Narrowed(pi) => &pi.pos,
             Shape::Hole(pi) => &pi.pos,
+            Shape::TypeErr(pos, _) => pos,
+            Shape::Import(ImportShape::Resolved(p, _)) => p,
+            Shape::Import(ImportShape::Unresolved(pi)) => &pi.pos,
         }
     }
 
@@ -343,7 +352,15 @@ impl Shape {
             Shape::List(lst) => Shape::List(PositionedItem::new(lst.val, pos)),
             Shape::Tuple(flds) => Shape::Tuple(PositionedItem::new(flds.val, pos)),
             Shape::Func(_) | Shape::Module(_) => self.clone(),
-            Shape::Hole(_) => Shape::Hole(pos),
+            Shape::Narrowed(pi) => Shape::Narrowed(pi.with_pos(pos)),
+            Shape::Hole(pi) => Shape::Hole(pi.with_pos(pos)),
+            Shape::Import(ImportShape::Resolved(_, s)) => {
+                Shape::Import(ImportShape::Resolved(pos, s))
+            }
+            Shape::Import(ImportShape::Unresolved(pi)) => {
+                Shape::Import(ImportShape::Unresolved(pi.with_pos(pos)))
+            }
+            Shape::TypeErr(_, msg) => Shape::TypeErr(pos, msg),
         }
     }
 }
@@ -423,41 +440,36 @@ impl Value {
         )
     }
 
-    fn derive_shape(&self) -> Shape {
+    fn derive_shape(&self, symbol_table: &mut BTreeMap<String, Shape>) -> Shape {
         let shape = match self {
             Value::Empty(p) => Shape::Empty(p.clone()),
             Value::Boolean(p) => Shape::Boolean(p.clone()),
             Value::Int(p) => Shape::Int(p.clone()),
             Value::Float(p) => Shape::Float(p.clone()),
             Value::Str(p) => Shape::Str(p.clone()),
-            // Symbols in a shape are placeholders. They allow a form of genericity
-            // in the shape. They can be any type and are only refined down.
-            // by their presence in an expression.
-            Value::Symbol(p) => Shape::Hole(p.clone()),
+            Value::Symbol(p) => {
+                if let Some(s) = symbol_table.get(&p.val) {
+                    s.clone()
+                } else {
+                    Shape::Hole(p.clone())
+                }
+            }
             Value::Tuple(flds) => {
                 let mut field_shapes = Vec::new();
                 for &(ref tok, ref expr) in &flds.val {
-                    field_shapes.push((tok.clone(), expr.derive_shape()));
+                    field_shapes.push((tok.clone(), expr.derive_shape(symbol_table)));
                 }
                 Shape::Tuple(PositionedItem::new(field_shapes, flds.pos.clone()))
             }
             Value::List(flds) => {
                 let mut field_shapes = Vec::new();
                 for f in &flds.elems {
-                    field_shapes.push(f.derive_shape());
+                    field_shapes.push(f.derive_shape(symbol_table));
                 }
                 Shape::List(PositionedItem::new(field_shapes, flds.pos.clone()))
             }
         };
         shape
-    }
-}
-
-impl TryFrom<&Value> for Shape {
-    type Error = crate::error::BuildError;
-
-    fn try_from(v: &Value) -> Result<Self, Self::Error> {
-        Ok(v.derive_shape())
     }
 }
 
@@ -532,7 +544,12 @@ impl<T> PositionedItem<T> {
 
     /// Constructs a new Positioned<T> with a value and a Position.
     pub fn new_with_pos(v: T, pos: Position) -> Self {
-        PositionedItem { pos: pos, val: v }
+        PositionedItem { pos, val: v }
+    }
+
+    pub fn with_pos(mut self, pos: Position) -> Self {
+        self.pos = pos;
+        self
     }
 }
 
@@ -747,7 +764,7 @@ impl ModuleDef {
         ModuleDef {
             scope: None,
             pos: pos.into(),
-            arg_set: arg_set,
+            arg_set,
             out_expr: None,
             arg_tuple: None,
             statements: stmts,
@@ -862,29 +879,14 @@ impl Expression {
         }
     }
 
-    fn derive_shape(&self) -> Shape {
-        // FIXME(jwall): Implement this
+    fn derive_shape(&self, symbol_table: &mut BTreeMap<String, Shape>) -> Shape {
         let shape = match self {
-            Expression::Simple(v) => v.derive_shape(),
+            Expression::Simple(v) => v.derive_shape(symbol_table),
             Expression::Format(def) => {
                 Shape::Str(PositionedItem::new("".to_owned(), def.pos.clone()))
             }
-            Expression::Not(def) => {
-                let shape = def.expr.as_ref().derive_shape();
-                if let Shape::Boolean(b) = shape {
-                    Shape::Boolean(PositionedItem::new(!b.val, def.pos.clone()))
-                } else {
-                    // TODO(jwall): Display implementations for shapes.
-                    return Shape::TypeErr(def.pos.clone(), BuildError::new(
-                        format!(
-                            "Expected Boolean value in Not expression but got: {:?}",
-                            shape
-                        ),
-                        TypeFail,
-                    ));
-                }
-            }
-            Expression::Grouped(v, _pos) => v.as_ref().derive_shape(),
+            Expression::Not(def) => derive_not_shape(def, symbol_table),
+            Expression::Grouped(v, _pos) => v.as_ref().derive_shape(symbol_table),
             Expression::Range(def) => Shape::List(PositionedItem::new(
                 vec![Shape::Int(PositionedItem::new(0, def.start.pos().clone()))],
                 def.pos.clone(),
@@ -900,48 +902,12 @@ impl Expression {
                 def.path.pos.clone(),
             ))),
             Expression::Binary(def) => {
-                let left_shape = def.left.derive_shape();
-                let right_shape = def.right.derive_shape();
-                match left_shape.resolve(&right_shape) {
-                    Some(shape) => shape,
-                    None => {
-                        return Shape::TypeErr(def.pos.clone(), BuildError::new(
-                            format!(
-                                "Expected {} value on right hand side of expression but got: {}",
-                                left_shape.type_name(),
-                                right_shape.type_name()
-                            ),
-                            TypeFail,
-                        ));
-                    }
-                }
+                let left_shape = def.left.derive_shape(symbol_table);
+                let right_shape = def.right.derive_shape(symbol_table);
+                left_shape.narrow(&right_shape)
             }
-            Expression::Copy(def) => {
-                let base_shape = def.selector.derive_shape();
-                match base_shape {
-                    Shape::TypeErr(_, _) => base_shape,
-                    Shape::Empty(_)
-                    | Shape::Boolean(_)
-                    | Shape::Int(_)
-                    | Shape::Float(_)
-                    | Shape::Str(_)
-                    | Shape::List(_)
-                    | Shape::Func(_) => Shape::TypeErr(def.pos.clone(), BuildError::new(format!("Not a Copyable type {}", base_shape.type_name()), TypeFail)),
-                    // This is an interesting one. Do we assume tuple or module here?
-                    // TODO(jwall): Maybe we want a Shape::Narrowed?
-                    Shape::Hole(_) => todo!(),
-                    // These have understandable ways to resolve the type.
-                    Shape::Module(_) => todo!(),
-                    Shape::Tuple(t_def) => {
-                        let mut base_fields = t_def.clone();
-                        base_fields.val.extend(def.fields.iter().map(|(tok, expr) | (tok.clone(), expr.derive_shape())));
-                        Shape::Tuple(base_fields).with_pos(def.pos.clone())
-                    },
-                    Shape::Import(_) => todo!(),
-
-                }
-            },
-            Expression::Include(_) => todo!(),
+            Expression::Copy(def) => derive_copy_shape(def, symbol_table),
+            Expression::Include(def) => derive_include_shape(def),
             Expression::Call(_) => todo!(),
             Expression::Func(_) => todo!(),
             Expression::Select(_) => todo!(),
@@ -954,11 +920,129 @@ impl Expression {
     }
 }
 
-impl TryFrom<&Expression> for Shape {
-    type Error = crate::error::BuildError;
+fn derive_include_shape(
+    IncludeDef {
+        pos,
+        path: _path,
+        typ: _typ,
+    }: &IncludeDef,
+) -> Shape {
+    Shape::Narrowed(PositionedItem::new(
+        vec![
+            Shape::Tuple(PositionedItem::new(vec![], pos.clone())),
+            Shape::List(PositionedItem::new(vec![], pos.clone())),
+        ],
+        pos,
+    ))
+}
 
-    fn try_from(e: &Expression) -> Result<Self, Self::Error> {
-        Ok(e.derive_shape())
+fn derive_not_shape(def: &NotDef, symbol_table: &mut BTreeMap<String, Shape>) -> Shape {
+    let shape = def.expr.as_ref().derive_shape(symbol_table);
+    if let Shape::Boolean(b) = shape {
+        Shape::Boolean(PositionedItem::new(!b.val, def.pos.clone()))
+    } else {
+        // TODO(jwall): Display implementations for shapes.
+        Shape::TypeErr(
+            def.pos.clone(),
+            format!(
+                "Expected Boolean value in Not expression but got: {:?}",
+                shape
+            ),
+        )
+    }
+}
+
+fn derive_copy_shape(def: &CopyDef, symbol_table: &mut BTreeMap<String, Shape>) -> Shape {
+    let base_shape = def.selector.derive_shape(symbol_table);
+    match &base_shape {
+        // TODO(jwall): Should we allow a stack of these?
+        Shape::TypeErr(_, _) => base_shape,
+        Shape::Empty(_)
+        | Shape::Boolean(_)
+        | Shape::Int(_)
+        | Shape::Float(_)
+        | Shape::Str(_)
+        | Shape::List(_)
+        | Shape::Func(_) => Shape::TypeErr(
+            def.pos.clone(),
+            format!("Not a Copyable type {}", base_shape.type_name()),
+        ),
+        // This is an interesting one. Do we assume tuple or module here?
+        // TODO(jwall): Maybe we want a Shape::Narrowed?
+        Shape::Hole(pi) => Shape::Narrowed(PositionedItem::new(
+            vec![
+                Shape::Tuple(PositionedItem::new(vec![], pi.pos.clone())),
+                Shape::Module(ModuleShape {
+                    items: vec![],
+                    ret: Box::new(Shape::Empty(pi.pos.clone())),
+                }),
+                Shape::Import(ImportShape::Unresolved(pi.clone())),
+            ],
+            pi.pos.clone(),
+        )),
+        Shape::Narrowed(potentials) => {
+            // 1. Do the possible shapes include tuple, module, or import?
+            let filtered = potentials
+                .val
+                .iter()
+                .filter_map(|v| match v {
+                    Shape::Tuple(_) | Shape::Module(_) | Shape::Import(_) | Shape::Hole(_) => {
+                        Some(v.clone())
+                    }
+                    _ => None,
+                })
+                .collect::<Vec<Shape>>();
+            if !filtered.is_empty() {
+                //  1.1 Then return those and strip the others.
+                Shape::Narrowed(PositionedItem::new(filtered, def.pos.clone()))
+            } else {
+                // 2. Else return a type error
+                Shape::TypeErr(
+                    def.pos.clone(),
+                    format!("Not a Copyable type {}", base_shape.type_name()),
+                )
+            }
+        }
+        // These have understandable ways to resolve the type.
+        Shape::Module(mdef) => {
+            let arg_fields = def
+                .fields
+                .iter()
+                .map(|(tok, expr)| (tok.fragment.clone(), expr.derive_shape(symbol_table)))
+                .collect::<BTreeMap<String, Shape>>();
+            // 1. Do our copyable fields have the right names and shapes based on mdef.items.
+            for (tok, shape) in mdef.items.iter() {
+                if let Some(s) = arg_fields.get(&tok.fragment) {
+                    if let Shape::TypeErr(pos, msg) = shape.narrow(s) {
+                        return Shape::TypeErr(pos, msg);
+                    }
+                }
+            }
+            //  1.1 If so then return the ret as our shape.
+            mdef.ret.as_ref().clone()
+        }
+        Shape::Tuple(t_def) => {
+            let mut base_fields = t_def.clone();
+            base_fields.val.extend(
+                def.fields
+                    .iter()
+                    .map(|(tok, expr)| (tok.clone(), expr.derive_shape(symbol_table))),
+            );
+            Shape::Tuple(base_fields).with_pos(def.pos.clone())
+        }
+        Shape::Import(ImportShape::Unresolved(_)) => Shape::Narrowed(PositionedItem::new(
+            vec![Shape::Tuple(PositionedItem::new(vec![], def.pos.clone()))],
+            def.pos.clone(),
+        )),
+        Shape::Import(ImportShape::Resolved(_, tuple_shape)) => {
+            let mut base_fields = tuple_shape.clone();
+            base_fields.extend(
+                def.fields
+                    .iter()
+                    .map(|(tok, expr)| (tok.clone(), expr.derive_shape(symbol_table))),
+            );
+            Shape::Tuple(PositionedItem::new(base_fields, def.pos.clone()))
+        }
     }
 }
 
