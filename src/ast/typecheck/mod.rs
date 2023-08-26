@@ -42,6 +42,10 @@ impl Checker {
         };
     }
 
+    pub fn pop_shape(&mut self) -> Option<Shape> {
+        self.shape_stack.pop()
+    }
+
     pub fn result(mut self) -> Result<BTreeMap<String, Shape>, BuildError> {
         if let Some(err) = self.err_stack.pop() {
             Err(err)
