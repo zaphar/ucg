@@ -776,14 +776,6 @@ impl ModuleDef {
     }
 }
 
-fn normalize_path(p: PathBuf) -> PathBuf {
-    let mut normalized = PathBuf::new();
-    for segment in p.components() {
-        normalized.push(segment);
-    }
-    return normalized;
-}
-
 /// RangeDef defines a range with optional step.
 #[derive(Debug, PartialEq, Clone)]
 pub struct RangeDef {
