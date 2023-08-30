@@ -20,7 +20,7 @@ use std::cmp::Ordering;
 use std::cmp::PartialEq;
 use std::cmp::PartialOrd;
 use std::collections::BTreeMap;
-use std::convert::{Into, TryFrom};
+use std::convert::Into;
 use std::fmt;
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -253,6 +253,27 @@ pub enum ImportShape {
     Unresolved(PositionedItem<String>),
 }
 
+#[derive(PartialEq, Debug, Clone)]
+pub struct NarrowedShape {
+    pub pos: Position,
+    pub types: Vec<Shape>,
+}
+
+impl NarrowedShape {
+    pub fn new(types: Vec<Shape>, line: usize, column: usize, offset: usize) -> Self {
+        Self::new_with_pos(types, Position::new(line, column, offset))
+    }
+
+    pub fn new_with_pos(types: Vec<Shape>, pos: Position) -> Self {
+        Self { pos, types }
+    }
+
+    pub fn with_pos(mut self, pos: Position) -> Self {
+        self.pos = pos;
+        self
+    }
+}
+
 #[doc = "Shapes represent the types that UCG values or expressions can have."]
 #[derive(PartialEq, Debug, Clone)]
 pub enum Shape {
@@ -262,28 +283,27 @@ pub enum Shape {
     Float(PositionedItem<f64>),
     Str(PositionedItem<String>),
     Tuple(PositionedItem<TupleShape>),
-    List(PositionedItem<ShapeList>),
+    List(NarrowedShape),
     Func(FuncShapeDef),
     Module(ModuleShape),
     Hole(PositionedItem<String>), // A type hole We don't know what this type is yet.
-    Narrowed(PositionedItem<Vec<Shape>>), // A narrowed type. We know *some* of the possible options.
-    Import(ImportShape),                  // A type hole We don't know what this type is yet.
-    TypeErr(Position, String),            // A type hole We don't know what this type is yet.
+    Narrowed(NarrowedShape),      // A narrowed type. We know *some* of the possible options.
+    Import(ImportShape),          // A type hole We don't know what this type is yet.
+    TypeErr(Position, String),    // A type hole We don't know what this type is yet.
 }
 
 impl Shape {
     pub fn narrow(&self, right: &Shape) -> Self {
-        dbg!((self, right));
-        dbg!(match (self, right) {
+        match (self, right) {
             (Shape::Str(_), Shape::Str(_))
             | (Shape::Boolean(_), Shape::Boolean(_))
             | (Shape::Empty(_), Shape::Empty(_))
             | (Shape::Int(_), Shape::Int(_))
             | (Shape::Float(_), Shape::Float(_)) => self.clone(),
             (Shape::Hole(_), other) | (other, Shape::Hole(_)) => other.clone(),
-            (Shape::List(left_slist), Shape::List(right_slist)) => {
-                // TODO
-                unimplemented!("Can't merge these yet.");
+            (Shape::Narrowed(left_slist), Shape::Narrowed(right_slist))
+            | (Shape::List(left_slist), Shape::List(right_slist)) => {
+                self.narrow_list_shapes(left_slist, right_slist, right)
             }
             (Shape::Tuple(left_slist), Shape::Tuple(right_slist)) => {
                 // TODO
@@ -299,9 +319,30 @@ impl Shape {
             }
             _ => Shape::TypeErr(
                 right.pos().clone(),
-                format!("Expected {} but got {}", self.type_name(), right.type_name()),
+                format!(
+                    "Expected {} but got {}",
+                    self.type_name(),
+                    right.type_name()
+                ),
             ),
-        })
+        }
+    }
+
+    fn narrow_list_shapes(
+        &self,
+        left_slist: &NarrowedShape,
+        right_slist: &NarrowedShape,
+        right: &Shape,
+    ) -> Shape {
+        let left_iter = left_slist.types.iter();
+        let right_iter = right_slist.types.iter();
+        if is_shape_subset(left_iter, right_slist) {
+            self.clone()
+        } else if is_shape_subset(right_iter, left_slist) {
+            right.clone()
+        } else {
+            Shape::TypeErr(right.pos().clone(), "Incompatible List Shapes".to_owned())
+        }
     }
 
     pub fn type_name(&self) -> &'static str {
@@ -349,7 +390,7 @@ impl Shape {
             Shape::Float(s) => Shape::Float(PositionedItem::new(s.val, pos)),
             Shape::Boolean(b) => Shape::Boolean(PositionedItem::new(b.val, pos)),
             Shape::Empty(p) => Shape::Empty(pos),
-            Shape::List(lst) => Shape::List(PositionedItem::new(lst.val, pos)),
+            Shape::List(lst) => Shape::List(NarrowedShape::new_with_pos(lst.types, pos)),
             Shape::Tuple(flds) => Shape::Tuple(PositionedItem::new(flds.val, pos)),
             Shape::Func(_) | Shape::Module(_) => self.clone(),
             Shape::Narrowed(pi) => Shape::Narrowed(pi.with_pos(pos)),
@@ -363,6 +404,29 @@ impl Shape {
             Shape::TypeErr(_, msg) => Shape::TypeErr(pos, msg),
         }
     }
+}
+
+fn is_shape_subset(mut right_iter: std::slice::Iter<Shape>, left_slist: &NarrowedShape) -> bool {
+    let right_subset = loop {
+        let mut matches = false;
+        let ls = if let Some(ls) = right_iter.next() {
+            ls
+        } else {
+            break true;
+        };
+        for rs in left_slist.types.iter() {
+            let s = ls.narrow(rs);
+            if let Shape::TypeErr(_, _) = s {
+                // noop
+            } else {
+                matches = true;
+            }
+        }
+        if !matches {
+            break matches;
+        }
+    };
+    right_subset
 }
 
 impl Value {
@@ -466,7 +530,7 @@ impl Value {
                 for f in &flds.elems {
                     field_shapes.push(f.derive_shape(symbol_table));
                 }
-                Shape::List(PositionedItem::new(field_shapes, flds.pos.clone()))
+                Shape::List(NarrowedShape::new_with_pos(field_shapes, flds.pos.clone()))
             }
         };
         shape
@@ -879,7 +943,7 @@ impl Expression {
             }
             Expression::Not(def) => derive_not_shape(def, symbol_table),
             Expression::Grouped(v, _pos) => v.as_ref().derive_shape(symbol_table),
-            Expression::Range(def) => Shape::List(PositionedItem::new(
+            Expression::Range(def) => Shape::List(NarrowedShape::new_with_pos(
                 vec![Shape::Int(PositionedItem::new(0, def.start.pos().clone()))],
                 def.pos.clone(),
             )),
@@ -919,12 +983,12 @@ fn derive_include_shape(
         typ: _typ,
     }: &IncludeDef,
 ) -> Shape {
-    Shape::Narrowed(PositionedItem::new(
+    Shape::Narrowed(NarrowedShape::new_with_pos(
         vec![
             Shape::Tuple(PositionedItem::new(vec![], pos.clone())),
-            Shape::List(PositionedItem::new(vec![], pos.clone())),
+            Shape::List(NarrowedShape::new_with_pos(vec![], pos.clone())),
         ],
-        pos,
+        pos.clone(),
     ))
 }
 
@@ -961,7 +1025,7 @@ fn derive_copy_shape(def: &CopyDef, symbol_table: &mut BTreeMap<String, Shape>) 
         ),
         // This is an interesting one. Do we assume tuple or module here?
         // TODO(jwall): Maybe we want a Shape::Narrowed?
-        Shape::Hole(pi) => Shape::Narrowed(PositionedItem::new(
+        Shape::Hole(pi) => Shape::Narrowed(NarrowedShape::new_with_pos(
             vec![
                 Shape::Tuple(PositionedItem::new(vec![], pi.pos.clone())),
                 Shape::Module(ModuleShape {
@@ -975,7 +1039,7 @@ fn derive_copy_shape(def: &CopyDef, symbol_table: &mut BTreeMap<String, Shape>) 
         Shape::Narrowed(potentials) => {
             // 1. Do the possible shapes include tuple, module, or import?
             let filtered = potentials
-                .val
+                .types
                 .iter()
                 .filter_map(|v| match v {
                     Shape::Tuple(_) | Shape::Module(_) | Shape::Import(_) | Shape::Hole(_) => {
@@ -986,7 +1050,7 @@ fn derive_copy_shape(def: &CopyDef, symbol_table: &mut BTreeMap<String, Shape>) 
                 .collect::<Vec<Shape>>();
             if !filtered.is_empty() {
                 //  1.1 Then return those and strip the others.
-                Shape::Narrowed(PositionedItem::new(filtered, def.pos.clone()))
+                Shape::Narrowed(NarrowedShape::new_with_pos(filtered, def.pos.clone()))
             } else {
                 // 2. Else return a type error
                 Shape::TypeErr(
@@ -1022,7 +1086,7 @@ fn derive_copy_shape(def: &CopyDef, symbol_table: &mut BTreeMap<String, Shape>) 
             );
             Shape::Tuple(base_fields).with_pos(def.pos.clone())
         }
-        Shape::Import(ImportShape::Unresolved(_)) => Shape::Narrowed(PositionedItem::new(
+        Shape::Import(ImportShape::Unresolved(_)) => Shape::Narrowed(NarrowedShape::new_with_pos(
             vec![Shape::Tuple(PositionedItem::new(vec![], def.pos.clone()))],
             def.pos.clone(),
         )),

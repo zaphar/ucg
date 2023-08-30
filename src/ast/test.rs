@@ -16,7 +16,7 @@ use std::collections::BTreeMap;
 use abortable_parser::iter::SliceIter;
 use abortable_parser::Result as ParseResult;
 
-use crate::ast::{Expression, ListDef, Position, PositionedItem, Shape, Token, TokenType, Value};
+use crate::ast::{Expression, ListDef, Position, PositionedItem, Shape, Token, TokenType, Value ,NarrowedShape};
 use crate::iter::OffsetStrIter;
 use crate::parse::expression;
 use crate::tokenizer::tokenize;
@@ -78,7 +78,7 @@ fn derive_shape_values() {
                 )))],
                 pos: Position::new(0, 0, 0),
             }),
-            Shape::List(PositionedItem::new(
+            Shape::List(NarrowedShape::new_with_pos(
                 vec![Shape::Int(PositionedItem::new(3, Position::new(0, 0, 0)))],
                 Position::new(0, 0, 0),
             )),
@@ -111,7 +111,7 @@ fn derive_shape_expressions() {
         ),
         (
             "0:1;",
-            Shape::List(PositionedItem::new(
+            Shape::List(NarrowedShape::new_with_pos(
                 vec![Shape::Int(PositionedItem::new(0, Position::new(0, 0, 0)))],
                 Position::new(0, 0, 0),
             )),
