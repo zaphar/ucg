@@ -42,6 +42,48 @@ fn simple_binary_typecheck() {
         "1 + 1;",
         Shape::Int(PositionedItem::new(1, Position::new(1, 1, 0)))
     );
+    assert_type_success!(
+        "\"\" + \"\";",
+        Shape::Str(PositionedItem::new(String::new(), Position::new(1, 1, 0)))
+    );
+    assert_type_success!(
+        "1.0 + 1.0;",
+        Shape::Float(PositionedItem::new(1.0, Position::new(1, 1, 0)))
+    );
+    assert_type_success!(
+        "[] + [];",
+        Shape::List(crate::ast::NarrowedShape::new(vec![], 1, 1, 0))
+    );
+    assert_type_success!(
+        "[1] + [2];",
+        Shape::List(crate::ast::NarrowedShape::new(
+            vec![Shape::Int(PositionedItem::new_with_pos(
+                1,
+                Position::new(1, 1, 0)
+            ))],
+            1,
+            1,
+            0
+        ))
+    );
+    assert_type_success!(
+        "[1, 1.0] + [1, 2.0];",
+        Shape::List(crate::ast::NarrowedShape::new(
+            vec![
+            Shape::Int(PositionedItem::new_with_pos(
+                1,
+                Position::new(1, 1, 0)
+            )),
+            Shape::Float(PositionedItem::new_with_pos(
+                1.0,
+                Position::new(1, 1, 0)
+            )),
+            ],
+            1,
+            1,
+            0
+        ))
+    );
 }
 
 // TODO Test that leverages symbol tables and let bindings.
@@ -66,6 +108,11 @@ fn simple_binary_typefail() {
         "1 + {};",
         "Expected int but got tuple",
         Position::new(1, 5, 4)
+    );
+    assert_type_fail!(
+        "[1] + [1.0];",
+        "Incompatible List Shapes",
+        Position::new(1, 7, 6)
     );
 }
 
