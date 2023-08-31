@@ -306,8 +306,7 @@ impl Shape {
                 self.narrow_list_shapes(left_slist, right_slist, right)
             }
             (Shape::Tuple(left_slist), Shape::Tuple(right_slist)) => {
-                // TODO
-                unimplemented!("Can't merge these yet.");
+                self.narrow_tuple_shapes(left_slist, right_slist, right)
             }
             (Shape::Func(left_opshape), Shape::Func(right_opshape)) => {
                 // TODO
@@ -328,6 +327,18 @@ impl Shape {
         }
     }
 
+    fn narrow_tuple_shapes(&self, left_slist: &PositionedItem<Vec<(Token, Shape)>>, right_slist: &PositionedItem<Vec<(Token, Shape)>>, right: &Shape) -> Shape {
+        let left_iter = left_slist.val.iter();
+        let right_iter = right_slist.val.iter();
+        if is_tuple_subset(left_iter, right_slist) {
+            self.clone()
+        } else if is_tuple_subset(right_iter, left_slist) {
+            right.clone()
+        } else {
+            Shape::TypeErr(right.pos().clone(), "Incompatible Tuple Shapes".to_owned())
+        }
+    }
+
     fn narrow_list_shapes(
         &self,
         left_slist: &NarrowedShape,
@@ -336,9 +347,9 @@ impl Shape {
     ) -> Shape {
         let left_iter = left_slist.types.iter();
         let right_iter = right_slist.types.iter();
-        if is_shape_subset(left_iter, right_slist) {
+        if is_list_subset(left_iter, right_slist) {
             self.clone()
-        } else if is_shape_subset(right_iter, left_slist) {
+        } else if is_list_subset(right_iter, left_slist) {
             right.clone()
         } else {
             Shape::TypeErr(right.pos().clone(), "Incompatible List Shapes".to_owned())
@@ -406,7 +417,34 @@ impl Shape {
     }
 }
 
-fn is_shape_subset(mut right_iter: std::slice::Iter<Shape>, left_slist: &NarrowedShape) -> bool {
+fn is_tuple_subset(
+    mut left_iter: std::slice::Iter<(Token, Shape)>,
+    right_slist: &PositionedItem<Vec<(Token, Shape)>>,
+) -> bool {
+    return loop {
+        if let Some((lt, ls)) = left_iter.next() {
+            let mut matched = false;
+            for (rt, rs) in right_slist.val.iter() {
+                if rt.fragment == lt.fragment {
+                    if let Shape::TypeErr(_, _) = ls.narrow(rs) {
+                        // noop
+                    } else {
+                        matched = true;
+                        continue;
+                    }
+                }
+            }
+            if !matched {
+                break false;
+            } else {
+                continue;
+            }
+        }
+        break true;
+    };
+}
+
+fn is_list_subset(mut right_iter: std::slice::Iter<Shape>, left_slist: &NarrowedShape) -> bool {
     let right_subset = loop {
         let mut matches = false;
         let ls = if let Some(ls) = right_iter.next() {
