@@ -1,5 +1,6 @@
 use std::convert::Into;
 
+use crate::ast::{Token, TokenType};
 use crate::ast::walk::Walker;
 use crate::ast::{Position, PositionedItem};
 use crate::parse;
@@ -55,6 +56,21 @@ fn simple_binary_typecheck() {
         Shape::List(crate::ast::NarrowedShape::new(vec![], 1, 1, 0))
     );
     assert_type_success!(
+        "{} + {};",
+        Shape::Tuple(PositionedItem::new(vec![], Position::new(1, 1, 0)))
+    );
+    // TODO(jwall): + isn't valid for tuples.
+    assert_type_success!(
+        "{foo = 1} + {foo = 1};",
+        Shape::Tuple(PositionedItem::new(
+            vec![
+                (Token { typ: TokenType::BAREWORD, fragment: "foo".to_owned(), pos: Position::new(1, 2, 1)},
+                Shape::Int(PositionedItem::new_with_pos(1, Position::new(1, 8, 7)))),
+            ],
+            Position::new(1, 1, 0)
+        ))
+    );
+    assert_type_success!(
         "[1] + [2];",
         Shape::List(crate::ast::NarrowedShape::new(
             vec![Shape::Int(PositionedItem::new_with_pos(
@@ -70,14 +86,8 @@ fn simple_binary_typecheck() {
         "[1, 1.0] + [1, 2.0];",
         Shape::List(crate::ast::NarrowedShape::new(
             vec![
-            Shape::Int(PositionedItem::new_with_pos(
-                1,
-                Position::new(1, 1, 0)
-            )),
-            Shape::Float(PositionedItem::new_with_pos(
-                1.0,
-                Position::new(1, 1, 0)
-            )),
+                Shape::Int(PositionedItem::new_with_pos(1, Position::new(1, 1, 0))),
+                Shape::Float(PositionedItem::new_with_pos(1.0, Position::new(1, 1, 0))),
             ],
             1,
             1,
@@ -113,6 +123,17 @@ fn simple_binary_typefail() {
         "[1] + [1.0];",
         "Incompatible List Shapes",
         Position::new(1, 7, 6)
+    );
+    // TODO(jwall): + isn't valid for tuples.
+    assert_type_fail!(
+        "{foo = 1} + {foo = 1.0};",
+        "Incompatible Tuple Shapes",
+        Position::new(1, 13, 12)
+    );
+    assert_type_fail!(
+        "{foo = 1} + {bar = 1};",
+        "Incompatible Tuple Shapes",
+        Position::new(1, 13, 12)
     );
 }
 
