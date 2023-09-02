@@ -15,10 +15,10 @@ pub enum Val {
     Boolean(bool),
     Int(i64),
     Float(f64),
-    Str(String),
+    Str(Rc<str>),
     List(Vec<Rc<Val>>),
-    Tuple(Vec<(String, Rc<Val>)>),
-    Env(Vec<(String, String)>),
+    Tuple(Vec<(Rc<str>, Rc<Val>)>),
+    Env(Vec<(Rc<str>, Rc<str>)>),
 }
 
 impl Val {
@@ -103,7 +103,7 @@ impl Val {
     }
 
     /// Returns the fields if this Val is a tuple. None otherwise.
-    pub fn get_fields(&self) -> Option<&Vec<(String, Rc<Val>)>> {
+    pub fn get_fields(&self) -> Option<&Vec<(Rc<str>, Rc<Val>)>> {
         if let &Val::Tuple(ref fs) = self {
             Some(fs)
         } else {
@@ -208,8 +208,8 @@ impl Display for Val {
     }
 }
 
-impl From<Val> for String {
-    fn from(v: Val) -> String {
+impl From<Val> for Rc<str> {
+    fn from(v: Val) -> Self {
         match v {
             Val::Int(ref i) => format!("{}", i),
             Val::Float(ref f) => format!("{}", f),
@@ -217,12 +217,12 @@ impl From<Val> for String {
             Val::Boolean(ref b) => format!("{}", b),
             Val::Empty => "NULL".to_string(),
             val => format!("{}", val),
-        }
+        }.into()
     }
 }
 
-impl From<String> for Val {
-    fn from(s: String) -> Val {
+impl From<Rc<str>> for Val {
+    fn from(s: Rc<str>) -> Val {
         Val::Str(s)
     }
 }

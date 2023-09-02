@@ -48,12 +48,12 @@ impl ExecConverter {
                 )
                 .to_boxed());
             }
-            let mut env: Option<&Vec<(String, Rc<Val>)>> = None;
+            let mut env: Option<&Vec<(Rc<str>, Rc<Val>)>> = None;
             let mut command: Option<&str> = None;
             let mut args: Option<&Vec<Rc<Val>>> = None;
             for &(ref name, ref val) in fields.iter() {
                 // We require a command field in our exec tuple.
-                if name == "command" {
+                if name.as_ref() == "command" {
                     if command.is_some() {
                         return Err(BuildError::new(
                             "There can only be one command field in an exec tuple",
@@ -72,7 +72,7 @@ impl ExecConverter {
                     .to_boxed());
                 }
                 // We optionally allow an env field in our exec tuple.
-                if name == "env" {
+                if name.as_ref() == "env" {
                     if let &Val::Tuple(ref l) = val.as_ref() {
                         if env.is_some() {
                             return Err(BuildError::new(
@@ -91,7 +91,7 @@ impl ExecConverter {
                     .to_boxed());
                 }
                 // We optionally allow an args field in our exec tuple.
-                if name == "args" {
+                if name.as_ref() == "args" {
                     if let &Val::List(ref l) = val.as_ref() {
                         if args.is_some() {
                             return Err(BuildError::new(

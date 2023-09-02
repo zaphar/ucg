@@ -15,19 +15,20 @@ use std::convert::From;
 use std::fmt;
 use std::fmt::Display;
 use std::io;
+use std::rc::Rc;
 
 use crate::ast::Position;
 use crate::build::opcode::convert;
 
 #[derive(Debug)]
 pub struct Error {
-    message: String,
+    message: Rc<str>,
     pos: Option<Position>,
     call_stack: Vec<Position>,
 }
 
 impl Error {
-    pub fn new(msg: String, pos: Position) -> Self {
+    pub fn new(msg: Rc<str>, pos: Position) -> Self {
         Self {
             message: msg,
             pos: Some(pos),
@@ -69,7 +70,7 @@ macro_rules! decorate_call {
 impl From<regex::Error> for Error {
     fn from(e: regex::Error) -> Self {
         Error {
-            message: format!("{}", e),
+            message: format!("{}", e).into(),
             pos: None,
             call_stack: Vec::new(),
         }
@@ -83,7 +84,7 @@ impl From<std::io::Error> for Error {
                 format!("OSError: Path not found: {}", e)
             }
             _ => format!("{}", e),
-        };
+        }.into();
         Error {
             message: msg,
             pos: None,
@@ -95,7 +96,7 @@ impl From<std::io::Error> for Error {
 impl From<convert::Error> for Error {
     fn from(e: convert::Error) -> Self {
         Error {
-            message: e.message(),
+            message: e.message().into(),
             pos: None,
             call_stack: Vec::new(),
         }

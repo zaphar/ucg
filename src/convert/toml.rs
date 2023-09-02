@@ -41,19 +41,19 @@ impl TomlConverter {
         Ok(toml::Value::Array(v))
     }
 
-    fn convert_tuple(&self, items: &Vec<(String, Rc<Val>)>) -> Result {
+    fn convert_tuple(&self, items: &Vec<(Rc<str>, Rc<Val>)>) -> Result {
         let mut mp = toml::value::Table::new();
         for &(ref k, ref v) in items.iter() {
-            mp.entry(k.clone()).or_insert(self.convert_value(v)?);
+            mp.entry(k.to_string()).or_insert(self.convert_value(v)?);
         }
         Ok(toml::Value::Table(mp))
     }
 
-    fn convert_env(&self, items: &Vec<(String, String)>) -> Result {
+    fn convert_env(&self, items: &Vec<(Rc<str>, Rc<str>)>) -> Result {
         let mut mp = toml::value::Table::new();
         for &(ref k, ref v) in items.iter() {
-            mp.entry(k.clone())
-                .or_insert(toml::Value::String(v.clone()));
+            mp.entry(k.to_string())
+                .or_insert(toml::Value::String(v.to_string()));
         }
         Ok(toml::Value::Table(mp))
     }
@@ -67,7 +67,7 @@ impl TomlConverter {
             }
             &Val::Float(f) => toml::Value::Float(f),
             &Val::Int(i) => toml::Value::Integer(i),
-            &Val::Str(ref s) => toml::Value::String(s.clone()),
+            &Val::Str(ref s) => toml::Value::String(s.to_string()),
             &Val::Env(ref fs) => self.convert_env(fs)?,
             &Val::List(ref l) => self.convert_list(l)?,
             &Val::Tuple(ref t) => self.convert_tuple(t)?,
@@ -77,7 +77,7 @@ impl TomlConverter {
 
     fn convert_toml_val(&self, v: &toml::Value) -> std::result::Result<Val, Box<dyn Error>> {
         Ok(match v {
-            toml::Value::String(s) => Val::Str(s.clone()),
+            toml::Value::String(s) => Val::Str(s.clone().into()),
             toml::Value::Integer(i) => Val::Int(*i),
             toml::Value::Float(f) => Val::Float(*f),
             toml::Value::Boolean(b) => Val::Boolean(*b),
@@ -91,11 +91,11 @@ impl TomlConverter {
             toml::Value::Table(m) => {
                 let mut fs = Vec::with_capacity(m.len());
                 for (key, value) in m {
-                    fs.push((key.to_string(), Rc::new(self.convert_toml_val(value)?)));
+                    fs.push((key.clone().into(), Rc::new(self.convert_toml_val(value)?)));
                 }
                 Val::Tuple(fs)
             }
-            toml::Value::Datetime(d) => Val::Str(format!("{}", d)),
+            toml::Value::Datetime(d) => Val::Str(format!("{}", d).into()),
         })
     }
 

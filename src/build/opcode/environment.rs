@@ -34,7 +34,7 @@ where
     Stdout: Write + Clone,
     Stderr: Write + Clone,
 {
-    pub val_cache: BTreeMap<String, Rc<Value>>,
+    pub val_cache: BTreeMap<Rc<str>, Rc<Value>>,
     // TODO implement a shape cache here.
     pub op_cache: cache::Ops,
     pub converter_registry: ConverterRegistry,
@@ -42,7 +42,7 @@ where
     pub assert_results: AssertCollector,
     pub stdout: Stdout,
     pub stderr: Stderr,
-    pub env_vars: BTreeMap<String, String>, // Environment Variables
+    pub env_vars: BTreeMap<Rc<str>, Rc<str>>, // Environment Variables
     pub out_lock: BTreeSet<PathBuf>,
 }
 
@@ -52,7 +52,7 @@ impl<Stdout: Write + Clone, Stderr: Write + Clone> Environment<Stdout, Stderr> {
         Self::new_with_vars(out, err, BTreeMap::new())
     }
 
-    pub fn new_with_vars(out: Stdout, err: Stderr, vars: BTreeMap<String, String>) -> Self {
+    pub fn new_with_vars(out: Stdout, err: Stderr, vars: BTreeMap<Rc<str>, Rc<str>>) -> Self {
         let mut me = Self {
             val_cache: BTreeMap::new(),
             env_vars: vars,
@@ -78,11 +78,11 @@ impl<Stdout: Write + Clone, Stderr: Write + Clone> Environment<Stdout, Stderr> {
         Value::C(Composite::Tuple(fields, positions))
     }
 
-    pub fn get_cached_path_val(&self, path: &String) -> Option<Rc<Value>> {
-        self.val_cache.get(path).cloned()
+    pub fn get_cached_path_val(&self, path: Rc<str>) -> Option<Rc<Value>> {
+        self.val_cache.get(&path).cloned()
     }
 
-    pub fn update_path_val(&mut self, path: &String, val: Rc<Value>) {
+    pub fn update_path_val(&mut self, path: Rc<str>, val: Rc<Value>) {
         self.val_cache.insert(path.clone(), val);
     }
 

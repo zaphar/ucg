@@ -15,6 +15,7 @@
 //! Implements typechecking for the parsed ucg AST.
 // FIXME(jwall): This probably just needs to disappear now.
 use std::collections::BTreeMap;
+use std::rc::Rc;
 
 use crate::ast::walk::Visitor;
 use crate::ast::{Expression, FailDef, ImportDef, IncludeDef, Position, Shape, Statement, Value};
@@ -28,7 +29,7 @@ use Statement::Let;
 use Value::{Boolean, Empty, Float, Int, List, Str, Symbol, Tuple};
 
 pub struct Checker {
-    symbol_table: BTreeMap<String, Shape>,
+    symbol_table: BTreeMap<Rc<str>, Shape>,
     err_stack: Vec<BuildError>,
     shape_stack: Vec<Shape>,
 }
@@ -46,7 +47,7 @@ impl Checker {
         self.shape_stack.pop()
     }
 
-    pub fn result(mut self) -> Result<BTreeMap<String, Shape>, BuildError> {
+    pub fn result(mut self) -> Result<BTreeMap<Rc<str>, Shape>, BuildError> {
         if let Some(err) = self.err_stack.pop() {
             Err(err)
         } else {

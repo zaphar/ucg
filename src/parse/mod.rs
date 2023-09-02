@@ -71,7 +71,7 @@ macro_rules! trace_parse {
 
 fn symbol_to_value(s: &Token) -> ConvertResult<Value> {
     Ok(Value::Symbol(value_node!(
-        s.fragment.to_string(),
+        s.fragment.clone(),
         s.pos.clone()
     )))
 }
@@ -84,7 +84,7 @@ make_fn!(
 
 fn str_to_value(s: &Token) -> ConvertResult<Value> {
     Ok(Value::Str(value_node!(
-        s.fragment.to_string(),
+        s.fragment.clone(),
         s.pos.clone()
     )))
 }
@@ -125,7 +125,7 @@ fn triple_to_number<'a>(
     }
 
     let suf = match v.2 {
-        None => "".to_string(),
+        None => "".into(),
         Some(bs) => bs.fragment,
     };
 
@@ -205,7 +205,7 @@ make_fn!(
     do_each!(
         b => match_type!(BOOLEAN),
         (Value::Boolean(PositionedItem{
-            val: b.fragment == "true",
+            val: b.fragment.as_ref() == "true",
             pos: b.pos,
         }))
     )
@@ -367,7 +367,7 @@ fn tuple_to_func<'a>(
         .drain(0..)
         .map(|s| PositionedItem {
             pos: s.pos().clone(),
-            val: s.to_string(),
+            val: s.to_string().into(),
         })
         .collect();
     Ok(Expression::Func(FuncDef {
@@ -567,7 +567,7 @@ make_fn!(
         expr => expression,
         _ => punct!(")"),
         (Expression::Cast(CastDef{
-            cast_type: match typ.fragment.as_str() {
+            cast_type: match typ.fragment.as_ref() {
                 "int" => CastType::Int,
                 "float" => CastType::Float,
                 "str" => CastType::Str,
@@ -812,7 +812,7 @@ macro_rules! match_binding_name {
         let mut _i = $i.clone();
         match match_type!(_i, BAREWORD) {
             Result::Complete(i, t) => {
-                if t.fragment == "env" {
+                if t.fragment.as_ref() == "env" {
                     return Result::Abort(Error::new(
                         format!("Cannot use binding {}. It is a reserved word.", t.fragment),
                         Box::new($i.clone()),

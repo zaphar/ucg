@@ -25,21 +25,21 @@ impl YamlConverter {
         Ok(serde_yaml::Value::Sequence(v))
     }
 
-    fn convert_env(&self, items: &Vec<(String, String)>) -> std::io::Result<serde_yaml::Value> {
+    fn convert_env(&self, items: &Vec<(Rc<str>, Rc<str>)>) -> std::io::Result<serde_yaml::Value> {
         let mut mp = serde_yaml::Mapping::new();
         for &(ref k, ref v) in items.iter() {
             mp.insert(
-                serde_yaml::Value::String(k.clone()),
-                serde_yaml::Value::String(v.clone()),
+                serde_yaml::Value::String(k.to_string()),
+                serde_yaml::Value::String(v.to_string()),
             );
         }
         Ok(serde_yaml::Value::Mapping(mp))
     }
 
-    fn convert_tuple(&self, items: &Vec<(String, Rc<Val>)>) -> std::io::Result<serde_yaml::Value> {
+    fn convert_tuple(&self, items: &Vec<(Rc<str>, Rc<Val>)>) -> std::io::Result<serde_yaml::Value> {
         let mut mapping = serde_yaml::Mapping::new();
         for &(ref k, ref v) in items.iter() {
-            mapping.insert(serde_yaml::Value::String(k.clone()), self.convert_value(v)?);
+            mapping.insert(serde_yaml::Value::String(k.to_string()), self.convert_value(v)?);
         }
         Ok(serde_yaml::Value::Mapping(mapping))
     }
@@ -56,7 +56,7 @@ impl YamlConverter {
                 Ok(v) => v,
                 _ => panic!("Int is too large or not a Number {}", i),
             },
-            &Val::Str(ref s) => serde_yaml::Value::String(s.clone()),
+            &Val::Str(ref s) => serde_yaml::Value::String(s.to_string()),
             &Val::Env(ref fs) => self.convert_env(fs)?,
             &Val::List(ref l) => self.convert_list(l)?,
             &Val::Tuple(ref t) => self.convert_tuple(t)?,
@@ -97,7 +97,7 @@ impl YamlConverter {
 
     fn convert_yaml_val(&self, v: &serde_yaml::Value) -> Result<Val, Box<dyn Error>> {
         Ok(match v {
-            serde_yaml::Value::String(s) => Val::Str(s.clone()),
+            serde_yaml::Value::String(s) => Val::Str(s.clone().into()),
             serde_yaml::Value::Number(n) => {
                 if let Some(i) = n.as_i64() {
                     Val::Int(i)
@@ -122,7 +122,7 @@ impl YamlConverter {
                 let mut collapsed = Vec::with_capacity(fs.len());
                 for (k, val) in fs {
                     if !seen_keys.contains(&k) {
-                        collapsed.push((k.clone(), val));
+                        collapsed.push((k.clone().into(), val));
                         seen_keys.insert(k);
                     }
                 }

@@ -489,7 +489,7 @@ fn main() {
     let mut import_paths = Vec::new();
     let mut env_vars = BTreeMap::new();
     for (var, val) in std::env::vars() {
-        env_vars.insert(var, val);
+        env_vars.insert(var.into(), val.into());
     }
     let env = RefCell::new(Environment::new_with_vars(
         StdoutWrapper::new(),

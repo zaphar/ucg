@@ -15,9 +15,9 @@ pub struct Base64Importer {
 impl Importer for Base64Importer {
     fn import(&self, bytes: &[u8]) -> Result<Rc<Val>, Box<dyn Error>> {
         return if self.url_safe {
-            Ok(Rc::new(Val::Str(STANDARD.encode(bytes))))
+            Ok(Rc::new(Val::Str(STANDARD.encode(bytes).into())))
         } else {
-            Ok(Rc::new(Val::Str(URL_SAFE.encode(bytes))))
+            Ok(Rc::new(Val::Str(URL_SAFE.encode(bytes).into())))
         };
     }
 }
