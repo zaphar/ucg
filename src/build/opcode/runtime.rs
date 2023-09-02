@@ -63,7 +63,7 @@ impl Builtins {
         h: Hook,
         stack: &mut Vec<(Rc<Value>, Position)>,
         env: &'a RefCell<Environment<O, E>>,
-        import_stack: &mut Vec<String>,
+        import_stack: &mut Vec<Rc<str>>,
         pos: Position,
     ) -> Result<(), Error>
     where
@@ -86,19 +86,19 @@ impl Builtins {
         }
     }
 
-    fn get_file_as_string(&self, path: &str) -> Result<String, Error> {
+    fn get_file_as_string(&self, path: &str) -> Result<Rc<str>, Error> {
         let mut f = File::open(path)?;
         let mut contents = String::new();
         // TODO(jwall): Proper error here
         f.read_to_string(&mut contents)?;
-        Ok(contents)
+        Ok(contents.into())
     }
 
     fn import<'a, O, E>(
         &mut self,
         stack: &mut Vec<(Rc<Value>, Position)>,
         env: &'a RefCell<Environment<O, E>>,
-        import_stack: &mut Vec<String>,
+        import_stack: &mut Vec<Rc<str>>,
         pos: Position,
     ) -> Result<(), Error>
     where
@@ -110,39 +110,39 @@ impl Builtins {
             if let &Value::P(Str(ref path)) = val.as_ref() {
                 // TODO(jwall): A bit hacky we should probably change import stacks to be pathbufs.
                 // first we chack the cache
-                if let Some(val) = env.borrow().get_cached_path_val(&path) {
+                if let Some(val) = env.borrow().get_cached_path_val(path.clone()) {
                     stack.push((val, path_pos));
                     return Ok(());
                 }
-                if import_stack.iter().find(|p| *p == path).is_some() {
+                if import_stack.iter().find(|p| p.as_ref() == path.as_ref()).is_some() {
                     return Err(Error::new(
-                        format!("Import cycle detected: {} in {:?}", path, import_stack),
+                        format!("Import cycle detected: {} in {:?}", path, import_stack).into(),
                         pos,
                     ));
                 }
-                let val = { env.borrow_mut().get_cached_path_val(&path) };
+                let val = { env.borrow_mut().get_cached_path_val(path.clone()) };
                 match val {
                     Some(v) => {
                         stack.push((v, path_pos));
                     }
                     None => {
-                        let path_buf = PathBuf::from(path);
+                        let path_buf = PathBuf::from(path.as_ref());
                         let op_pointer =
-                            decorate_error!(path_pos => env.borrow_mut().get_ops_for_path(&path))?;
+                            decorate_error!(path_pos => env.borrow_mut().get_ops_for_path(path.as_ref()))?;
                         // TODO(jwall): What if we don't have a base path?
                         let mut vm =
                             VM::with_pointer(self.strict, op_pointer, path_buf.parent().unwrap())
                                 .with_import_stack(import_stack.clone());
                         vm.run(env)?;
                         let result = Rc::new(vm.symbols_to_tuple(true));
-                        env.borrow_mut().update_path_val(&path, result.clone());
+                        env.borrow_mut().update_path_val(path.clone(), result.clone());
                         stack.push((result, pos));
                     }
                 }
                 import_stack.push(path.clone());
                 return Ok(());
             }
-            return Err(Error::new(format!("Invalid Path {:?}", val), pos));
+            return Err(Error::new(format!("Invalid Path {:?}", val).into(), pos));
         }
         unreachable!();
     }
@@ -163,7 +163,7 @@ impl Builtins {
             if let &Value::P(Str(ref path)) = val.as_ref() {
                 path.clone()
             } else {
-                return Err(Error::new(format!("Invalid Path {:?}", val), path_pos));
+                return Err(Error::new(format!("Invalid Path {:?}", val).into(), path_pos));
             }
         } else {
             unreachable!();
@@ -173,14 +173,14 @@ impl Builtins {
                 typ.clone()
             } else {
                 return Err(Error::new(
-                    format!("Expected conversion type but got {:?}", val),
+                    format!("Expected conversion type but got {:?}", val).into(),
                     typ_pos,
                 ));
             }
         } else {
             unreachable!();
         };
-        if typ == "str" {
+        if typ.as_ref() == "str" {
             stack.push((
                 Rc::new(P(Str(self.get_file_as_string(&path)?))),
                 pos.clone(),
@@ -196,12 +196,12 @@ impl Builtins {
                         } else {
                             match importer.import(contents.as_bytes()) {
                                 Ok(v) => v.into(),
-                                Err(e) => return Err(Error::new(format!("{}", e), pos)),
+                                Err(e) => return Err(Error::new(format!("{}", e).into(), pos)),
                             }
                         }
                     }
                     None => {
-                        return Err(Error::new(format!("No such conversion type {}", &typ), pos))
+                        return Err(Error::new(format!("No such conversion type {}", &typ).into(), pos))
                     }
                 }),
                 pos,
@@ -226,10 +226,10 @@ impl Builtins {
                 // look for the ok field.
                 let mut ok = None;
                 for &(ref name, ref val) in tuple_flds.iter() {
-                    if name == "desc" {
+                    if name.as_ref() == "desc" {
                         desc = Some(val.as_ref());
                     }
-                    if name == "ok" {
+                    if name.as_ref() == "ok" {
                         ok = Some(val.as_ref());
                     }
                 }
@@ -284,7 +284,7 @@ impl Builtins {
             let write_path = path.as_ref().to_path_buf();
             if env.borrow().get_out_lock_for_path(&path) {
                 return Err(Error::new(
-                    format!("You can only have one output per file"),
+                    "You can only have one output per file".into(),
                     pos,
                 ));
             }
@@ -293,7 +293,7 @@ impl Builtins {
         } else {
             if env.borrow().get_out_lock_for_path("/dev/stdout") {
                 return Err(Error::new(
-                    format!("You can only have one output per file"),
+                    "You can only have one output per file".into(),
                     pos,
                 ));
             }
@@ -316,18 +316,18 @@ impl Builtins {
                             None => Box::new(stdout),
                         };
                         if let Err(e) = c.convert(Rc::new(val), &mut writer) {
-                            return Err(Error::new(format!("{}", e), pos.clone()));
+                            return Err(Error::new(format!("{}", e).into(), pos.clone()));
                         }
                         return Ok(());
                     } else {
                         return Err(Error::new(
-                            format!("No such conversion type {:?}", c_type),
+                            format!("No such conversion type {:?}", c_type).into(),
                             c_type_pos,
                         ));
                     }
                 }
                 return Err(Error::new(
-                    format!("Not a conversion type {:?}", c_type_val),
+                    format!("Not a conversion type {:?}", c_type_val).into(),
                     val_pos,
                 ));
             }
@@ -356,14 +356,14 @@ impl Builtins {
                             Ok(_) => {
                                 stack.push((
                                     Rc::new(P(Str(
-                                        String::from_utf8_lossy(buf.as_slice()).to_string()
+                                        String::from_utf8_lossy(buf.as_slice()).into()
                                     ))),
                                     pos,
                                 ));
                             }
                             Err(_e) => {
                                 return Err(Error::new(
-                                    format!("No such conversion type {:?}", c_type),
+                                    format!("No such conversion type {:?}", c_type).into(),
                                     c_typ_pos,
                                 ));
                             }
@@ -373,7 +373,7 @@ impl Builtins {
                 }
             }
             return Err(Error::new(
-                format!("Not a conversion type {:?}", val),
+                format!("Not a conversion type {:?}", val).into(),
                 val_pos,
             ));
         }
@@ -384,7 +384,7 @@ impl Builtins {
         &self,
         stack: &mut Vec<(Rc<Value>, Position)>,
         env: &'a RefCell<Environment<O, E>>,
-        import_stack: &Vec<String>,
+        import_stack: &Vec<Rc<str>>,
         pos: Position,
     ) -> Result<(), Error>
     where
@@ -407,7 +407,7 @@ impl Builtins {
         let f = if let &F(ref f) = fptr.as_ref() {
             f
         } else {
-            return Err(Error::new(format!("Not a function!!"), fptr_pos));
+            return Err(Error::new(format!("Not a function!!").into(), fptr_pos));
         };
 
         match list.as_ref() {
@@ -443,16 +443,14 @@ impl Builtins {
                         // we expect them to be a list of exactly 2 items.
                         if fval.len() != 2 {
                             return Err(Error::new(
-                                format!(
-                                    "Map Functions over tuples must return a list of two items"
-                                ),
+                                "Map Functions over tuples must return a list of two items".into(),
                                 result_pos,
                             ));
                         }
                         let name = match fval[0].as_ref() {
                             &P(Str(ref name)) => name.clone(),
                             _ => return Err(Error::new(
-                                format!("Map functions over tuples must return a String as the first list item"),
+                                "Map functions over tuples must return a String as the first list item".into(),
                                 result_pos,
                             )),
                         };
@@ -467,7 +465,7 @@ impl Builtins {
             &P(Str(ref s)) => {
                 let mut buf = String::new();
                 for c in s.chars() {
-                    stack.push((Rc::new(P(Str(c.to_string()))), list_pos.clone()));
+                    stack.push((Rc::new(P(Str(c.to_string().into()))), list_pos.clone()));
                     // call function and push it's result on the stack.
                     let (result, result_pos) = decorate_call!(pos =>
                         VM::fcall_impl(f, self.strict, stack, env.clone(), import_stack))?;
@@ -475,16 +473,16 @@ impl Builtins {
                         buf.push_str(s);
                     } else {
                         return Err(Error::new(
-                            format!("Map functions over string should return strings"),
+                            "Map functions over string should return strings".into(),
                             result_pos,
                         ));
                     }
                 }
-                stack.push((Rc::new(P(Str(buf))), pos));
+                stack.push((Rc::new(P(Str(buf.into()))), pos));
             }
             _ => {
                 return Err(Error::new(
-                    format!("You can only map over lists, tuples, or strings"),
+                    "You can only map over lists, tuples, or strings".into(),
                     pos,
                 ))
             }
@@ -496,7 +494,7 @@ impl Builtins {
         &self,
         stack: &mut Vec<(Rc<Value>, Position)>,
         env: &'a RefCell<Environment<O, E>>,
-        import_stack: &Vec<String>,
+        import_stack: &Vec<Rc<str>>,
         pos: Position,
     ) -> Result<(), Error>
     where
@@ -519,7 +517,7 @@ impl Builtins {
         let f = if let &F(ref f) = fptr.as_ref() {
             f
         } else {
-            return Err(Error::new(format!("Not a function!!"), fptr_pos));
+            return Err(Error::new("Not a function!!".into(), fptr_pos));
         };
 
         match list.as_ref() {
@@ -578,7 +576,7 @@ impl Builtins {
             &P(Str(ref s)) => {
                 let mut buf = String::new();
                 for c in s.chars() {
-                    stack.push((Rc::new(P(Str(c.to_string()))), list_pos.clone()));
+                    stack.push((Rc::new(P(Str(c.to_string().into()))), list_pos.clone()));
                     // call function and push it's result on the stack.
                     let (condition, _) = decorate_call!(pos =>
                         VM::fcall_impl(f, self.strict, stack, env.clone(), import_stack))?;
@@ -591,11 +589,11 @@ impl Builtins {
                         _ => buf.push(c),
                     }
                 }
-                stack.push((Rc::new(P(Str(buf))), pos));
+                stack.push((Rc::new(P(Str(buf.into()))), pos));
             }
             _ => {
                 return Err(Error::new(
-                    format!("You can only filter over lists, tuples, or strings"),
+                    "You can only filter over lists, tuples, or strings".into(),
                     pos,
                 ))
             }
@@ -610,7 +608,7 @@ impl Builtins {
                 s.clone()
             } else {
                 return Err(Error::new(
-                    format!("Expected string bug got {:?}", val),
+                    format!("Expected string bug got {:?}", val).into(),
                     val_pos,
                 ));
             }
@@ -624,7 +622,7 @@ impl Builtins {
                 s.clone()
             } else {
                 return Err(Error::new(
-                    format!("Expected string bug got {:?}", val),
+                    format!("Expected string bug got {:?}", val).into(),
                     val_pos,
                 ));
             }
@@ -642,7 +640,7 @@ impl Builtins {
         &self,
         stack: &mut Vec<(Rc<Value>, Position)>,
         env: &'a RefCell<Environment<O, E>>,
-        import_stack: &Vec<String>,
+        import_stack: &Vec<Rc<str>>,
         pos: Position,
     ) -> Result<(), Error>
     where
@@ -671,7 +669,7 @@ impl Builtins {
         let f = if let &F(ref f) = fptr.as_ref() {
             f
         } else {
-            return Err(Error::new(format!("Not a function!"), fptr_pos));
+            return Err(Error::new("Noe a function!".into(), fptr_pos));
         };
 
         match list.as_ref() {
@@ -711,7 +709,7 @@ impl Builtins {
                 for c in s.chars() {
                     // push function arguments on the stack.
                     stack.push((acc.clone(), acc_pos.clone()));
-                    stack.push((Rc::new(P(Str(c.to_string()))), list_pos.clone()));
+                    stack.push((Rc::new(P(Str(c.to_string().into()))), list_pos.clone()));
                     // call function and push it's result on the stack.
                     let (new_acc, new_acc_pos) = decorate_call!(pos =>
                         VM::fcall_impl(f, self.strict, stack, env.clone(), import_stack))?;
@@ -721,7 +719,7 @@ impl Builtins {
             }
             _ => {
                 return Err(Error::new(
-                    format!("You can only reduce over lists, tuples, or strings"),
+                    "You can only reduce over lists, tuples, or strings".into(),
                     pos.clone(),
                 ))
             }
@@ -769,7 +767,7 @@ impl Builtins {
             }
             _ => {
                 return Err(Error::new(
-                    format!("Ranges can only be created with Ints"),
+                    format!("Ranges can only be created with Ints").into(),
                     pos,
                 ));
             }
@@ -809,7 +807,7 @@ impl Builtins {
             writable_val,
             &val_pos
         ) {
-            return Err(Error::new(format!("{}", e), pos));
+            return Err(Error::new(format!("{}", e).into(), pos));
         };
         stack.push((val, val_pos));
         Ok(())

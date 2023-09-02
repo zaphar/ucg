@@ -60,7 +60,7 @@ impl OpPointer {
             return Ok(());
         }
         Err(Error::new(
-            format!("FAULT!!! Invalid Jump!"),
+            "FAULT!!! Invalid Jump!".into(),
             match self.pos() {
                 Some(pos) => pos.clone(),
                 None => Position::new(0, 0, 0),
@@ -86,7 +86,7 @@ impl OpPointer {
         match self.ptr {
             Some(ptr) => Ok(ptr),
             None => Err(Error::new(
-                format!("FAULT!!! Position Check failure!"),
+                "FAULT!!! Position Check failure!".into(),
                 Position::new(0, 0, 0),
             )),
         }

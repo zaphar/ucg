@@ -10,9 +10,9 @@ use crate::ast::PositionedItem;
 use crate::build::ir::Val;
 use crate::error;
 
-pub fn find_in_fieldlist(target: &str, fs: &Vec<(String, Rc<Val>)>) -> Option<Rc<Val>> {
+pub fn find_in_fieldlist(target: &str, fs: &Vec<(Rc<str>, Rc<Val>)>) -> Option<Rc<Val>> {
     for (key, val) in fs.iter().cloned() {
-        if target == &key {
+        if target == key.as_ref() {
             return Some(val.clone());
         }
     }
@@ -20,7 +20,7 @@ pub fn find_in_fieldlist(target: &str, fs: &Vec<(String, Rc<Val>)>) -> Option<Rc
 }
 
 /// Defines a set of values in a parsed file.
-pub type ValueMap = HashMap<PositionedItem<String>, Rc<Val>>;
+pub type ValueMap = HashMap<PositionedItem<Rc<str>>, Rc<Val>>;
 
 /// Defines a scope for execution in ucg.
 ///
@@ -132,11 +132,11 @@ impl Scope {
     ///    valid when the current value is a tuple.
     /// * everything else is looked up in the currently accumulated build output
     ///   for this execution context.
-    pub fn lookup_sym(&self, sym: &PositionedItem<String>, is_symbol: bool) -> Option<Rc<Val>> {
-        if &sym.val == "env" && is_symbol {
+    pub fn lookup_sym(&self, sym: &PositionedItem<Rc<str>>, is_symbol: bool) -> Option<Rc<Val>> {
+        if sym.val.as_ref() == "env" && is_symbol {
             return Some(self.env.clone());
         }
-        if &sym.val == "self" && is_symbol {
+        if sym.val.as_ref() == "self" && is_symbol {
             return self.curr_val.clone();
         }
         if self.search_curr_val && self.curr_val.is_some() {
@@ -179,7 +179,7 @@ impl Scope {
     fn lookup_in_tuple(
         pos: &Position,
         field: &str,
-        fs: &Vec<(String, Rc<Val>)>,
+        fs: &Vec<(Rc<str>, Rc<Val>)>,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
         if let Some(vv) = find_in_fieldlist(&field, fs) {
             Ok(vv)

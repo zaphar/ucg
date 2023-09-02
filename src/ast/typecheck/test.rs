@@ -45,7 +45,7 @@ fn simple_binary_typecheck() {
     );
     assert_type_success!(
         "\"\" + \"\";",
-        Shape::Str(PositionedItem::new(String::new(), Position::new(1, 1, 0)))
+        Shape::Str(PositionedItem::new("".into(), Position::new(1, 1, 0)))
     );
     assert_type_success!(
         "1.0 + 1.0;",
@@ -64,7 +64,7 @@ fn simple_binary_typecheck() {
         "{foo = 1} + {foo = 1};",
         Shape::Tuple(PositionedItem::new(
             vec![
-                (Token { typ: TokenType::BAREWORD, fragment: "foo".to_owned(), pos: Position::new(1, 2, 1)},
+                (Token { typ: TokenType::BAREWORD, fragment: "foo".into(), pos: Position::new(1, 2, 1)},
                 Shape::Int(PositionedItem::new_with_pos(1, Position::new(1, 8, 7)))),
             ],
             Position::new(1, 1, 0)

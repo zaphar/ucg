@@ -153,7 +153,7 @@ fn test_expr_copy_no_such_tuple() {
         vec![(
             Expression::Copy(CopyDef {
                 selector: Value::Symbol(PositionedItem::new(
-                    "tpl1".to_string(),
+                    "tpl1".into(),
                     Position::new(1, 1, 1),
                 )),
                 fields: Vec::new(),

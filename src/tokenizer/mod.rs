@@ -14,6 +14,7 @@
 
 //! The tokenization stage of the ucg compiler.
 use std;
+use std::rc::Rc;
 
 use abortable_parser::combinators::*;
 use abortable_parser::iter::SliceIter;
@@ -104,7 +105,7 @@ make_fn!(strtok<OffsetStrIter, Token>,
            (Token{
                typ: TokenType::QUOTED,
                pos: Position::from(&span),
-               fragment: frag.to_string(),
+               fragment: frag.into(),
            })
        )
 );
@@ -117,7 +118,7 @@ make_fn!(barewordtok<OffsetStrIter, Token>,
            (Token{
                typ: TokenType::BAREWORD,
                pos: Position::from(&span),
-               fragment: frag.to_string(),
+               fragment: frag.into(),
            })
        )
 );
@@ -130,7 +131,7 @@ make_fn!(digittok<OffsetStrIter, Token>,
            (Token{
                typ: TokenType::DIGIT,
                pos: Position::from(&span),
-               fragment: digits.to_string(),
+               fragment: digits.into(),
            })
        )
 );
@@ -145,7 +146,7 @@ make_fn!(booleantok<OffsetStrIter, Token>,
         (Token{
             typ: TokenType::BOOLEAN,
             pos: Position::from(&span),
-            fragment: token.to_string(),
+            fragment: token.into(),
         })
     )
 );
@@ -161,7 +162,7 @@ macro_rules! do_text_token_tok {
            (Token {
                typ: $type,
                pos: Position::from(&span),
-               fragment: frag.to_string(),
+               fragment: frag.into(),
            })
            )
     };
@@ -173,7 +174,7 @@ macro_rules! do_text_token_tok {
             (Token {
                 typ: $type,
                 pos: Position::from(&span),
-                fragment: frag.to_string(),
+                fragment: frag.into(),
             })
             )
     };
@@ -414,7 +415,7 @@ make_fn!(whitespace<OffsetStrIter, Token>,
          (Token{
             typ: TokenType::WS,
             pos: Position::from(&span),
-            fragment: String::new(),
+            fragment: "".into(),
          })
     )
 );
@@ -426,7 +427,7 @@ make_fn!(end_of_input<OffsetStrIter, Token>,
         (Token{
             typ: TokenType::END,
             pos: Position::from(&span),
-            fragment: String::new(),
+            fragment: "".into(),
         })
     )
 );
@@ -557,7 +558,7 @@ pub fn tokenize<'a>(
     }
     // ensure that we always have an END token to go off of.
     out.push(Token {
-        fragment: String::new(),
+        fragment: "".into(),
         typ: TokenType::END,
         pos: Position::from(&i),
     });
@@ -688,10 +689,12 @@ macro_rules! match_token {
     ($i:expr, $t:expr, $f:expr, $msg:expr, $h:expr) => {{
         use abortable_parser::Result;
         use std;
+        use std::rc::Rc;
+        let f: Rc<str> = $f.into();
         let mut i_ = $i.clone();
         let tok = i_.next();
         if let Some(tok) = tok {
-            if tok.typ == $t && &tok.fragment == $f {
+            if tok.typ == $t && tok.fragment.as_ref() == f.as_ref() {
                 match $h(tok) {
                     std::result::Result::Ok(v) => Result::Complete(i_.clone(), v),
                     std::result::Result::Err(e) => {

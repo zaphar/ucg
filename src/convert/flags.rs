@@ -94,7 +94,7 @@ impl FlagConverter {
         Ok(())
     }
 
-    fn write(&self, pfx: &str, flds: &Vec<(String, Rc<Val>)>, w: &mut dyn Write) -> ConvertResult {
+    fn write(&self, pfx: &str, flds: &Vec<(Rc<str>, Rc<Val>)>, w: &mut dyn Write) -> ConvertResult {
         for &(ref name, ref val) in flds.iter() {
             if let &Val::Empty = val.as_ref() {
                 self.write_flag_name(pfx, name, w)?;
