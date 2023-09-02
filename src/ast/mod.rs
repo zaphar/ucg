@@ -701,13 +701,23 @@ impl<'a> From<&'a PositionedItem<String>> for PositionedItem<String> {
 
 /// Encodes a func expression in the UCG AST..
 ///
-/// A func is a pure function over a tuple.
+/// A func is a pure function over a expression.
 #[derive(PartialEq, Debug, Clone)]
 pub struct FuncDef {
     pub scope: Option<Scope>,
     pub argdefs: Vec<PositionedItem<String>>,
     pub fields: Box<Expression>,
     pub pos: Position,
+}
+
+impl FuncDef {
+    fn derive_shape(&self) -> Shape {
+        // 1. First set up our symbols.
+        let _table = self.argdefs.iter().map(|sym| (sym.val.clone(), Shape::Hole(sym.clone()))).collect::<BTreeMap<String, Shape>>();
+        // 2.Then determine the shapes of those symbols in our expression.
+        // 3. Finally determine what the return shape can be.
+        todo!();
+    }
 }
 
 /// Specifies the types of binary operations supported in
@@ -1003,7 +1013,7 @@ impl Expression {
             Expression::Copy(def) => derive_copy_shape(def, symbol_table),
             Expression::Include(def) => derive_include_shape(def),
             Expression::Call(_) => todo!(),
-            Expression::Func(_) => todo!(),
+            Expression::Func(def) => def.derive_shape(),
             Expression::Select(_) => todo!(),
             Expression::FuncOp(_) => todo!(),
             Expression::Module(_) => todo!(),
