@@ -46,7 +46,7 @@ pub struct VM {
     working_dir: PathBuf,
     stack: Vec<(Rc<Value>, Position)>,
     symbols: Stack,
-    import_stack: Vec<String>,
+    import_stack: Vec<Rc<str>>,
     runtime: runtime::Builtins,
     ops: OpPointer,
     pub last: Option<(Rc<Value>, Position)>,
@@ -82,7 +82,7 @@ impl VM {
         self
     }
 
-    pub fn with_import_stack(mut self, imports: Vec<String>) -> Self {
+    pub fn with_import_stack(mut self, imports: Vec<Rc<str>>) -> Self {
         self.import_stack = imports;
         self
     }
@@ -114,8 +114,8 @@ impl VM {
         let mut flds = Vec::new();
         let mut pos_list = Vec::new();
         for sym in self.symbols.symbol_list() {
-            if include_mod || sym != "mod" {
-                let (val, pos) = self.symbols.get(sym).unwrap().clone();
+            if include_mod || sym.as_ref() != "mod" {
+                let (val, pos) = self.symbols.get(sym.as_ref()).unwrap().clone();
                 pos_list.push((pos.clone(), pos.clone()));
                 flds.push((sym.clone(), val));
             }
@@ -198,7 +198,7 @@ impl VM {
             };
         }
         if let Some(p) = self.ops.path.as_ref() {
-            self.import_stack.push(p.to_string_lossy().to_string());
+            self.import_stack.push(p.to_string_lossy().into());
         }
         Ok(())
     }
@@ -207,7 +207,7 @@ impl VM {
         if let Value::P(ref p) = val {
             self.push(
                 Rc::new(match t {
-                    CastType::Str => Value::P(Primitive::Str(format!("{}", p))),
+                    CastType::Str => Value::P(Primitive::Str(format!("{}", p).into())),
                     CastType::Int => Value::P(Primitive::Int(p.try_into()?)),
                     CastType::Float => Value::P(Primitive::Float(p.try_into()?)),
                     CastType::Bool => Value::P(Primitive::Bool(p.try_into()?)),
@@ -236,15 +236,14 @@ impl VM {
             M(_) => "module",
             S(_) => "sym",
             T(_) => "thunk",
-        }
-        .to_owned();
-        self.push(Rc::new(P(Str(typ_name))), pos)?;
+        };
+        self.push(Rc::new(P(Str(typ_name.into()))), pos)?;
         Ok(())
     }
 
     fn op_deref<O, E>(
         &mut self,
-        name: String,
+        name: Rc<str>,
         env: &RefCell<Environment<O, E>>,
         pos: &Position,
     ) -> Result<(), Error>
@@ -279,7 +278,7 @@ impl VM {
                 format!(
                     "Not a boolean condition {:?} in && expression at {}",
                     cond, pos
-                ),
+                ).into(),
                 cond_pos.clone(),
             ));
         }
@@ -299,7 +298,7 @@ impl VM {
                 format!(
                     "Not a boolean condition {:?} in || expression at {}!",
                     cond, pos
-                ),
+                ).into(),
                 cond_pos.clone(),
             ));
         }
@@ -314,7 +313,7 @@ impl VM {
             }
         } else {
             return Err(Error::new(
-                format!("Expected boolean but got {:?}!", cond),
+                format!("Expected boolean but got {:?}!", cond).into(),
                 cond_pos.clone(),
             ));
         }
@@ -329,7 +328,7 @@ impl VM {
             }
         } else {
             return Err(Error::new(
-                format!("Expected boolean but got {:?}!", cond),
+                format!("Expected boolean but got {:?}!", cond).into(),
                 pos.clone(),
             ));
         }
@@ -345,9 +344,9 @@ impl VM {
         let matched = match (field_name.as_ref(), search.as_ref()) {
             (&S(ref fname), &P(Str(ref sname))) | (&S(ref fname), &S(ref sname)) => fname == sname,
             (&S(ref fname), &P(Bool(b))) => {
-                if fname == "true" && b {
+                if fname.as_ref() == "true" && b {
                     true
-                } else if fname == "false" && !b {
+                } else if fname.as_ref() == "false" && !b {
                     true
                 } else {
                     false
@@ -373,14 +372,14 @@ impl VM {
                     (Some(ptr), flds.clone(), pos_list.clone())
                 } else {
                     return Err(Error::new(
-                        format!("Expected tuple but got {:?}", tpl_val),
+                        format!("Expected tuple but got {:?}", tpl_val).into(),
                         tpl_val_pos,
                     ));
                 }
             }
             _ => {
                 return Err(Error::new(
-                    format!("Expected tuple but got {:?}", mod_val),
+                    format!("Expected tuple but got {:?}", mod_val).into(),
                     mod_val_pos,
                 ));
             }
@@ -392,7 +391,7 @@ impl VM {
             let pkg_ops = vec![
                 Op::InitList,
                 Op::Func(3),
-                Op::Val(Str(path.to_string_lossy().to_string())),
+                Op::Val(Str(path.to_string_lossy().into())),
                 Op::Runtime(Hook::Import),
                 Op::Return,
             ];
@@ -434,13 +433,13 @@ impl VM {
                     bindings.push(sym.clone());
                 } else {
                     return Err(Error::new(
-                        format!("Not an argument name {:?}", e),
+                        format!("Not an argument name {:?}", e).into(),
                         args_pos,
                     ));
                 }
             }
         } else {
-            return Err(Error::new(format!("Fault!!! Bad Argument List"), args_pos));
+            return Err(Error::new("Fault!!! Bad Argument List".into(), args_pos));
         }
         let mut ops = self.ops.clone();
         ops.jump(idx)?;
@@ -462,7 +461,7 @@ impl VM {
         strict: bool,
         stack: &mut Vec<(Rc<Value>, Position)>,
         env: &'a RefCell<Environment<O, E>>,
-        import_stack: &Vec<String>,
+        import_stack: &Vec<Rc<str>>,
     ) -> Result<(Rc<Value>, Position), Error>
     where
         O: std::io::Write + Clone,
@@ -531,7 +530,7 @@ impl VM {
                         format!(
                             "Func called with too many args expected {} args but got {}",
                             arity, arg_length
-                        ),
+                        ).into(),
                         pos,
                     ));
                 }
@@ -540,7 +539,7 @@ impl VM {
                         format!(
                             "Func called with too few args expected {} args but got {}",
                             arity, arg_length
-                        ),
+                        ).into(),
                         pos,
                     ));
                 }
@@ -549,7 +548,7 @@ impl VM {
                 Self::fcall_impl(f, self.runtime.strict, &mut self.stack, env.clone(), &self.import_stack))?;
             self.push(val, pos.clone())?;
         } else {
-            return Err(Error::new(format!("Not a function! {:?}", f,), pos));
+            return Err(Error::new(format!("Not a function! {:?}", f,).into(), pos));
         }
         Ok(())
     }
@@ -569,7 +568,7 @@ impl VM {
             format!(
                 "Expected Boolean but got {:?} in expression at {}",
                 operand, pos
-            ),
+            ).into(),
             operand_pos,
         ));
     }
@@ -584,7 +583,7 @@ impl VM {
                 format!(
                     "Expected values of the same type but got {:?} at {} and {:?} at {} for expression",
                     left, left_pos, right, right_pos,
-                ),
+                ).into(),
                 pos,
             ));
         }
@@ -607,7 +606,7 @@ impl VM {
                     format!(
                         "Expected numeric values of the same type but got {:?} at {} and {:?} at {} for expression",
                         left, left_pos, right, right_pos,
-                    ),
+                    ).into(),
                     pos.clone(),
                 ));
             }
@@ -630,7 +629,7 @@ impl VM {
                     format!(
                         "Expected numeric values of the same type but got {:?} at {} and {:?} at {} for expression",
                         left, left_pos, right, right_pos,
-                    ),
+                    ).into(),
                     pos.clone(),
                 ));
             }
@@ -653,7 +652,7 @@ impl VM {
                     format!(
                         "Expected numeric values of the same type but got {:?} at {} and {:?} at {} for expression",
                         left, left_pos, right, right_pos,
-                    ),
+                    ).into(),
                     pos,
                 ));
             }
@@ -676,7 +675,7 @@ impl VM {
                     format!(
                         "Expected numeric values of the same type but got {:?} at {} and {:?} at {} for expression",
                         left, left_pos, right, right_pos,
-                    ),
+                    ).into(),
                     pos,
                 ));
             }
@@ -850,7 +849,7 @@ impl VM {
             return Ok(());
         }
         return Err(Error::new(
-            format!("Invalid selector index: {:?} target: {:?}", right, left),
+            format!("Invalid selector index: {:?} target: {:?}", right, left).into(),
             pos,
         ));
     }
@@ -869,7 +868,7 @@ impl VM {
                     }
                 } else {
                     return Err(Error::new(
-                        format!("Expected String or Symbol got: {}", right.type_name()),
+                        format!("Expected String or Symbol got: {}", right.type_name()).into(),
                         right_pos,
                     ));
                 }
@@ -884,13 +883,13 @@ impl VM {
             }
             &P(Str(ref s)) => {
                 if let &P(Str(ref part)) = right.as_ref() {
-                    self.push(Rc::new(P(Bool(s.contains(part)))), pos)?;
+                    self.push(Rc::new(P(Bool(s.contains(part.as_ref())))), pos)?;
                     return Ok(());
                 }
             }
             _ => {
                 return Err(Error::new(
-                    format!("Expected String, Tuple, or List got: {}", left.type_name()),
+                    format!("Expected String, Tuple, or List got: {}", left.type_name()).into(),
                     left_pos,
                 ));
             }
@@ -974,7 +973,7 @@ impl VM {
                 self.merge_field_into_tuple(
                     &mut flds,
                     &mut flds_pos_list,
-                    "this".to_owned(),
+                    "this".into(),
                     &pos,
                     Rc::new(this),
                     &val_pos,
@@ -989,7 +988,7 @@ impl VM {
                     self.merge_field_into_tuple(
                         &mut flds,
                         &mut flds_pos_list,
-                        "pkg".to_owned(),
+                        "pkg".into(),
                         &pos,
                         pkg_func,
                         &val_pos,
@@ -1000,7 +999,7 @@ impl VM {
                     .clean_copy()
                     .to_new_pointer(ptr.clone())
                     .with_import_stack(self.import_stack.clone());
-                vm.push(Rc::new(S("mod".to_owned())), pos.clone())?;
+                vm.push(Rc::new(S("mod".into())), pos.clone())?;
                 vm.push(Rc::new(C(Tuple(flds, flds_pos_list))), pos.clone())?;
                 decorate_call!(pos => vm.run(env))?;
                 if let Some(ptr) = result_ptr {
@@ -1014,7 +1013,7 @@ impl VM {
             }
             _ => {
                 return Err(Error::new(
-                    format!("Expected a Tuple or Module but got {:?}", tgt),
+                    format!("Expected a Tuple or Module but got {:?}", tgt).into(),
                     pos,
                 ));
             }
@@ -1024,9 +1023,9 @@ impl VM {
 
     fn merge_field_into_tuple(
         &self,
-        src_fields: &mut Vec<(String, Rc<Value>)>,
+        src_fields: &mut Vec<(Rc<str>, Rc<Value>)>,
         pos_fields: &mut Vec<(Position, Position)>,
-        name: String,
+        name: Rc<str>,
         name_pos: &Position,
         value: Rc<Value>,
         val_pos: &Position,
@@ -1043,7 +1042,7 @@ impl VM {
                             fld.1.type_name(),
                             name,
                             value.type_name(),
-                        ),
+                        ).into(),
                         val_pos.clone(),
                     ));
                 }
@@ -1065,21 +1064,21 @@ impl VM {
 
     pub fn binding_push(
         &mut self,
-        name: String,
+        name: Rc<str>,
         val: Rc<Value>,
         strict: bool,
         pos: &Position,
         name_pos: &Position,
     ) -> Result<(), Error> {
-        if self.reserved_words.contains(name.as_str()) {
+        if self.reserved_words.contains(name.as_ref()) {
             return Err(Error::new(
-                format!("{} is a reserved word.", name),
+                format!("{} is a reserved word.", name).into(),
                 name_pos.clone(),
             ));
         }
         if self.symbols.is_bound(&name) && strict {
             return Err(Error::new(
-                format!("Binding {} already exists", name),
+                format!("Binding {} already exists", name).into(),
                 pos.clone(),
             ));
         }
@@ -1116,7 +1115,7 @@ impl VM {
         match tpl {
             Some((v, pos)) => Ok((v, pos)),
             None => {
-                return Err(Error::new(format!("No such binding {}", name), pos.clone()));
+                return Err(Error::new(format!("No such binding {}", name).into(), pos.clone()));
             }
         }
     }
@@ -1137,7 +1136,7 @@ impl VM {
             (P(Float(f)), P(Float(ff))) => Float(f * ff),
             _ => {
                 return Err(Error::new(
-                    format!("Expected {} but got {:?}", left.type_name(), right),
+                    format!("Expected {} but got {:?}", left.type_name(), right).into(),
                     pos.clone(),
                 ))
             }
@@ -1150,7 +1149,7 @@ impl VM {
             (P(Float(f)), P(Float(ff))) => Float(f / ff),
             _ => {
                 return Err(Error::new(
-                    format!("Expected {} but got {:?}", left.type_name(), right),
+                    format!("Expected {} but got {:?}", left.type_name(), right).into(),
                     pos.clone(),
                 ))
             }
@@ -1163,7 +1162,7 @@ impl VM {
             (P(Float(f)), Value::P(Float(ff))) => Float(f - ff),
             _ => {
                 return Err(Error::new(
-                    format!("Expected {} but got {:?}", left.type_name(), right),
+                    format!("Expected {} but got {:?}", left.type_name(), right).into(),
                     pos.clone(),
                 ))
             }
@@ -1176,7 +1175,7 @@ impl VM {
             (P(Float(f)), Value::P(Float(ff))) => Float(f % ff),
             _ => {
                 return Err(Error::new(
-                    format!("Expected {} but got {:?}", left.type_name(), right),
+                    format!("Expected {} but got {:?}", left.type_name(), right).into(),
                     pos.clone(),
                 ))
             }
@@ -1191,7 +1190,7 @@ impl VM {
                 let mut ns = String::new();
                 ns.push_str(&s);
                 ns.push_str(&ss);
-                P(Str(ns))
+                P(Str(ns.into()))
             }
             (
                 C(List(ref left_list, ref left_pos_list)),
@@ -1216,7 +1215,7 @@ impl VM {
             }
             _ => {
                 return Err(Error::new(
-                    format!("Expected {} but got {:?}", left.type_name(), right),
+                    format!("Expected {} but got {:?}", left.type_name(), right).into(),
                     pos.clone(),
                 ))
             }

@@ -26,7 +26,7 @@ fn assert_build(input: &str) {
     let out_buffer: Vec<u8> = Vec::new();
     let err_buffer: Vec<u8> = Vec::new();
     let mut env_vars = BTreeMap::new();
-    env_vars.insert("FOO".to_owned(), "bar".to_owned());
+    env_vars.insert("FOO".into(), "bar".into());
     let env = RefCell::new(Environment::new_with_vars(out_buffer, err_buffer, env_vars));
     let mut b = FileBuilder::new("<Eval>", &i_paths, &env);
     b.enable_validate_mode();

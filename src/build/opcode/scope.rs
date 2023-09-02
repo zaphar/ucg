@@ -19,7 +19,7 @@ use crate::ast::Position;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Stack {
-    curr: BTreeMap<String, (Rc<Value>, Position)>,
+    curr: BTreeMap<Rc<str>, (Rc<Value>, Position)>,
 }
 
 impl Stack {
@@ -41,12 +41,12 @@ impl Stack {
         self.curr.get(name).is_some()
     }
 
-    pub fn add(&mut self, name: String, val: Rc<Value>, pos: Position) {
+    pub fn add(&mut self, name: Rc<str>, val: Rc<Value>, pos: Position) {
         self.curr.insert(name, (val, pos));
     }
 
-    pub fn symbol_list(&self) -> Vec<&String> {
-        self.curr.keys().collect()
+    pub fn symbol_list(&self) -> Vec<Rc<str>> {
+        self.curr.keys().cloned().collect()
     }
 
     pub fn snapshot(&self) -> Self {

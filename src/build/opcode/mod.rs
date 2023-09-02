@@ -39,7 +39,7 @@ pub enum Primitive {
     // Primitive Types
     Int(i64),
     Float(f64),
-    Str(String),
+    Str(Rc<str>),
     Bool(bool),
     Empty,
 }
@@ -67,7 +67,7 @@ impl Value {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Composite {
     List(Vec<Rc<Value>>, Vec<Position>),
-    Tuple(Vec<(String, Rc<Value>)>, Vec<(Position, Position)>),
+    Tuple(Vec<(Rc<str>, Rc<Value>)>, Vec<(Position, Position)>),
 }
 
 use Composite::{List, Tuple};
@@ -75,7 +75,7 @@ use Composite::{List, Tuple};
 #[derive(Debug, PartialEq, Clone)]
 pub struct Func {
     ptr: OpPointer,
-    bindings: Vec<String>,
+    bindings: Vec<Rc<str>>,
     snapshot: Stack,
 }
 
@@ -83,7 +83,7 @@ pub struct Func {
 pub struct Module {
     ptr: OpPointer,
     result_ptr: Option<usize>,
-    flds: Vec<(String, Rc<Value>)>,
+    flds: Vec<(Rc<str>, Rc<Value>)>,
     flds_pos_list: Vec<(Position, Position)>,
     pkg_ptr: Option<OpPointer>,
 }
@@ -91,7 +91,7 @@ pub struct Module {
 #[derive(Clone)]
 pub enum Value {
     // Binding names.
-    S(String),
+    S(Rc<str>),
     // Primitive Types
     P(Primitive),
     // Composite Types.
@@ -147,9 +147,9 @@ pub enum Op {
     // Primitive casts
     Cast(CastType),
     // A bareword for use in bindings or lookups
-    Sym(String),
+    Sym(Rc<str>),
     // Reference a binding on the heap
-    DeRef(String),
+    DeRef(Rc<str>),
     // Complex Type ops
     InitTuple,
     Field,

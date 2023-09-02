@@ -13,6 +13,7 @@
 // limitations under the License.
 use std::collections::BTreeMap;
 use std::path::Path;
+use std::rc::Rc;
 
 use crate::ast::rewrite::Rewriter;
 use crate::ast::walk::Walker;
@@ -30,8 +31,8 @@ pub struct AST();
 pub struct OpsMap {
     pub ops: Vec<Op>,
     pub pos: Vec<Position>,
-    pub shape_map: BTreeMap<String, Shape>,
-    pub links: BTreeMap<String, Position>,
+    pub shape_map: BTreeMap<Rc<str>, Shape>,
+    pub links: BTreeMap<Rc<str>, Position>,
 }
 
 impl OpsMap {
@@ -51,7 +52,7 @@ impl OpsMap {
         self
     }
 
-    pub fn add_link(&mut self, path: String, pos: Position) {
+    pub fn add_link(&mut self, path: Rc<str>, pos: Position) {
         self.links.insert(path, pos);
     }
 
@@ -227,7 +228,7 @@ impl AST {
                                         kind: BinaryExprType::IS,
                                         right: Box::new(Expression::Simple(Value::Str(
                                             PositionedItem::new(
-                                                "tuple".to_owned(),
+                                                "tuple".into(),
                                                 def.left.pos().clone(),
                                             ),
                                         ))),
@@ -321,7 +322,7 @@ impl AST {
             Expression::Fail(def) => {
                 let msg_pos = def.message.pos().clone();
                 Self::translate_expr(*def.message, &mut ops, root);
-                ops.push(Op::Val(Primitive::Str("UserDefined: ".to_owned())), msg_pos);
+                ops.push(Op::Val(Primitive::Str("UserDefined: ".into())), msg_pos);
                 ops.push(Op::Add, def.pos.clone());
                 ops.push(Op::Bang, def.pos);
             }
@@ -373,7 +374,7 @@ impl AST {
                         // Add our item binding shadowing any binding that already
                         // existed.
                         let expr_pos = expr.pos().clone();
-                        ops.push(Op::Sym("item".to_owned()), expr.pos().clone());
+                        ops.push(Op::Sym("item".into()), expr.pos().clone());
                         Self::translate_expr(*expr, &mut ops, root);
                         ops.push(Op::BindOver, expr_pos.clone());
                         let mut elems = Vec::new();
@@ -531,7 +532,7 @@ impl AST {
                 } else {
                     ops.push(
                         Op::Val(Primitive::Str(
-                            "Unhandled select case with no default".to_owned(),
+                            "Unhandled select case with no default".into(),
                         )),
                         default_pos,
                     );
@@ -569,7 +570,7 @@ impl AST {
                     let _ = printer.render_expr(&def.expr);
                 }
                 let expr_pretty = String::from_utf8(buffer).unwrap();
-                ops.push(Op::Val(Primitive::Str(expr_pretty)), def.pos.clone());
+                ops.push(Op::Val(Primitive::Str(expr_pretty.into())), def.pos.clone());
                 Self::translate_expr(*def.expr, &mut ops, root);
                 ops.push(Op::Runtime(Hook::Trace(def.pos.clone())), def.pos);
             }
@@ -586,7 +587,8 @@ impl AST {
     ) {
         match part {
             TemplatePart::Str(s) => {
-                ops.push(Op::Val(Primitive::Str(s.into_iter().collect())), pos);
+                let part: String = s.into_iter().map(|c| c.to_string()).collect();
+                ops.push(Op::Val(Primitive::Str(part.into())), pos);
             }
             TemplatePart::PlaceHolder(_idx) => {
                 if !place_holder {

@@ -38,7 +38,7 @@ impl XmlConverter {
         }
     }
 
-    fn get_tuple_val(v: &Val) -> std::result::Result<&Vec<(String, Rc<Val>)>, Box<dyn Error>> {
+    fn get_tuple_val(v: &Val) -> std::result::Result<&Vec<(Rc<str>, Rc<Val>)>, Box<dyn Error>> {
         if let Val::Tuple(ref fs) = v {
             Ok(fs)
         } else {
@@ -58,15 +58,15 @@ impl XmlConverter {
         // First we determine if this is a tag or text node
         if let Val::Tuple(ref fs) = v {
             let mut name: Option<&str> = None;
-            let mut attrs: Option<&Vec<(String, Rc<Val>)>> = None;
+            let mut attrs: Option<&Vec<(Rc<str>, Rc<Val>)>> = None;
             let mut children: Option<&Vec<Rc<Val>>> = None;
             let mut text: Option<&str> = None;
             let mut ns: Option<(&str, &str)> = None;
             for (ref field, ref val) in fs.iter() {
-                if field == "name" {
+                if field.as_ref() == "name" {
                     name = Some(Self::get_str_val(val.as_ref())?);
                 }
-                if field == "ns" {
+                if field.as_ref() == "ns" {
                     if let Val::Tuple(ref fs) = val.as_ref() {
                         let mut prefix = "";
                         let mut uri = "";
@@ -74,10 +74,10 @@ impl XmlConverter {
                             if val.is_empty() {
                                 continue;
                             }
-                            if name == "uri" {
+                            if name.as_ref() == "uri" {
                                 uri = Self::get_str_val(val.as_ref())?;
                             }
-                            if name == "prefix" {
+                            if name.as_ref() == "prefix" {
                                 prefix = Self::get_str_val(val.as_ref())?;
                             }
                         }
@@ -88,19 +88,19 @@ impl XmlConverter {
                         ns = Some(("", s));
                     }
                 }
-                if field == "attrs" {
+                if field.as_ref() == "attrs" {
                     // This should be a tuple.
                     if !val.is_empty() {
                         attrs = Some(Self::get_tuple_val(val.as_ref())?);
                     }
                 }
-                if field == "children" {
+                if field.as_ref() == "children" {
                     // This should be a list of tuples.
                     if !val.is_empty() {
                         children = Some(Self::get_list_val(val.as_ref())?);
                     }
                 }
-                if field == "text" {
+                if field.as_ref() == "text" {
                     if !val.is_empty() {
                         text = Some(Self::get_str_val(val.as_ref())?);
                     }
@@ -160,19 +160,19 @@ impl XmlConverter {
             let mut standalone: Option<bool> = None;
             let mut root: Option<Rc<Val>> = None;
             for &(ref name, ref val) in fs.iter() {
-                if name == "version" {
+                if name.as_ref() == "version" {
                     version = Some(Self::get_str_val(val)?);
                 }
-                if name == "encoding" {
+                if name.as_ref() == "encoding" {
                     encoding = Some(Self::get_str_val(val)?);
                 }
-                if name == "standalone" {
+                if name.as_ref() == "standalone" {
                     standalone = match val.as_ref() {
                         Val::Boolean(b) => Some(*b),
                         _ => None,
                     };
                 }
-                if name == "root" {
+                if name.as_ref() == "root" {
                     root = Some(val.clone());
                 }
             }

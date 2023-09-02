@@ -46,11 +46,11 @@ fn derive_shape_values() {
         ),
         (
             Value::Str(PositionedItem::new(
-                "foo".to_owned(),
+                "foo".into(),
                 Position::new(0, 1, 2),
             )),
             Shape::Str(PositionedItem::new(
-                "foo".to_owned(),
+                "foo".into(),
                 Position::new(0, 1, 2),
             )),
         ),
@@ -103,7 +103,7 @@ fn derive_shape_expressions() {
         ),
         (
             "\"foo {}\" % (1);",
-            Shape::Str(PositionedItem::new("".to_owned(), Position::new(0, 0, 0))),
+            Shape::Str(PositionedItem::new("".into(), Position::new(0, 0, 0))),
         ),
         (
             "not true;",
@@ -112,8 +112,8 @@ fn derive_shape_expressions() {
         (
             "0:1;",
             Shape::List(NarrowedShape::new_with_pos(
-                vec![Shape::Int(PositionedItem::new(0, Position::new(0, 0, 0)))],
-                Position::new(0, 0, 0),
+                vec![Shape::Int(PositionedItem::new(0, Position::new(1, 1, 0)))],
+                Position::new(1, 1, 0),
             )),
         ),
         (
@@ -126,7 +126,7 @@ fn derive_shape_expressions() {
         ),
         (
             "str(1);",
-            Shape::Str(PositionedItem::new("".to_owned(), Position::new(0, 0, 0))),
+            Shape::Str(PositionedItem::new("".into(), Position::new(0, 0, 0))),
         ),
         (
             "bool(\"true\");",

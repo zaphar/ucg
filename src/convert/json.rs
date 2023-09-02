@@ -34,19 +34,19 @@ impl JsonConverter {
         Ok(serde_json::Value::Array(v))
     }
 
-    fn convert_tuple(&self, items: &Vec<(String, Rc<Val>)>) -> std::io::Result<serde_json::Value> {
+    fn convert_tuple(&self, items: &Vec<(Rc<str>, Rc<Val>)>) -> std::io::Result<serde_json::Value> {
         let mut mp = serde_json::Map::new();
         for &(ref k, ref v) in items.iter() {
-            mp.entry(k.clone()).or_insert(self.convert_value(v)?);
+            mp.entry(k.as_ref()).or_insert(self.convert_value(v)?);
         }
         Ok(serde_json::Value::Object(mp))
     }
 
-    fn convert_env(&self, items: &Vec<(String, String)>) -> std::io::Result<serde_json::Value> {
+    fn convert_env(&self, items: &Vec<(Rc<str>, Rc<str>)>) -> std::io::Result<serde_json::Value> {
         let mut mp = serde_json::Map::new();
         for &(ref k, ref v) in items.iter() {
-            mp.entry(k.clone())
-                .or_insert(serde_json::Value::String(v.clone()));
+            mp.entry(k.as_ref())
+                .or_insert(serde_json::Value::String(v.to_string()));
         }
         Ok(serde_json::Value::Object(mp))
     }
@@ -71,7 +71,7 @@ impl JsonConverter {
                 };
                 serde_json::Value::Number(n)
             }
-            &Val::Str(ref s) => serde_json::Value::String(s.clone()),
+            &Val::Str(ref s) => serde_json::Value::String(s.to_string()),
             &Val::Env(ref fs) => self.convert_env(fs)?,
             &Val::List(ref l) => self.convert_list(l)?,
             &Val::Tuple(ref t) => self.convert_tuple(t)?,
@@ -81,7 +81,7 @@ impl JsonConverter {
 
     fn convert_json_val(&self, v: &serde_json::Value) -> std::result::Result<Val, Box<dyn Error>> {
         Ok(match v {
-            serde_json::Value::String(s) => Val::Str(s.clone()),
+            serde_json::Value::String(s) => Val::Str(s.clone().into()),
             serde_json::Value::Number(n) => {
                 if let Some(i) = n.as_i64() {
                     Val::Int(i)
@@ -101,7 +101,7 @@ impl JsonConverter {
             serde_json::Value::Object(m) => {
                 let mut fs = Vec::with_capacity(m.len());
                 for (key, value) in m {
-                    fs.push((key.to_string(), Rc::new(self.convert_json_val(value)?)));
+                    fs.push((key.clone().into(), Rc::new(self.convert_json_val(value)?)));
                 }
                 Val::Tuple(fs)
             }

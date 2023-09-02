@@ -11,7 +11,7 @@ fn test_empty_token() {
     let result = emptytok(OffsetStrIter::new("NULL "));
     assert!(result.is_complete(), "result {:?} is not done", result);
     if let Result::Complete(_, tok) = result {
-        assert_eq!(tok.fragment, "NULL");
+        assert_eq!(tok.fragment.as_ref(), "NULL");
         assert_eq!(tok.typ, TokenType::EMPTY);
     }
 }
@@ -21,7 +21,7 @@ fn test_assert_token() {
     let result = asserttok(OffsetStrIter::new("assert "));
     assert!(result.is_complete(), "result {:?} is not done", result);
     if let Result::Complete(_, tok) = result {
-        assert_eq!(tok.fragment, "assert");
+        assert_eq!(tok.fragment.as_ref(), "assert");
         assert_eq!(tok.typ, TokenType::BAREWORD);
     }
 }
@@ -31,7 +31,7 @@ fn test_out_token() {
     let result = outtok(OffsetStrIter::new("out "));
     assert!(result.is_complete(), "result {:?} is not done", result);
     if let Result::Complete(_, tok) = result {
-        assert_eq!(tok.fragment, "out");
+        assert_eq!(tok.fragment.as_ref(), "out");
         assert_eq!(tok.typ, TokenType::BAREWORD);
     }
 }
@@ -41,7 +41,7 @@ fn test_out_token_with_comment() {
     let result = outtok(OffsetStrIter::new("out//comment"));
     assert!(result.is_complete(), "result {:?} is not done", result);
     if let Result::Complete(_, tok) = result {
-        assert_eq!(tok.fragment, "out");
+        assert_eq!(tok.fragment.as_ref(), "out");
         assert_eq!(tok.typ, TokenType::BAREWORD);
     }
 }
@@ -66,7 +66,7 @@ fn test_string_with_escaping() {
     let result = strtok(OffsetStrIter::new("\"foo \\\\ \\\"bar\""));
     assert!(result.is_complete(), "result {:?} is not ok", result);
     if let Result::Complete(_, tok) = result {
-        assert_eq!(tok.fragment, "foo \\ \"bar".to_string());
+        assert_eq!(tok.fragment.as_ref(), "foo \\ \"bar".to_string());
     }
 }
 
@@ -77,7 +77,7 @@ fn test_tokenize_bareword_with_dash() {
     assert!(result.is_ok(), "result {:?} is not ok", result);
     if let Ok(toks) = result {
         assert_eq!(toks.len(), 2);
-        assert_eq!(toks[0].fragment, "foo-bar");
+        assert_eq!(toks[0].fragment.as_ref(), "foo-bar");
     }
 }
 
@@ -92,7 +92,7 @@ macro_rules! assert_token {
         );
         if let Result::Complete(_, tok) = result {
             assert_eq!(tok.typ, $typ);
-            assert_eq!(tok.fragment, $input);
+            assert_eq!(tok.fragment.as_ref(), $input);
         }
     };
 }
@@ -204,7 +204,7 @@ fn test_parse_comment() {
             cmt,
             Token {
                 typ: TokenType::COMMENT,
-                fragment: " comment".to_string(),
+                fragment: " comment".into(),
                 pos: Position {
                     file: None,
                     line: 1,
@@ -221,7 +221,7 @@ fn test_parse_comment() {
             cmt,
             Token {
                 typ: TokenType::COMMENT,
-                fragment: " comment".to_string(),
+                fragment: " comment".into(),
                 pos: Position {
                     file: None,
                     column: 1,
@@ -238,7 +238,7 @@ fn test_parse_comment() {
             cmt,
             Token {
                 typ: TokenType::COMMENT,
-                fragment: " comment".to_string(),
+                fragment: " comment".into(),
                 pos: Position {
                     file: None,
                     column: 1,
@@ -254,7 +254,7 @@ fn test_parse_comment() {
 #[test]
 fn test_match_word() {
     let input = vec![Token {
-        fragment: "foo".to_string(),
+        fragment: "foo".into(),
         typ: TokenType::BAREWORD,
         pos: Position {
             file: None,
@@ -273,7 +273,7 @@ fn test_match_word() {
 #[test]
 fn test_match_word_empty_input() {
     let input = vec![Token {
-        fragment: "".to_string(),
+        fragment: "".into(),
         typ: TokenType::END,
         pos: Position {
             file: None,
@@ -296,7 +296,7 @@ fn test_match_word_empty_input() {
 #[test]
 fn test_match_punct() {
     let input = vec![Token {
-        fragment: "!".to_string(),
+        fragment: "!".into(),
         typ: TokenType::PUNCT,
         pos: Position {
             file: None,
@@ -315,7 +315,7 @@ fn test_match_punct() {
 #[test]
 fn test_match_type() {
     let input = vec![Token {
-        fragment: "foo".to_string(),
+        fragment: "foo".into(),
         typ: TokenType::BAREWORD,
         pos: Position {
             file: None,

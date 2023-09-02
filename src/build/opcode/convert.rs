@@ -19,14 +19,14 @@ impl Error {
     }
 }
 
-impl From<&Primitive> for String {
+impl From<&Primitive> for Rc<str> {
     fn from(p: &Primitive) -> Self {
         match p {
-            Primitive::Int(i) => format!("{}", i),
-            Primitive::Float(f) => format!("{}", f),
-            Primitive::Str(s) => format!("{}", s),
-            Primitive::Bool(b) => format!("{}", b),
-            Primitive::Empty => "NULL".to_owned(),
+            Primitive::Int(i) => format!("{}", i).into(),
+            Primitive::Float(f) => format!("{}", f).into(),
+            Primitive::Str(s) => format!("{}", s).into(),
+            Primitive::Bool(b) => format!("{}", b).into(),
+            Primitive::Empty => "NULL".into(),
         }
     }
 }
@@ -85,7 +85,7 @@ impl TryFrom<&Primitive> for bool {
                 cast_type: CastType::Int,
             }),
             Primitive::Bool(b) => Ok(*b),
-            Primitive::Str(s) => match s.as_str() {
+            Primitive::Str(s) => match s.as_ref() {
                 "true" => Ok(true),
                 "false" => Ok(false),
                 _ => Err(Error {
@@ -192,15 +192,15 @@ impl From<&Val> for Value {
     }
 }
 
-impl From<&Composite> for String {
+impl From<&Composite> for Rc<str> {
     fn from(c: &Composite) -> Self {
         let mut buf = String::new();
         match c {
             &List(ref elems, _) => {
                 buf.push_str("[");
                 for e in elems.iter() {
-                    let val: String = e.as_ref().into();
-                    buf.push_str(&val);
+                    let val: Rc<str> = e.as_ref().into();
+                    buf.push_str(val.as_ref());
                     buf.push_str(",");
                 }
                 buf.push_str("]");
@@ -210,26 +210,26 @@ impl From<&Composite> for String {
                 for &(ref k, ref v) in flds.iter() {
                     buf.push_str(&k);
                     buf.push_str(" = ");
-                    let val: String = v.as_ref().into();
+                    let val: Rc<str> = v.as_ref().into();
                     buf.push_str(&val);
                     buf.push_str(",");
                 }
                 buf.push_str("}");
             }
         }
-        buf
+        buf.into()
     }
 }
 
-impl From<&Value> for String {
+impl From<&Value> for Rc<str> {
     fn from(v: &Value) -> Self {
         match v {
             &S(ref s) => s.clone(),
             &P(ref p) => p.into(),
             &C(ref c) => c.into(),
-            &T(_) => "<Thunk>".to_owned(),
-            &F(_) => "<Func>".to_owned(),
-            &M(_) => "<Module>".to_owned(),
+            &T(_) => "<Thunk>".into(),
+            &F(_) => "<Func>".into(),
+            &M(_) => "<Module>".into(),
         }
     }
 }

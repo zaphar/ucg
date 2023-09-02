@@ -181,7 +181,7 @@ where
             if found.contains(&link) {
                 continue;
             }
-            let ops = match self.environment.borrow_mut().get_ops_for_path(link.clone()) {
+            let ops = match self.environment.borrow_mut().get_ops_for_path(link.as_ref()) {
                 Ok(ops) => ops,
                 Err(e) => return Err(Box::new(e.with_pos(path_pos))),
             };
@@ -343,7 +343,7 @@ where
         if let Some(val) = self.out.clone() {
             if let &Val::Tuple(ref flds) = val.as_ref() {
                 for (k, v) in flds.iter() {
-                    if k == name {
+                    if k.as_ref() == name {
                         return Some(v.clone());
                     }
                 }

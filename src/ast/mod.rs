@@ -125,18 +125,18 @@ pub enum TokenType {
 #[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord, Hash)]
 pub struct Token {
     pub typ: TokenType,
-    pub fragment: String,
+    pub fragment: Rc<str>,
     pub pos: Position,
 }
 
 impl Token {
     /// Constructs a new Token with a type and line and column information.
-    pub fn new<S: Into<String>, P: Into<Position>>(f: S, typ: TokenType, p: P) -> Self {
+    pub fn new<S: Into<Rc<str>>, P: Into<Position>>(f: S, typ: TokenType, p: P) -> Self {
         Self::new_with_pos(f, typ, p.into())
     }
 
     // Constructs a new Token with a type and a Position.
-    pub fn new_with_pos<S: Into<String>>(f: S, typ: TokenType, pos: Position) -> Self {
+    pub fn new_with_pos<S: Into<Rc<str>>>(f: S, typ: TokenType, pos: Position) -> Self {
         Token {
             typ,
             fragment: f.into(),
@@ -241,8 +241,8 @@ pub enum Value {
     Boolean(PositionedItem<bool>),
     Int(PositionedItem<i64>),
     Float(PositionedItem<f64>),
-    Str(PositionedItem<String>),
-    Symbol(PositionedItem<String>),
+    Str(PositionedItem<Rc<str>>),
+    Symbol(PositionedItem<Rc<str>>),
     Tuple(PositionedItem<FieldList>),
     List(ListDef),
 }
@@ -250,7 +250,7 @@ pub enum Value {
 #[derive(PartialEq, Debug, Clone)]
 pub enum ImportShape {
     Resolved(Position, TupleShape),
-    Unresolved(PositionedItem<String>),
+    Unresolved(PositionedItem<Rc<str>>),
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -281,15 +281,15 @@ pub enum Shape {
     Boolean(PositionedItem<bool>),
     Int(PositionedItem<i64>),
     Float(PositionedItem<f64>),
-    Str(PositionedItem<String>),
+    Str(PositionedItem<Rc<str>>),
     Tuple(PositionedItem<TupleShape>),
     List(NarrowedShape),
     Func(FuncShapeDef),
     Module(ModuleShape),
-    Hole(PositionedItem<String>), // A type hole We don't know what this type is yet.
-    Narrowed(NarrowedShape),      // A narrowed type. We know *some* of the possible options.
-    Import(ImportShape),          // A type hole We don't know what this type is yet.
-    TypeErr(Position, String),    // A type hole We don't know what this type is yet.
+    Hole(PositionedItem<Rc<str>>), // A type hole We don't know what this type is yet.
+    Narrowed(NarrowedShape),       // A narrowed type. We know *some* of the possible options.
+    Import(ImportShape),           // A type hole We don't know what this type is yet.
+    TypeErr(Position, String),     // A type hole We don't know what this type is yet.
 }
 
 impl Shape {
@@ -327,7 +327,12 @@ impl Shape {
         }
     }
 
-    fn narrow_tuple_shapes(&self, left_slist: &PositionedItem<Vec<(Token, Shape)>>, right_slist: &PositionedItem<Vec<(Token, Shape)>>, right: &Shape) -> Shape {
+    fn narrow_tuple_shapes(
+        &self,
+        left_slist: &PositionedItem<Vec<(Token, Shape)>>,
+        right_slist: &PositionedItem<Vec<(Token, Shape)>>,
+        right: &Shape,
+    ) -> Shape {
         let left_iter = left_slist.val.iter();
         let right_iter = right_slist.val.iter();
         if is_tuple_subset(left_iter, right_slist) {
@@ -542,7 +547,7 @@ impl Value {
         )
     }
 
-    fn derive_shape(&self, symbol_table: &mut BTreeMap<String, Shape>) -> Shape {
+    fn derive_shape(&self, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
         let shape = match self {
             Value::Empty(p) => Shape::Empty(p.clone()),
             Value::Boolean(p) => Shape::Boolean(p.clone()),
@@ -690,8 +695,8 @@ impl<'a> From<&'a Token> for PositionedItem<String> {
     }
 }
 
-impl<'a> From<&'a PositionedItem<String>> for PositionedItem<String> {
-    fn from(t: &PositionedItem<String>) -> PositionedItem<String> {
+impl<'a> From<&'a PositionedItem<Rc<str>>> for PositionedItem<Rc<str>> {
+    fn from(t: &PositionedItem<Rc<str>>) -> PositionedItem<Rc<str>> {
         PositionedItem {
             pos: t.pos.clone(),
             val: t.val.clone(),
@@ -705,7 +710,7 @@ impl<'a> From<&'a PositionedItem<String>> for PositionedItem<String> {
 #[derive(PartialEq, Debug, Clone)]
 pub struct FuncDef {
     pub scope: Option<Scope>,
-    pub argdefs: Vec<PositionedItem<String>>,
+    pub argdefs: Vec<PositionedItem<Rc<str>>>,
     pub fields: Box<Expression>,
     pub pos: Position,
 }
@@ -713,7 +718,11 @@ pub struct FuncDef {
 impl FuncDef {
     fn derive_shape(&self) -> Shape {
         // 1. First set up our symbols.
-        let _table = self.argdefs.iter().map(|sym| (sym.val.clone(), Shape::Hole(sym.clone()))).collect::<BTreeMap<String, Shape>>();
+        let _table = self
+            .argdefs
+            .iter()
+            .map(|sym| (sym.val.clone(), Shape::Hole(sym.clone())))
+            .collect::<BTreeMap<Rc<str>, Shape>>();
         // 2.Then determine the shapes of those symbols in our expression.
         // 3. Finally determine what the return shape can be.
         todo!();
@@ -983,11 +992,11 @@ impl Expression {
         }
     }
 
-    fn derive_shape(&self, symbol_table: &mut BTreeMap<String, Shape>) -> Shape {
+    fn derive_shape(&self, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
         let shape = match self {
             Expression::Simple(v) => v.derive_shape(symbol_table),
             Expression::Format(def) => {
-                Shape::Str(PositionedItem::new("".to_owned(), def.pos.clone()))
+                Shape::Str(PositionedItem::new("".into(), def.pos.clone()))
             }
             Expression::Not(def) => derive_not_shape(def, symbol_table),
             Expression::Grouped(v, _pos) => v.as_ref().derive_shape(symbol_table),
@@ -997,7 +1006,7 @@ impl Expression {
             )),
             Expression::Cast(def) => match def.cast_type {
                 CastType::Int => Shape::Int(PositionedItem::new(0, def.pos.clone())),
-                CastType::Str => Shape::Str(PositionedItem::new("".to_owned(), def.pos.clone())),
+                CastType::Str => Shape::Str(PositionedItem::new("".into(), def.pos.clone())),
                 CastType::Float => Shape::Float(PositionedItem::new(0.0, def.pos.clone())),
                 CastType::Bool => Shape::Boolean(PositionedItem::new(true, def.pos.clone())),
             },
@@ -1040,7 +1049,7 @@ fn derive_include_shape(
     ))
 }
 
-fn derive_not_shape(def: &NotDef, symbol_table: &mut BTreeMap<String, Shape>) -> Shape {
+fn derive_not_shape(def: &NotDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
     let shape = def.expr.as_ref().derive_shape(symbol_table);
     if let Shape::Boolean(b) = shape {
         Shape::Boolean(PositionedItem::new(!b.val, def.pos.clone()))
@@ -1056,7 +1065,7 @@ fn derive_not_shape(def: &NotDef, symbol_table: &mut BTreeMap<String, Shape>) ->
     }
 }
 
-fn derive_copy_shape(def: &CopyDef, symbol_table: &mut BTreeMap<String, Shape>) -> Shape {
+fn derive_copy_shape(def: &CopyDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
     let base_shape = def.selector.derive_shape(symbol_table);
     match &base_shape {
         // TODO(jwall): Should we allow a stack of these?
@@ -1113,7 +1122,7 @@ fn derive_copy_shape(def: &CopyDef, symbol_table: &mut BTreeMap<String, Shape>) 
                 .fields
                 .iter()
                 .map(|(tok, expr)| (tok.fragment.clone(), expr.derive_shape(symbol_table)))
-                .collect::<BTreeMap<String, Shape>>();
+                .collect::<BTreeMap<Rc<str>, Shape>>();
             // 1. Do our copyable fields have the right names and shapes based on mdef.items.
             for (tok, shape) in mdef.items.iter() {
                 if let Some(s) = arg_fields.get(&tok.fragment) {
