@@ -16,7 +16,7 @@ use std::collections::BTreeMap;
 use abortable_parser::iter::SliceIter;
 use abortable_parser::Result as ParseResult;
 
-use crate::ast::{Expression, ListDef, Position, PositionedItem, Shape, Token, TokenType, Value ,NarrowedShape};
+use crate::ast::{Expression, ListDef, Position, PositionedItem, Shape, Token, TokenType, Value ,NarrowedShape, typecheck::DeriveShape};
 use crate::iter::OffsetStrIter;
 use crate::parse::expression;
 use crate::tokenizer::tokenize;
