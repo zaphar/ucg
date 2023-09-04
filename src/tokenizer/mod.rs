@@ -14,7 +14,6 @@
 
 //! The tokenization stage of the ucg compiler.
 use std;
-use std::rc::Rc;
 
 use abortable_parser::combinators::*;
 use abortable_parser::iter::SliceIter;
