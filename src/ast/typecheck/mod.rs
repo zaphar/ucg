@@ -20,7 +20,9 @@ use crate::ast::walk::Visitor;
 use crate::ast::{Expression, FailDef, ImportDef, IncludeDef, Shape, Statement, Value};
 use crate::error::{BuildError, ErrorType};
 
-use super::{PositionedItem, NarrowedShape, ImportShape, CastType, NotDef, CopyDef, ModuleShape, FuncDef};
+use super::{
+    CastType, CopyDef, FuncDef, ImportShape, ModuleShape, NarrowedShape, NotDef, PositionedItem,
+};
 
 /// Trait for shape derivation.
 pub trait DeriveShape {
@@ -171,9 +173,7 @@ impl DeriveShape for Expression {
     fn derive_shape(&self, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
         match self {
             Expression::Simple(v) => v.derive_shape(symbol_table),
-            Expression::Format(def) => {
-                Shape::Str(PositionedItem::new("".into(), def.pos.clone()))
-            }
+            Expression::Format(def) => Shape::Str(PositionedItem::new("".into(), def.pos.clone())),
             Expression::Not(def) => derive_not_shape(def, symbol_table),
             Expression::Grouped(v, _pos) => v.as_ref().derive_shape(symbol_table),
             Expression::Range(def) => Shape::List(NarrowedShape::new_with_pos(
@@ -247,6 +247,14 @@ pub struct Checker {
     shape_stack: Vec<Shape>,
 }
 
+// TODO(jwall): I am beginning to suspect that derive_shape should be a Trait.
+// It would allow me to specify the contract a little more specifically now that
+// I'm basically implementing the method all over the place.
+
+// TODO(jwall): The symbol table contract also needs to be fleshed out a little better.
+// I need to acccount for scopes syntactic scopes a bit. packages, functions and modules all are a
+// factor.
+
 impl Checker {
     pub fn new() -> Self {
         return Self {
@@ -295,7 +303,6 @@ impl Visitor for Checker {
     }
 
     fn visit_value(&mut self, val: &mut Value) {
-        // TODO(jwall): Some values can contain expressions. Handle those here.
         match val {
             Value::Empty(p) => self.shape_stack.push(Shape::Empty(p.clone())),
             Value::Boolean(p) => self.shape_stack.push(Shape::Boolean(p.clone())),
