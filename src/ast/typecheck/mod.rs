@@ -62,18 +62,24 @@ fn derive_include_shape(
 
 fn derive_not_shape(def: &NotDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
     let shape = def.expr.as_ref().derive_shape(symbol_table);
-    if let Shape::Boolean(b) = shape {
-        Shape::Boolean(PositionedItem::new(!b.val, def.pos.clone()))
-    } else {
-        // TODO(jwall): Display implementations for shapes.
-        Shape::TypeErr(
-            def.pos.clone(),
-            format!(
-                "Expected Boolean value in Not expression but got: {:?}",
-                shape
-            ),
-        )
-    }
+    if let Shape::Boolean(b) = &shape {
+        return Shape::Boolean(PositionedItem::new(!b.val, def.pos.clone()));
+    } else if let Shape::Hole(_) = &shape {
+        return Shape::Boolean(PositionedItem::new(true, def.pos.clone()));
+    } else if let Shape::Narrowed(shape_list) = &shape {
+        for s in shape_list.types.iter() {
+            if let Shape::Boolean(b) = s {
+                return Shape::Boolean(PositionedItem::new(!b.val, def.pos.clone()));
+            }
+        }
+    };
+    Shape::TypeErr(
+        def.pos.clone(),
+        format!(
+            "Expected Boolean value in Not expression but got: {:?}",
+            shape
+        ),
+    )
 }
 
 fn derive_copy_shape(def: &CopyDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
