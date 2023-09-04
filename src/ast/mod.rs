@@ -274,7 +274,8 @@ impl NarrowedShape {
     }
 }
 
-#[doc = "Shapes represent the types that UCG values or expressions can have."]
+// TODO(jwall): Display implementations for shapes.
+/// Shapes represent the types that UCG values or expressions can have.
 #[derive(PartialEq, Debug, Clone)]
 pub enum Shape {
     Empty(Position),
@@ -309,12 +310,10 @@ impl Shape {
                 self.narrow_tuple_shapes(left_slist, right_slist, right)
             }
             (Shape::Func(left_opshape), Shape::Func(right_opshape)) => {
-                // TODO
-                unimplemented!("Can't merge these yet.");
+                todo!();
             }
             (Shape::Module(left_opshape), Shape::Module(right_opshape)) => {
-                // TODO
-                unimplemented!("Can't merge these yet.");
+                todo!();
             }
             _ => Shape::TypeErr(
                 right.pos().clone(),
