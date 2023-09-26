@@ -17,7 +17,9 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use crate::ast::walk::Visitor;
-use crate::ast::{Expression, FailDef, ImportDef, IncludeDef, Shape, Statement, Value};
+use crate::ast::{
+    Expression, FailDef, FuncShapeDef, ImportDef, IncludeDef, Shape, Statement, Value,
+};
 use crate::error::{BuildError, ErrorType};
 
 use super::{
@@ -31,16 +33,20 @@ pub trait DeriveShape {
 }
 
 impl DeriveShape for FuncDef {
-    fn derive_shape(&self, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
+    fn derive_shape(&self, _symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
         // 1. First set up our symbols.
-        let _table = self
+        let mut table = self
             .argdefs
             .iter()
             .map(|sym| (sym.val.clone(), Shape::Hole(sym.clone())))
             .collect::<BTreeMap<Rc<str>, Shape>>();
         // 2.Then determine the shapes of those symbols in our expression.
+        let _shape = self.fields.derive_shape(&mut table);
         // 3. Finally determine what the return shape can be.
-        todo!();
+        Shape::Func(FuncShapeDef {
+            args: table,
+            ret: todo!(),
+        })
     }
 }
 
@@ -87,8 +93,7 @@ fn derive_copy_shape(def: &CopyDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>)
     match &base_shape {
         // TODO(jwall): Should we allow a stack of these?
         Shape::TypeErr(_, _) => base_shape,
-        Shape::Empty(_)
-        | Shape::Boolean(_)
+        Shape::Boolean(_)
         | Shape::Int(_)
         | Shape::Float(_)
         | Shape::Str(_)
@@ -103,7 +108,10 @@ fn derive_copy_shape(def: &CopyDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>)
                 Shape::Tuple(PositionedItem::new(vec![], pi.pos.clone())),
                 Shape::Module(ModuleShape {
                     items: vec![],
-                    ret: Box::new(Shape::Empty(pi.pos.clone())),
+                    ret: Box::new(Shape::Narrowed(NarrowedShape {
+                        pos: pi.pos.clone(),
+                        types: vec![],
+                    })),
                 }),
                 Shape::Import(ImportShape::Unresolved(pi.clone())),
             ],
@@ -142,7 +150,7 @@ fn derive_copy_shape(def: &CopyDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>)
             // 1. Do our copyable fields have the right names and shapes based on mdef.items.
             for (tok, shape) in mdef.items.iter() {
                 if let Some(s) = arg_fields.get(&tok.fragment) {
-                    if let Shape::TypeErr(pos, msg) = shape.narrow(s) {
+                    if let Shape::TypeErr(pos, msg) = shape.narrow(s, symbol_table) {
                         return Shape::TypeErr(pos, msg);
                     }
                 }
@@ -199,7 +207,7 @@ impl DeriveShape for Expression {
             Expression::Binary(def) => {
                 let left_shape = def.left.derive_shape(symbol_table);
                 let right_shape = def.right.derive_shape(symbol_table);
-                left_shape.narrow(&right_shape)
+                left_shape.narrow(&right_shape, symbol_table)
             }
             Expression::Copy(def) => derive_copy_shape(def, symbol_table),
             Expression::Include(def) => derive_include_shape(def),
@@ -217,7 +225,7 @@ impl DeriveShape for Expression {
 impl DeriveShape for Value {
     fn derive_shape(&self, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
         match self {
-            Value::Empty(p) => Shape::Empty(p.clone()),
+            Value::Empty(p) => Shape::Narrowed(NarrowedShape::new_with_pos(vec![], p.clone())),
             Value::Boolean(p) => Shape::Boolean(p.clone()),
             Value::Int(p) => Shape::Int(p.clone()),
             Value::Float(p) => Shape::Float(p.clone()),
@@ -310,7 +318,12 @@ impl Visitor for Checker {
 
     fn visit_value(&mut self, val: &mut Value) {
         match val {
-            Value::Empty(p) => self.shape_stack.push(Shape::Empty(p.clone())),
+            Value::Empty(p) => self
+                .shape_stack
+                .push(Shape::Narrowed(NarrowedShape::new_with_pos(
+                    vec![],
+                    p.clone(),
+                ))),
             Value::Boolean(p) => self.shape_stack.push(Shape::Boolean(p.clone())),
             Value::Int(p) => self.shape_stack.push(Shape::Int(p.clone())),
             Value::Float(p) => self.shape_stack.push(Shape::Float(p.clone())),

@@ -25,10 +25,6 @@ use crate::tokenizer::tokenize;
 fn derive_shape_values() {
     let value_cases = vec![
         (
-            Value::Empty(Position::new(0, 0, 0)),
-            Shape::Empty(Position::new(0, 0, 0)),
-        ),
-        (
             Value::Boolean(PositionedItem::new(false, Position::new(0, 1, 2))),
             Shape::Boolean(PositionedItem::new(false, Position::new(0, 1, 2))),
         ),

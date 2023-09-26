@@ -224,7 +224,7 @@ pub type ShapeList = Vec<Shape>;
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct FuncShapeDef {
-    args: Vec<Shape>,
+    args: BTreeMap<Rc<str>, Shape>,
     ret: Box<Shape>,
 }
 
@@ -278,7 +278,6 @@ impl NarrowedShape {
 /// Shapes represent the types that UCG values or expressions can have.
 #[derive(PartialEq, Debug, Clone)]
 pub enum Shape {
-    Empty(Position),
     Boolean(PositionedItem<bool>),
     Int(PositionedItem<i64>),
     Float(PositionedItem<f64>),
@@ -294,20 +293,28 @@ pub enum Shape {
 }
 
 impl Shape {
-    pub fn narrow(&self, right: &Shape) -> Self {
+    pub fn narrow(&self, right: &Shape, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Self {
+        dbg!((self, right));
         match (self, right) {
             (Shape::Str(_), Shape::Str(_))
             | (Shape::Boolean(_), Shape::Boolean(_))
-            | (Shape::Empty(_), Shape::Empty(_))
             | (Shape::Int(_), Shape::Int(_))
             | (Shape::Float(_), Shape::Float(_)) => self.clone(),
-            (Shape::Hole(_), other) | (other, Shape::Hole(_)) => other.clone(),
+            (Shape::Hole(sym), other) | (other, Shape::Hole(sym)) => {
+                if symbol_table.contains_key(&sym.val) {
+                    symbol_table.insert(sym.val.clone(), other.clone().with_pos(sym.pos.clone()));
+                } else {
+                    // TODO(jwall): Is this an error?
+                    todo!();
+                }
+                other.clone()
+            },
             (Shape::Narrowed(left_slist), Shape::Narrowed(right_slist))
             | (Shape::List(left_slist), Shape::List(right_slist)) => {
-                self.narrow_list_shapes(left_slist, right_slist, right)
+                self.narrow_list_shapes(left_slist, right_slist, right, symbol_table)
             }
             (Shape::Tuple(left_slist), Shape::Tuple(right_slist)) => {
-                self.narrow_tuple_shapes(left_slist, right_slist, right)
+                self.narrow_tuple_shapes(left_slist, right_slist, right, symbol_table)
             }
             (Shape::Func(left_opshape), Shape::Func(right_opshape)) => {
                 todo!();
@@ -331,12 +338,13 @@ impl Shape {
         left_slist: &PositionedItem<Vec<(Token, Shape)>>,
         right_slist: &PositionedItem<Vec<(Token, Shape)>>,
         right: &Shape,
+        symbol_table: &mut BTreeMap<Rc<str>, Shape>,
     ) -> Shape {
         let left_iter = left_slist.val.iter();
         let right_iter = right_slist.val.iter();
-        if is_tuple_subset(left_iter, right_slist) {
+        if is_tuple_subset(left_iter, right_slist, symbol_table) {
             self.clone()
-        } else if is_tuple_subset(right_iter, left_slist) {
+        } else if is_tuple_subset(right_iter, left_slist, symbol_table) {
             right.clone()
         } else {
             Shape::TypeErr(right.pos().clone(), "Incompatible Tuple Shapes".to_owned())
@@ -348,12 +356,13 @@ impl Shape {
         left_slist: &NarrowedShape,
         right_slist: &NarrowedShape,
         right: &Shape,
+        symbol_table: &mut BTreeMap<Rc<str>, Shape>,
     ) -> Shape {
         let left_iter = left_slist.types.iter();
         let right_iter = right_slist.types.iter();
-        if is_list_subset(left_iter, right_slist) {
+        if is_list_subset(left_iter, right_slist, symbol_table) {
             self.clone()
-        } else if is_list_subset(right_iter, left_slist) {
+        } else if is_list_subset(right_iter, left_slist, symbol_table) {
             right.clone()
         } else {
             Shape::TypeErr(right.pos().clone(), "Incompatible List Shapes".to_owned())
@@ -366,7 +375,6 @@ impl Shape {
             Shape::Int(s) => "int",
             Shape::Float(s) => "float",
             Shape::Boolean(b) => "boolean",
-            Shape::Empty(p) => "nil",
             // TODO(jwall): make these type names account for what they contain.
             Shape::List(lst) => "list",
             Shape::Tuple(flds) => "tuple",
@@ -385,7 +393,6 @@ impl Shape {
             Shape::Int(s) => &s.pos,
             Shape::Float(s) => &s.pos,
             Shape::Boolean(b) => &b.pos,
-            Shape::Empty(p) => p,
             Shape::List(lst) => &lst.pos,
             Shape::Tuple(flds) => &flds.pos,
             Shape::Func(def) => def.ret.pos(),
@@ -404,7 +411,6 @@ impl Shape {
             Shape::Int(s) => Shape::Int(PositionedItem::new(s.val, pos)),
             Shape::Float(s) => Shape::Float(PositionedItem::new(s.val, pos)),
             Shape::Boolean(b) => Shape::Boolean(PositionedItem::new(b.val, pos)),
-            Shape::Empty(p) => Shape::Empty(pos),
             Shape::List(lst) => Shape::List(NarrowedShape::new_with_pos(lst.types, pos)),
             Shape::Tuple(flds) => Shape::Tuple(PositionedItem::new(flds.val, pos)),
             Shape::Func(_) | Shape::Module(_) => self.clone(),
@@ -424,13 +430,14 @@ impl Shape {
 fn is_tuple_subset(
     mut left_iter: std::slice::Iter<(Token, Shape)>,
     right_slist: &PositionedItem<Vec<(Token, Shape)>>,
+    symbol_table: &mut BTreeMap<Rc<str>, Shape>,
 ) -> bool {
     return loop {
         if let Some((lt, ls)) = left_iter.next() {
             let mut matched = false;
             for (rt, rs) in right_slist.val.iter() {
                 if rt.fragment == lt.fragment {
-                    if let Shape::TypeErr(_, _) = ls.narrow(rs) {
+                    if let Shape::TypeErr(_, _) = ls.narrow(rs, symbol_table) {
                         // noop
                     } else {
                         matched = true;
@@ -448,7 +455,11 @@ fn is_tuple_subset(
     };
 }
 
-fn is_list_subset(mut right_iter: std::slice::Iter<Shape>, left_slist: &NarrowedShape) -> bool {
+fn is_list_subset(
+    mut right_iter: std::slice::Iter<Shape>,
+    left_slist: &NarrowedShape,
+    symbol_table: &mut BTreeMap<Rc<str>, Shape>,
+) -> bool {
     let right_subset = loop {
         let mut matches = false;
         let ls = if let Some(ls) = right_iter.next() {
@@ -457,7 +468,7 @@ fn is_list_subset(mut right_iter: std::slice::Iter<Shape>, left_slist: &Narrowed
             break true;
         };
         for rs in left_slist.types.iter() {
-            let s = ls.narrow(rs);
+            let s = ls.narrow(rs, symbol_table);
             if let Shape::TypeErr(_, _) = s {
                 // noop
             } else {
