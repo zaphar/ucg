@@ -1,9 +1,12 @@
 use std::convert::Into;
 
-use crate::ast::{Token, TokenType};
+use abortable_parser::SliceIter;
+
 use crate::ast::walk::Walker;
 use crate::ast::{Position, PositionedItem};
-use crate::parse;
+use crate::ast::{Token, TokenType};
+use crate::parse::{expression, parse};
+use crate::tokenizer::tokenize;
 
 use super::*;
 
@@ -63,10 +66,14 @@ fn simple_binary_typecheck() {
     assert_type_success!(
         "{foo = 1} + {foo = 1};",
         Shape::Tuple(PositionedItem::new(
-            vec![
-                (Token { typ: TokenType::BAREWORD, fragment: "foo".into(), pos: Position::new(1, 2, 1)},
-                Shape::Int(PositionedItem::new_with_pos(1, Position::new(1, 8, 7)))),
-            ],
+            vec![(
+                Token {
+                    typ: TokenType::BAREWORD,
+                    fragment: "foo".into(),
+                    pos: Position::new(1, 2, 1)
+                },
+                Shape::Int(PositionedItem::new_with_pos(1, Position::new(1, 8, 7)))
+            ),],
             Position::new(1, 1, 0)
         ))
     );
@@ -144,4 +151,26 @@ fn multiple_binary_typefail() {
         "Expected int but got boolean",
         Position::new(1, 9, 8)
     );
+}
+
+#[test]
+fn infer_symbol_type_test() {
+    // foo should be determined to be int
+    let expr = "1 + foo".into();
+    let symbol: Rc<str> = "foo".into();
+    let mut checker = Checker::new();
+    checker
+        .symbol_table
+        .insert(symbol.clone(), Shape::Hole(PositionedItem::new(symbol.clone(), Position::new(0, 0, 0))));
+    let tokens = tokenize(expr, None).unwrap();
+    let token_iter = SliceIter::new(&tokens);
+    let expr = expression(token_iter);
+    if let abortable_parser::Result::Complete(_, mut expr) = expr {
+        checker.walk_expression(&mut expr);
+        dbg!(&checker.symbol_table);
+        assert_eq!(
+            checker.symbol_table[&symbol],
+            Shape::Int(PositionedItem::new(1, Position::new(0, 0, 0)))
+        );
+    }
 }
