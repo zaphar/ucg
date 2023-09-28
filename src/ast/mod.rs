@@ -303,9 +303,6 @@ impl Shape {
             (Shape::Hole(sym), other) | (other, Shape::Hole(sym)) => {
                 if symbol_table.contains_key(&sym.val) {
                     symbol_table.insert(sym.val.clone(), other.clone().with_pos(sym.pos.clone()));
-                } else {
-                    // TODO(jwall): Is this an error?
-                    todo!();
                 }
                 other.clone()
             },
