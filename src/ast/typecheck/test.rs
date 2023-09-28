@@ -153,24 +153,101 @@ fn multiple_binary_typefail() {
     );
 }
 
+macro_rules! infer_symbol_test {
+    ($e:expr, $sym_list:expr, $sym_init_list:expr) => {{
+        let expr = $e.into();
+        let mut checker = Checker::new();
+        for (idx, shape) in $sym_init_list.iter().enumerate() {
+            let symbol = $sym_list[idx].0.clone();
+            checker
+                .symbol_table
+                .insert(symbol.clone(), shape.clone());
+        }
+        let tokens = tokenize(expr, None).unwrap();
+        let token_iter = SliceIter::new(&tokens);
+        let expr = expression(token_iter);
+        if let abortable_parser::Result::Complete(_, mut expr) = expr {
+            checker.walk_expression(&mut expr);
+            dbg!(&checker.symbol_table);
+            for (sym, shape) in $sym_list {
+                assert_eq!(
+                    checker.symbol_table[&sym],
+                     shape,
+                );
+            }
+        } else {
+            assert!(false, "Expression failed to parse");
+        }
+    }}
+}
+
 #[test]
 fn infer_symbol_type_test() {
     // foo should be determined to be int
-    let expr = "1 + foo".into();
-    let symbol: Rc<str> = "foo".into();
-    let mut checker = Checker::new();
-    checker
-        .symbol_table
-        .insert(symbol.clone(), Shape::Hole(PositionedItem::new(symbol.clone(), Position::new(0, 0, 0))));
-    let tokens = tokenize(expr, None).unwrap();
-    let token_iter = SliceIter::new(&tokens);
-    let expr = expression(token_iter);
-    if let abortable_parser::Result::Complete(_, mut expr) = expr {
-        checker.walk_expression(&mut expr);
-        dbg!(&checker.symbol_table);
-        assert_eq!(
-            checker.symbol_table[&symbol],
-            Shape::Int(PositionedItem::new(1, Position::new(0, 0, 0)))
-        );
+    let foo = Into::<Rc<str>>::into("foo");
+    let bar = Into::<Rc<str>>::into("bar");
+    let table = vec![
+        (
+            "1 + foo",
+            vec![(
+                foo.clone(),
+                Shape::Int(PositionedItem::new(1, Position::new(0, 0, 0))),
+            )],
+            vec![Shape::Hole(PositionedItem::new(
+                foo.clone(),
+                Position::new(0, 0, 0),
+            ))],
+        ),
+        (
+            "bar + foo",
+            vec![
+                (
+                    foo.clone(),
+                    Shape::Float(PositionedItem::new(1.0, Position::new(0, 0, 0))),
+                ),
+                (
+                    bar.clone(),
+                    Shape::Float(PositionedItem::new(1.0, Position::new(0, 0, 0))),
+                ),
+            ],
+            vec![
+                Shape::Hole(PositionedItem::new(foo.clone(), Position::new(0, 0, 0))),
+                Shape::Float(PositionedItem::new(1.0, Position::new(0, 0, 0))),
+            ],
+        ),
+    ];
+    for (expr, sym_list, sym_init_list) in table {
+        infer_symbol_test!(expr, sym_list, sym_init_list)
     }
+}
+
+#[test]
+fn infer_func_type_test() {
+    let mut args = BTreeMap::new();
+    args.insert(
+        Into::<Rc<str>>::into("foo"),
+        Shape::Int(PositionedItem {
+            pos: Position {
+                file: None,
+                line: 1,
+                column: 6,
+                offset: 5,
+            },
+            val: 1,
+        }),
+    );
+    let ret = Shape::Int(PositionedItem {
+        pos: Position {
+            file: None,
+            line: 1,
+            column: 20,
+            offset: 19,
+        },
+        val: 1,
+    })
+    .into();
+    assert_type_success!(
+        "func(foo) => foo + 1;",
+        Shape::Func(FuncShapeDef { args, ret })
+    );
 }
