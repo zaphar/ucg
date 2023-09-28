@@ -35,14 +35,21 @@ pub trait DeriveShape {
 impl DeriveShape for FuncDef {
     fn derive_shape(&self, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
         // 1. First set up our symbols.
-        let mut table = self
+        let mut sym_table = self
             .argdefs
             .iter()
             .map(|sym| (sym.val.clone(), Shape::Hole(sym.clone())))
             .collect::<BTreeMap<Rc<str>, Shape>>();
+        sym_table.append(&mut symbol_table.clone());
         // 2.Then determine the shapes of those symbols in our expression.
-        let shape = self.fields.derive_shape(&mut table);
+        let shape = self.fields.derive_shape(&mut sym_table);
         // 3. Finally determine what the return shape can be.
+        // only include the closed over shapes.
+        let table = self
+            .argdefs
+            .iter()
+            .map(|sym| (sym.val.clone(), sym_table.get(&sym.val).unwrap().clone()))
+            .collect::<BTreeMap<Rc<str>, Shape>>();
         Shape::Func(FuncShapeDef {
             args: table,
             ret: shape.into(),
@@ -276,6 +283,11 @@ impl Checker {
             err_stack: Vec::new(),
             shape_stack: Vec::new(),
         };
+    }
+
+    pub fn with_symbol_table(mut self, symbol_table: BTreeMap<Rc<str>, Shape>) -> Self {
+        self.symbol_table = symbol_table;
+        self
     }
 
     pub fn pop_shape(&mut self) -> Option<Shape> {
