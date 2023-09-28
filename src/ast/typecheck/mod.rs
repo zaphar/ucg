@@ -33,7 +33,7 @@ pub trait DeriveShape {
 }
 
 impl DeriveShape for FuncDef {
-    fn derive_shape(&self, _symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
+    fn derive_shape(&self, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
         // 1. First set up our symbols.
         let mut table = self
             .argdefs
@@ -41,11 +41,11 @@ impl DeriveShape for FuncDef {
             .map(|sym| (sym.val.clone(), Shape::Hole(sym.clone())))
             .collect::<BTreeMap<Rc<str>, Shape>>();
         // 2.Then determine the shapes of those symbols in our expression.
-        let _shape = self.fields.derive_shape(&mut table);
+        let shape = self.fields.derive_shape(&mut table);
         // 3. Finally determine what the return shape can be.
         Shape::Func(FuncShapeDef {
             args: table,
-            ret: todo!(),
+            ret: shape.into(),
         })
     }
 }
