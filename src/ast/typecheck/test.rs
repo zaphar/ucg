@@ -24,19 +24,18 @@ macro_rules! assert_type_fail {
 }
 
 macro_rules! assert_type_success {
-    ($e:expr, $shap:expr) => {{
-        let mut checker = Checker::new();
+    ($e:expr, $shape:expr) => {{
+        assert_type_success!($e, $shape, BTreeMap::new());
+    }};
+    ($e:expr, $shape:expr, $sym_table:expr) => {{
+        let mut checker = Checker::new().with_symbol_table($sym_table);
         let mut expr = parse($e.into(), None).unwrap();
         checker.walk_statement_list(expr.iter_mut().collect());
         let maybe_shape = checker.pop_shape();
         let result = checker.result();
         assert!(result.is_ok(), "We expect this to typecheck successfully.");
-        assert!(
-            result.unwrap().is_empty(),
-            "We don't expect a symbol table entry."
-        );
         assert!(maybe_shape.is_some(), "We got a shape out of it");
-        assert_eq!(maybe_shape.unwrap(), $shap);
+        assert_eq!(maybe_shape.unwrap(), $shape);
     }};
 }
 
@@ -224,8 +223,10 @@ fn infer_symbol_type_test() {
 #[test]
 fn infer_func_type_test() {
     let mut args = BTreeMap::new();
+    let foo = Into::<Rc<str>>::into("foo");
+    let bar = Into::<Rc<str>>::into("bar");
     args.insert(
-        Into::<Rc<str>>::into("foo"),
+        foo.clone(),
         Shape::Int(PositionedItem {
             pos: Position {
                 file: None,
@@ -249,5 +250,48 @@ fn infer_func_type_test() {
     assert_type_success!(
         "func(foo) => foo + 1;",
         Shape::Func(FuncShapeDef { args, ret })
+    );
+    let mut symbol_table = BTreeMap::new();
+    symbol_table.insert(
+        bar.clone(),
+        Shape::Int(PositionedItem {
+            pos: Position {
+                file: None,
+                line: 1,
+                column: 20,
+                offset: 19,
+            },
+            val: 1,
+        }),
+    );
+    let mut args = BTreeMap::new();
+    args.insert(
+        foo.clone(),
+        Shape::Int(PositionedItem {
+            pos: Position {
+                file: None,
+                line: 1,
+                column: 6,
+                offset: 5,
+            },
+            val: 1,
+        }),
+    );
+    assert_type_success!(
+        "func(foo) => foo + bar;",
+        Shape::Func(FuncShapeDef {
+            args: args,
+            ret: Shape::Int(PositionedItem {
+                pos: Position {
+                    file: None,
+                    line: 1,
+                    column: 20,
+                    offset: 19,
+                },
+                val: 1,
+            })
+            .into()
+        }),
+        symbol_table
     );
 }
