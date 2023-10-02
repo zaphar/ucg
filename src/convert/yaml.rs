@@ -39,7 +39,10 @@ impl YamlConverter {
     fn convert_tuple(&self, items: &Vec<(Rc<str>, Rc<Val>)>) -> std::io::Result<serde_yaml::Value> {
         let mut mapping = serde_yaml::Mapping::new();
         for &(ref k, ref v) in items.iter() {
-            mapping.insert(serde_yaml::Value::String(k.to_string()), self.convert_value(v)?);
+            mapping.insert(
+                serde_yaml::Value::String(k.to_string()),
+                self.convert_value(v)?,
+            );
         }
         Ok(serde_yaml::Value::Mapping(mapping))
     }

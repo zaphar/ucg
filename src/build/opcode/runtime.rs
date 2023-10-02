@@ -114,7 +114,11 @@ impl Builtins {
                     stack.push((val, path_pos));
                     return Ok(());
                 }
-                if import_stack.iter().find(|p| p.as_ref() == path.as_ref()).is_some() {
+                if import_stack
+                    .iter()
+                    .find(|p| p.as_ref() == path.as_ref())
+                    .is_some()
+                {
                     return Err(Error::new(
                         format!("Import cycle detected: {} in {:?}", path, import_stack).into(),
                         pos,
@@ -127,15 +131,15 @@ impl Builtins {
                     }
                     None => {
                         let path_buf = PathBuf::from(path.as_ref());
-                        let op_pointer =
-                            decorate_error!(path_pos => env.borrow_mut().get_ops_for_path(path.as_ref()))?;
+                        let op_pointer = decorate_error!(path_pos => env.borrow_mut().get_ops_for_path(path.as_ref()))?;
                         // TODO(jwall): What if we don't have a base path?
                         let mut vm =
                             VM::with_pointer(self.strict, op_pointer, path_buf.parent().unwrap())
                                 .with_import_stack(import_stack.clone());
                         vm.run(env)?;
                         let result = Rc::new(vm.symbols_to_tuple(true));
-                        env.borrow_mut().update_path_val(path.clone(), result.clone());
+                        env.borrow_mut()
+                            .update_path_val(path.clone(), result.clone());
                         stack.push((result, pos));
                     }
                 }
@@ -163,7 +167,10 @@ impl Builtins {
             if let &Value::P(Str(ref path)) = val.as_ref() {
                 path.clone()
             } else {
-                return Err(Error::new(format!("Invalid Path {:?}", val).into(), path_pos));
+                return Err(Error::new(
+                    format!("Invalid Path {:?}", val).into(),
+                    path_pos,
+                ));
             }
         } else {
             unreachable!();
@@ -201,7 +208,10 @@ impl Builtins {
                         }
                     }
                     None => {
-                        return Err(Error::new(format!("No such conversion type {}", &typ).into(), pos))
+                        return Err(Error::new(
+                            format!("No such conversion type {}", &typ).into(),
+                            pos,
+                        ))
                     }
                 }),
                 pos,
@@ -355,9 +365,7 @@ impl Builtins {
                         match c.convert(Rc::new(val), &mut buf) {
                             Ok(_) => {
                                 stack.push((
-                                    Rc::new(P(Str(
-                                        String::from_utf8_lossy(buf.as_slice()).into()
-                                    ))),
+                                    Rc::new(P(Str(String::from_utf8_lossy(buf.as_slice()).into()))),
                                     pos,
                                 ));
                             }

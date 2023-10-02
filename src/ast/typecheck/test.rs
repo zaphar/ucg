@@ -41,18 +41,9 @@ macro_rules! assert_type_success {
 
 #[test]
 fn simple_binary_typecheck() {
-    assert_type_success!(
-        "1 + 1;",
-        Shape::Int(PositionedItem::new(1, Position::new(1, 1, 0)))
-    );
-    assert_type_success!(
-        "\"\" + \"\";",
-        Shape::Str(PositionedItem::new("".into(), Position::new(1, 1, 0)))
-    );
-    assert_type_success!(
-        "1.0 + 1.0;",
-        Shape::Float(PositionedItem::new(1.0, Position::new(1, 1, 0)))
-    );
+    assert_type_success!("1 + 1;", Shape::Int(Position::new(1, 1, 0)));
+    assert_type_success!("\"\" + \"\";", Shape::Str(Position::new(1, 1, 0)));
+    assert_type_success!("1.0 + 1.0;", Shape::Float(Position::new(1, 1, 0)));
     assert_type_success!(
         "[] + [];",
         Shape::List(crate::ast::NarrowedShape::new(vec![], 1, 1, 0))
@@ -71,7 +62,7 @@ fn simple_binary_typecheck() {
                     fragment: "foo".into(),
                     pos: Position::new(1, 2, 1)
                 },
-                Shape::Int(PositionedItem::new_with_pos(1, Position::new(1, 8, 7)))
+                Shape::Int(Position::new(1, 8, 7))
             ),],
             Position::new(1, 1, 0)
         ))
@@ -79,10 +70,7 @@ fn simple_binary_typecheck() {
     assert_type_success!(
         "[1] + [2];",
         Shape::List(crate::ast::NarrowedShape::new(
-            vec![Shape::Int(PositionedItem::new_with_pos(
-                1,
-                Position::new(1, 1, 0)
-            ))],
+            vec![Shape::Int(Position::new(1, 2, 1))],
             1,
             1,
             0
@@ -92,8 +80,8 @@ fn simple_binary_typecheck() {
         "[1, 1.0] + [1, 2.0];",
         Shape::List(crate::ast::NarrowedShape::new(
             vec![
-                Shape::Int(PositionedItem::new_with_pos(1, Position::new(1, 1, 0))),
-                Shape::Float(PositionedItem::new_with_pos(1.0, Position::new(1, 1, 0))),
+                Shape::Int(Position::new(1, 2, 1)),
+                Shape::Float(Position::new(1, 5, 4)),
             ],
             1,
             1,
@@ -188,10 +176,7 @@ fn infer_symbol_type_test() {
     let table = vec![
         (
             "1 + foo",
-            vec![(
-                foo.clone(),
-                Shape::Int(PositionedItem::new(1, Position::new(0, 0, 0))),
-            )],
+            vec![(foo.clone(), Shape::Int(Position::new(0, 0, 0)))],
             vec![Shape::Hole(PositionedItem::new(
                 foo.clone(),
                 Position::new(0, 0, 0),
@@ -200,18 +185,12 @@ fn infer_symbol_type_test() {
         (
             "bar + foo",
             vec![
-                (
-                    foo.clone(),
-                    Shape::Float(PositionedItem::new(1.0, Position::new(0, 0, 0))),
-                ),
-                (
-                    bar.clone(),
-                    Shape::Float(PositionedItem::new(1.0, Position::new(0, 0, 0))),
-                ),
+                (foo.clone(), Shape::Float(Position::new(0, 0, 0))),
+                (bar.clone(), Shape::Float(Position::new(0, 0, 0))),
             ],
             vec![
                 Shape::Hole(PositionedItem::new(foo.clone(), Position::new(0, 0, 0))),
-                Shape::Float(PositionedItem::new(1.0, Position::new(0, 0, 0))),
+                Shape::Float(Position::new(0, 0, 0)),
             ],
         ),
     ];
@@ -227,24 +206,18 @@ fn infer_func_type_test() {
     let bar = Into::<Rc<str>>::into("bar");
     args.insert(
         foo.clone(),
-        Shape::Int(PositionedItem {
-            pos: Position {
-                file: None,
-                line: 1,
-                column: 6,
-                offset: 5,
-            },
-            val: 1,
-        }),
-    );
-    let ret = Shape::Int(PositionedItem {
-        pos: Position {
+        Shape::Int(Position {
             file: None,
             line: 1,
-            column: 20,
-            offset: 19,
-        },
-        val: 1,
+            column: 6,
+            offset: 5,
+        }),
+    );
+    let ret = Shape::Int(Position {
+        file: None,
+        line: 1,
+        column: 1,
+        offset: 0,
     })
     .into();
     assert_type_success!(
@@ -254,44 +227,44 @@ fn infer_func_type_test() {
     let mut symbol_table = BTreeMap::new();
     symbol_table.insert(
         bar.clone(),
-        Shape::Int(PositionedItem {
-            pos: Position {
+        Shape::Int(Position {
                 file: None,
                 line: 1,
                 column: 20,
                 offset: 19,
-            },
-            val: 1,
         }),
     );
     let mut args = BTreeMap::new();
     args.insert(
         foo.clone(),
-        Shape::Int(PositionedItem {
-            pos: Position {
+        Shape::Int(Position {
                 file: None,
                 line: 1,
                 column: 6,
                 offset: 5,
-            },
-            val: 1,
         }),
     );
     assert_type_success!(
         "func(foo) => foo + bar;",
         Shape::Func(FuncShapeDef {
             args: args,
-            ret: Shape::Int(PositionedItem {
-                pos: Position {
+            ret: Shape::Int(Position {
                     file: None,
                     line: 1,
-                    column: 20,
-                    offset: 19,
-                },
-                val: 1,
+                    column: 1,
+                    offset: 0,
             })
             .into()
         }),
         symbol_table
     );
 }
+
+//#[test]
+//fn infer_select_shape() {
+//    assert_type_success!(
+//        r#"select () => { true = "foo", false = 1 }"#,
+//        Shape::Narrowed(NarrowedShape { pos: Position { file: None, line: 0, column: 0, offset: 0 }, types: vec![
+//            Shape::Str(PositionedItem { pos: , val: () })
+//        ] }))
+//}

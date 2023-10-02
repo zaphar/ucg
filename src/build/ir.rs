@@ -217,7 +217,8 @@ impl From<Val> for Rc<str> {
             Val::Boolean(ref b) => format!("{}", b),
             Val::Empty => "NULL".to_string(),
             val => format!("{}", val),
-        }.into()
+        }
+        .into()
     }
 }
 

@@ -83,10 +83,7 @@ make_fn!(
 );
 
 fn str_to_value(s: &Token) -> ConvertResult<Value> {
-    Ok(Value::Str(value_node!(
-        s.fragment.clone(),
-        s.pos.clone()
-    )))
+    Ok(Value::Str(value_node!(s.fragment.clone(), s.pos.clone())))
 }
 
 // quoted_value is a quoted string.
