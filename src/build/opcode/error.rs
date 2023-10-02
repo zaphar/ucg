@@ -84,7 +84,8 @@ impl From<std::io::Error> for Error {
                 format!("OSError: Path not found: {}", e)
             }
             _ => format!("{}", e),
-        }.into();
+        }
+        .into();
         Error {
             message: msg,
             pos: None,

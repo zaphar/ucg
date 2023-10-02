@@ -181,7 +181,11 @@ where
             if found.contains(&link) {
                 continue;
             }
-            let ops = match self.environment.borrow_mut().get_ops_for_path(link.as_ref()) {
+            let ops = match self
+                .environment
+                .borrow_mut()
+                .get_ops_for_path(link.as_ref())
+            {
                 Ok(ops) => ops,
                 Err(e) => return Err(Box::new(e.with_pos(path_pos))),
             };

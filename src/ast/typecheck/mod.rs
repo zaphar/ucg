@@ -38,7 +38,7 @@ impl DeriveShape for FuncDef {
         let mut sym_table = self
             .argdefs
             .iter()
-            .map(|sym| (sym.val.clone(), Shape::Hole(sym.clone())))
+            .map(|sym| (sym.val.clone(), dbg!(Shape::Hole(sym.clone()))))
             .collect::<BTreeMap<Rc<str>, Shape>>();
         sym_table.append(&mut symbol_table.clone());
         // 2.Then determine the shapes of those symbols in our expression.
@@ -48,11 +48,20 @@ impl DeriveShape for FuncDef {
         let table = self
             .argdefs
             .iter()
-            .map(|sym| (sym.val.clone(), sym_table.get(&sym.val).unwrap().clone()))
+            .map(|sym| {
+                (
+                    sym.val.clone(),
+                    dbg!(sym_table
+                        .get(&sym.val)
+                        .unwrap()
+                        .clone()
+                        .with_pos(sym.pos.clone())),
+                )
+            })
             .collect::<BTreeMap<Rc<str>, Shape>>();
         Shape::Func(FuncShapeDef {
             args: table,
-            ret: shape.into(),
+            ret: shape.with_pos(self.pos.clone()).into(),
         })
     }
 }
@@ -75,14 +84,14 @@ fn derive_include_shape(
 
 fn derive_not_shape(def: &NotDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
     let shape = def.expr.as_ref().derive_shape(symbol_table);
-    if let Shape::Boolean(b) = &shape {
-        return Shape::Boolean(PositionedItem::new(!b.val, def.pos.clone()));
+    if let Shape::Boolean(_) = &shape {
+        return Shape::Boolean(def.pos.clone());
     } else if let Shape::Hole(_) = &shape {
-        return Shape::Boolean(PositionedItem::new(true, def.pos.clone()));
+        return Shape::Boolean(def.pos.clone());
     } else if let Shape::Narrowed(shape_list) = &shape {
         for s in shape_list.types.iter() {
-            if let Shape::Boolean(b) = s {
-                return Shape::Boolean(PositionedItem::new(!b.val, def.pos.clone()));
+            if let Shape::Boolean(_) = s {
+                return Shape::Boolean(def.pos.clone());
             }
         }
     };
@@ -194,18 +203,18 @@ impl DeriveShape for Expression {
     fn derive_shape(&self, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
         match self {
             Expression::Simple(v) => v.derive_shape(symbol_table),
-            Expression::Format(def) => Shape::Str(PositionedItem::new("".into(), def.pos.clone())),
+            Expression::Format(def) => Shape::Str(def.pos.clone()),
             Expression::Not(def) => derive_not_shape(def, symbol_table),
             Expression::Grouped(v, _pos) => v.as_ref().derive_shape(symbol_table),
             Expression::Range(def) => Shape::List(NarrowedShape::new_with_pos(
-                vec![Shape::Int(PositionedItem::new(0, def.start.pos().clone()))],
+                vec![Shape::Int(def.start.pos().clone())],
                 def.pos.clone(),
             )),
             Expression::Cast(def) => match def.cast_type {
-                CastType::Int => Shape::Int(PositionedItem::new(0, def.pos.clone())),
-                CastType::Str => Shape::Str(PositionedItem::new("".into(), def.pos.clone())),
-                CastType::Float => Shape::Float(PositionedItem::new(0.0, def.pos.clone())),
-                CastType::Bool => Shape::Boolean(PositionedItem::new(true, def.pos.clone())),
+                CastType::Int => Shape::Int(def.pos.clone()),
+                CastType::Str => Shape::Str(def.pos.clone()),
+                CastType::Float => Shape::Float(def.pos.clone()),
+                CastType::Bool => Shape::Boolean(def.pos.clone()),
             },
             Expression::Import(def) => Shape::Import(ImportShape::Unresolved(PositionedItem::new(
                 def.path.fragment.clone(),
@@ -233,10 +242,10 @@ impl DeriveShape for Value {
     fn derive_shape(&self, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
         match self {
             Value::Empty(p) => Shape::Narrowed(NarrowedShape::new_with_pos(vec![], p.clone())),
-            Value::Boolean(p) => Shape::Boolean(p.clone()),
-            Value::Int(p) => Shape::Int(p.clone()),
-            Value::Float(p) => Shape::Float(p.clone()),
-            Value::Str(p) => Shape::Str(p.clone()),
+            Value::Boolean(p) => Shape::Boolean(p.pos.clone()),
+            Value::Int(p) => Shape::Int(p.pos.clone()),
+            Value::Float(p) => Shape::Float(p.pos.clone()),
+            Value::Str(p) => Shape::Str(p.pos.clone()),
             Value::Symbol(p) => {
                 if let Some(s) = symbol_table.get(&p.val) {
                     s.clone()
@@ -336,10 +345,10 @@ impl Visitor for Checker {
                     vec![],
                     p.clone(),
                 ))),
-            Value::Boolean(p) => self.shape_stack.push(Shape::Boolean(p.clone())),
-            Value::Int(p) => self.shape_stack.push(Shape::Int(p.clone())),
-            Value::Float(p) => self.shape_stack.push(Shape::Float(p.clone())),
-            Value::Str(p) => self.shape_stack.push(Shape::Str(p.clone())),
+            Value::Boolean(p) => self.shape_stack.push(Shape::Boolean(p.pos.clone())),
+            Value::Int(p) => self.shape_stack.push(Shape::Int(p.pos.clone())),
+            Value::Float(p) => self.shape_stack.push(Shape::Float(p.pos.clone())),
+            Value::Str(p) => self.shape_stack.push(Shape::Str(p.pos.clone())),
             // Symbols in a shape are placeholders. They allow a form of genericity
             // in the shape. They can be any type and are only refined down.
             // by their presence in an expression.
