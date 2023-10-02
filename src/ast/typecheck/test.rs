@@ -15,7 +15,7 @@ macro_rules! assert_type_fail {
         let mut checker = Checker::new();
         let mut expr = parse($e.into(), None).unwrap();
         checker.walk_statement_list(expr.iter_mut().collect());
-        let result = dbg!(checker.result());
+        let result = checker.result();
         assert!(result.is_err(), "We expect this to fail a typecheck.");
         let err = result.unwrap_err();
         assert_eq!(err.msg, $msg);
@@ -155,7 +155,6 @@ macro_rules! infer_symbol_test {
         let expr = expression(token_iter);
         if let abortable_parser::Result::Complete(_, mut expr) = expr {
             checker.walk_expression(&mut expr);
-            dbg!(&checker.symbol_table);
             for (sym, shape) in $sym_list {
                 assert_eq!(
                     checker.symbol_table[&sym],
@@ -228,20 +227,20 @@ fn infer_func_type_test() {
     symbol_table.insert(
         bar.clone(),
         Shape::Int(Position {
-                file: None,
-                line: 1,
-                column: 20,
-                offset: 19,
+            file: None,
+            line: 1,
+            column: 20,
+            offset: 19,
         }),
     );
     let mut args = BTreeMap::new();
     args.insert(
         foo.clone(),
         Shape::Int(Position {
-                file: None,
-                line: 1,
-                column: 6,
-                offset: 5,
+            file: None,
+            line: 1,
+            column: 6,
+            offset: 5,
         }),
     );
     assert_type_success!(
@@ -249,10 +248,10 @@ fn infer_func_type_test() {
         Shape::Func(FuncShapeDef {
             args: args,
             ret: Shape::Int(Position {
-                    file: None,
-                    line: 1,
-                    column: 1,
-                    offset: 0,
+                file: None,
+                line: 1,
+                column: 1,
+                offset: 0,
             })
             .into()
         }),
@@ -260,11 +259,275 @@ fn infer_func_type_test() {
     );
 }
 
-//#[test]
-//fn infer_select_shape() {
-//    assert_type_success!(
-//        r#"select () => { true = "foo", false = 1 }"#,
-//        Shape::Narrowed(NarrowedShape { pos: Position { file: None, line: 0, column: 0, offset: 0 }, types: vec![
-//            Shape::Str(PositionedItem { pos: , val: () })
-//        ] }))
-//}
+#[test]
+fn infer_select_shape() {
+    assert_type_success!(
+        r#"select (foo) => { true = "foo", false = 1 };"#,
+        Shape::Narrowed(NarrowedShape {
+            pos: Position {
+                file: None,
+                line: 1,
+                column: 1,
+                offset: 0
+            },
+            types: vec![
+                Shape::Str(Position::new(1, 26, 25)),
+                Shape::Int(Position::new(1, 41, 40)),
+            ]
+        })
+    );
+    assert_type_success!(
+        r#"select (foo) => { true = "foo", false = { } };"#,
+        Shape::Narrowed(NarrowedShape {
+            pos: Position {
+                file: None,
+                line: 1,
+                column: 1,
+                offset: 0
+            },
+            types: vec![
+                Shape::Str(Position::new(1, 26, 25)),
+                Shape::Tuple(PositionedItem {
+                    pos: Position {
+                        file: None,
+                        line: 1,
+                        column: 41,
+                        offset: 40
+                    },
+                    val: vec![],
+                }),
+            ],
+        })
+    );
+    assert_type_success!(
+        r#"select (foo) => { true = { }, false = { } };"#,
+        Shape::Narrowed(NarrowedShape {
+            pos: Position {
+                file: None,
+                line: 1,
+                column: 1,
+                offset: 0
+            },
+            types: vec![Shape::Tuple(PositionedItem {
+                pos: Position {
+                    file: None,
+                    line: 1,
+                    column: 26,
+                    offset: 25
+                },
+                val: vec![],
+            }),],
+        })
+    );
+    assert_type_success!(
+        r#"select (foo) => { true = { foo = 1, }, false = { bar = "foo" } };"#,
+        Shape::Narrowed(NarrowedShape {
+            pos: Position {
+                file: None,
+                line: 1,
+                column: 1,
+                offset: 0
+            },
+            types: vec![
+                Shape::Tuple(PositionedItem {
+                    pos: Position {
+                        file: None,
+                        line: 1,
+                        column: 26,
+                        offset: 25
+                    },
+                    val: vec![(
+                        Token {
+                            typ: TokenType::BAREWORD,
+                            fragment: "foo".into(),
+                            pos: Position {
+                                file: None,
+                                line: 1,
+                                column: 28,
+                                offset: 27
+                            }
+                        },
+                        Shape::Int(Position {
+                            file: None,
+                            line: 1,
+                            column: 34,
+                            offset: 33
+                        })
+                    )]
+                }),
+                Shape::Tuple(PositionedItem {
+                    pos: Position {
+                        file: None,
+                        line: 1,
+                        column: 48,
+                        offset: 47
+                    },
+                    val: vec![(
+                        Token {
+                            typ: TokenType::BAREWORD,
+                            fragment: "bar".into(),
+                            pos: Position {
+                                file: None,
+                                line: 1,
+                                column: 50,
+                                offset: 49
+                            }
+                        },
+                        Shape::Str(Position {
+                            file: None,
+                            line: 1,
+                            column: 56,
+                            offset: 55
+                        })
+                    )]
+                })
+            ]
+        })
+    );
+    assert_type_success!(
+        r#"select (foo) => { true = { foo = 1, bar = "quux" }, false = { bar = "foo" } };"#,
+        Shape::Narrowed(NarrowedShape {
+            pos: Position {
+                file: None,
+                line: 1,
+                column: 1,
+                offset: 0
+            },
+            types: vec![
+                Shape::Tuple(PositionedItem {
+                    pos: Position {
+                        file: None,
+                        line: 1,
+                        column: 26,
+                        offset: 25
+                    },
+                    val: vec![
+                        (
+                            Token {
+                                typ: TokenType::BAREWORD,
+                                fragment: "foo".into(),
+                                pos: Position {
+                                    file: None,
+                                    line: 1,
+                                    column: 28,
+                                    offset: 27
+                                }
+                            },
+                            Shape::Int(Position {
+                                file: None,
+                                line: 1,
+                                column: 34,
+                                offset: 33
+                            })
+                        ),
+                        (
+                            Token {
+                                typ: TokenType::BAREWORD,
+                                fragment: "bar".into(),
+                                pos: Position {
+                                    file: None,
+                                    line: 1,
+                                    column: 37,
+                                    offset: 36
+                                }
+                            },
+                            Shape::Str(Position {
+                                file: None,
+                                line: 1,
+                                column: 43,
+                                offset: 42
+                            })
+                        ),
+                    ]
+                }),
+                Shape::Tuple(PositionedItem {
+                    pos: Position {
+                        file: None,
+                        line: 1,
+                        column: 61,
+                        offset: 60
+                    },
+                    val: vec![(
+                        Token {
+                            typ: TokenType::BAREWORD,
+                            fragment: "bar".into(),
+                            pos: Position {
+                                file: None,
+                                line: 1,
+                                column: 63,
+                                offset: 62
+                            }
+                        },
+                        Shape::Str(Position {
+                            file: None,
+                            line: 1,
+                            column: 69,
+                            offset: 68
+                        })
+                    )]
+                })
+            ]
+        })
+    );
+    assert_type_success!(
+        r#"select (foo) => { true = [ "quux" ], false = [ 1 ] };"#,
+        Shape::Narrowed(NarrowedShape {
+            pos: Position {
+                file: None,
+                line: 1,
+                column: 1,
+                offset: 0
+            },
+            types: vec![
+                Shape::List(NarrowedShape {
+                    pos: Position {
+                        file: None,
+                        line: 1,
+                        column: 26,
+                        offset: 25
+                    },
+                    types: vec![Shape::Str(Position {
+                        file: None,
+                        line: 1,
+                        column: 28,
+                        offset: 27
+                    })]
+                }),
+                Shape::List(NarrowedShape {
+                    pos: Position {
+                        file: None,
+                        line: 1,
+                        column: 46,
+                        offset: 45
+                    },
+                    types: vec![Shape::Int(Position {
+                        file: None,
+                        line: 1,
+                        column: 48,
+                        offset: 47
+                    })]
+                })
+            ]
+        })
+    );
+}
+
+fn parse_expression(expr: &str) -> Option<Expression> {
+    let tokens = tokenize(expr.into(), None).unwrap();
+    let token_iter = SliceIter::new(&tokens);
+    let expr = expression(token_iter);
+    if let abortable_parser::Result::Complete(_, expr) = expr {
+        return Some(expr)
+    }
+    None
+}
+
+#[test]
+fn func_type_equivalence() {
+    let mut symbol_table = BTreeMap::new();
+    let expr1 = "func(arg1) => arg1 + 1;";
+    let expr2 = "func(arg2) => arg2 + 1;";
+    let shape1 = parse_expression(expr1).unwrap().derive_shape(&mut symbol_table);
+    let shape2 = parse_expression(expr2).unwrap().derive_shape(&mut symbol_table);
+    assert!(dbg!(shape1.equivalent(&shape2, &mut symbol_table)));
+}

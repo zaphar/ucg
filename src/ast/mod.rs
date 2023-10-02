@@ -272,6 +272,15 @@ impl NarrowedShape {
         self.pos = pos;
         self
     }
+
+    pub fn merge_in_shape(&mut self, shape: Shape, symbol_table: &mut BTreeMap<Rc<str>, Shape>) {
+        for s in self.types.iter() {
+            if s.equivalent(&shape, symbol_table) {
+                return;
+            }
+        }
+        self.types.push(shape)
+    }
 }
 
 // TODO(jwall): Display implementations for shapes.
@@ -293,8 +302,69 @@ pub enum Shape {
 }
 
 impl Shape {
+    pub fn equivalent(&self, right: &Shape, symbol_table: &BTreeMap<Rc<str>, Shape>) -> bool {
+        match (self, right) {
+            (Shape::Str(_), Shape::Str(_))
+            | (Shape::Boolean(_), Shape::Boolean(_))
+            | (Shape::Int(_), Shape::Int(_))
+            | (Shape::Hole(_), Shape::Hole(_))
+            | (Shape::Float(_), Shape::Float(_)) => true,
+            (Shape::Narrowed(left_slist), Shape::Narrowed(right_slist))
+            | (Shape::List(left_slist), Shape::List(right_slist)) => {
+                for ls in left_slist.types.iter() {
+                    let mut found = false;
+                    for rs in right_slist.types.iter() {
+                        if ls.equivalent(rs, symbol_table) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if !found {
+                        return false;
+                    }
+                }
+                true
+            }
+            (Shape::Tuple(left_slist), Shape::Tuple(right_slist)) => {
+                for (lt, ls) in left_slist.val.iter() {
+                    let mut found = false;
+                    for (rt, rs) in right_slist.val.iter() {
+                        if lt.fragment == rt.fragment && ls.equivalent(rs, symbol_table) {
+                            found = true;
+                        }
+                    }
+                    if !found {
+                        return false;
+                    }
+                }
+                true
+            }
+            (Shape::Func(left_opshape), Shape::Func(right_opshape)) => {
+                if left_opshape.args.len() != right_opshape.args.len() {
+                    return false;
+                }
+                let left_args: Vec<&Shape> = dbg!(left_opshape.args.values().collect());
+                let right_args: Vec<&Shape> = dbg!(right_opshape.args.values().collect());
+                for idx in 0..left_args.len() {
+                    let shap = left_args[idx];
+                    if !shap.equivalent(right_args[idx], symbol_table)
+                    {
+                        return false;
+                    }
+                }
+                if !&left_opshape.ret.equivalent(&right_opshape.ret, symbol_table) {
+                    return false;
+                }
+                true
+            }
+            (Shape::Module(left_opshape), Shape::Module(right_opshape)) => {
+                todo!();
+            }
+            _ => false,
+        }
+    }
+
     pub fn narrow(&self, right: &Shape, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Self {
-        dbg!((self, right));
         match (self, right) {
             (Shape::Str(_), Shape::Str(_))
             | (Shape::Boolean(_), Shape::Boolean(_))
