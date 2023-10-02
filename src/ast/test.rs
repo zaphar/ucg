@@ -16,7 +16,10 @@ use std::collections::BTreeMap;
 use abortable_parser::iter::SliceIter;
 use abortable_parser::Result as ParseResult;
 
-use crate::ast::{Expression, ListDef, Position, PositionedItem, Shape, Token, TokenType, Value ,NarrowedShape, typecheck::DeriveShape};
+use crate::ast::{
+    typecheck::DeriveShape, Expression, ListDef, NarrowedShape, Position, PositionedItem, Shape,
+    Token, TokenType, Value,
+};
 use crate::iter::OffsetStrIter;
 use crate::parse::expression;
 use crate::tokenizer::tokenize;
@@ -26,29 +29,23 @@ fn derive_shape_values() {
     let value_cases = vec![
         (
             Value::Boolean(PositionedItem::new(false, Position::new(0, 1, 2))),
-            Shape::Boolean(PositionedItem::new(false, Position::new(0, 1, 2))),
+            Shape::Boolean(Position::new(0, 1, 2)),
         ),
         (
             Value::Boolean(PositionedItem::new(true, Position::new(0, 1, 2))),
-            Shape::Boolean(PositionedItem::new(true, Position::new(0, 1, 2))),
+            Shape::Boolean(Position::new(0, 1, 2)),
         ),
         (
             Value::Int(PositionedItem::new(1, Position::new(0, 1, 2))),
-            Shape::Int(PositionedItem::new(1, Position::new(0, 1, 2))),
+            Shape::Int(Position::new(0, 1, 2)),
         ),
         (
             Value::Float(PositionedItem::new(2.0, Position::new(0, 1, 2))),
-            Shape::Float(PositionedItem::new(2.0, Position::new(0, 1, 2))),
+            Shape::Float(Position::new(0, 1, 2)),
         ),
         (
-            Value::Str(PositionedItem::new(
-                "foo".into(),
-                Position::new(0, 1, 2),
-            )),
-            Shape::Str(PositionedItem::new(
-                "foo".into(),
-                Position::new(0, 1, 2),
-            )),
+            Value::Str(PositionedItem::new("foo".into(), Position::new(0, 1, 2))),
+            Shape::Str(Position::new(0, 1, 2)),
         ),
         (
             Value::Tuple(PositionedItem::new(
@@ -61,7 +58,7 @@ fn derive_shape_values() {
             Shape::Tuple(PositionedItem::new(
                 vec![(
                     Token::new("foo", TokenType::BAREWORD, Position::new(0, 0, 0)),
-                    Shape::Int(PositionedItem::new(3, Position::new(0, 0, 0))),
+                    Shape::Int(Position::new(0, 0, 0)),
                 )],
                 Position::new(0, 0, 0),
             )),
@@ -75,7 +72,7 @@ fn derive_shape_values() {
                 pos: Position::new(0, 0, 0),
             }),
             Shape::List(NarrowedShape::new_with_pos(
-                vec![Shape::Int(PositionedItem::new(3, Position::new(0, 0, 0)))],
+                vec![Shape::Int(Position::new(0, 0, 0))],
                 Position::new(0, 0, 0),
             )),
         ),
@@ -89,49 +86,22 @@ fn derive_shape_values() {
 #[test]
 fn derive_shape_expressions() {
     let expr_cases = vec![
-        (
-            "3;",
-            Shape::Int(PositionedItem::new(3, Position::new(0, 0, 0))),
-        ),
-        (
-            "(3);",
-            Shape::Int(PositionedItem::new(3, Position::new(0, 0, 0))),
-        ),
-        (
-            "\"foo {}\" % (1);",
-            Shape::Str(PositionedItem::new("".into(), Position::new(0, 0, 0))),
-        ),
-        (
-            "not true;",
-            Shape::Boolean(PositionedItem::new(false, Position::new(1, 0, 0))),
-        ),
+        ("3;", Shape::Int(Position::new(0, 0, 0))),
+        ("(3);", Shape::Int(Position::new(0, 0, 0))),
+        ("\"foo {}\" % (1);", Shape::Str(Position::new(0, 0, 0))),
+        ("not true;", Shape::Boolean(Position::new(1, 0, 0))),
         (
             "0:1;",
             Shape::List(NarrowedShape::new_with_pos(
-                vec![Shape::Int(PositionedItem::new(0, Position::new(1, 1, 0)))],
+                vec![Shape::Int(Position::new(1, 1, 0))],
                 Position::new(1, 1, 0),
             )),
         ),
-        (
-            "int(\"1\");",
-            Shape::Int(PositionedItem::new(0, Position::new(0, 0, 0))),
-        ),
-        (
-            "float(1);",
-            Shape::Float(PositionedItem::new(0.0, Position::new(0, 0, 0))),
-        ),
-        (
-            "str(1);",
-            Shape::Str(PositionedItem::new("".into(), Position::new(0, 0, 0))),
-        ),
-        (
-            "bool(\"true\");",
-            Shape::Boolean(PositionedItem::new(true, Position::new(0, 0, 0))),
-        ),
-        (
-            "1 + 1;",
-            Shape::Int(PositionedItem::new(1, Position::new(1, 1, 0))),
-        ),
+        ("int(\"1\");", Shape::Int(Position::new(0, 0, 0))),
+        ("float(1);", Shape::Float(Position::new(0, 0, 0))),
+        ("str(1);", Shape::Str(Position::new(0, 0, 0))),
+        ("bool(\"true\");", Shape::Boolean(Position::new(0, 0, 0))),
+        ("1 + 1;", Shape::Int(Position::new(1, 1, 0))),
     ];
 
     for (expr, shape) in expr_cases {

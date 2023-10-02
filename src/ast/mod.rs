@@ -278,10 +278,10 @@ impl NarrowedShape {
 /// Shapes represent the types that UCG values or expressions can have.
 #[derive(PartialEq, Debug, Clone)]
 pub enum Shape {
-    Boolean(PositionedItem<bool>),
-    Int(PositionedItem<i64>),
-    Float(PositionedItem<f64>),
-    Str(PositionedItem<Rc<str>>),
+    Boolean(Position),
+    Int(Position),
+    Float(Position),
+    Str(Position),
     Tuple(PositionedItem<TupleShape>),
     List(NarrowedShape),
     Func(FuncShapeDef),
@@ -305,7 +305,7 @@ impl Shape {
                     symbol_table.insert(sym.val.clone(), other.clone().with_pos(sym.pos.clone()));
                 }
                 other.clone()
-            },
+            }
             (Shape::Narrowed(left_slist), Shape::Narrowed(right_slist))
             | (Shape::List(left_slist), Shape::List(right_slist)) => {
                 self.narrow_list_shapes(left_slist, right_slist, right, symbol_table)
@@ -386,10 +386,10 @@ impl Shape {
 
     pub fn pos(&self) -> &Position {
         match self {
-            Shape::Str(s) => &s.pos,
-            Shape::Int(s) => &s.pos,
-            Shape::Float(s) => &s.pos,
-            Shape::Boolean(b) => &b.pos,
+            Shape::Str(p) => &p,
+            Shape::Int(p) => &p,
+            Shape::Float(p) => &p,
+            Shape::Boolean(p) => &p,
             Shape::List(lst) => &lst.pos,
             Shape::Tuple(flds) => &flds.pos,
             Shape::Func(def) => def.ret.pos(),
@@ -404,10 +404,10 @@ impl Shape {
 
     pub fn with_pos(self, pos: Position) -> Self {
         match self {
-            Shape::Str(s) => Shape::Str(PositionedItem::new(s.val, pos)),
-            Shape::Int(s) => Shape::Int(PositionedItem::new(s.val, pos)),
-            Shape::Float(s) => Shape::Float(PositionedItem::new(s.val, pos)),
-            Shape::Boolean(b) => Shape::Boolean(PositionedItem::new(b.val, pos)),
+            Shape::Str(_) => Shape::Str(pos.clone()),
+            Shape::Int(_) => Shape::Int(pos.clone()),
+            Shape::Float(_) => Shape::Float(pos.clone()),
+            Shape::Boolean(_) => Shape::Boolean(pos.clone()),
             Shape::List(lst) => Shape::List(NarrowedShape::new_with_pos(lst.types, pos)),
             Shape::Tuple(flds) => Shape::Tuple(PositionedItem::new(flds.val, pos)),
             Shape::Func(_) | Shape::Module(_) => self.clone(),

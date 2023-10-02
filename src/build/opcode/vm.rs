@@ -278,7 +278,8 @@ impl VM {
                 format!(
                     "Not a boolean condition {:?} in && expression at {}",
                     cond, pos
-                ).into(),
+                )
+                .into(),
                 cond_pos.clone(),
             ));
         }
@@ -298,7 +299,8 @@ impl VM {
                 format!(
                     "Not a boolean condition {:?} in || expression at {}!",
                     cond, pos
-                ).into(),
+                )
+                .into(),
                 cond_pos.clone(),
             ));
         }
@@ -530,7 +532,8 @@ impl VM {
                         format!(
                             "Func called with too many args expected {} args but got {}",
                             arity, arg_length
-                        ).into(),
+                        )
+                        .into(),
                         pos,
                     ));
                 }
@@ -539,7 +542,8 @@ impl VM {
                         format!(
                             "Func called with too few args expected {} args but got {}",
                             arity, arg_length
-                        ).into(),
+                        )
+                        .into(),
                         pos,
                     ));
                 }
@@ -568,7 +572,8 @@ impl VM {
             format!(
                 "Expected Boolean but got {:?} in expression at {}",
                 operand, pos
-            ).into(),
+            )
+            .into(),
             operand_pos,
         ));
     }
@@ -1042,7 +1047,8 @@ impl VM {
                             fld.1.type_name(),
                             name,
                             value.type_name(),
-                        ).into(),
+                        )
+                        .into(),
                         val_pos.clone(),
                     ));
                 }
@@ -1115,7 +1121,10 @@ impl VM {
         match tpl {
             Some((v, pos)) => Ok((v, pos)),
             None => {
-                return Err(Error::new(format!("No such binding {}", name).into(), pos.clone()));
+                return Err(Error::new(
+                    format!("No such binding {}", name).into(),
+                    pos.clone(),
+                ));
             }
         }
     }
