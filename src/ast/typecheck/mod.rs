@@ -14,6 +14,7 @@
 
 //! Implements typechecking for the parsed ucg AST.
 use std::collections::BTreeMap;
+use std::default;
 use std::rc::Rc;
 
 use crate::ast::walk::Visitor;
@@ -24,6 +25,7 @@ use crate::error::{BuildError, ErrorType};
 
 use super::{
     CastType, CopyDef, FuncDef, ImportShape, ModuleShape, NarrowedShape, NotDef, PositionedItem,
+    SelectDef, Position,
 };
 
 /// Trait for shape derivation.
@@ -63,6 +65,18 @@ impl DeriveShape for FuncDef {
             args: table,
             ret: shape.with_pos(self.pos.clone()).into(),
         })
+    }
+}
+
+impl DeriveShape for SelectDef {
+    fn derive_shape(&self, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
+        let SelectDef { val: _, default: _, tuple, pos: _ } = self;
+        let mut narrowed_shape = NarrowedShape { pos: self.pos.clone(), types: Vec::with_capacity(tuple.len()) };
+        for (_, expr) in tuple {
+            let shape = expr.derive_shape(symbol_table);
+            narrowed_shape.merge_in_shape(shape, symbol_table);
+        }
+        Shape::Narrowed(narrowed_shape)
     }
 }
 
@@ -229,7 +243,7 @@ impl DeriveShape for Expression {
             Expression::Include(def) => derive_include_shape(def),
             Expression::Call(_) => todo!(),
             Expression::Func(def) => def.derive_shape(symbol_table),
-            Expression::Select(_) => todo!(),
+            Expression::Select(def) => def.derive_shape(symbol_table),
             Expression::FuncOp(_) => todo!(),
             Expression::Module(_) => todo!(),
             Expression::Fail(_) => todo!(),
@@ -254,11 +268,7 @@ impl DeriveShape for Value {
                 }
             }
             Value::Tuple(flds) => {
-                let mut field_shapes = Vec::new();
-                for &(ref tok, ref expr) in &flds.val {
-                    field_shapes.push((tok.clone(), expr.derive_shape(symbol_table)));
-                }
-                Shape::Tuple(PositionedItem::new(field_shapes, flds.pos.clone()))
+                derive_field_list_shape(&flds.val, &flds.pos, symbol_table)
             }
             Value::List(flds) => {
                 let mut field_shapes = Vec::new();
@@ -269,6 +279,14 @@ impl DeriveShape for Value {
             }
         }
     }
+}
+
+fn derive_field_list_shape(flds: &Vec<(super::Token, Expression)>, pos: &Position, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
+    let mut field_shapes = Vec::new();
+    for &(ref tok, ref expr) in flds {
+        field_shapes.push((tok.clone(), expr.derive_shape(symbol_table)));
+    }
+    Shape::Tuple(PositionedItem::new(field_shapes, pos.clone()))
 }
 
 pub struct Checker {
