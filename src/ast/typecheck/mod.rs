@@ -245,7 +245,7 @@ impl DeriveShape for Expression {
             Expression::Func(def) => def.derive_shape(symbol_table),
             Expression::Select(def) => def.derive_shape(symbol_table),
             Expression::FuncOp(_) => todo!(),
-            Expression::Module(_) => todo!(),
+            Expression::Module(def) => def.derive_shape(symbol_table),
             Expression::Fail(_) => todo!(),
             Expression::Debug(_) => todo!(),
         }

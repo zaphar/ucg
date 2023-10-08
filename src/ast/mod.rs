@@ -926,6 +926,10 @@ impl ModuleDef {
     pub fn set_out_expr(&mut self, expr: Expression) {
         self.out_expr = Some(Box::new(expr));
     }
+
+    pub fn derive_shape(&mut self, expr: Expression) {
+        todo!()
+    }
 }
 
 /// RangeDef defines a range with optional step.
