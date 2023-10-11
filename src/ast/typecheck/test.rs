@@ -1,10 +1,9 @@
 use std::convert::Into;
 
-use abortable_parser::SliceIter;
+use abortable_parser::{Positioned, SliceIter};
 
 use crate::ast::walk::Walker;
 use crate::ast::{Position, PositionedItem};
-use crate::ast::{Token, TokenType};
 use crate::parse::{expression, parse};
 use crate::tokenizer::tokenize;
 
@@ -57,11 +56,7 @@ fn simple_binary_typecheck() {
         "{foo = 1} + {foo = 1};",
         Shape::Tuple(PositionedItem::new(
             vec![(
-                Token {
-                    typ: TokenType::BAREWORD,
-                    fragment: "foo".into(),
-                    pos: Position::new(1, 2, 1)
-                },
+                PositionedItem::new("foo".into(), Position::new(1, 2, 1)),
                 Shape::Int(Position::new(1, 8, 7))
             ),],
             Position::new(1, 1, 0)
@@ -191,6 +186,26 @@ fn infer_symbol_type_test() {
                 Shape::Hole(PositionedItem::new(foo.clone(), Position::new(0, 0, 0))),
                 Shape::Float(Position::new(0, 0, 0)),
             ],
+        ),
+        (
+            "bar.foo",
+            vec![(
+                bar.clone(),
+                Shape::Tuple(PositionedItem::new(
+                    vec![(
+                        PositionedItem::new(foo.clone(), Position::new(1, 5, 4)),
+                        Shape::Narrowed(NarrowedShape {
+                            pos: Position::new(0, 0, 0),
+                            types: Vec::new(),
+                        }),
+                    )],
+                    Position::new(0, 0, 0),
+                )),
+            )],
+            vec![Shape::Hole(PositionedItem::new(
+                bar.clone(),
+                Position::new(0, 0, 0),
+            ))],
         ),
     ];
     for (expr, sym_list, sym_init_list) in table {
@@ -337,16 +352,15 @@ fn infer_select_shape() {
                         offset: 25
                     },
                     val: vec![(
-                        Token {
-                            typ: TokenType::BAREWORD,
-                            fragment: "foo".into(),
-                            pos: Position {
+                        PositionedItem::new(
+                            "foo".into(),
+                            Position {
                                 file: None,
                                 line: 1,
                                 column: 28,
                                 offset: 27
                             }
-                        },
+                        ),
                         Shape::Int(Position {
                             file: None,
                             line: 1,
@@ -363,16 +377,15 @@ fn infer_select_shape() {
                         offset: 47
                     },
                     val: vec![(
-                        Token {
-                            typ: TokenType::BAREWORD,
-                            fragment: "bar".into(),
-                            pos: Position {
+                        PositionedItem::new(
+                            "bar".into(),
+                            Position {
                                 file: None,
                                 line: 1,
                                 column: 50,
                                 offset: 49
                             }
-                        },
+                        ),
                         Shape::Str(Position {
                             file: None,
                             line: 1,
@@ -403,16 +416,15 @@ fn infer_select_shape() {
                     },
                     val: vec![
                         (
-                            Token {
-                                typ: TokenType::BAREWORD,
-                                fragment: "foo".into(),
-                                pos: Position {
+                            PositionedItem::new(
+                                "foo".into(),
+                                Position {
                                     file: None,
                                     line: 1,
                                     column: 28,
                                     offset: 27
                                 }
-                            },
+                            ),
                             Shape::Int(Position {
                                 file: None,
                                 line: 1,
@@ -421,16 +433,15 @@ fn infer_select_shape() {
                             })
                         ),
                         (
-                            Token {
-                                typ: TokenType::BAREWORD,
-                                fragment: "bar".into(),
-                                pos: Position {
+                            PositionedItem::new(
+                                "bar".into(),
+                                Position {
                                     file: None,
                                     line: 1,
                                     column: 37,
                                     offset: 36
                                 }
-                            },
+                            ),
                             Shape::Str(Position {
                                 file: None,
                                 line: 1,
@@ -448,16 +459,15 @@ fn infer_select_shape() {
                         offset: 60
                     },
                     val: vec![(
-                        Token {
-                            typ: TokenType::BAREWORD,
-                            fragment: "bar".into(),
-                            pos: Position {
+                        PositionedItem::new(
+                            "bar".into(),
+                            Position {
                                 file: None,
                                 line: 1,
                                 column: 63,
                                 offset: 62
                             }
-                        },
+                        ),
                         Shape::Str(Position {
                             file: None,
                             line: 1,
@@ -517,7 +527,7 @@ fn parse_expression(expr: &str) -> Option<Expression> {
     let token_iter = SliceIter::new(&tokens);
     let expr = expression(token_iter);
     if let abortable_parser::Result::Complete(_, expr) = expr {
-        return Some(expr)
+        return Some(expr);
     }
     None
 }
@@ -527,7 +537,11 @@ fn func_type_equivalence() {
     let mut symbol_table = BTreeMap::new();
     let expr1 = "func(arg1) => arg1 + 1;";
     let expr2 = "func(arg2) => arg2 + 1;";
-    let shape1 = parse_expression(expr1).unwrap().derive_shape(&mut symbol_table);
-    let shape2 = parse_expression(expr2).unwrap().derive_shape(&mut symbol_table);
+    let shape1 = parse_expression(expr1)
+        .unwrap()
+        .derive_shape(&mut symbol_table);
+    let shape2 = parse_expression(expr2)
+        .unwrap()
+        .derive_shape(&mut symbol_table);
     assert!(dbg!(shape1.equivalent(&shape2, &mut symbol_table)));
 }

@@ -145,6 +145,12 @@ impl Token {
     }
 }
 
+impl<'a> From<&'a Token> for PositionedItem<Rc<str>> {
+    fn from(value: &'a Token) -> Self {
+        Self::new(value.fragment.clone(), value.pos.clone())
+    }
+}
+
 impl abortable_parser::Positioned for Token {
     fn line(&self) -> usize {
         self.pos.line
@@ -219,7 +225,7 @@ macro_rules! make_expr {
 /// This is usually used as the body of a tuple in the UCG AST.
 pub type FieldList = Vec<(Token, Expression)>; // Token is expected to be a symbol
 
-pub type TupleShape = Vec<(Token, Shape)>;
+pub type TupleShape = Vec<(PositionedItem<Rc<str>>, Shape)>;
 pub type ShapeList = Vec<Shape>;
 
 #[derive(PartialEq, Debug, Clone)]
@@ -329,7 +335,7 @@ impl Shape {
                 for (lt, ls) in left_slist.val.iter() {
                     let mut found = false;
                     for (rt, rs) in right_slist.val.iter() {
-                        if lt.fragment == rt.fragment && ls.equivalent(rs, symbol_table) {
+                        if lt.val == rt.val && ls.equivalent(rs, symbol_table) {
                             found = true;
                         }
                     }
@@ -347,12 +353,14 @@ impl Shape {
                 let right_args: Vec<&Shape> = dbg!(right_opshape.args.values().collect());
                 for idx in 0..left_args.len() {
                     let shap = left_args[idx];
-                    if !shap.equivalent(right_args[idx], symbol_table)
-                    {
+                    if !shap.equivalent(right_args[idx], symbol_table) {
                         return false;
                     }
                 }
-                if !&left_opshape.ret.equivalent(&right_opshape.ret, symbol_table) {
+                if !&left_opshape
+                    .ret
+                    .equivalent(&right_opshape.ret, symbol_table)
+                {
                     return false;
                 }
                 true
@@ -402,8 +410,8 @@ impl Shape {
 
     fn narrow_tuple_shapes(
         &self,
-        left_slist: &PositionedItem<Vec<(Token, Shape)>>,
-        right_slist: &PositionedItem<Vec<(Token, Shape)>>,
+        left_slist: &PositionedItem<Vec<(PositionedItem<Rc<str>>, Shape)>>,
+        right_slist: &PositionedItem<Vec<(PositionedItem<Rc<str>>, Shape)>>,
         right: &Shape,
         symbol_table: &mut BTreeMap<Rc<str>, Shape>,
     ) -> Shape {
@@ -495,15 +503,15 @@ impl Shape {
 }
 
 fn is_tuple_subset(
-    mut left_iter: std::slice::Iter<(Token, Shape)>,
-    right_slist: &PositionedItem<Vec<(Token, Shape)>>,
+    mut left_iter: std::slice::Iter<(PositionedItem<Rc<str>>, Shape)>,
+    right_slist: &PositionedItem<Vec<(PositionedItem<Rc<str>>, Shape)>>,
     symbol_table: &mut BTreeMap<Rc<str>, Shape>,
 ) -> bool {
     return loop {
         if let Some((lt, ls)) = left_iter.next() {
             let mut matched = false;
             for (rt, rs) in right_slist.val.iter() {
-                if rt.fragment == lt.fragment {
+                if rt.val == lt.val {
                     if let Shape::TypeErr(_, _) = ls.narrow(rs, symbol_table) {
                         // noop
                     } else {
@@ -927,7 +935,7 @@ impl ModuleDef {
         self.out_expr = Some(Box::new(expr));
     }
 
-    pub fn derive_shape(&mut self, expr: Expression) {
+    pub fn derive_shape(&self, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
         todo!()
     }
 }
