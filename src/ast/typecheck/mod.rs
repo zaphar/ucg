@@ -14,7 +14,6 @@
 
 //! Implements typechecking for the parsed ucg AST.
 use std::collections::BTreeMap;
-use std::default;
 use std::rc::Rc;
 
 use crate::ast::walk::Visitor;
@@ -24,8 +23,8 @@ use crate::ast::{
 use crate::error::{BuildError, ErrorType};
 
 use super::{
-    CastType, CopyDef, FuncDef, ImportShape, ModuleShape, NarrowedShape, NotDef, PositionedItem,
-    SelectDef, Position,
+    BinaryExprType, BinaryOpDef, CastType, CopyDef, FuncDef, ImportShape, ModuleShape,
+    NarrowedShape, NotDef, Position, PositionedItem, SelectDef,
 };
 
 /// Trait for shape derivation.
@@ -70,8 +69,16 @@ impl DeriveShape for FuncDef {
 
 impl DeriveShape for SelectDef {
     fn derive_shape(&self, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
-        let SelectDef { val: _, default: _, tuple, pos: _ } = self;
-        let mut narrowed_shape = NarrowedShape { pos: self.pos.clone(), types: Vec::with_capacity(tuple.len()) };
+        let SelectDef {
+            val: _,
+            default: _,
+            tuple,
+            pos: _,
+        } = self;
+        let mut narrowed_shape = NarrowedShape {
+            pos: self.pos.clone(),
+            types: Vec::with_capacity(tuple.len()),
+        };
         for (_, expr) in tuple {
             let shape = expr.derive_shape(symbol_table);
             narrowed_shape.merge_in_shape(shape, symbol_table);
@@ -178,8 +185,8 @@ fn derive_copy_shape(def: &CopyDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>)
                 .map(|(tok, expr)| (tok.fragment.clone(), expr.derive_shape(symbol_table)))
                 .collect::<BTreeMap<Rc<str>, Shape>>();
             // 1. Do our copyable fields have the right names and shapes based on mdef.items.
-            for (tok, shape) in mdef.items.iter() {
-                if let Some(s) = arg_fields.get(&tok.fragment) {
+            for (sym, shape) in mdef.items.iter() {
+                if let Some(s) = arg_fields.get(&sym.val) {
                     if let Shape::TypeErr(pos, msg) = shape.narrow(s, symbol_table) {
                         return Shape::TypeErr(pos, msg);
                     }
@@ -193,7 +200,7 @@ fn derive_copy_shape(def: &CopyDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>)
             base_fields.val.extend(
                 def.fields
                     .iter()
-                    .map(|(tok, expr)| (tok.clone(), expr.derive_shape(symbol_table))),
+                    .map(|(tok, expr)| (tok.into(), expr.derive_shape(symbol_table))),
             );
             Shape::Tuple(base_fields).with_pos(def.pos.clone())
         }
@@ -206,7 +213,7 @@ fn derive_copy_shape(def: &CopyDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>)
             base_fields.extend(
                 def.fields
                     .iter()
-                    .map(|(tok, expr)| (tok.clone(), expr.derive_shape(symbol_table))),
+                    .map(|(tok, expr)| (tok.into(), expr.derive_shape(symbol_table))),
             );
             Shape::Tuple(PositionedItem::new(base_fields, def.pos.clone()))
         }
@@ -237,7 +244,48 @@ impl DeriveShape for Expression {
             Expression::Binary(def) => {
                 let left_shape = def.left.derive_shape(symbol_table);
                 let right_shape = def.right.derive_shape(symbol_table);
-                left_shape.narrow(&right_shape, symbol_table)
+                // We need to do somethig different if it's a ShapeKind::DOT
+                if def.kind == BinaryExprType::DOT {
+                    dbg!(&def);
+                    // left_shape can be assumed to be of type tuple.
+                    // If left_shape is not known it can be inferred to be a tuple with right
+                    // shapes symbol as a field name.
+                    if let Shape::Hole(p) = left_shape {
+                        dbg!(&p);
+                        if let Shape::Hole(pi) = right_shape {
+                            dbg!(&pi);
+                            let derived_shape = Shape::Tuple(PositionedItem::new(
+                                // TODO(jeremy): This needs to be a token...
+                                vec![(
+                                    pi.into(),
+                                    Shape::Narrowed(NarrowedShape {
+                                        pos: p.pos.clone(),
+                                        types: Vec::new(),
+                                    }),
+                                )],
+                                p.pos.clone(),
+                            ));
+                            symbol_table.insert(p.val.clone(), derived_shape);
+                            return Shape::Narrowed(NarrowedShape {
+                                pos: p.pos.clone(),
+                                types: Vec::new(),
+                            });
+                        }
+                    } else if let Shape::Tuple(fields_pi) = left_shape {
+                        dbg!(&fields_pi);
+                        if let Shape::Hole(pi) = right_shape {
+                            dbg!(&pi);
+                            for (sym, shape) in fields_pi.val {
+                                if pi.val == sym.val {
+                                    return shape;
+                                }
+                            }
+                        }
+                    }
+                    Shape::TypeErr(def.pos.clone(), "Invalid Tuple field selector".to_owned())
+                } else {
+                    left_shape.narrow(&right_shape, symbol_table)
+                }
             }
             Expression::Copy(def) => derive_copy_shape(def, symbol_table),
             Expression::Include(def) => derive_include_shape(def),
@@ -267,9 +315,7 @@ impl DeriveShape for Value {
                     Shape::Hole(p.clone())
                 }
             }
-            Value::Tuple(flds) => {
-                derive_field_list_shape(&flds.val, &flds.pos, symbol_table)
-            }
+            Value::Tuple(flds) => derive_field_list_shape(&flds.val, &flds.pos, symbol_table),
             Value::List(flds) => {
                 let mut field_shapes = Vec::new();
                 for f in &flds.elems {
@@ -281,10 +327,17 @@ impl DeriveShape for Value {
     }
 }
 
-fn derive_field_list_shape(flds: &Vec<(super::Token, Expression)>, pos: &Position, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
+fn derive_field_list_shape(
+    flds: &Vec<(super::Token, Expression)>,
+    pos: &Position,
+    symbol_table: &mut BTreeMap<Rc<str>, Shape>,
+) -> Shape {
     let mut field_shapes = Vec::new();
     for &(ref tok, ref expr) in flds {
-        field_shapes.push((tok.clone(), expr.derive_shape(symbol_table)));
+        field_shapes.push((
+            PositionedItem::new(tok.fragment.clone(), tok.pos.clone()),
+            expr.derive_shape(symbol_table),
+        ));
     }
     Shape::Tuple(PositionedItem::new(field_shapes, pos.clone()))
 }
