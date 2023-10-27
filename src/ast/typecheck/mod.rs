@@ -13,17 +13,17 @@
 // limitations under the License.
 
 //! Implements typechecking for the parsed ucg AST.
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
-use crate::ast::walk::Visitor;
+use crate::ast::walk::{Visitor, Walker};
 use crate::ast::{
     Expression, FailDef, FuncShapeDef, ImportDef, IncludeDef, Shape, Statement, Value,
 };
 use crate::error::{BuildError, ErrorType};
 
 use super::{
-    BinaryExprType, BinaryOpDef, CastType, CopyDef, FuncDef, ImportShape, ModuleShape,
+    BinaryExprType, BinaryOpDef, CastType, CopyDef, FuncDef, ImportShape, ModuleDef, ModuleShape,
     NarrowedShape, NotDef, Position, PositionedItem, SelectDef,
 };
 
@@ -63,6 +63,48 @@ impl DeriveShape for FuncDef {
         Shape::Func(FuncShapeDef {
             args: table,
             ret: shape.with_pos(self.pos.clone()).into(),
+        })
+    }
+}
+
+impl DeriveShape for ModuleDef {
+    fn derive_shape(&self, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
+        let sym_table: BTreeMap<Rc<str>, Shape> = self
+            .arg_set
+            .iter()
+            .map(|(tok, expr)| (tok.fragment.clone(), expr.derive_shape(symbol_table)))
+            .collect();
+        let sym_positions: BTreeSet<PositionedItem<Rc<str>>> =
+            self.arg_set.iter().map(|(tok, _)| tok.into()).collect();
+        let mut checker = Checker::new().with_symbol_table(sym_table);
+        checker.walk_statement_list(self.statements.clone().iter_mut().collect());
+        if let Some(mut expr) = self.out_expr.clone() {
+            checker.walk_expression(&mut expr);
+        } else {
+            // TODO(jwall): We need to construct a tuple from the let statements here.
+        }
+        let ret = Box::new(
+            checker
+                .pop_shape()
+                .expect("There should always be a return type here"),
+        );
+        let mut items = Vec::new();
+        let sym_table = checker
+            .result()
+            .expect("There should aways be a symbol_table here");
+        for pos_key in sym_positions {
+            let key = pos_key.val.clone();
+            items.push((
+                pos_key,
+                sym_table
+                    .get(&key)
+                    .expect("This should always have a valid shape")
+                    .clone(),
+            ));
+        }
+        Shape::Module(ModuleShape {
+            items,
+            ret,
         })
     }
 }
@@ -455,7 +497,20 @@ impl Visitor for Checker {
     }
 
     fn visit_statement(&mut self, _stmt: &mut Statement) {
-        // noop by default
+        if let Statement::Let(def) = _stmt {
+            let name = def.name.fragment.clone();
+            let shape = def.value.derive_shape(&mut self.symbol_table);
+            if let Shape::TypeErr(pos, msg) = &shape {
+                self.err_stack.push(BuildError::with_pos(
+                    msg.clone(),
+                    ErrorType::TypeFail,
+                    pos.clone(),
+                ));
+            } else {
+                self.symbol_table.insert(name.clone(), shape.clone());
+                self.shape_stack.push(shape);
+            }
+        }
     }
 
     fn leave_statement(&mut self, stmt: &Statement) {

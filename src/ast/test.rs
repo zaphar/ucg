@@ -86,10 +86,10 @@ fn derive_shape_values() {
 #[test]
 fn derive_shape_expressions() {
     let expr_cases = vec![
-        ("3;", Shape::Int(Position::new(0, 0, 0))),
-        ("(3);", Shape::Int(Position::new(0, 0, 0))),
-        ("\"foo {}\" % (1);", Shape::Str(Position::new(0, 0, 0))),
-        ("not true;", Shape::Boolean(Position::new(1, 0, 0))),
+        ("3;", Shape::Int(Position::new(1, 1, 0))),
+        ("(3);", Shape::Int(Position::new(1, 2, 1))),
+        ("\"foo {}\" % (1);", Shape::Str(Position::new(1, 1, 0))),
+        ("not true;", Shape::Boolean(Position::new(1, 1, 0))),
         (
             "0:1;",
             Shape::List(NarrowedShape::new_with_pos(
@@ -97,10 +97,10 @@ fn derive_shape_expressions() {
                 Position::new(1, 1, 0),
             )),
         ),
-        ("int(\"1\");", Shape::Int(Position::new(0, 0, 0))),
-        ("float(1);", Shape::Float(Position::new(0, 0, 0))),
-        ("str(1);", Shape::Str(Position::new(0, 0, 0))),
-        ("bool(\"true\");", Shape::Boolean(Position::new(0, 0, 0))),
+        ("int(\"1\");", Shape::Int(Position::new(1, 1, 0))),
+        ("float(1);", Shape::Float(Position::new(1, 1, 0))),
+        ("str(1);", Shape::Str(Position::new(1, 1, 0))),
+        ("bool(\"true\");", Shape::Boolean(Position::new(1, 1, 0))),
         ("1 + 1;", Shape::Int(Position::new(1, 1, 0))),
     ];
 

@@ -21,7 +21,7 @@
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays; };
         craneLib = (crane.mkLib pkgs);
-        ucg = craneLib.buildPackage rec {
+        ucg = craneLib.buildPackage {
             pname = "ucg";
             version = "0.7.3";
             src = ./.;

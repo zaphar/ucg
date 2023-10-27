@@ -1,6 +1,6 @@
 use std::convert::Into;
 
-use abortable_parser::{Positioned, SliceIter};
+use abortable_parser::SliceIter;
 
 use crate::ast::walk::Walker;
 use crate::ast::{Position, PositionedItem};
@@ -31,6 +31,17 @@ macro_rules! assert_type_success {
         let mut expr = parse($e.into(), None).unwrap();
         checker.walk_statement_list(expr.iter_mut().collect());
         let maybe_shape = checker.pop_shape();
+        let result = checker.result();
+        assert!(result.is_ok(), "We expect this to typecheck successfully.");
+        assert!(maybe_shape.is_some(), "We got a shape out of it");
+        assert_eq!(maybe_shape.unwrap(), $shape);
+    }};
+    ($e:expr, $shape:expr, $sym_table:expr, $expected_sym:expr) => {{
+        let mut checker = Checker::new().with_symbol_table($sym_table);
+        let mut expr = parse($e.into(), None).unwrap();
+        checker.walk_statement_list(expr.iter_mut().collect());
+        let maybe_shape = checker.pop_shape();
+        assert_eq!(checker.symbol_table[$expected_sym], $shape);
         let result = checker.result();
         assert!(result.is_ok(), "We expect this to typecheck successfully.");
         assert!(maybe_shape.is_some(), "We got a shape out of it");
@@ -544,4 +555,39 @@ fn func_type_equivalence() {
         .unwrap()
         .derive_shape(&mut symbol_table);
     assert!(dbg!(shape1.equivalent(&shape2, &mut symbol_table)));
+}
+
+#[test]
+fn let_stmt_inference() {
+    let int_stmt = "let foo = 1;";
+    assert_type_success!(
+        int_stmt,
+        Shape::Int(Position::new(1, 11, 10)),
+        BTreeMap::new(),
+        "foo".into()
+    );
+    let float_stmt = "let foo = 1.0;";
+    assert_type_success!(
+        float_stmt,
+        Shape::Float(Position::new(1, 11, 10)),
+        BTreeMap::new(),
+        "foo".into()
+    );
+}
+
+#[test]
+fn test_module_inference() {
+    let simple_mod_stmt = include_str!("simple_mod.ucg");
+    assert_type_success!(
+        simple_mod_stmt,
+        Shape::Module(ModuleShape {
+            items: vec![],
+            ret: Box::new(Shape::Int(Position {
+                file: None,
+                line: 2,
+                column: 7,
+                offset: 14
+            }))
+        })
+    )
 }
