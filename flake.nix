@@ -10,12 +10,12 @@
         };
         naersk.url = "github:nix-community/naersk";
         flake-compat = {
-            url = github:edolstra/flake-compat;
+            url = "github:edolstra/flake-compat";
             flake = false;
         };
     };
 
-    outputs = {self, nixpkgs, flake-utils, rust-overlay, naersk, flake-compat}:
+    outputs = {nixpkgs, flake-utils, rust-overlay, naersk, ...}:
     flake-utils.lib.eachDefaultSystem (system:
     let
         overlays = [ rust-overlay.overlays.default ];
@@ -29,8 +29,7 @@
             rustc = rust-bin;
             cargo = rust-bin;
         };
-        ucg = with pkgs;
-            naersk-lib.buildPackage rec {
+        ucg = naersk-lib.buildPackage rec {
                 pname = "ucg";
                 version = "0.7.3";
                 src = ./.;
