@@ -1,0 +1,5 @@
+module{
+  arg=0,
+} => (foo) {
+  let foo = mod.arg;
+};
