@@ -32,7 +32,11 @@ macro_rules! assert_type_success {
         checker.walk_statement_list(expr.iter_mut().collect());
         let maybe_shape = checker.pop_shape();
         let result = checker.result();
-        assert!(result.is_ok(), "We expect this to typecheck successfully.");
+        assert!(
+            result.is_ok(),
+            "We expect this to typecheck successfully. {:?}",
+            result
+        );
         assert!(maybe_shape.is_some(), "We got a shape out of it");
         assert_eq!(maybe_shape.unwrap(), $shape);
     }};
@@ -205,10 +209,10 @@ fn infer_symbol_type_test() {
                 Shape::Tuple(PositionedItem::new(
                     vec![(
                         PositionedItem::new(foo.clone(), Position::new(1, 5, 4)),
-                        Shape::Narrowed(NarrowedShape {
-                            pos: Position::new(0, 0, 0),
-                            types: Vec::new(),
-                        }),
+                        Shape::Narrowed(NarrowedShape::new_with_pos(
+                            Vec::new(),
+                            Position::new(0, 0, 0),
+                        )),
                     )],
                     Position::new(0, 0, 0),
                 )),
@@ -289,29 +293,23 @@ fn infer_func_type_test() {
 fn infer_select_shape() {
     assert_type_success!(
         r#"select (foo) => { true = "foo", false = 1 };"#,
-        Shape::Narrowed(NarrowedShape {
-            pos: Position {
+        Shape::Narrowed(NarrowedShape::new_with_pos(
+            vec![
+                Shape::Str(Position::new(1, 26, 25)),
+                Shape::Int(Position::new(1, 41, 40)),
+            ],
+            Position {
                 file: None,
                 line: 1,
                 column: 1,
                 offset: 0
             },
-            types: vec![
-                Shape::Str(Position::new(1, 26, 25)),
-                Shape::Int(Position::new(1, 41, 40)),
-            ]
-        })
+        ))
     );
     assert_type_success!(
         r#"select (foo) => { true = "foo", false = { } };"#,
-        Shape::Narrowed(NarrowedShape {
-            pos: Position {
-                file: None,
-                line: 1,
-                column: 1,
-                offset: 0
-            },
-            types: vec![
+        Shape::Narrowed(NarrowedShape::new_with_pos(
+            vec![
                 Shape::Str(Position::new(1, 26, 25)),
                 Shape::Tuple(PositionedItem {
                     pos: Position {
@@ -323,18 +321,18 @@ fn infer_select_shape() {
                     val: vec![],
                 }),
             ],
-        })
-    );
-    assert_type_success!(
-        r#"select (foo) => { true = { }, false = { } };"#,
-        Shape::Narrowed(NarrowedShape {
-            pos: Position {
+            Position {
                 file: None,
                 line: 1,
                 column: 1,
                 offset: 0
             },
-            types: vec![Shape::Tuple(PositionedItem {
+        ))
+    );
+    assert_type_success!(
+        r#"select (foo) => { true = { }, false = { } };"#,
+        Shape::Narrowed(NarrowedShape::new_with_pos(
+            vec![Shape::Tuple(PositionedItem {
                 pos: Position {
                     file: None,
                     line: 1,
@@ -343,18 +341,18 @@ fn infer_select_shape() {
                 },
                 val: vec![],
             }),],
-        })
-    );
-    assert_type_success!(
-        r#"select (foo) => { true = { foo = 1, }, false = { bar = "foo" } };"#,
-        Shape::Narrowed(NarrowedShape {
-            pos: Position {
+            Position {
                 file: None,
                 line: 1,
                 column: 1,
                 offset: 0
             },
-            types: vec![
+        ))
+    );
+    assert_type_success!(
+        r#"select (foo) => { true = { foo = 1, }, false = { bar = "foo" } };"#,
+        Shape::Narrowed(NarrowedShape::new_with_pos(
+            vec![
                 Shape::Tuple(PositionedItem {
                     pos: Position {
                         file: None,
@@ -405,19 +403,19 @@ fn infer_select_shape() {
                         })
                     )]
                 })
-            ]
-        })
-    );
-    assert_type_success!(
-        r#"select (foo) => { true = { foo = 1, bar = "quux" }, false = { bar = "foo" } };"#,
-        Shape::Narrowed(NarrowedShape {
-            pos: Position {
+            ],
+            Position {
                 file: None,
                 line: 1,
                 column: 1,
                 offset: 0
             },
-            types: vec![
+        ))
+    );
+    assert_type_success!(
+        r#"select (foo) => { true = { foo = 1, bar = "quux" }, false = { bar = "foo" } };"#,
+        Shape::Narrowed(NarrowedShape::new_with_pos(
+            vec![
                 Shape::Tuple(PositionedItem {
                     pos: Position {
                         file: None,
@@ -487,49 +485,55 @@ fn infer_select_shape() {
                         })
                     )]
                 })
-            ]
-        })
-    );
-    assert_type_success!(
-        r#"select (foo) => { true = [ "quux" ], false = [ 1 ] };"#,
-        Shape::Narrowed(NarrowedShape {
-            pos: Position {
+            ],
+            Position {
                 file: None,
                 line: 1,
                 column: 1,
                 offset: 0
             },
-            types: vec![
-                Shape::List(NarrowedShape {
-                    pos: Position {
+        ))
+    );
+    assert_type_success!(
+        r#"select (foo) => { true = [ "quux" ], false = [ 1 ] };"#,
+        Shape::Narrowed(NarrowedShape::new_with_pos(
+            vec![
+                Shape::List(NarrowedShape::new_with_pos(
+                    vec![Shape::Str(Position {
+                        file: None,
+                        line: 1,
+                        column: 28,
+                        offset: 27
+                    })],
+                    Position {
                         file: None,
                         line: 1,
                         column: 26,
                         offset: 25
                     },
-                    types: vec![Shape::Str(Position {
+                )),
+                Shape::List(NarrowedShape::new_with_pos(
+                    vec![Shape::Int(Position {
                         file: None,
                         line: 1,
-                        column: 28,
-                        offset: 27
-                    })]
-                }),
-                Shape::List(NarrowedShape {
-                    pos: Position {
+                        column: 48,
+                        offset: 47
+                    })],
+                    Position {
                         file: None,
                         line: 1,
                         column: 46,
                         offset: 45
                     },
-                    types: vec![Shape::Int(Position {
-                        file: None,
-                        line: 1,
-                        column: 48,
-                        offset: 47
-                    })]
-                })
-            ]
-        })
+                ))
+            ],
+            Position {
+                file: None,
+                line: 1,
+                column: 1,
+                offset: 0
+            },
+        ))
     );
 }
 
@@ -589,5 +593,66 @@ fn test_module_inference() {
                 offset: 14
             }))
         })
-    )
+    );
+    let complex_mod_stmt = include_str!("complex_module.ucg");
+    assert_type_success!(
+        complex_mod_stmt,
+        Shape::Module(ModuleShape {
+            items: vec![(
+                PositionedItem {
+                    pos: Position {
+                        file: None,
+                        line: 2,
+                        column: 3,
+                        offset: 10
+                    },
+                    val: "arg".into()
+                },
+                Shape::Int(Position {
+                    file: None,
+                    line: 2,
+                    column: 7,
+                    offset: 14
+                })
+            )],
+            ret: Box::new(Shape::Int(Position {
+                file: None,
+                line: 2,
+                column: 7,
+                offset: 14
+            }))
+        })
+    );
+    let infer_mod_arg_stmt = include_str!("infer_module_arg.ucg");
+    assert_type_success!(
+        infer_mod_arg_stmt,
+        Shape::Module(ModuleShape {
+            items: vec![(
+                PositionedItem {
+                    pos: Position {
+                        file: None,
+                        line: 2,
+                        column: 3,
+                        offset: 10
+                    },
+                    val: "arg".into()
+                },
+                Shape::Narrowed(NarrowedShape::new_with_pos(
+                    vec![],
+                    Position {
+                        file: None,
+                        line: 2,
+                        column: 3,
+                        offset: 10
+                    },
+                ))
+            )],
+            ret: Box::new(Shape::Int(Position {
+                file: None,
+                line: 2,
+                column: 7,
+                offset: 14
+            }))
+        })
+    );
 }

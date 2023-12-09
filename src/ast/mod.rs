@@ -260,9 +260,15 @@ pub enum ImportShape {
 }
 
 #[derive(PartialEq, Debug, Clone)]
+pub enum NarrowingShape {
+    Narrowed(Vec<Shape>),
+    Any,
+}
+
+#[derive(PartialEq, Debug, Clone)]
 pub struct NarrowedShape {
     pub pos: Position,
-    pub types: Vec<Shape>,
+    pub types: NarrowingShape,
 }
 
 impl NarrowedShape {
@@ -271,7 +277,10 @@ impl NarrowedShape {
     }
 
     pub fn new_with_pos(types: Vec<Shape>, pos: Position) -> Self {
-        Self { pos, types }
+        Self {
+            pos,
+            types: NarrowingShape::Narrowed(types),
+        }
     }
 
     pub fn with_pos(mut self, pos: Position) -> Self {
@@ -280,12 +289,19 @@ impl NarrowedShape {
     }
 
     pub fn merge_in_shape(&mut self, shape: Shape, symbol_table: &mut BTreeMap<Rc<str>, Shape>) {
-        for s in self.types.iter() {
-            if s.equivalent(&shape, symbol_table) {
-                return;
+        match &mut self.types {
+            NarrowingShape::Narrowed(ref mut types) => {
+                for s in types.iter() {
+                    if s.equivalent(&shape, symbol_table) {
+                        return;
+                    }
+                }
+                types.push(shape);
+            }
+            NarrowingShape::Any => {
+                self.types = NarrowingShape::Narrowed(vec![shape]);
             }
         }
-        self.types.push(shape)
     }
 }
 
@@ -315,11 +331,49 @@ impl Shape {
             | (Shape::Int(_), Shape::Int(_))
             | (Shape::Hole(_), Shape::Hole(_))
             | (Shape::Float(_), Shape::Float(_)) => true,
-            (Shape::Narrowed(left_slist), Shape::Narrowed(right_slist))
-            | (Shape::List(left_slist), Shape::List(right_slist)) => {
-                for ls in left_slist.types.iter() {
+            (
+                Shape::List(NarrowedShape {
+                    pos: _,
+                    types: NarrowingShape::Any,
+                }),
+                Shape::List(NarrowedShape {
+                    pos: _,
+                    types: NarrowingShape::Any,
+                }),
+            )
+            | (
+                Shape::Narrowed(NarrowedShape {
+                    pos: _,
+                    types: NarrowingShape::Any,
+                }),
+                Shape::Narrowed(NarrowedShape {
+                    pos: _,
+                    types: NarrowingShape::Any,
+                }),
+            ) => true,
+            (
+                Shape::List(NarrowedShape {
+                    pos: _,
+                    types: NarrowingShape::Narrowed(left_slist),
+                }),
+                Shape::List(NarrowedShape {
+                    pos: _,
+                    types: NarrowingShape::Narrowed(right_slist),
+                }),
+            )
+            | (
+                Shape::Narrowed(NarrowedShape {
+                    pos: _,
+                    types: NarrowingShape::Narrowed(left_slist),
+                }),
+                Shape::Narrowed(NarrowedShape {
+                    pos: _,
+                    types: NarrowingShape::Narrowed(right_slist),
+                }),
+            ) => {
+                for ls in left_slist.iter() {
                     let mut found = false;
-                    for rs in right_slist.types.iter() {
+                    for rs in right_slist.iter() {
                         if ls.equivalent(rs, symbol_table) {
                             found = true;
                             break;
@@ -331,6 +385,46 @@ impl Shape {
                 }
                 true
             }
+            (
+                Shape::List(NarrowedShape {
+                    pos: _,
+                    types: NarrowingShape::Any,
+                }),
+                Shape::List(NarrowedShape {
+                    pos: _,
+                    types: NarrowingShape::Narrowed(right_slist),
+                }),
+            )
+            | (
+                Shape::Narrowed(NarrowedShape {
+                    pos: _,
+                    types: NarrowingShape::Any,
+                }),
+                Shape::Narrowed(NarrowedShape {
+                    pos: _,
+                    types: NarrowingShape::Narrowed(right_slist),
+                }),
+            ) => true,
+            (
+                Shape::List(NarrowedShape {
+                    pos,
+                    types: NarrowingShape::Narrowed(left_slist),
+                }),
+                Shape::List(NarrowedShape {
+                    pos: _,
+                    types: NarrowingShape::Any,
+                }),
+            )
+            | (
+                Shape::Narrowed(NarrowedShape {
+                    pos,
+                    types: NarrowingShape::Narrowed(left_slist),
+                }),
+                Shape::Narrowed(NarrowedShape {
+                    pos: _,
+                    types: NarrowingShape::Any,
+                }),
+            ) => true,
             (Shape::Tuple(left_slist), Shape::Tuple(right_slist)) => {
                 for (lt, ls) in left_slist.val.iter() {
                     let mut found = false;
@@ -433,14 +527,24 @@ impl Shape {
         right: &Shape,
         symbol_table: &mut BTreeMap<Rc<str>, Shape>,
     ) -> Shape {
-        let left_iter = left_slist.types.iter();
-        let right_iter = right_slist.types.iter();
-        if is_list_subset(left_iter, right_slist, symbol_table) {
-            self.clone()
-        } else if is_list_subset(right_iter, left_slist, symbol_table) {
-            right.clone()
-        } else {
-            Shape::TypeErr(right.pos().clone(), "Incompatible List Shapes".to_owned())
+        match (&left_slist.types, &right_slist.types) {
+            (
+                NarrowingShape::Narrowed(ref left_types),
+                NarrowingShape::Narrowed(ref right_types),
+            ) => {
+                let left_iter = left_types.iter();
+                let right_iter = right_types.iter();
+                if is_list_subset(left_iter, right_slist, symbol_table) {
+                    self.clone()
+                } else if is_list_subset(right_iter, left_slist, symbol_table) {
+                    right.clone()
+                } else {
+                    Shape::TypeErr(right.pos().clone(), "Incompatible List Shapes".to_owned())
+                }
+            }
+            (NarrowingShape::Narrowed(_), NarrowingShape::Any)
+            | (NarrowingShape::Any, NarrowingShape::Any) => self.clone(),
+            (NarrowingShape::Any, NarrowingShape::Narrowed(_)) => right.clone(),
         }
     }
 
@@ -486,10 +590,11 @@ impl Shape {
             Shape::Int(_) => Shape::Int(pos.clone()),
             Shape::Float(_) => Shape::Float(pos.clone()),
             Shape::Boolean(_) => Shape::Boolean(pos.clone()),
-            Shape::List(lst) => Shape::List(NarrowedShape::new_with_pos(lst.types, pos)),
+            Shape::List(NarrowedShape { pos: _, types: NarrowingShape::Narrowed(lst) }) => Shape::List(NarrowedShape::new_with_pos(lst, pos)),
+            Shape::List(NarrowedShape { pos: _, types: NarrowingShape::Any }) => Shape::List(NarrowedShape {pos, types: NarrowingShape::Any}),
             Shape::Tuple(flds) => Shape::Tuple(PositionedItem::new(flds.val, pos)),
             Shape::Func(_) | Shape::Module(_) => self.clone(),
-            Shape::Narrowed(pi) => Shape::Narrowed(pi.with_pos(pos)),
+            Shape::Narrowed(narrowed_shape) => Shape::Narrowed(narrowed_shape.with_pos(pos)),
             Shape::Hole(pi) => Shape::Hole(pi.with_pos(pos)),
             Shape::Import(ImportShape::Resolved(_, s)) => {
                 Shape::Import(ImportShape::Resolved(pos, s))
@@ -535,6 +640,10 @@ fn is_list_subset(
     left_slist: &NarrowedShape,
     symbol_table: &mut BTreeMap<Rc<str>, Shape>,
 ) -> bool {
+    let left_slist = match &left_slist.types {
+        NarrowingShape::Any => return true,
+        NarrowingShape::Narrowed(ref list) => list,
+    };
     let right_subset = loop {
         let mut matches = false;
         let ls = if let Some(ls) = right_iter.next() {
@@ -542,7 +651,7 @@ fn is_list_subset(
         } else {
             break true;
         };
-        for rs in left_slist.types.iter() {
+        for rs in left_slist.iter() {
             let s = ls.narrow(rs, symbol_table);
             if let Shape::TypeErr(_, _) = s {
                 // noop
