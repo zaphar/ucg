@@ -372,6 +372,7 @@ impl Shape {
         }
     }
 
+    // FIXME(jwall): This needs to move wholesale into the Checker
     pub fn narrow(&self, right: &Shape, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Self {
         match (self, right) {
             (Shape::Str(_), Shape::Str(_))

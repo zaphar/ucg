@@ -41,7 +41,8 @@ macro_rules! assert_type_success {
         let mut expr = parse($e.into(), None).unwrap();
         checker.walk_statement_list(expr.iter_mut().collect());
         let maybe_shape = checker.pop_shape();
-        assert_eq!(checker.symbol_table[$expected_sym], $shape);
+        // FIXME?(jwall): We should probably just use an symbol table lookup api here. 
+        assert_eq!(checker.symbol_table.last().map(|t| t[$expected_sym]), Some($shape));
         let result = checker.result();
         assert!(result.is_ok(), "We expect this to typecheck successfully.");
         assert!(maybe_shape.is_some(), "We got a shape out of it");
@@ -154,7 +155,7 @@ macro_rules! infer_symbol_test {
             let symbol = $sym_list[idx].0.clone();
             checker
                 .symbol_table
-                .insert(symbol.clone(), shape.clone());
+                .last_mut(|t| t.insert(symbol.clone(), shape.clone()));
         }
         let tokens = tokenize(expr, None).unwrap();
         let token_iter = SliceIter::new(&tokens);

@@ -27,23 +27,30 @@ use super::{
     NarrowedShape, NotDef, Position, PositionedItem, SelectDef,
 };
 
+// FIXME(jwall): This needs to just go away.
 /// Trait for shape derivation.
 pub trait DeriveShape {
     /// Derive a shape using a provided symbol table.
-    fn derive_shape(&self, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape;
+    fn derive_shape(&self, symbol_table: &mut Vec<BTreeMap<Rc<str>, Shape>>) -> Shape;
 }
 
 impl DeriveShape for FuncDef {
-    fn derive_shape(&self, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
+    fn derive_shape(&self, symbol_table: &mut Vec<BTreeMap<Rc<str>, Shape>>) -> Shape {
+        // FIXME(jwall): This is *all* wrong here.
         // 1. First set up our symbols.
         let mut sym_table = self
             .argdefs
             .iter()
             .map(|sym| (sym.val.clone(), dbg!(Shape::Hole(sym.clone()))))
             .collect::<BTreeMap<Rc<str>, Shape>>();
-        sym_table.append(&mut symbol_table.clone());
+        sym_table.append(
+            &mut (symbol_table
+                .last()
+                .expect("We should definitely have a symbol_table here")
+                .clone()),
+        );
         // 2.Then determine the shapes of those symbols in our expression.
-        let shape = self.fields.derive_shape(&mut sym_table);
+        let shape = self.fields.derive_shape(&mut vec![sym_table]);
         // 3. Finally determine what the return shape can be.
         // only include the closed over shapes.
         let table = self
@@ -68,7 +75,7 @@ impl DeriveShape for FuncDef {
 }
 
 impl DeriveShape for ModuleDef {
-    fn derive_shape(&self, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
+    fn derive_shape(&self, symbol_table: &mut Vec<BTreeMap<Rc<str>, Shape>>) -> Shape {
         let sym_table: BTreeMap<Rc<str>, Shape> = self
             .arg_set
             .iter()
@@ -102,15 +109,12 @@ impl DeriveShape for ModuleDef {
                     .clone(),
             ));
         }
-        Shape::Module(ModuleShape {
-            items,
-            ret,
-        })
+        Shape::Module(ModuleShape { items, ret })
     }
 }
 
 impl DeriveShape for SelectDef {
-    fn derive_shape(&self, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
+    fn derive_shape(&self, symbol_table: &mut Vec<BTreeMap<Rc<str>, Shape>>) -> Shape {
         let SelectDef {
             val: _,
             default: _,
@@ -123,12 +127,18 @@ impl DeriveShape for SelectDef {
         };
         for (_, expr) in tuple {
             let shape = expr.derive_shape(symbol_table);
-            narrowed_shape.merge_in_shape(shape, symbol_table);
+            narrowed_shape.merge_in_shape(
+                shape,
+                symbol_table
+                    .last_mut()
+                    .expect("We should definitely have a symbol table here"),
+            );
         }
         Shape::Narrowed(narrowed_shape)
     }
 }
 
+// FIXME(jwall): This needs to move wholesale into the Checker
 fn derive_include_shape(
     IncludeDef {
         pos,
@@ -145,7 +155,8 @@ fn derive_include_shape(
     ))
 }
 
-fn derive_not_shape(def: &NotDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
+// FIXME(jwall): This needs to move wholesale into the Checker
+fn derive_not_shape(def: &NotDef, symbol_table: &mut Vec<BTreeMap<Rc<str>, Shape>>) -> Shape {
     let shape = def.expr.as_ref().derive_shape(symbol_table);
     if let Shape::Boolean(_) = &shape {
         return Shape::Boolean(def.pos.clone());
@@ -167,103 +178,8 @@ fn derive_not_shape(def: &NotDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -
     )
 }
 
-fn derive_copy_shape(def: &CopyDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
-    let base_shape = def.selector.derive_shape(symbol_table);
-    match &base_shape {
-        // TODO(jwall): Should we allow a stack of these?
-        Shape::TypeErr(_, _) => base_shape,
-        Shape::Boolean(_)
-        | Shape::Int(_)
-        | Shape::Float(_)
-        | Shape::Str(_)
-        | Shape::List(_)
-        | Shape::Func(_) => Shape::TypeErr(
-            def.pos.clone(),
-            format!("Not a Copyable type {}", base_shape.type_name()),
-        ),
-        // This is an interesting one. Do we assume tuple or module here?
-        Shape::Hole(pi) => Shape::Narrowed(NarrowedShape::new_with_pos(
-            vec![
-                Shape::Tuple(PositionedItem::new(vec![], pi.pos.clone())),
-                Shape::Module(ModuleShape {
-                    items: vec![],
-                    ret: Box::new(Shape::Narrowed(NarrowedShape {
-                        pos: pi.pos.clone(),
-                        types: vec![],
-                    })),
-                }),
-                Shape::Import(ImportShape::Unresolved(pi.clone())),
-            ],
-            pi.pos.clone(),
-        )),
-        Shape::Narrowed(potentials) => {
-            // 1. Do the possible shapes include tuple, module, or import?
-            let filtered = potentials
-                .types
-                .iter()
-                .filter_map(|v| match v {
-                    Shape::Tuple(_) | Shape::Module(_) | Shape::Import(_) | Shape::Hole(_) => {
-                        Some(v.clone())
-                    }
-                    _ => None,
-                })
-                .collect::<Vec<Shape>>();
-            if !filtered.is_empty() {
-                //  1.1 Then return those and strip the others.
-                Shape::Narrowed(NarrowedShape::new_with_pos(filtered, def.pos.clone()))
-            } else {
-                // 2. Else return a type error
-                Shape::TypeErr(
-                    def.pos.clone(),
-                    format!("Not a Copyable type {}", base_shape.type_name()),
-                )
-            }
-        }
-        // These have understandable ways to resolve the type.
-        Shape::Module(mdef) => {
-            let arg_fields = def
-                .fields
-                .iter()
-                .map(|(tok, expr)| (tok.fragment.clone(), expr.derive_shape(symbol_table)))
-                .collect::<BTreeMap<Rc<str>, Shape>>();
-            // 1. Do our copyable fields have the right names and shapes based on mdef.items.
-            for (sym, shape) in mdef.items.iter() {
-                if let Some(s) = arg_fields.get(&sym.val) {
-                    if let Shape::TypeErr(pos, msg) = shape.narrow(s, symbol_table) {
-                        return Shape::TypeErr(pos, msg);
-                    }
-                }
-            }
-            //  1.1 If so then return the ret as our shape.
-            mdef.ret.as_ref().clone()
-        }
-        Shape::Tuple(t_def) => {
-            let mut base_fields = t_def.clone();
-            base_fields.val.extend(
-                def.fields
-                    .iter()
-                    .map(|(tok, expr)| (tok.into(), expr.derive_shape(symbol_table))),
-            );
-            Shape::Tuple(base_fields).with_pos(def.pos.clone())
-        }
-        Shape::Import(ImportShape::Unresolved(_)) => Shape::Narrowed(NarrowedShape::new_with_pos(
-            vec![Shape::Tuple(PositionedItem::new(vec![], def.pos.clone()))],
-            def.pos.clone(),
-        )),
-        Shape::Import(ImportShape::Resolved(_, tuple_shape)) => {
-            let mut base_fields = tuple_shape.clone();
-            base_fields.extend(
-                def.fields
-                    .iter()
-                    .map(|(tok, expr)| (tok.into(), expr.derive_shape(symbol_table))),
-            );
-            Shape::Tuple(PositionedItem::new(base_fields, def.pos.clone()))
-        }
-    }
-}
-
 impl DeriveShape for Expression {
-    fn derive_shape(&self, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
+    fn derive_shape(&self, symbol_table: &mut Vec<BTreeMap<Rc<str>, Shape>>) -> Shape {
         match self {
             Expression::Simple(v) => v.derive_shape(symbol_table),
             Expression::Format(def) => Shape::Str(def.pos.clone()),
@@ -342,37 +258,10 @@ impl DeriveShape for Expression {
     }
 }
 
-impl DeriveShape for Value {
-    fn derive_shape(&self, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
-        match self {
-            Value::Empty(p) => Shape::Narrowed(NarrowedShape::new_with_pos(vec![], p.clone())),
-            Value::Boolean(p) => Shape::Boolean(p.pos.clone()),
-            Value::Int(p) => Shape::Int(p.pos.clone()),
-            Value::Float(p) => Shape::Float(p.pos.clone()),
-            Value::Str(p) => Shape::Str(p.pos.clone()),
-            Value::Symbol(p) => {
-                if let Some(s) = symbol_table.get(&p.val) {
-                    s.clone()
-                } else {
-                    Shape::Hole(p.clone())
-                }
-            }
-            Value::Tuple(flds) => derive_field_list_shape(&flds.val, &flds.pos, symbol_table),
-            Value::List(flds) => {
-                let mut field_shapes = Vec::new();
-                for f in &flds.elems {
-                    field_shapes.push(f.derive_shape(symbol_table));
-                }
-                Shape::List(NarrowedShape::new_with_pos(field_shapes, flds.pos.clone()))
-            }
-        }
-    }
-}
-
 fn derive_field_list_shape(
     flds: &Vec<(super::Token, Expression)>,
     pos: &Position,
-    symbol_table: &mut BTreeMap<Rc<str>, Shape>,
+    symbol_table: &mut Vec<BTreeMap<Rc<str>, Shape>>,
 ) -> Shape {
     let mut field_shapes = Vec::new();
     for &(ref tok, ref expr) in flds {
@@ -385,7 +274,7 @@ fn derive_field_list_shape(
 }
 
 pub struct Checker {
-    symbol_table: BTreeMap<Rc<str>, Shape>,
+    symbol_table: Vec<BTreeMap<Rc<str>, Shape>>,
     err_stack: Vec<BuildError>,
     shape_stack: Vec<Shape>,
 }
@@ -401,15 +290,28 @@ pub struct Checker {
 impl Checker {
     pub fn new() -> Self {
         return Self {
-            symbol_table: BTreeMap::new(),
+            symbol_table: vec![BTreeMap::new()],
             err_stack: Vec::new(),
             shape_stack: Vec::new(),
         };
     }
 
     pub fn with_symbol_table(mut self, symbol_table: BTreeMap<Rc<str>, Shape>) -> Self {
-        self.symbol_table = symbol_table;
+        self.symbol_table = vec![symbol_table];
         self
+    }
+
+    pub fn lookup_symbol<'a>(&'a self, sym: Rc<str>) -> Option<&'a Shape> {
+        for table in self.symbol_table.iter().rev() {
+            if let Some(shape) = table.get(&sym) {
+                return Some(shape);
+            }
+        }
+        return None;
+    }
+
+    pub fn insert_symbol(&mut self, sym: Rc<str>, shape: Shape) {
+        self.symbol_table.last_mut().map(|t| t.insert(sym, shape));
     }
 
     pub fn pop_shape(&mut self) -> Option<Shape> {
@@ -420,9 +322,108 @@ impl Checker {
         if let Some(err) = self.err_stack.pop() {
             Err(err)
         } else {
-            Ok(self.symbol_table)
+            Ok(self
+                .symbol_table
+                .pop()
+                .expect("We should have a symbol table here somehwere"))
         }
     }
+    
+    fn derive_copy_shape(&mut self, def: &CopyDef) -> Shape {
+        let base_shape = def.selector.derive_shape(symbol_table);
+        match &base_shape {
+            // TODO(jwall): Should we allow a stack of these?
+            Shape::TypeErr(_, _) => base_shape,
+            Shape::Boolean(_)
+            | Shape::Int(_)
+            | Shape::Float(_)
+            | Shape::Str(_)
+            | Shape::List(_)
+            | Shape::Func(_) => Shape::TypeErr(
+                def.pos.clone(),
+                format!("Not a Copyable type {}", base_shape.type_name()),
+            ),
+            // This is an interesting one. Do we assume tuple or module here?
+            Shape::Hole(pi) => Shape::Narrowed(NarrowedShape::new_with_pos(
+                vec![
+                    Shape::Tuple(PositionedItem::new(vec![], pi.pos.clone())),
+                    Shape::Module(ModuleShape {
+                        items: vec![],
+                        ret: Box::new(Shape::Narrowed(NarrowedShape {
+                            pos: pi.pos.clone(),
+                            types: vec![],
+                        })),
+                    }),
+                    Shape::Import(ImportShape::Unresolved(pi.clone())),
+                ],
+                pi.pos.clone(),
+            )),
+            Shape::Narrowed(potentials) => {
+                // 1. Do the possible shapes include tuple, module, or import?
+                let filtered = potentials
+                    .types
+                    .iter()
+                    .filter_map(|v| match v {
+                        Shape::Tuple(_) | Shape::Module(_) | Shape::Import(_) | Shape::Hole(_) => {
+                            Some(v.clone())
+                        }
+                        _ => None,
+                    })
+                    .collect::<Vec<Shape>>();
+                if !filtered.is_empty() {
+                    //  1.1 Then return those and strip the others.
+                    Shape::Narrowed(NarrowedShape::new_with_pos(filtered, def.pos.clone()))
+                } else {
+                    // 2. Else return a type error
+                    Shape::TypeErr(
+                        def.pos.clone(),
+                        format!("Not a Copyable type {}", base_shape.type_name()),
+                    )
+                }
+            }
+            // These have understandable ways to resolve the type.
+            Shape::Module(mdef) => {
+                let arg_fields = def
+                    .fields
+                    .iter()
+                    .map(|(tok, expr)| (tok.fragment.clone(), expr.derive_shape(symbol_table)))
+                    .collect::<BTreeMap<Rc<str>, Shape>>();
+                // 1. Do our copyable fields have the right names and shapes based on mdef.items.
+                for (sym, shape) in mdef.items.iter() {
+                    if let Some(s) = arg_fields.get(&sym.val) {
+                        if let Shape::TypeErr(pos, msg) = shape.narrow(s, symbol_table) {
+                            return Shape::TypeErr(pos, msg);
+                        }
+                    }
+                }
+                //  1.1 If so then return the ret as our shape.
+                mdef.ret.as_ref().clone()
+            }
+            Shape::Tuple(t_def) => {
+                let mut base_fields = t_def.clone();
+                base_fields.val.extend(
+                    def.fields
+                        .iter()
+                        .map(|(tok, expr)| (tok.into(), expr.derive_shape(symbol_table))),
+                );
+                Shape::Tuple(base_fields).with_pos(def.pos.clone())
+            }
+            Shape::Import(ImportShape::Unresolved(_)) => Shape::Narrowed(NarrowedShape::new_with_pos(
+                vec![Shape::Tuple(PositionedItem::new(vec![], def.pos.clone()))],
+                def.pos.clone(),
+            )),
+            Shape::Import(ImportShape::Resolved(_, tuple_shape)) => {
+                let mut base_fields = tuple_shape.clone();
+                base_fields.extend(
+                    def.fields
+                        .iter()
+                        .map(|(tok, expr)| (tok.into(), expr.derive_shape(symbol_table))),
+                );
+                Shape::Tuple(PositionedItem::new(base_fields, def.pos.clone()))
+            }
+        }
+    }
+
 }
 
 impl Visitor for Checker {
@@ -451,28 +452,31 @@ impl Visitor for Checker {
     }
 
     fn visit_value(&mut self, val: &mut Value) {
-        match val {
-            Value::Empty(p) => self
-                .shape_stack
-                .push(Shape::Narrowed(NarrowedShape::new_with_pos(
-                    vec![],
-                    p.clone(),
-                ))),
-            Value::Boolean(p) => self.shape_stack.push(Shape::Boolean(p.pos.clone())),
-            Value::Int(p) => self.shape_stack.push(Shape::Int(p.pos.clone())),
-            Value::Float(p) => self.shape_stack.push(Shape::Float(p.pos.clone())),
-            Value::Str(p) => self.shape_stack.push(Shape::Str(p.pos.clone())),
-            // Symbols in a shape are placeholders. They allow a form of genericity
-            // in the shape. They can be any type and are only refined down.
-            // by their presence in an expression.
-            Value::Symbol(p) => self.shape_stack.push(Shape::Hole(p.clone())),
-            Value::List(_) => {
-                // noop
+        let shape = match val {
+            Value::Empty(p) => Shape::Narrowed(NarrowedShape::new_with_pos(vec![], p.clone())),
+            Value::Boolean(p) => Shape::Boolean(p.pos.clone()),
+            Value::Int(p) => Shape::Int(p.pos.clone()),
+            Value::Float(p) => Shape::Float(p.pos.clone()),
+            Value::Str(p) => Shape::Str(p.pos.clone()),
+            Value::Symbol(p) => {
+                if let Some(s) = self.lookup_symbol(p.val.clone()) {
+                    s.clone()
+                } else {
+                    Shape::Hole(p.clone())
+                }
             }
-            Value::Tuple(_) => {
-                // noop
+            // FIXME(jwall): This needs to be handled differently
+            Value::Tuple(flds) => derive_field_list_shape(&flds.val, &flds.pos, symbol_table),
+            // FIXME(jwall): This needs to be handled differently
+            Value::List(flds) => {
+                let mut field_shapes = Vec::new();
+                for f in &flds.elems {
+                    field_shapes.push(f.derive_shape(&mut self.symbol_table));
+                }
+                Shape::List(NarrowedShape::new_with_pos(field_shapes, flds.pos.clone()))
             }
-        }
+        };
+        self.shape_stack.push(shape)
     }
 
     fn leave_value(&mut self, _val: &Value) {
@@ -507,7 +511,11 @@ impl Visitor for Checker {
                     pos.clone(),
                 ));
             } else {
-                self.symbol_table.insert(name.clone(), shape.clone());
+                // FIXME(jwall): Should this insert a new symbol_tableif it doesn't exist?
+                self.symbol_table
+                    .last_mut()
+                    .map(|t| t.insert(name.clone(), shape.clone()))
+                    .expect("We should already have a symbol table here");
                 self.shape_stack.push(shape);
             }
         }
