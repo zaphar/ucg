@@ -20,7 +20,7 @@
     let
         overlays = [ rust-overlay.overlays.default ];
         pkgs = import nixpkgs { inherit system overlays; };
-        rust-bin = pkgs.rust-bin.stable."1.64.0".default.override {
+        rust-bin = pkgs.rust-bin.stable."1.70.0".default.override {
             extensions = [ "rust-src" ];
             # Add wasm32 as an extra target besides the native target.
             targets = [ "wasm32-unknown-unknown" ];
