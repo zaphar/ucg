@@ -10,17 +10,17 @@
         };
         naersk.url = "github:nix-community/naersk";
         flake-compat = {
-            url = github:edolstra/flake-compat;
+            url = "github:edolstra/flake-compat";
             flake = false;
         };
     };
 
-    outputs = {self, nixpkgs, flake-utils, rust-overlay, naersk, flake-compat}:
+    outputs = {nixpkgs, flake-utils, rust-overlay, naersk, ...}:
     flake-utils.lib.eachDefaultSystem (system:
     let
         overlays = [ rust-overlay.overlays.default ];
         pkgs = import nixpkgs { inherit system overlays; };
-        rust-bin = pkgs.rust-bin.stable."1.70.0".default.override {
+        rust-bin = pkgs.rust-bin.stable."1.87.0".default.override {
             extensions = [ "rust-src" ];
             # Add wasm32 as an extra target besides the native target.
             targets = [ "wasm32-unknown-unknown" ];
@@ -29,13 +29,12 @@
             rustc = rust-bin;
             cargo = rust-bin;
         };
-        ucg = with pkgs;
-            naersk-lib.buildPackage rec {
-                pname = "ucg";
-                version = "0.7.3";
-                src = ./.;
-                cargoBuildOptions = opts: opts ++ ["-p" "${pname}" ];
-            };
+        ucg = naersk-lib.buildPackage rec {
+            pname = "ucg";
+            version = "0.7.3";
+            src = ./.;
+            cargoBuildOptions = opts: opts ++ ["-p" "${pname}" ];
+        };
     in
     {
         packages = {
@@ -45,6 +44,10 @@
         defaultApp = {
             type = "app";
             program = "${ucg}/bin/ucg";
+        };
+        devShells.default = pkgs.mkShell {
+          buildInputs = [ rust-bin pkgs.rust-analyzer pkgs.cargo-tarpaulin ];
+          packages = with pkgs; [ gnumake ];
         };
     });
 }
