@@ -8,30 +8,23 @@
             url = "github:oxalica/rust-overlay";
             inputs.nixpkgs.follows = "nixpkgs";
         };
-        naersk.url = "github:nix-community/naersk";
+        crane.url = "github:ipetkov/crane";
         flake-compat = {
             url = "github:edolstra/flake-compat";
             flake = false;
         };
     };
 
-    outputs = {nixpkgs, flake-utils, rust-overlay, naersk, ...}:
+    outputs = {nixpkgs, flake-utils, rust-overlay, crane, ...}:
     flake-utils.lib.eachDefaultSystem (system:
     let
-        overlays = [ rust-overlay.overlays.default ];
+        overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays; };
-        rust-bin = pkgs.rust-bin.stable.latest.default.override {
-            extensions = [ "rust-src" ];
-        };
-        naersk-lib = pkgs.callPackage naersk {
-            rustc = rust-bin;
-            cargo = rust-bin;
-        };
-        ucg = naersk-lib.buildPackage rec {
+        craneLib = (crane.mkLib pkgs);
+        ucg = craneLib.buildPackage rec {
             pname = "ucg";
             version = "0.7.3";
             src = ./.;
-            cargoBuildOptions = opts: opts ++ ["-p" "${pname}" ];
         };
     in
     {
@@ -43,9 +36,8 @@
             type = "app";
             program = "${ucg}/bin/ucg";
         };
-        devShells.default = pkgs.mkShell {
-          buildInputs = [ rust-bin pkgs.rust-analyzer pkgs.cargo-tarpaulin ];
-          packages = with pkgs; [ gnumake ];
+        devShells.default = craneLib.devShell {
+          packages = with pkgs; [ gnumake rust-analyzer cargo-tarpaulin];
         };
     });
 }
