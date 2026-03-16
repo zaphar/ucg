@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make stdlibtest:*)",
+      "Bash(make integration:*)",
+      "Bash(cargo fmt:*)",
+      "Bash(cargo run:*)"
+    ]
+  }
+}

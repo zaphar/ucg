@@ -443,8 +443,8 @@ impl Shape {
                 if left_opshape.args.len() != right_opshape.args.len() {
                     return false;
                 }
-                let left_args: Vec<&Shape> = dbg!(left_opshape.args.values().collect());
-                let right_args: Vec<&Shape> = dbg!(right_opshape.args.values().collect());
+                let left_args: Vec<&Shape> = left_opshape.args.values().collect();
+                let right_args: Vec<&Shape> = right_opshape.args.values().collect();
                 for idx in 0..left_args.len() {
                     let shap = left_args[idx];
                     if !shap.equivalent(right_args[idx], symbol_table) {
@@ -460,7 +460,23 @@ impl Shape {
                 true
             }
             (Shape::Module(left_opshape), Shape::Module(right_opshape)) => {
-                todo!();
+                // Check items have compatible structure
+                for (lt, ls) in left_opshape.items.iter() {
+                    let mut found = false;
+                    for (rt, rs) in right_opshape.items.iter() {
+                        if lt.val == rt.val && ls.equivalent(rs, symbol_table) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if !found {
+                        return false;
+                    }
+                }
+                // Check return types
+                left_opshape
+                    .ret
+                    .equivalent(&right_opshape.ret, symbol_table)
             }
             _ => false,
         }
@@ -468,6 +484,10 @@ impl Shape {
 
     pub fn narrow(&self, right: &Shape, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Self {
         match (self, right) {
+            // Propagate TypeErr
+            (Shape::TypeErr(_, _), _) => self.clone(),
+            (_, Shape::TypeErr(_, _)) => right.clone(),
+            // Same-type narrowing
             (Shape::Str(_), Shape::Str(_))
             | (Shape::Boolean(_), Shape::Boolean(_))
             | (Shape::Int(_), Shape::Int(_))
@@ -478,18 +498,161 @@ impl Shape {
                 }
                 other.clone()
             }
-            (Shape::Narrowed(left_slist), Shape::Narrowed(right_slist))
-            | (Shape::List(left_slist), Shape::List(right_slist)) => {
+            // Narrowed(Any) is unconstrained - matches anything
+            (
+                Shape::Narrowed(NarrowedShape {
+                    types: NarrowingShape::Any,
+                    ..
+                }),
+                other,
+            )
+            | (
+                other,
+                Shape::Narrowed(NarrowedShape {
+                    types: NarrowingShape::Any,
+                    ..
+                }),
+            ) => other.clone(),
+            // Narrowed with empty candidates acts as unconstrained
+            (
+                Shape::Narrowed(NarrowedShape {
+                    types: NarrowingShape::Narrowed(types),
+                    ..
+                }),
+                other,
+            ) if types.is_empty() => other.clone(),
+            (
+                other,
+                Shape::Narrowed(NarrowedShape {
+                    types: NarrowingShape::Narrowed(types),
+                    ..
+                }),
+            ) if types.is_empty() => other.clone(),
+            // Narrowed with candidates vs concrete type - filter candidates
+            (
+                Shape::Narrowed(NarrowedShape {
+                    pos: _,
+                    types: NarrowingShape::Narrowed(types),
+                }),
+                other,
+            ) => {
+                let compatible: Vec<Shape> = types
+                    .iter()
+                    .filter(|t| {
+                        let result = t.narrow(other, symbol_table);
+                        !matches!(result, Shape::TypeErr(_, _))
+                    })
+                    .cloned()
+                    .collect();
+                if compatible.is_empty() {
+                    Shape::TypeErr(
+                        right.pos().clone(),
+                        format!(
+                            "No narrowed candidate is compatible with {}",
+                            other.type_name()
+                        ),
+                    )
+                } else {
+                    other.clone()
+                }
+            }
+            (
+                other,
+                Shape::Narrowed(NarrowedShape {
+                    pos: _,
+                    types: NarrowingShape::Narrowed(types),
+                }),
+            ) => {
+                let compatible: Vec<Shape> = types
+                    .iter()
+                    .filter(|t| {
+                        let result = other.narrow(t, symbol_table);
+                        !matches!(result, Shape::TypeErr(_, _))
+                    })
+                    .cloned()
+                    .collect();
+                if compatible.is_empty() {
+                    Shape::TypeErr(
+                        right.pos().clone(),
+                        format!(
+                            "No narrowed candidate is compatible with {}",
+                            other.type_name()
+                        ),
+                    )
+                } else {
+                    other.clone()
+                }
+            }
+            (Shape::List(left_slist), Shape::List(right_slist)) => {
                 self.narrow_list_shapes(left_slist, right_slist, right, symbol_table)
             }
             (Shape::Tuple(left_slist), Shape::Tuple(right_slist)) => {
                 self.narrow_tuple_shapes(left_slist, right_slist, right, symbol_table)
             }
             (Shape::Func(left_opshape), Shape::Func(right_opshape)) => {
-                todo!();
+                if left_opshape.args.len() != right_opshape.args.len() {
+                    return Shape::TypeErr(
+                        right.pos().clone(),
+                        format!(
+                            "Function arity mismatch: expected {} args, got {}",
+                            left_opshape.args.len(),
+                            right_opshape.args.len()
+                        ),
+                    );
+                }
+                let left_args: Vec<&Shape> = left_opshape.args.values().collect();
+                let right_args: Vec<&Shape> = right_opshape.args.values().collect();
+                for idx in 0..left_args.len() {
+                    let narrowed = left_args[idx].narrow(right_args[idx], symbol_table);
+                    if let Shape::TypeErr(_, _) = narrowed {
+                        return Shape::TypeErr(
+                            right.pos().clone(),
+                            "Incompatible function argument types".to_owned(),
+                        );
+                    }
+                }
+                let ret_narrowed = left_opshape.ret.narrow(&right_opshape.ret, symbol_table);
+                if let Shape::TypeErr(_, _) = ret_narrowed {
+                    return Shape::TypeErr(
+                        right.pos().clone(),
+                        "Incompatible function return types".to_owned(),
+                    );
+                }
+                self.clone()
             }
             (Shape::Module(left_opshape), Shape::Module(right_opshape)) => {
-                todo!();
+                // Check items are structurally compatible
+                for (lt, ls) in left_opshape.items.iter() {
+                    let mut found = false;
+                    for (rt, rs) in right_opshape.items.iter() {
+                        if lt.val == rt.val {
+                            let narrowed = ls.narrow(rs, symbol_table);
+                            if let Shape::TypeErr(_, _) = narrowed {
+                                return Shape::TypeErr(
+                                    right.pos().clone(),
+                                    "Incompatible module argument types".to_owned(),
+                                );
+                            }
+                            found = true;
+                            break;
+                        }
+                    }
+                    if !found {
+                        return Shape::TypeErr(
+                            right.pos().clone(),
+                            "Incompatible Module Shapes".to_owned(),
+                        );
+                    }
+                }
+                // Narrow return types
+                let ret_narrowed = left_opshape.ret.narrow(&right_opshape.ret, symbol_table);
+                if let Shape::TypeErr(_, _) = ret_narrowed {
+                    return Shape::TypeErr(
+                        right.pos().clone(),
+                        "Incompatible module return types".to_owned(),
+                    );
+                }
+                self.clone()
             }
             _ => Shape::TypeErr(
                 right.pos().clone(),
@@ -590,8 +753,17 @@ impl Shape {
             Shape::Int(_) => Shape::Int(pos.clone()),
             Shape::Float(_) => Shape::Float(pos.clone()),
             Shape::Boolean(_) => Shape::Boolean(pos.clone()),
-            Shape::List(NarrowedShape { pos: _, types: NarrowingShape::Narrowed(lst) }) => Shape::List(NarrowedShape::new_with_pos(lst, pos)),
-            Shape::List(NarrowedShape { pos: _, types: NarrowingShape::Any }) => Shape::List(NarrowedShape {pos, types: NarrowingShape::Any}),
+            Shape::List(NarrowedShape {
+                pos: _,
+                types: NarrowingShape::Narrowed(lst),
+            }) => Shape::List(NarrowedShape::new_with_pos(lst, pos)),
+            Shape::List(NarrowedShape {
+                pos: _,
+                types: NarrowingShape::Any,
+            }) => Shape::List(NarrowedShape {
+                pos,
+                types: NarrowingShape::Any,
+            }),
             Shape::Tuple(flds) => Shape::Tuple(PositionedItem::new(flds.val, pos)),
             Shape::Func(_) | Shape::Module(_) => self.clone(),
             Shape::Narrowed(narrowed_shape) => Shape::Narrowed(narrowed_shape.with_pos(pos)),

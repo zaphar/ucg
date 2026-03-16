@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
 use std::io::{Read, Write};
@@ -21,6 +22,8 @@ use super::pointer::OpPointer;
 use super::Error;
 use super::{cache, Primitive};
 use super::{Composite, Value};
+use crate::ast::walk::Walker;
+use crate::ast::Shape;
 use crate::build::AssertCollector;
 use crate::build::Val;
 use crate::convert::{ConverterRegistry, ImporterRegistry};
@@ -35,7 +38,7 @@ where
     Stderr: Write + Clone,
 {
     pub val_cache: BTreeMap<Rc<str>, Rc<Value>>,
-    // TODO implement a shape cache here.
+    pub shape_cache: Rc<RefCell<BTreeMap<PathBuf, Shape>>>,
     pub op_cache: cache::Ops,
     pub converter_registry: ConverterRegistry,
     pub importer_registry: ImporterRegistry,
@@ -55,6 +58,7 @@ impl<Stdout: Write + Clone, Stderr: Write + Clone> Environment<Stdout, Stderr> {
     pub fn new_with_vars(out: Stdout, err: Stderr, vars: BTreeMap<Rc<str>, Rc<str>>) -> Self {
         let mut me = Self {
             val_cache: BTreeMap::new(),
+            shape_cache: Rc::new(RefCell::new(BTreeMap::new())),
             env_vars: vars,
             op_cache: cache::Ops::new(),
             assert_results: AssertCollector::new(),
@@ -91,6 +95,7 @@ impl<Stdout: Write + Clone, Stderr: Write + Clone> Environment<Stdout, Stderr> {
         P: Into<PathBuf> + Clone,
     {
         let path_copy = path.clone();
+        let shape_cache = self.shape_cache.clone();
         self.op_cache.entry(path.clone()).get_pointer_or_else(
             || {
                 // FIXME(jwall): We need to do proper error handling here.
@@ -103,7 +108,21 @@ impl<Stdout: Write + Clone, Stderr: Write + Clone> Environment<Stdout, Stderr> {
                 f.read_to_string(&mut contents)?;
                 let iter = OffsetStrIter::new(&contents).with_src_file(&p);
                 // FIXME(jwall): Unify BuildError and our other Error
-                let stmts = parse(iter, None).unwrap();
+                let mut stmts = parse(iter, None).unwrap();
+                // type check the parsed AST
+                let mut checker = crate::ast::typecheck::Checker::new()
+                    .with_working_dir(root)
+                    .with_shape_cache(shape_cache);
+                checker.walk_statement_list(stmts.iter_mut().collect());
+                if let Err(type_err) = checker.result() {
+                    let pos = type_err
+                        .pos
+                        .unwrap_or_else(|| crate::ast::Position::new(0, 0, 0));
+                    return Err(Error::new(
+                        format!("Type error: {}", type_err.msg).into(),
+                        pos,
+                    ));
+                }
                 // then we create an ops from it
                 let ops = super::translate::AST::translate(stmts, &root);
                 Ok(ops)

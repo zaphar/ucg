@@ -13,7 +13,9 @@
 // limitations under the License.
 
 //! Implements typechecking for the parsed ucg AST.
-use std::collections::{BTreeMap, BTreeSet};
+use std::cell::RefCell;
+use std::collections::BTreeMap;
+use std::path::PathBuf;
 use std::rc::Rc;
 
 use crate::ast::walk::{Visitor, Walker};
@@ -21,10 +23,13 @@ use crate::ast::{
     Expression, FailDef, FuncShapeDef, ImportDef, IncludeDef, Shape, Statement, Value,
 };
 use crate::error::{BuildError, ErrorType};
+use crate::iter::OffsetStrIter;
+use crate::parse::parse;
 
 use super::{
-    BinaryExprType, BinaryOpDef, CastType, CopyDef, FuncDef, ImportShape, ModuleDef, ModuleShape,
-    NarrowedShape, NarrowingShape, NotDef, Position, PositionedItem, SelectDef, TupleShape,
+    BinaryExprType, BinaryOpDef, CallDef, CastType, CopyDef, FuncDef, FuncOpDef, ImportShape,
+    MapFilterOpDef, ModuleDef, ModuleShape, NarrowedShape, NarrowingShape, NotDef, Position,
+    PositionedItem, ReduceOpDef, SelectDef, TupleShape,
 };
 
 /// Trait for shape derivation.
@@ -39,10 +44,10 @@ impl DeriveShape for FuncDef {
         let mut sym_table = self
             .argdefs
             .iter()
-            .map(|sym| (sym.val.clone(), dbg!(Shape::Hole(sym.clone()))))
+            .map(|sym| (sym.val.clone(), Shape::Hole(sym.clone())))
             .collect::<BTreeMap<Rc<str>, Shape>>();
         sym_table.append(&mut symbol_table.clone());
-        // 2.Then determine the shapes of those symbols in our expression.
+        // 2. Then determine the shapes of those symbols in our expression.
         let shape = self.fields.derive_shape(&mut sym_table);
         // 3. Finally determine what the return shape can be.
         // only include the closed over shapes.
@@ -52,11 +57,11 @@ impl DeriveShape for FuncDef {
             .map(|sym| {
                 (
                     sym.val.clone(),
-                    dbg!(sym_table
+                    sym_table
                         .get(&sym.val)
                         .unwrap()
                         .clone()
-                        .with_pos(sym.pos.clone())),
+                        .with_pos(sym.pos.clone()),
                 )
             })
             .collect::<BTreeMap<Rc<str>, Shape>>();
@@ -76,7 +81,18 @@ impl DeriveShape for ModuleDef {
             mod_shape = self
                 .arg_set
                 .iter()
-                .map(|(tok, expr)| (tok.into(), expr.derive_shape(symbol_table)))
+                .map(|(tok, expr)| {
+                    let default_shape = expr.derive_shape(symbol_table);
+                    let shape = match &default_shape {
+                        // Empty tuple default means "any tuple" - treat as unconstrained
+                        Shape::Tuple(pi) if pi.val.is_empty() => Shape::Narrowed(NarrowedShape {
+                            pos: tok.pos.clone(),
+                            types: NarrowingShape::Any,
+                        }),
+                        _ => default_shape,
+                    };
+                    (tok.into(), shape)
+                })
                 .collect();
             sym_table.insert(
                 mod_key.clone(),
@@ -86,18 +102,26 @@ impl DeriveShape for ModuleDef {
         // TODO(jwall): We should modify the shape_list when we can continue narrowing a type.
         let mut checker = Checker::new().with_symbol_table(sym_table);
         checker.walk_statement_list(self.statements.clone().iter_mut().collect());
-        if let Some(mut expr) = self.out_expr.clone() {
-            checker.walk_expression(&mut expr);
+        // Derive the out expression shape directly instead of using walk_expression,
+        // since DeriveShape already recurses through expression children.
+        let ret = if let Some(out_expr) = &self.out_expr {
+            Box::new(out_expr.derive_shape(&mut checker.symbol_table))
         } else {
-            // TODO(jwall): Remove this when we require out expressions.
+            Box::new(
+                checker
+                    .pop_shape()
+                    .unwrap_or(Shape::Narrowed(NarrowedShape {
+                        pos: self.pos.clone(),
+                        types: NarrowingShape::Any,
+                    })),
+            )
+        };
+        // Read back narrowed arg shapes from the checker's symbol table
+        if let Some(Shape::Tuple(mod_tuple)) = checker.symbol_table.get(&mod_key) {
+            mod_shape = mod_tuple.val.clone();
         }
-        let ret = Box::new(
-            checker
-                .pop_shape()
-                .expect("There should always be a return type here"),
-        );
         Shape::Module(ModuleShape {
-            items: dbg!(mod_shape),
+            items: mod_shape,
             ret,
         })
     }
@@ -205,7 +229,7 @@ fn derive_copy_shape(def: &CopyDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>)
             pi.pos.clone(),
         )),
         Shape::Narrowed(NarrowedShape {
-            pos,
+            pos: _,
             types: NarrowingShape::Any,
         }) => Shape::Narrowed(NarrowedShape::new_with_pos(
             vec![
@@ -224,7 +248,7 @@ fn derive_copy_shape(def: &CopyDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>)
             def.pos.clone(),
         )),
         Shape::Narrowed(NarrowedShape {
-            pos,
+            pos: _,
             types: NarrowingShape::Narrowed(potentials),
         }) => {
             // 1. Do the possible shapes include tuple, module, or import?
@@ -291,6 +315,202 @@ fn derive_copy_shape(def: &CopyDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>)
     }
 }
 
+fn derive_call_shape(def: &CallDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
+    let func_shape = def.funcref.derive_shape(symbol_table);
+    match &func_shape {
+        Shape::Func(fdef) => {
+            // Check arg count
+            if fdef.args.len() != def.arglist.len() {
+                return Shape::TypeErr(
+                    def.pos.clone(),
+                    format!(
+                        "Function expects {} arguments but got {}",
+                        fdef.args.len(),
+                        def.arglist.len()
+                    ),
+                );
+            }
+            // Derive arg shapes for side effects (symbol narrowing)
+            // Note: We don't check arg types against the function's declared arg types
+            // because FuncShapeDef.args is a BTreeMap (alphabetical order) while call
+            // args are positional. The function body already constrains types internally.
+            for arg_expr in def.arglist.iter() {
+                arg_expr.derive_shape(symbol_table);
+            }
+            // Return the function's return type
+            fdef.ret.as_ref().clone()
+        }
+        Shape::Hole(_) => {
+            // Unknown function, derive arg shapes but return Any
+            for arg_expr in def.arglist.iter() {
+                arg_expr.derive_shape(symbol_table);
+            }
+            Shape::Narrowed(NarrowedShape {
+                pos: def.pos.clone(),
+                types: NarrowingShape::Any,
+            })
+        }
+        Shape::Narrowed(nshape) => {
+            match &nshape.types {
+                NarrowingShape::Any => {
+                    // Could be a function, derive arg shapes but return Any
+                    for arg_expr in def.arglist.iter() {
+                        arg_expr.derive_shape(symbol_table);
+                    }
+                    Shape::Narrowed(NarrowedShape {
+                        pos: def.pos.clone(),
+                        types: NarrowingShape::Any,
+                    })
+                }
+                NarrowingShape::Narrowed(types) => {
+                    // Filter to Func types and check each
+                    let func_types: Vec<&FuncShapeDef> = types
+                        .iter()
+                        .filter_map(|t| {
+                            if let Shape::Func(fdef) = t {
+                                Some(fdef)
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    if func_types.is_empty() {
+                        return Shape::TypeErr(def.pos.clone(), "Not a callable type".to_owned());
+                    }
+                    // Derive arg shapes
+                    let arg_shapes: Vec<Shape> = def
+                        .arglist
+                        .iter()
+                        .map(|e| e.derive_shape(symbol_table))
+                        .collect();
+                    // Collect possible return types
+                    let mut ret_shapes = Vec::new();
+                    for fdef in func_types {
+                        if fdef.args.len() == arg_shapes.len() {
+                            ret_shapes.push(fdef.ret.as_ref().clone());
+                        }
+                    }
+                    if ret_shapes.is_empty() {
+                        Shape::TypeErr(
+                            def.pos.clone(),
+                            "No callable candidate matches argument count".to_owned(),
+                        )
+                    } else if ret_shapes.len() == 1 {
+                        ret_shapes.pop().unwrap()
+                    } else {
+                        Shape::Narrowed(NarrowedShape::new_with_pos(ret_shapes, def.pos.clone()))
+                    }
+                }
+            }
+        }
+        _ => Shape::TypeErr(
+            def.pos.clone(),
+            format!("Not a callable type: {}", func_shape.type_name()),
+        ),
+    }
+}
+
+fn derive_func_op_shape(def: &FuncOpDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
+    match def {
+        FuncOpDef::Map(MapFilterOpDef { func, target, pos }) => {
+            let target_shape = target.derive_shape(symbol_table);
+            let func_shape = func.derive_shape(symbol_table);
+            // target must be a list
+            match &target_shape {
+                Shape::List(_) | Shape::Hole(_) => {}
+                Shape::Narrowed(NarrowedShape {
+                    types: NarrowingShape::Any,
+                    ..
+                }) => {}
+                _ => {
+                    return Shape::TypeErr(
+                        pos.clone(),
+                        format!(
+                            "map target must be a list, got {}",
+                            target_shape.type_name()
+                        ),
+                    );
+                }
+            }
+            // Return type is List(func.ret)
+            match &func_shape {
+                Shape::Func(fdef) => Shape::List(NarrowedShape::new_with_pos(
+                    vec![fdef.ret.as_ref().clone()],
+                    pos.clone(),
+                )),
+                _ => Shape::List(NarrowedShape {
+                    pos: pos.clone(),
+                    types: NarrowingShape::Any,
+                }),
+            }
+        }
+        FuncOpDef::Filter(MapFilterOpDef { func, target, pos }) => {
+            let target_shape = target.derive_shape(symbol_table);
+            let _func_shape = func.derive_shape(symbol_table);
+            // target must be a list, return type is same list type
+            match &target_shape {
+                Shape::List(_) => target_shape,
+                Shape::Hole(_) => Shape::List(NarrowedShape {
+                    pos: pos.clone(),
+                    types: NarrowingShape::Any,
+                }),
+                Shape::Narrowed(NarrowedShape {
+                    types: NarrowingShape::Any,
+                    ..
+                }) => Shape::List(NarrowedShape {
+                    pos: pos.clone(),
+                    types: NarrowingShape::Any,
+                }),
+                _ => Shape::TypeErr(
+                    pos.clone(),
+                    format!(
+                        "filter target must be a list, got {}",
+                        target_shape.type_name()
+                    ),
+                ),
+            }
+        }
+        FuncOpDef::Reduce(ReduceOpDef {
+            func,
+            acc,
+            target,
+            pos,
+        }) => {
+            let target_shape = target.derive_shape(symbol_table);
+            let acc_shape = acc.derive_shape(symbol_table);
+            let func_shape = func.derive_shape(symbol_table);
+            // target must be a list
+            match &target_shape {
+                Shape::List(_) | Shape::Hole(_) => {}
+                Shape::Narrowed(NarrowedShape {
+                    types: NarrowingShape::Any,
+                    ..
+                }) => {}
+                _ => {
+                    return Shape::TypeErr(
+                        pos.clone(),
+                        format!(
+                            "reduce target must be a list, got {}",
+                            target_shape.type_name()
+                        ),
+                    );
+                }
+            }
+            // Return type is acc's shape narrowed against func.ret
+            match &func_shape {
+                Shape::Func(fdef) => {
+                    let narrowed = acc_shape.narrow(&fdef.ret, symbol_table);
+                    match narrowed {
+                        Shape::TypeErr(_, _) => acc_shape,
+                        other => other,
+                    }
+                }
+                _ => acc_shape,
+            }
+        }
+    }
+}
+
 impl DeriveShape for Expression {
     fn derive_shape(&self, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
         match self {
@@ -313,33 +533,132 @@ impl DeriveShape for Expression {
                 def.path.pos.clone(),
             ))),
             Expression::Binary(def) => {
-                dbg!(&def);
                 let left_shape = def.left.derive_shape(symbol_table);
-                // We need to do somethig different if it's a BinaryExprType::DOT
                 if def.kind == BinaryExprType::DOT {
-                    // TODO(jwall): We should update the symbol table with the new
-                    // left shape type if it was a symbol
                     let shape =
                         derive_dot_expression(&def.pos, &left_shape, &def.right, symbol_table);
+                    // Update the symbol table with the inferred left shape
                     if let Expression::Simple(Value::Symbol(pi)) = def.left.as_ref() {
-                        symbol_table.insert(pi.val.clone(), shape.clone());
+                        if let Shape::TypeErr(_, _) = &shape {
+                            // Don't update symbol table on type errors
+                        } else {
+                            match &left_shape {
+                                Shape::Hole(_) => {
+                                    let inferred = infer_container_shape_from_dot(
+                                        &left_shape,
+                                        &def.right,
+                                        &shape,
+                                        &def.pos,
+                                        symbol_table,
+                                    );
+                                    symbol_table.insert(pi.val.clone(), inferred);
+                                }
+                                _ => {}
+                            }
+                        }
                     }
                     shape
                 } else {
                     let right_shape = def.right.derive_shape(symbol_table);
-                    left_shape.narrow(&right_shape, symbol_table)
+                    match &def.kind {
+                        // Comparison operators return Boolean
+                        BinaryExprType::Equal
+                        | BinaryExprType::NotEqual
+                        | BinaryExprType::GT
+                        | BinaryExprType::LT
+                        | BinaryExprType::GTEqual
+                        | BinaryExprType::LTEqual
+                        | BinaryExprType::REMatch
+                        | BinaryExprType::NotREMatch
+                        | BinaryExprType::IN
+                        | BinaryExprType::IS => {
+                            // Check operands are compatible (narrow checks this)
+                            // but always return Boolean
+                            Shape::Boolean(def.pos.clone())
+                        }
+                        // Boolean operators require boolean operands
+                        BinaryExprType::AND | BinaryExprType::OR => {
+                            // Narrow to check compatibility
+                            let narrowed = left_shape.narrow(&right_shape, symbol_table);
+                            if let Shape::TypeErr(_, _) = &narrowed {
+                                narrowed
+                            } else {
+                                Shape::Boolean(def.pos.clone())
+                            }
+                        }
+                        // Math operators narrow types
+                        _ => left_shape.narrow(&right_shape, symbol_table),
+                    }
                 }
             }
             Expression::Copy(def) => derive_copy_shape(def, symbol_table),
             Expression::Include(def) => derive_include_shape(def),
-            Expression::Call(_) => todo!(),
+            Expression::Call(def) => derive_call_shape(def, symbol_table),
             Expression::Func(def) => def.derive_shape(symbol_table),
             Expression::Select(def) => def.derive_shape(symbol_table),
-            Expression::FuncOp(_) => todo!(),
+            Expression::FuncOp(def) => derive_func_op_shape(def, symbol_table),
             Expression::Module(def) => def.derive_shape(symbol_table),
-            Expression::Fail(_) => todo!(),
-            Expression::Debug(_) => todo!(),
+            Expression::Fail(def) => {
+                let msg_shape = def.message.derive_shape(symbol_table);
+                match &msg_shape {
+                    Shape::Str(_) | Shape::Hole(_) => {}
+                    Shape::Narrowed(NarrowedShape {
+                        types: NarrowingShape::Any,
+                        ..
+                    }) => {}
+                    _ => {
+                        return Shape::TypeErr(
+                            def.pos.clone(),
+                            format!(
+                                "fail message must be a string, got {}",
+                                msg_shape.type_name()
+                            ),
+                        );
+                    }
+                }
+                // fail never produces a value - any type is compatible
+                Shape::Narrowed(NarrowedShape {
+                    pos: def.pos.clone(),
+                    types: NarrowingShape::Any,
+                })
+            }
+            Expression::Debug(def) => {
+                // Debug is transparent - return the shape of the inner expression
+                def.expr.derive_shape(symbol_table)
+            }
         }
+    }
+}
+
+/// Infer the container shape from a dot expression.
+/// When we have `hole.field`, we need to infer what the hole must be
+/// (a tuple with that field).
+fn infer_container_shape_from_dot(
+    left_shape: &Shape,
+    right_expr: &Expression,
+    _field_shape: &Shape,
+    _pos: &Position,
+    _symbol_table: &mut BTreeMap<Rc<str>, Shape>,
+) -> Shape {
+    match (left_shape, right_expr) {
+        (Shape::Hole(hole_pi), Expression::Simple(Value::Symbol(pi)))
+        | (Shape::Hole(hole_pi), Expression::Simple(Value::Str(pi))) => {
+            Shape::Tuple(PositionedItem::new(
+                vec![(
+                    PositionedItem::new(pi.val.clone(), pi.pos.clone()),
+                    Shape::Narrowed(NarrowedShape {
+                        pos: hole_pi.pos.clone(),
+                        types: NarrowingShape::Any,
+                    }),
+                )],
+                hole_pi.pos.clone(),
+            ))
+        }
+        (Shape::Hole(hole_pi), Expression::Simple(Value::Int(_))) => Shape::List(NarrowedShape {
+            pos: hole_pi.pos.clone(),
+            types: NarrowingShape::Any,
+        }),
+        _ => left_shape.clone(),
     }
 }
 
@@ -351,11 +670,8 @@ fn derive_dot_expression(
 ) -> Shape {
     // left shape is symbol or tuple or array.
     // right shape is symbol, str, number, grouped expression
-    // left_shape can be assumed to be of type tuple.
-    // If left_shape is not known it can be inferred to be a tuple with right
-    // shapes symbol as a field name.
     match (left_shape, right_expr) {
-        // These all recurse down the dot chain
+        // ===== Recursive cases: right side is itself a DOT chain =====
         (
             Shape::Tuple(tshape),
             Expression::Binary(BinaryOpDef {
@@ -365,15 +681,17 @@ fn derive_dot_expression(
                 pos,
             }),
         ) => {
-            let next_left_shape = left.derive_shape(symbol_table);
-            let mut tshape = tshape.clone();
-            if let Shape::Hole(pi) = next_left_shape {
-                tshape.val.push((
-                    pi.clone(),
-                    Shape::Narrowed(NarrowedShape::new_with_pos(vec![], pos.clone())),
-                ));
+            // left is the next accessor in the chain
+            let accessor_shape = left.derive_shape(symbol_table);
+            // Resolve what field the accessor refers to in this tuple
+            let resolved = resolve_tuple_field(tshape, &accessor_shape, left, pos);
+            match resolved {
+                Shape::TypeErr(_, _) => resolved,
+                field_shape => {
+                    // Recurse with the field's shape as the new left
+                    derive_dot_expression(pos, &field_shape, right, symbol_table)
+                }
             }
-            return Shape::Tuple(tshape);
         }
         (
             Shape::List(lshape),
@@ -384,56 +702,71 @@ fn derive_dot_expression(
                 pos,
             }),
         ) => {
-            let next_left_shape = left.derive_shape(symbol_table);
-            if let Shape::Int(_) = next_left_shape {
-                return Shape::List(lshape.clone());
-            };
-            if let Shape::Hole(pi) = next_left_shape {
-                return Shape::Tuple(PositionedItem {
-                    pos: pi.pos.clone(),
-                    val: vec![(
-                        pi.clone(),
-                        Shape::Narrowed(NarrowedShape {
-                            pos: pi.pos.clone(),
-                            types: NarrowingShape::Any,
-                        }),
-                    )],
-                });
-            } else {
-                todo!()
-            };
+            let accessor_shape = left.derive_shape(symbol_table);
+            match &accessor_shape {
+                Shape::Int(_) => {
+                    // Indexing a list gives us the element type
+                    let elem_shape = Shape::Narrowed(lshape.clone());
+                    derive_dot_expression(pos, &elem_shape, right, symbol_table)
+                }
+                Shape::Hole(_pi) => {
+                    // Unknown accessor on a list - could be int index
+                    let elem_shape = Shape::Narrowed(lshape.clone());
+                    derive_dot_expression(pos, &elem_shape, right, symbol_table)
+                }
+                _ => Shape::TypeErr(
+                    pos.clone(),
+                    format!(
+                        "Lists can only be indexed by integer, got {}",
+                        accessor_shape.type_name()
+                    ),
+                ),
+            }
         }
         (
             Shape::Narrowed(narrowed_shape),
             Expression::Binary(BinaryOpDef {
                 kind: BinaryExprType::DOT,
-                left,
-                right,
+                left: _,
+                right: _,
                 pos,
             }),
         ) => {
-            let next_left_shape = left.derive_shape(symbol_table);
-            let types = match &narrowed_shape.types {
-                NarrowingShape::Any => todo!(),
-                NarrowingShape::Narrowed(ref types) => types,
-            };
-            match next_left_shape {
-                Shape::Hole(_) | Shape::Int(_) | Shape::Str(_) => {
-                    if types
-                        .iter()
-                        .any(|s| s.type_name() == "tuple" || s.type_name() == "list")
-                    {
-                        todo!()
-                    }
-                    todo!()
+            // For narrowed types with DOT chains, try each candidate
+            match &narrowed_shape.types {
+                NarrowingShape::Any => {
+                    // Unconstrained - result is also unconstrained
+                    Shape::Narrowed(NarrowedShape {
+                        pos: pos.clone(),
+                        types: NarrowingShape::Any,
+                    })
                 }
-                _ => {
-                    todo!()
+                NarrowingShape::Narrowed(types) => {
+                    // Try each candidate type
+                    let mut results = Vec::new();
+                    for t in types {
+                        let inner_result = derive_dot_expression(pos, t, right_expr, symbol_table);
+                        if let Shape::TypeErr(_, _) = &inner_result {
+                            // Skip incompatible candidates
+                        } else {
+                            results.push(inner_result);
+                        }
+                    }
+                    if results.is_empty() {
+                        Shape::TypeErr(
+                            pos.clone(),
+                            "No candidate type is compatible with field access".to_owned(),
+                        )
+                    } else if results.len() == 1 {
+                        results.pop().unwrap()
+                    } else {
+                        Shape::Narrowed(NarrowedShape::new_with_pos(results, pos.clone()))
+                    }
                 }
             }
         }
         (
-            Shape::Hole(_),
+            Shape::Hole(_hole_pi),
             Expression::Binary(BinaryOpDef {
                 kind: BinaryExprType::DOT,
                 left,
@@ -441,31 +774,239 @@ fn derive_dot_expression(
                 pos,
             }),
         ) => {
-            todo!()
+            // We don't know what the hole is, but it's being accessed with a dot chain.
+            // The accessor tells us something about the hole's type.
+            let accessor_shape = left.derive_shape(symbol_table);
+            match &accessor_shape {
+                // Symbol/Str accessor means it could be a tuple
+                Shape::Hole(_) | Shape::Str(_) => {
+                    // Infer as tuple with unknown field, then continue chain
+                    let field_shape = Shape::Narrowed(NarrowedShape {
+                        pos: pos.clone(),
+                        types: NarrowingShape::Any,
+                    });
+                    derive_dot_expression(pos, &field_shape, right, symbol_table)
+                }
+                Shape::Int(_) => {
+                    // Infer as list, element is unknown
+                    let elem_shape = Shape::Narrowed(NarrowedShape {
+                        pos: pos.clone(),
+                        types: NarrowingShape::Any,
+                    });
+                    derive_dot_expression(pos, &elem_shape, right, symbol_table)
+                }
+                _ => Shape::Narrowed(NarrowedShape {
+                    pos: pos.clone(),
+                    types: NarrowingShape::Any,
+                }),
+            }
         }
 
-        // These do not recurse down the dot chain
-        (Shape::Tuple(_), Expression::Simple(Value::Str(pi)))
-        | (Shape::Tuple(_), Expression::Simple(Value::Symbol(pi))) => todo!(),
-        (Shape::List(_), Expression::Simple(Value::Symbol(pi))) => todo!(),
-        (Shape::List(_), Expression::Simple(Value::Int(pi))) => todo!(),
-        (Shape::Hole(_), Expression::Simple(Value::Str(pi))) => todo!(),
-        (Shape::Hole(_), Expression::Simple(Value::Symbol(pi))) => todo!(),
-        (Shape::Hole(_), Expression::Simple(Value::Int(pi))) => todo!(),
-        (Shape::Narrowed(_), Expression::Simple(Value::Symbol(pi))) => todo!(),
-        (Shape::Narrowed(_), Expression::Simple(Value::Str(pi))) => todo!(),
-        (Shape::Narrowed(_), Expression::Simple(Value::Int(pi))) => todo!(),
-        (_, Expression::Grouped(expr, _)) => {
-            return derive_dot_expression(pos, left_shape, expr.as_ref(), symbol_table)
+        // ===== Terminal cases: right side is a simple value =====
+
+        // Tuple field access by name
+        (Shape::Tuple(tshape), Expression::Simple(Value::Str(pi)))
+        | (Shape::Tuple(tshape), Expression::Simple(Value::Symbol(pi))) => {
+            for (field_name, field_shape) in tshape.val.iter() {
+                if field_name.val == pi.val {
+                    return field_shape.clone();
+                }
+            }
+            Shape::TypeErr(
+                pi.pos.clone(),
+                format!("Field '{}' not found in tuple", pi.val),
+            )
         }
-        (_, _) => return Shape::TypeErr(pos.clone(), "Invalid Tuple field selector".to_owned()),
+
+        // Tuple indexed by int - type error
+        (Shape::Tuple(_), Expression::Simple(Value::Int(pi))) => Shape::TypeErr(
+            pi.pos.clone(),
+            "Tuples cannot be indexed by integer".to_owned(),
+        ),
+
+        // List indexed by int - return element shape
+        (Shape::List(lshape), Expression::Simple(Value::Int(_pi))) => {
+            Shape::Narrowed(lshape.clone())
+        }
+
+        // List accessed by name - type error
+        (Shape::List(_), Expression::Simple(Value::Symbol(pi)))
+        | (Shape::List(_), Expression::Simple(Value::Str(pi))) => Shape::TypeErr(
+            pi.pos.clone(),
+            "Lists cannot be accessed by field name".to_owned(),
+        ),
+
+        // Hole accessed by name - infer as tuple with that field
+        (Shape::Hole(hole_pi), Expression::Simple(Value::Symbol(_pi)))
+        | (Shape::Hole(hole_pi), Expression::Simple(Value::Str(_pi))) => {
+            Shape::Narrowed(NarrowedShape {
+                pos: hole_pi.pos.clone(),
+                types: NarrowingShape::Any,
+            })
+        }
+
+        // Hole accessed by int - infer as list
+        (Shape::Hole(hole_pi), Expression::Simple(Value::Int(_pi))) => {
+            Shape::Narrowed(NarrowedShape {
+                pos: hole_pi.pos.clone(),
+                types: NarrowingShape::Any,
+            })
+        }
+
+        // Narrowed accessed by name - filter candidates
+        (Shape::Narrowed(nshape), Expression::Simple(Value::Symbol(pi)))
+        | (Shape::Narrowed(nshape), Expression::Simple(Value::Str(pi))) => {
+            match &nshape.types {
+                NarrowingShape::Any => Shape::Narrowed(NarrowedShape {
+                    pos: pi.pos.clone(),
+                    types: NarrowingShape::Any,
+                }),
+                NarrowingShape::Narrowed(types) if types.is_empty() => {
+                    // Empty candidates = unconstrained, field access is allowed
+                    Shape::Narrowed(NarrowedShape {
+                        pos: pi.pos.clone(),
+                        types: NarrowingShape::Any,
+                    })
+                }
+                NarrowingShape::Narrowed(types) => {
+                    let mut results = Vec::new();
+                    for t in types {
+                        match t {
+                            Shape::Tuple(tshape) => {
+                                for (field_name, field_shape) in tshape.val.iter() {
+                                    if field_name.val == pi.val {
+                                        results.push(field_shape.clone());
+                                    }
+                                }
+                            }
+                            Shape::Hole(_) => {
+                                results.push(Shape::Narrowed(NarrowedShape {
+                                    pos: pi.pos.clone(),
+                                    types: NarrowingShape::Any,
+                                }));
+                            }
+                            _ => { /* not field-accessible, skip */ }
+                        }
+                    }
+                    if results.is_empty() {
+                        Shape::TypeErr(
+                            pi.pos.clone(),
+                            format!("No candidate type has field '{}'", pi.val),
+                        )
+                    } else if results.len() == 1 {
+                        results.pop().unwrap()
+                    } else {
+                        Shape::Narrowed(NarrowedShape::new_with_pos(results, pi.pos.clone()))
+                    }
+                }
+            }
+        }
+
+        // Narrowed accessed by int - filter to list-like candidates
+        (Shape::Narrowed(nshape), Expression::Simple(Value::Int(pi))) => {
+            match &nshape.types {
+                NarrowingShape::Any => Shape::Narrowed(NarrowedShape {
+                    pos: pi.pos.clone(),
+                    types: NarrowingShape::Any,
+                }),
+                NarrowingShape::Narrowed(types) if types.is_empty() => {
+                    // Empty candidates = unconstrained
+                    Shape::Narrowed(NarrowedShape {
+                        pos: pi.pos.clone(),
+                        types: NarrowingShape::Any,
+                    })
+                }
+                NarrowingShape::Narrowed(types) => {
+                    let mut results = Vec::new();
+                    for t in types {
+                        match t {
+                            Shape::List(lshape) => {
+                                results.push(Shape::Narrowed(lshape.clone()));
+                            }
+                            Shape::Hole(_) => {
+                                results.push(Shape::Narrowed(NarrowedShape {
+                                    pos: pi.pos.clone(),
+                                    types: NarrowingShape::Any,
+                                }));
+                            }
+                            _ => { /* not int-indexable, skip */ }
+                        }
+                    }
+                    if results.is_empty() {
+                        Shape::TypeErr(
+                            pi.pos.clone(),
+                            "No candidate type supports integer indexing".to_owned(),
+                        )
+                    } else if results.len() == 1 {
+                        results.pop().unwrap()
+                    } else {
+                        Shape::Narrowed(NarrowedShape::new_with_pos(results, pi.pos.clone()))
+                    }
+                }
+            }
+        }
+
+        // Grouped expression - unwrap and recurse
+        (_, Expression::Grouped(expr, _)) => {
+            derive_dot_expression(pos, left_shape, expr.as_ref(), symbol_table)
+        }
+
+        // Resolved import - treat as a tuple of exported bindings
+        (Shape::Import(ImportShape::Resolved(_, tuple_fields)), _) => {
+            let tshape = PositionedItem::new(tuple_fields.clone(), pos.clone());
+            derive_dot_expression(pos, &Shape::Tuple(tshape), right_expr, symbol_table)
+        }
+
+        // Unresolved import - allow any field access
+        (Shape::Import(ImportShape::Unresolved(_)), _) => Shape::Narrowed(NarrowedShape {
+            pos: pos.clone(),
+            types: NarrowingShape::Any,
+        }),
+
+        // TypeErr propagation
+        (Shape::TypeErr(_, _), _) => left_shape.clone(),
+
+        // Everything else is invalid
+        (_, _) => Shape::TypeErr(pos.clone(), "Invalid field selector".to_owned()),
+    }
+}
+
+/// Helper to resolve a field in a tuple shape given an accessor
+fn resolve_tuple_field(
+    tshape: &PositionedItem<TupleShape>,
+    _accessor_shape: &Shape,
+    accessor_expr: &Expression,
+    pos: &Position,
+) -> Shape {
+    match accessor_expr {
+        Expression::Simple(Value::Symbol(pi)) | Expression::Simple(Value::Str(pi)) => {
+            for (field_name, field_shape) in tshape.val.iter() {
+                if field_name.val == pi.val {
+                    return field_shape.clone();
+                }
+            }
+            Shape::TypeErr(
+                pos.clone(),
+                format!("Field '{}' not found in tuple", pi.val),
+            )
+        }
+        _ => {
+            // For computed field access, we can't know the field at type-check time
+            Shape::Narrowed(NarrowedShape {
+                pos: pos.clone(),
+                types: NarrowingShape::Any,
+            })
+        }
     }
 }
 
 impl DeriveShape for Value {
     fn derive_shape(&self, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
         match self {
-            Value::Empty(p) => Shape::Narrowed(NarrowedShape::new_with_pos(vec![], p.clone())),
+            Value::Empty(p) => Shape::Narrowed(NarrowedShape {
+                pos: p.clone(),
+                types: NarrowingShape::Any,
+            }),
             Value::Boolean(p) => Shape::Boolean(p.pos.clone()),
             Value::Int(p) => Shape::Int(p.pos.clone()),
             Value::Float(p) => Shape::Float(p.pos.clone()),
@@ -508,15 +1049,19 @@ pub struct Checker {
     symbol_table: BTreeMap<Rc<str>, Shape>,
     err_stack: Vec<BuildError>,
     shape_stack: Vec<Shape>,
+    // Tracks nesting into Module expressions. When > 0, visit_statement
+    // is skipped because inner statements are handled by ModuleDef::derive_shape
+    // with its own Checker.
+    nested_depth: usize,
+    // When false, type errors involving Empty/NULL values are suppressed.
+    strict: bool,
+    // Working directory for resolving import paths.
+    working_dir: Option<PathBuf>,
+    // Cache of already-resolved import shapes, shared across Checker instances.
+    shape_cache: Rc<RefCell<BTreeMap<PathBuf, Shape>>>,
+    // Stack of currently-being-resolved imports for cycle detection.
+    import_stack: Vec<PathBuf>,
 }
-
-// TODO(jwall): I am beginning to suspect that derive_shape should be a Trait.
-// It would allow me to specify the contract a little more specifically now that
-// I'm basically implementing the method all over the place.
-
-// TODO(jwall): The symbol table contract also needs to be fleshed out a little better.
-// I need to acccount for scopes syntactic scopes a bit. packages, functions and modules all are a
-// factor.
 
 impl Checker {
     pub fn new() -> Self {
@@ -524,7 +1069,32 @@ impl Checker {
             symbol_table: BTreeMap::new(),
             err_stack: Vec::new(),
             shape_stack: Vec::new(),
+            nested_depth: 0,
+            strict: true,
+            working_dir: None,
+            shape_cache: Rc::new(RefCell::new(BTreeMap::new())),
+            import_stack: Vec::new(),
         };
+    }
+
+    pub fn with_strict(mut self, strict: bool) -> Self {
+        self.strict = strict;
+        self
+    }
+
+    pub fn with_working_dir<P: Into<PathBuf>>(mut self, dir: P) -> Self {
+        self.working_dir = Some(dir.into());
+        self
+    }
+
+    pub fn with_shape_cache(mut self, cache: Rc<RefCell<BTreeMap<PathBuf, Shape>>>) -> Self {
+        self.shape_cache = cache;
+        self
+    }
+
+    pub fn with_import_stack(mut self, stack: Vec<PathBuf>) -> Self {
+        self.import_stack = stack;
+        self
     }
 
     pub fn with_symbol_table(mut self, symbol_table: BTreeMap<Rc<str>, Shape>) -> Self {
@@ -536,11 +1106,133 @@ impl Checker {
         self.shape_stack.pop()
     }
 
-    pub fn result(mut self) -> Result<BTreeMap<Rc<str>, Shape>, BuildError> {
-        if let Some(err) = self.err_stack.pop() {
-            Err(err)
+    fn push_shape_or_err(&mut self, shape: Shape) {
+        if let Shape::TypeErr(pos, msg) = &shape {
+            self.err_stack.push(BuildError::with_pos(
+                msg.clone(),
+                ErrorType::TypeFail,
+                pos.clone(),
+            ));
         } else {
+            self.shape_stack.push(shape);
+        }
+    }
+
+    /// Resolve an import path to a Shape by reading, parsing, and type-checking
+    /// the imported file. Returns `ImportShape::Resolved` with the exported tuple
+    /// shape, or `ImportShape::Unresolved` if no working directory is set.
+    fn resolve_import(&mut self, path: &str, pos: &Position) -> Shape {
+        let working_dir = match &self.working_dir {
+            Some(dir) => dir.clone(),
+            None => {
+                return Shape::Import(ImportShape::Unresolved(PositionedItem::new(
+                    path.into(),
+                    pos.clone(),
+                )));
+            }
+        };
+
+        let resolved_path = working_dir.join(path);
+
+        // Check the cache first
+        if let Some(cached) = self.shape_cache.borrow().get(&resolved_path) {
+            return cached.clone();
+        }
+
+        // Check for import cycles
+        if self.import_stack.contains(&resolved_path) {
+            return Shape::TypeErr(
+                pos.clone(),
+                format!("Import cycle detected: {}", resolved_path.display()),
+            );
+        }
+
+        // Read the file
+        let contents = match std::fs::read_to_string(&resolved_path) {
+            Ok(c) => c,
+            Err(_) => {
+                // File not found or unreadable — return unresolved rather than error,
+                // since the file might be generated or available at runtime.
+                return Shape::Import(ImportShape::Unresolved(PositionedItem::new(
+                    path.into(),
+                    pos.clone(),
+                )));
+            }
+        };
+
+        // Parse the file
+        let iter = OffsetStrIter::new(&contents).with_src_file(&resolved_path);
+        let mut stmts = match parse(iter, None) {
+            Ok(stmts) => stmts,
+            Err(_) => {
+                return Shape::TypeErr(
+                    pos.clone(),
+                    format!("Failed to parse imported file: {}", resolved_path.display()),
+                );
+            }
+        };
+
+        // Type-check the imported file with a new Checker sharing the cache
+        let import_dir = resolved_path.parent().map(|p| p.to_path_buf());
+        let mut import_stack = self.import_stack.clone();
+        import_stack.push(resolved_path.clone());
+
+        let mut child_checker = Checker::new()
+            .with_shape_cache(self.shape_cache.clone())
+            .with_import_stack(import_stack)
+            .with_strict(self.strict);
+        if let Some(dir) = import_dir {
+            child_checker = child_checker.with_working_dir(dir);
+        }
+
+        child_checker.walk_statement_list(stmts.iter_mut().collect());
+
+        // Check for type errors in the imported file
+        let symbol_table = match child_checker.result() {
+            Ok(syms) => syms,
+            Err(err) => {
+                // Don't cache type errors — the file may be fixed and re-imported.
+                return Shape::TypeErr(
+                    err.pos.unwrap_or_else(|| pos.clone()),
+                    format!(
+                        "Type error in imported file {}: {}",
+                        resolved_path.display(),
+                        err.msg
+                    ),
+                );
+            }
+        };
+
+        // Collect exported symbols as a tuple shape
+        let tuple_fields: TupleShape = symbol_table
+            .iter()
+            .map(|(name, shape)| {
+                (
+                    PositionedItem::new(name.clone(), pos.clone()),
+                    shape.clone(),
+                )
+            })
+            .collect();
+
+        let resolved = Shape::Import(ImportShape::Resolved(pos.clone(), tuple_fields));
+
+        // Cache only successful results
+        self.shape_cache
+            .borrow_mut()
+            .insert(resolved_path, resolved.clone());
+
+        resolved
+    }
+
+    /// Returns the accumulated symbol table if type checking succeeded,
+    /// or the first type error encountered (which is typically the root cause).
+    pub fn result(self) -> Result<BTreeMap<Rc<str>, Shape>, BuildError> {
+        if self.err_stack.is_empty() {
             Ok(self.symbol_table)
+        } else {
+            // Return the first error — it's usually the root cause.
+            // Subsequent errors are often cascading failures.
+            Err(self.err_stack.into_iter().next().unwrap())
         }
     }
 }
@@ -570,70 +1262,69 @@ impl Visitor for Checker {
         // noop by default
     }
 
-    fn visit_value(&mut self, val: &mut Value) {
-        match val {
-            Value::Empty(p) => self
-                .shape_stack
-                .push(Shape::Narrowed(NarrowedShape::new_with_pos(
-                    vec![],
-                    p.clone(),
-                ))),
-            Value::Boolean(p) => self.shape_stack.push(Shape::Boolean(p.pos.clone())),
-            Value::Int(p) => self.shape_stack.push(Shape::Int(p.pos.clone())),
-            Value::Float(p) => self.shape_stack.push(Shape::Float(p.pos.clone())),
-            Value::Str(p) => self.shape_stack.push(Shape::Str(p.pos.clone())),
-            // Symbols in a shape are placeholders. They allow a form of genericity
-            // in the shape. They can be any type and are only refined down.
-            // by their presence in an expression.
-            Value::Symbol(p) => self.shape_stack.push(Shape::Hole(p.clone())),
-            Value::List(_) => {
-                // noop
-            }
-            Value::Tuple(_) => {
-                // noop
-            }
+    // visit_value is intentionally a noop — DeriveShape handles value shapes.
+
+    fn visit_expression(&mut self, expr: &mut Expression) {
+        // Track entry into Module expressions so we skip their inner statements
+        // (they're handled by ModuleDef::derive_shape with a separate Checker).
+        if matches!(expr, Expression::Module(_)) {
+            self.nested_depth += 1;
         }
-    }
-
-    fn leave_value(&mut self, _val: &Value) {
-        // noop by default
-    }
-
-    fn visit_expression(&mut self, _expr: &mut Expression) {
-        // noop by default
     }
 
     fn leave_expression(&mut self, expr: &Expression) {
-        let shape = expr.derive_shape(&mut self.symbol_table);
-        if let Shape::TypeErr(pos, msg) = &shape {
-            self.err_stack.push(BuildError::with_pos(
-                msg.clone(),
-                ErrorType::TypeFail,
-                pos.clone(),
-            ));
-        } else {
-            self.shape_stack.push(shape);
+        if matches!(expr, Expression::Module(_)) {
+            self.nested_depth -= 1;
         }
     }
 
-    fn visit_statement(&mut self, _stmt: &mut Statement) {
-        if let Statement::Let(def) = _stmt {
-            let name = def.name.fragment.clone();
-            let shape = def.value.derive_shape(&mut self.symbol_table);
-            if let Shape::TypeErr(pos, msg) = &shape {
-                self.err_stack.push(BuildError::with_pos(
-                    msg.clone(),
-                    ErrorType::TypeFail,
-                    pos.clone(),
-                ));
-            } else {
-                self.symbol_table.insert(name.clone(), shape.clone());
-                self.shape_stack.push(shape);
+    fn visit_statement(&mut self, stmt: &mut Statement) {
+        // Skip statements inside nested Module expressions — they're handled
+        // by ModuleDef::derive_shape with its own Checker.
+        if self.nested_depth > 0 {
+            return;
+        }
+        match stmt {
+            Statement::Let(def) => {
+                let name = def.name.fragment.clone();
+                let mut shape = def.value.derive_shape(&mut self.symbol_table);
+                // Resolve unresolved imports if we have a working directory
+                if let Shape::Import(ImportShape::Unresolved(pi)) = &shape {
+                    shape = self.resolve_import(&pi.val, &pi.pos);
+                }
+                if let Shape::TypeErr(pos, msg) = &shape {
+                    self.err_stack.push(BuildError::with_pos(
+                        msg.clone(),
+                        ErrorType::TypeFail,
+                        pos.clone(),
+                    ));
+                } else {
+                    self.symbol_table.insert(name.clone(), shape.clone());
+                    self.shape_stack.push(shape);
+                }
+            }
+            Statement::Assert(_pos, ref expr) => {
+                let shape = expr.derive_shape(&mut self.symbol_table);
+                // UCG asserts accept either a boolean or a tuple with an `ok` field
+                // e.g., `assert { ok = expr, desc = "..." };`
+                self.push_shape_or_err(shape);
+            }
+            Statement::Output(_pos, _tok, ref expr) => {
+                let shape = expr.derive_shape(&mut self.symbol_table);
+                self.push_shape_or_err(shape);
+            }
+            Statement::Print(_pos, _tok, ref expr) => {
+                let shape = expr.derive_shape(&mut self.symbol_table);
+                self.push_shape_or_err(shape);
+            }
+            Statement::Expression(ref expr) => {
+                let shape = expr.derive_shape(&mut self.symbol_table);
+                self.push_shape_or_err(shape);
             }
         }
     }
 
-    fn leave_statement(&mut self, stmt: &Statement) {
+    fn leave_statement(&mut self, _stmt: &Statement) {
         // noop by default
     }
 }
