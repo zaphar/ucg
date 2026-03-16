@@ -33,6 +33,25 @@ compile errors. Bindings are immutable and once bound they can't be modified.
 let name = "foo";
 ```
 
+Let statements can optionally include a shape constraint using the `::` syntax.
+The constraint is a zero-value exemplar that declares what type the bound value
+must be. The type checker will report an error if the value doesn't match.
+
+```
+let port :: 0 = 8080;          // port must be an integer
+let host :: "" = "localhost";   // host must be a string
+```
+
+You can use named bindings as constraints to define reusable shapes:
+
+```
+let Config = {host = "", port = 0};
+let my_config :: Config = {host = "example.com", port = 443};
+```
+
+See <a href="/reference/typechecking">Type Checking & Shape Constraints</a>
+for full details.
+
 Output Statements
 -----------
 

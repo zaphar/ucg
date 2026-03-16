@@ -7,9 +7,9 @@ in_search_index = true
 +++
 
 UCG is an expression oriented functional language with immutability,
-copy-on-write semantics and forward type inference. Everything in UCG is an
-expression except for a few statements that introduce named bindings or
-generate an output.
+copy-on-write semantics, forward type inference, and optional shape
+constraints. Everything in UCG is an expression except for a few statements
+that introduce named bindings or generate an output.
 
 UCG is purpose built for constructing configurations. Anything that is not
 useful for that is excluded. All ucg output targets one of the compilation
@@ -28,3 +28,4 @@ Among the possibilities this opens up are:
 * Unit testing your configuration generation logic
 * Converting one config format to another config format
 * Dynammic querying of your configurations using the `ucg eval` command
+* Defining and enforcing configuration schemas with shape constraints

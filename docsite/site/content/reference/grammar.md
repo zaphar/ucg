@@ -85,7 +85,8 @@ list: lbracket, [ list_elements ], rbracket ;
 ### Tuples
 
 ```
-field_pair: field, equal, expr ;
+shape_suffix: "::", non_operator_expr ;
+field_pair: field, [shape_suffix], equal, expr ;
 field_list: field_pair, { comma, field_pair }, [comma]
 tuple: lbrace, [ field_list ], rbrace;
 ```
@@ -121,14 +122,15 @@ select_expr: select_keyword, lparen, expr, [comma, expr], fatcomma, tuple ;
 #### Function Definition
 
 ```
-arglist: expr, { comma, expr }, [comma] ;
-func_def: func_keyword, lparen, [ arglist ], rparen, fatcomma, tuple ;
+arg: bareword, [shape_suffix] ;
+arglist: arg, { comma, arg }, [comma] ;
+func_def: func_keyword, lparen, [ arglist ], rparen, fatcomma, expr ;
 ```
 
 #### Module Definition
 
 ```
-module_def: module_keyword, tuple, fatcomma, [lparen, expr, rparen], lbrace, [ { statement } ], rbrace ;
+module_def: module_keyword, tuple, fatcomma, [lparen, expr, [shape_suffix], rparen], lbrace, [ { statement } ], rbrace ;
 ```
 
 #### Copy and Call Expression
@@ -237,7 +239,7 @@ expr: binary_expr | non_operator_expr ;
 ## Statements
 
 ```
-let_statement: let_keyword, bareword, equal, expr ;
+let_statement: let_keyword, bareword, [shape_suffix], equal, expr ;
 out_statement: out_keyword, bareword, str ;
 convert_statement: convert_keyword, bareword, str ;
 assert_statement: assert_keyword, pipe, { statement }, pipe ;

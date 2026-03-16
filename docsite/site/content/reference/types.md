@@ -85,6 +85,19 @@ let tuple = {
 };
 ```
 
+Tuple fields can optionally include shape constraints using the `::` syntax to
+enforce field types at compile time:
+
+```
+let config = {
+    host :: "" = "localhost",
+    port :: 0 = 8080,
+};
+```
+
+See <a href="/reference/typechecking">Type Checking & Shape Constraints</a>
+for more details.
+
 ### Lists
 
 Lists are a 0 indexed heterogenous list of expressions. The are delimited by square 

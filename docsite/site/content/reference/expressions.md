@@ -374,6 +374,16 @@ let add = func (arg1, arg2) => arg1 + arg2;
 add(1, 1) == 2;
 ```
 
+Function arguments can optionally carry shape constraints using the `::` syntax
+to declare their expected types:
+
+```
+let add = func (a :: 0, b :: 0) => a + b;
+```
+
+See <a href="/reference/typechecking">Type Checking & Shape Constraints</a>
+for more details.
+
 Functional processing expressions
 ---------------------------------
 
@@ -592,11 +602,23 @@ let embedded_with_params = top_mod{deep_value = "Some"};
 embedded_with_params.embedded.value == "Some";
 ```
 
+Module parameters support shape constraints just like tuple fields:
+
+```
+let WebServer = module {
+    host :: "" = "localhost",
+    port :: 0 = 80,
+} => {
+    let url = "http://@:@" % (mod.host, mod.port);
+};
+```
+
 ### Return Expressions
 
 If there is a return expression then the module will only export the result of
 that expression. The out expression is computed after the last statement in the
-module has been evaluated.
+module has been evaluated. The out expression can optionally include a shape
+constraint:
 
 ```
 let top_mod_out_expr = module {
