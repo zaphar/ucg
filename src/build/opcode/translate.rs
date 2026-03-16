@@ -240,6 +240,7 @@ impl AST {
                                     )))),
                                     tuple: vec![(
                                         Token::new("true", TokenType::BAREWORD, def.right.pos()),
+                                        None,
                                         Expression::Simple(Value::Str(name)),
                                     )],
                                     pos: def.left.pos().clone(),
@@ -406,7 +407,7 @@ impl AST {
             }
             Expression::Func(def) => {
                 ops.push(Op::InitList, def.pos.clone());
-                for b in def.argdefs {
+                for (b, _constraint) in def.argdefs {
                     // FIXME(jwall): if there is a projection
                     // then add the projection check here?
                     ops.push(Op::Sym(b.val), b.pos.clone());
@@ -466,7 +467,7 @@ impl AST {
                 let stmts = def.statements;
                 // Init our module tuple bindings
                 ops.push(Op::InitTuple, def.pos.clone());
-                for (t, e) in argset {
+                for (t, _constraint, e) in argset {
                     // FIXME(jwall): if there is a projection
                     // then add the projection check here?
                     ops.push(Op::Sym(t.fragment), t.pos.clone());
@@ -515,7 +516,7 @@ impl AST {
                 let default_pos = def.val.pos().clone();
                 Self::translate_expr(*def.val, &mut ops, root);
                 let mut jumps = Vec::new();
-                for (key, val) in def.tuple {
+                for (key, _constraint, val) in def.tuple {
                     ops.push(Op::Sym(key.fragment), key.pos.clone());
                     ops.push(Op::Noop, key.pos);
                     let idx = ops.len() - 1;
@@ -612,13 +613,13 @@ impl AST {
 
     fn translate_copy(
         mut ops: &mut OpsMap,
-        flds: Vec<(Token, Expression)>,
+        flds: Vec<(Token, Option<Expression>, Expression)>,
         pos: Position,
         root: &Path,
     ) {
         ops.push(Op::PushSelf, pos.clone());
         ops.push(Op::InitTuple, pos.clone());
-        for (t, e) in flds {
+        for (t, _constraint, e) in flds {
             ops.push(Op::Sym(t.fragment), t.pos.clone());
             Self::translate_expr(e, &mut ops, root);
             ops.push(Op::Field, t.pos.clone());
@@ -639,7 +640,7 @@ impl AST {
             }
             Value::Tuple(flds) => {
                 ops.push(Op::InitTuple, flds.pos);
-                for (k, v) in flds.val {
+                for (k, _constraint, v) in flds.val {
                     ops.push(Op::Sym(k.fragment), k.pos.clone());
                     Self::translate_expr(v, &mut ops, root);
                     ops.push(Op::Field, k.pos.clone());

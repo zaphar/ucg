@@ -209,14 +209,14 @@ make_fn!(
 );
 
 make_fn!(
-    field_value<SliceIter<Token>, (Token, Expression)>,
+    field_value<SliceIter<Token>, (Token, Option<Expression>, Expression)>,
     do_each!(
             field => wrap_err!(either!(match_type!(BOOLEAN), match_type!(BAREWORD), match_type!(STR)),
                                "Field names must be a bareword or a string."),
-            _ => optional!(shape_suffix),
+            constraint => optional!(shape_suffix),
             _ => must!(punct!("=")),
             value => must!(expression),
-            (field, value)
+            (field, constraint, value)
     )
 );
 
@@ -287,11 +287,11 @@ make_fn!(
 );
 
 make_fn!(
-    shape_suffix<SliceIter<Token>, Value>,
+    shape_suffix<SliceIter<Token>, Expression>,
     do_each!(
         _ => punct!("::"),
-        shape => value,
-        (dbg!(shape))
+        shape => non_op_expression,
+        (shape)
     )
 );
 
@@ -353,7 +353,7 @@ make_fn!(
 
 fn tuple_to_func<'a>(
     pos: Position,
-    vals: Option<Vec<Value>>,
+    vals: Option<Vec<(Value, Option<Expression>)>>,
     val: Expression,
 ) -> ConvertResult<'a, Expression> {
     let mut default_args = match vals {
@@ -362,9 +362,14 @@ fn tuple_to_func<'a>(
     };
     let arglist = default_args
         .drain(0..)
-        .map(|s| PositionedItem {
-            pos: s.pos().clone(),
-            val: s.to_string().into(),
+        .map(|(s, constraint)| {
+            (
+                PositionedItem {
+                    pos: s.pos().clone(),
+                    val: s.to_string().into(),
+                },
+                constraint,
+            )
         })
         .collect();
     Ok(Expression::Func(FuncDef {
@@ -376,13 +381,13 @@ fn tuple_to_func<'a>(
 }
 
 make_fn!(
-    arglist<SliceIter<Token>, Vec<Value>>,
+    arglist<SliceIter<Token>, Vec<(Value, Option<Expression>)>>,
     separated!(
         punct!(","),
         do_each!(
             sym => symbol,
-            _ => optional!(shape_suffix),
-            (sym)
+            constraint => optional!(shape_suffix),
+            (sym, constraint)
         )
     )
 );
@@ -396,32 +401,29 @@ fn module_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expres
         _ => optional!(punct!(",")),
         _ => must!(punct!("}")),
         _ => must!(punct!("=>")),
-        out_expr => optional!(
+        out_expr_and_constraint => optional!(
             do_each!(
                 _ => punct!("("),
-                expr => must!(do_each!(
-                        expr => expression,
-                        _ => optional!(shape_suffix),
-                        (expr)
-                    )
-                ),
+                expr => must!(expression),
+                constraint => optional!(shape_suffix),
                 _ => must!(punct!(")")),
-                (expr)
+                (expr, constraint)
             )
         ),
         _ => must!(punct!("{")),
         stmt_list =>  trace_parse!(repeat!(statement)),
         _ => must!(punct!("}")),
-        (pos, arglist, out_expr, stmt_list)
+        (pos, arglist, out_expr_and_constraint, stmt_list)
     );
     match parsed {
         Result::Abort(e) => Result::Abort(e),
         Result::Fail(e) => Result::Fail(e),
         Result::Incomplete(offset) => Result::Incomplete(offset),
-        Result::Complete(rest, (pos, arglist, out_expr, stmt_list)) => {
+        Result::Complete(rest, (pos, arglist, out_expr_and_constraint, stmt_list)) => {
             let mut def = ModuleDef::new(arglist.unwrap_or_else(|| Vec::new()), stmt_list, pos);
-            if let Some(expr) = out_expr {
+            if let Some((expr, constraint)) = out_expr_and_constraint {
                 def.set_out_expr(expr);
+                def.out_constraint = constraint.map(Box::new);
             }
             Result::Complete(rest, Expression::Module(def))
         }
@@ -829,13 +831,14 @@ make_fn!(
     do_each!(
         pos => pos,
         name => wrap_err!(match_binding_name!(), "Expected name for binding"),
-        _ => optional!(trace_parse!(shape_suffix)),
+        constraint => optional!(trace_parse!(shape_suffix)),
         _ => punct!("="),
         val => trace_parse!(wrap_err!(expression, "Expected Expression to bind")),
         _ => punct!(";"),
         (Statement::Let(LetDef {
             pos: pos,
             name: name,
+            constraint: constraint,
             value: val,
         }))
     )

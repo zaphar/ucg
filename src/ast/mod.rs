@@ -223,7 +223,7 @@ macro_rules! make_expr {
 /// An ordered list of Name = Value pairs.
 ///
 /// This is usually used as the body of a tuple in the UCG AST.
-pub type FieldList = Vec<(Token, Expression)>; // Token is expected to be a symbol
+pub type FieldList = Vec<(Token, Option<Expression>, Expression)>; // Token is expected to be a symbol, with optional constraint
 
 pub type TupleShape = Vec<(PositionedItem<Rc<str>>, Shape)>;
 pub type ShapeList = Vec<Shape>;
@@ -856,9 +856,9 @@ impl Value {
     fn fields_to_string(v: &FieldList) -> String {
         let mut buf = String::new();
         buf.push_str("{\n");
-        for ref t in v.iter() {
+        for (tok, _, _) in v.iter() {
             buf.push_str("\t");
-            buf.push_str(&t.0.fragment);
+            buf.push_str(&tok.fragment);
             buf.push_str("\n");
         }
         buf.push_str("}");
@@ -1044,7 +1044,7 @@ impl<'a> From<&'a PositionedItem<Rc<str>>> for PositionedItem<Rc<str>> {
 #[derive(PartialEq, Debug, Clone)]
 pub struct FuncDef {
     pub scope: Option<Scope>,
-    pub argdefs: Vec<PositionedItem<Rc<str>>>,
+    pub argdefs: Vec<(PositionedItem<Rc<str>>, Option<Expression>)>,
     pub fields: Box<Expression>,
     pub pos: Position,
 }
@@ -1196,6 +1196,7 @@ pub struct ModuleDef {
     pub pos: Position,
     pub arg_set: FieldList,
     pub out_expr: Option<Box<Expression>>,
+    pub out_constraint: Option<Box<Expression>>,
     pub arg_tuple: Option<Rc<Val>>,
     pub statements: Vec<Statement>,
 }
@@ -1207,6 +1208,7 @@ impl ModuleDef {
             pos: pos.into(),
             arg_set,
             out_expr: None,
+            out_constraint: None,
             arg_tuple: None,
             statements: stmts,
         }
@@ -1377,6 +1379,7 @@ impl fmt::Display for Expression {
 pub struct LetDef {
     pub pos: Position,
     pub name: Token,
+    pub constraint: Option<Expression>,
     pub value: Expression,
 }
 

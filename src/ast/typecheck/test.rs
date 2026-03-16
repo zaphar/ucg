@@ -22,6 +22,30 @@ macro_rules! assert_type_fail {
     }};
 }
 
+macro_rules! assert_type_ok {
+    ($e:expr) => {{
+        let mut checker = Checker::new();
+        let mut stmts = parse($e.into(), None).unwrap();
+        checker.walk_statement_list(stmts.iter_mut().collect());
+        let result = checker.result();
+        assert!(
+            result.is_ok(),
+            "We expect this to typecheck successfully. {:?}",
+            result
+        );
+    }};
+}
+
+macro_rules! assert_type_err {
+    ($e:expr) => {{
+        let mut checker = Checker::new();
+        let mut stmts = parse($e.into(), None).unwrap();
+        checker.walk_statement_list(stmts.iter_mut().collect());
+        let result = checker.result();
+        assert!(result.is_err(), "We expect this to fail a typecheck.");
+    }};
+}
+
 macro_rules! assert_type_success {
     ($e:expr, $shape:expr) => {{
         assert_type_success!($e, $shape, BTreeMap::new());
@@ -990,4 +1014,69 @@ fn test_import_caching() {
         ),
         "imp2 should be resolved"
     );
+}
+
+// Shape constraint tests
+
+#[test]
+fn test_let_shape_constraint() {
+    assert_type_ok!("let x :: 0 = 42;");
+}
+
+#[test]
+fn test_let_shape_constraint_mismatch() {
+    assert_type_err!("let x :: 0 = \"wrong\";");
+}
+
+#[test]
+fn test_named_shape_constraint() {
+    assert_type_ok!("let MyShape = {foo = 0}; let x :: MyShape = {foo = 1};");
+}
+
+#[test]
+fn test_named_shape_constraint_mismatch() {
+    assert_type_err!("let MyShape = {foo = 0}; let x :: MyShape = {foo = \"wrong\"};");
+}
+
+#[test]
+fn test_func_arg_constraint() {
+    // Func with constrained arg: the constraint `0` at col 11 gives arg shape Int
+    // but the actual shape uses the position from the constraint expression parse
+    let args: BTreeMap<Rc<str>, Shape> =
+        BTreeMap::from([("x".into(), Shape::Int(Position::new(1, 6, 5)))]);
+    let ret = Box::new(Shape::Int(Position::new(1, 1, 0)));
+    assert_type_success!(
+        "func(x :: 0) => x + 1;",
+        Shape::Func(FuncShapeDef { args, ret })
+    );
+}
+
+#[test]
+fn test_tuple_field_constraint() {
+    assert_type_ok!("{foo :: 0 = 42};");
+}
+
+#[test]
+fn test_tuple_field_constraint_mismatch() {
+    assert_type_err!("{foo :: 0 = \"wrong\"};");
+}
+
+#[test]
+fn test_string_constraint() {
+    assert_type_ok!("let x :: \"\" = \"hello\";");
+}
+
+#[test]
+fn test_string_constraint_mismatch() {
+    assert_type_err!("let x :: \"\" = 42;");
+}
+
+#[test]
+fn test_bool_constraint() {
+    assert_type_ok!("let x :: true = false;");
+}
+
+#[test]
+fn test_bool_constraint_mismatch() {
+    assert_type_err!("let x :: true = 42;");
 }

@@ -44,7 +44,14 @@ impl DeriveShape for FuncDef {
         let mut sym_table = self
             .argdefs
             .iter()
-            .map(|sym| (sym.val.clone(), Shape::Hole(sym.clone())))
+            .map(|(sym, constraint)| {
+                let shape = if let Some(c) = constraint {
+                    c.derive_shape(symbol_table)
+                } else {
+                    Shape::Hole(sym.clone())
+                };
+                (sym.val.clone(), shape)
+            })
             .collect::<BTreeMap<Rc<str>, Shape>>();
         sym_table.append(&mut symbol_table.clone());
         // 2. Then determine the shapes of those symbols in our expression.
@@ -54,7 +61,7 @@ impl DeriveShape for FuncDef {
         let table = self
             .argdefs
             .iter()
-            .map(|sym| {
+            .map(|(sym, _constraint)| {
                 (
                     sym.val.clone(),
                     sym_table
@@ -77,11 +84,11 @@ impl DeriveShape for ModuleDef {
         let mut sym_table: BTreeMap<Rc<str>, Shape> = BTreeMap::new();
         let mod_key: Rc<str> = "mod".into();
         let mut mod_shape: TupleShape = Vec::new();
-        if let Some(pos) = self.arg_set.first().map(|(t, _)| t.pos.clone()) {
+        if let Some(pos) = self.arg_set.first().map(|(t, _, _)| t.pos.clone()) {
             mod_shape = self
                 .arg_set
                 .iter()
-                .map(|(tok, expr)| {
+                .map(|(tok, _constraint, expr)| {
                     let default_shape = expr.derive_shape(symbol_table);
                     let shape = match &default_shape {
                         // Empty tuple default means "any tuple" - treat as unconstrained
@@ -104,7 +111,7 @@ impl DeriveShape for ModuleDef {
         checker.walk_statement_list(self.statements.clone().iter_mut().collect());
         // Derive the out expression shape directly instead of using walk_expression,
         // since DeriveShape already recurses through expression children.
-        let ret = if let Some(out_expr) = &self.out_expr {
+        let mut ret = if let Some(out_expr) = &self.out_expr {
             Box::new(out_expr.derive_shape(&mut checker.symbol_table))
         } else {
             Box::new(
@@ -116,6 +123,16 @@ impl DeriveShape for ModuleDef {
                     })),
             )
         };
+        // Enforce output constraint if present
+        if let Some(ref constraint_expr) = self.out_constraint {
+            let constraint_shape = constraint_expr.derive_shape(symbol_table);
+            let narrowed = ret.narrow(&constraint_shape, symbol_table);
+            if let Shape::TypeErr(_, _) = &narrowed {
+                ret = Box::new(narrowed);
+            } else {
+                ret = Box::new(narrowed);
+            }
+        }
         // Read back narrowed arg shapes from the checker's symbol table
         if let Some(Shape::Tuple(mod_tuple)) = checker.symbol_table.get(&mod_key) {
             mod_shape = mod_tuple.val.clone();
@@ -137,7 +154,7 @@ impl DeriveShape for SelectDef {
         } = self;
         let mut narrowed_shape =
             NarrowedShape::new_with_pos(Vec::with_capacity(tuple.len()), self.pos.clone());
-        for (_, expr) in tuple {
+        for (_, _constraint, expr) in tuple {
             let shape = expr.derive_shape(symbol_table);
             narrowed_shape.merge_in_shape(shape, symbol_table);
         }
@@ -277,7 +294,9 @@ fn derive_copy_shape(def: &CopyDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>)
             let arg_fields = def
                 .fields
                 .iter()
-                .map(|(tok, expr)| (tok.fragment.clone(), expr.derive_shape(symbol_table)))
+                .map(|(tok, _constraint, expr)| {
+                    (tok.fragment.clone(), expr.derive_shape(symbol_table))
+                })
                 .collect::<BTreeMap<Rc<str>, Shape>>();
             // 1. Do our copyable fields have the right names and shapes based on mdef.items.
             for (sym, shape) in mdef.items.iter() {
@@ -295,7 +314,7 @@ fn derive_copy_shape(def: &CopyDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>)
             base_fields.val.extend(
                 def.fields
                     .iter()
-                    .map(|(tok, expr)| (tok.into(), expr.derive_shape(symbol_table))),
+                    .map(|(tok, _constraint, expr)| (tok.into(), expr.derive_shape(symbol_table))),
             );
             Shape::Tuple(base_fields).with_pos(def.pos.clone())
         }
@@ -308,7 +327,7 @@ fn derive_copy_shape(def: &CopyDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>)
             base_fields.extend(
                 def.fields
                     .iter()
-                    .map(|(tok, expr)| (tok.into(), expr.derive_shape(symbol_table))),
+                    .map(|(tok, _constraint, expr)| (tok.into(), expr.derive_shape(symbol_table))),
             );
             Shape::Tuple(PositionedItem::new(base_fields, def.pos.clone()))
         }
@@ -1031,15 +1050,26 @@ impl DeriveShape for Value {
 }
 
 fn derive_field_list_shape(
-    flds: &Vec<(super::Token, Expression)>,
+    flds: &Vec<(super::Token, Option<Expression>, Expression)>,
     pos: &Position,
     symbol_table: &mut BTreeMap<Rc<str>, Shape>,
 ) -> Shape {
     let mut field_shapes = Vec::new();
-    for &(ref tok, ref expr) in flds {
+    for (ref tok, ref constraint, ref expr) in flds {
+        let value_shape = expr.derive_shape(symbol_table);
+        let shape = if let Some(c) = constraint {
+            let constraint_shape = c.derive_shape(symbol_table);
+            let narrowed = value_shape.narrow(&constraint_shape, symbol_table);
+            if let Shape::TypeErr(_, _) = &narrowed {
+                return narrowed;
+            }
+            narrowed
+        } else {
+            value_shape
+        };
         field_shapes.push((
             PositionedItem::new(tok.fragment.clone(), tok.pos.clone()),
-            expr.derive_shape(symbol_table),
+            shape,
         ));
     }
     Shape::Tuple(PositionedItem::new(field_shapes, pos.clone()))
@@ -1291,6 +1321,20 @@ impl Visitor for Checker {
                 // Resolve unresolved imports if we have a working directory
                 if let Shape::Import(ImportShape::Unresolved(pi)) = &shape {
                     shape = self.resolve_import(&pi.val, &pi.pos);
+                }
+                // Enforce constraint if present
+                if let Some(ref constraint_expr) = def.constraint {
+                    let constraint_shape = constraint_expr.derive_shape(&mut self.symbol_table);
+                    let narrowed = shape.narrow(&constraint_shape, &mut self.symbol_table);
+                    if let Shape::TypeErr(pos, msg) = &narrowed {
+                        self.err_stack.push(BuildError::with_pos(
+                            msg.clone(),
+                            ErrorType::TypeFail,
+                            pos.clone(),
+                        ));
+                        return;
+                    }
+                    shape = narrowed;
                 }
                 if let Shape::TypeErr(pos, msg) = &shape {
                     self.err_stack.push(BuildError::with_pos(

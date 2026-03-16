@@ -51,6 +51,7 @@ fn derive_shape_values() {
             Value::Tuple(PositionedItem::new(
                 vec![(
                     Token::new("foo", TokenType::BAREWORD, Position::new(0, 0, 0)),
+                    None,
                     Expression::Simple(Value::Int(PositionedItem::new(3, Position::new(0, 0, 0)))),
                 )],
                 Position::new(0, 0, 0),

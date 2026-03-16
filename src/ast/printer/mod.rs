@@ -155,7 +155,10 @@ where
         Ok(())
     }
 
-    fn render_tuple_def(&mut self, def: &Vec<(Token, Expression)>) -> std::io::Result<()> {
+    fn render_tuple_def(
+        &mut self,
+        def: &Vec<(Token, Option<Expression>, Expression)>,
+    ) -> std::io::Result<()> {
         self.w.write(&['{' as u8])?;
         // If the field list is just 1 we might be able to collapse the tuple.
         self.curr_indent += self.indent_size;
@@ -164,7 +167,7 @@ where
         if has_fields {
             write!(self.w, "\n")?;
         }
-        for &(ref t, ref expr) in def.iter() {
+        for (ref t, ref constraint, ref expr) in def.iter() {
             let field_line = t.pos.line;
             let expr_line = expr.pos().line;
             self.render_comment_if_needed(field_line)?;
@@ -173,10 +176,15 @@ where
             }
             write!(self.w, "{}", indent)?;
             if Self::is_bareword(&t.fragment) {
-                write!(&mut self.w, "{} = ", t.fragment)?;
+                write!(&mut self.w, "{}", t.fragment)?;
             } else {
-                write!(self.w, "\"{}\" = ", Self::escape_quotes(&t.fragment))?;
+                write!(self.w, "\"{}\"", Self::escape_quotes(&t.fragment))?;
             }
+            if let Some(c) = constraint {
+                write!(self.w, " :: ")?;
+                self.render_expr(c)?;
+            }
+            write!(self.w, " = ")?;
             self.render_expr(expr)?;
             write!(&mut self.w, ",")?;
             write!(self.w, "\n")?;
@@ -344,11 +352,20 @@ where
             Expression::Func(_def) => {
                 self.w.write("func (".as_bytes())?;
                 if _def.argdefs.len() == 1 {
-                    write!(self.w, "{}", _def.argdefs.first().unwrap())?;
+                    let (ref arg, ref constraint) = _def.argdefs.first().unwrap();
+                    write!(self.w, "{}", arg)?;
+                    if let Some(c) = constraint {
+                        write!(self.w, " :: ")?;
+                        self.render_expr(c)?;
+                    }
                 } else {
                     let mut prefix = "";
-                    for n in _def.argdefs.iter() {
+                    for (ref n, ref constraint) in _def.argdefs.iter() {
                         write!(self.w, "{}{}", prefix, n.val)?;
+                        if let Some(c) = constraint {
+                            write!(self.w, " :: ")?;
+                            self.render_expr(c)?;
+                        }
                         prefix = ", ";
                     }
                 }
@@ -472,6 +489,10 @@ where
                 if let Some(ref e) = _def.out_expr {
                     write!(self.w, "(")?;
                     self.render_expr(e)?;
+                    if let Some(ref c) = _def.out_constraint {
+                        write!(self.w, " :: ")?;
+                        self.render_expr(c)?;
+                    }
                     write!(self.w, ") ")?;
                 }
                 write!(self.w, "{{\n")?;
@@ -548,7 +569,12 @@ where
         self.render_comment_if_needed(line)?;
         match stmt {
             Statement::Let(def) => {
-                write!(&mut self.w, "let {} = ", def.name.fragment)?;
+                write!(&mut self.w, "let {}", def.name.fragment)?;
+                if let Some(ref c) = def.constraint {
+                    write!(self.w, " :: ")?;
+                    self.render_expr(c)?;
+                }
+                write!(self.w, " = ")?;
                 self.render_expr(&def.value)?;
             }
             Statement::Expression(_expr) => {

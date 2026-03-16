@@ -80,7 +80,7 @@ pub trait Walker: Visitor {
     }
 
     fn walk_fieldset(&mut self, fs: &mut FieldList) {
-        for &mut (_, ref mut expr) in fs.iter_mut() {
+        for (_, _constraint, ref mut expr) in fs.iter_mut() {
             self.walk_expression(expr);
         }
     }
