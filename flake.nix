@@ -20,7 +20,10 @@
     let
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays; };
-        craneLib = (crane.mkLib pkgs);
+        rust-bin = pkgs.rust-bin.stable.latest.default.override {
+            extensions = [ "rust-src" ];
+        };
+        craneLib = (crane.mkLib pkgs).overrideToolchain rust-bin;
         ucg = craneLib.buildPackage {
             pname = "ucg";
             version = "0.8.0";
