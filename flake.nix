@@ -23,7 +23,7 @@
         craneLib = (crane.mkLib pkgs);
         ucg = craneLib.buildPackage {
             pname = "ucg";
-            version = "0.7.3";
+            version = "0.8.0";
             src = ./.;
         };
     in
