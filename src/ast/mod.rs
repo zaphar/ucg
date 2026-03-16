@@ -392,7 +392,7 @@ impl Shape {
                 }),
                 Shape::List(NarrowedShape {
                     pos: _,
-                    types: NarrowingShape::Narrowed(right_slist),
+                    types: NarrowingShape::Narrowed(_right_slist),
                 }),
             )
             | (
@@ -402,13 +402,13 @@ impl Shape {
                 }),
                 Shape::Narrowed(NarrowedShape {
                     pos: _,
-                    types: NarrowingShape::Narrowed(right_slist),
+                    types: NarrowingShape::Narrowed(_right_slist),
                 }),
             ) => true,
             (
                 Shape::List(NarrowedShape {
-                    pos,
-                    types: NarrowingShape::Narrowed(left_slist),
+                    pos: _pos,
+                    types: NarrowingShape::Narrowed(_left_slist),
                 }),
                 Shape::List(NarrowedShape {
                     pos: _,
@@ -417,8 +417,8 @@ impl Shape {
             )
             | (
                 Shape::Narrowed(NarrowedShape {
-                    pos,
-                    types: NarrowingShape::Narrowed(left_slist),
+                    pos: _pos,
+                    types: NarrowingShape::Narrowed(_left_slist),
                 }),
                 Shape::Narrowed(NarrowedShape {
                     pos: _,
@@ -713,13 +713,13 @@ impl Shape {
 
     pub fn type_name(&self) -> &'static str {
         match self {
-            Shape::Str(s) => "str",
-            Shape::Int(s) => "int",
-            Shape::Float(s) => "float",
-            Shape::Boolean(b) => "boolean",
+            Shape::Str(_) => "str",
+            Shape::Int(_) => "int",
+            Shape::Float(_) => "float",
+            Shape::Boolean(_) => "boolean",
             // TODO(jwall): make these type names account for what they contain.
-            Shape::List(lst) => "list",
-            Shape::Tuple(flds) => "tuple",
+            Shape::List(_) => "list",
+            Shape::Tuple(_) => "tuple",
             Shape::Func(_) => "func",
             Shape::Module(_) => "module",
             Shape::Narrowed(_) => "narrowed",

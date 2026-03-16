@@ -122,7 +122,7 @@ where
 
     pub fn clone_builder(&self) -> Self {
         FileBuilder {
-            environment: self.environment.clone(),
+            environment: self.environment,
             strict: self.strict,
             working_dir: self.working_dir.clone(),
             std: self.std.clone(),

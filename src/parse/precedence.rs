@@ -393,7 +393,7 @@ pub fn parse_precedence(i: SliceIter<Element>) -> Result<SliceIter<Element>, Exp
 }
 
 /// Parse a binary operator expression.
-pub fn op_expression<'a>(i: SliceIter<'a, Token>) -> Result<SliceIter<Token>, Expression> {
+pub fn op_expression<'a>(i: SliceIter<'a, Token>) -> Result<SliceIter<'a, Token>, Expression> {
     let preparse = parse_operand_list(i.clone());
     match preparse {
         Result::Fail(e) => Result::Fail(e),

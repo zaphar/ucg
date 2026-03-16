@@ -567,7 +567,7 @@ pub fn tokenize<'a>(
 /// Clones a token.
 ///
 /// This is necessary to allow the match_type and match_token macros to work.
-pub fn token_clone(t: &Token) -> std::result::Result<Token, Error<SliceIter<Token>>> {
+pub fn token_clone<'a>(t: &Token) -> std::result::Result<Token, Error<SliceIter<'a, Token>>> {
     Ok(t.clone())
 }
 

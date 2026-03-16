@@ -69,7 +69,7 @@ macro_rules! trace_parse {
     };
 }
 
-fn symbol_to_value(s: &Token) -> ConvertResult<Value> {
+fn symbol_to_value<'a>(s: &Token) -> ConvertResult<'a, Value> {
     Ok(Value::Symbol(value_node!(
         s.fragment.clone(),
         s.pos.clone()
@@ -82,7 +82,7 @@ make_fn!(
     match_type!(BAREWORD => symbol_to_value)
 );
 
-fn str_to_value(s: &Token) -> ConvertResult<Value> {
+fn str_to_value<'a>(s: &Token) -> ConvertResult<'a, Value> {
     Ok(Value::Str(value_node!(s.fragment.clone(), s.pos.clone())))
 }
 

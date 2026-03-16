@@ -429,7 +429,7 @@ impl Builtins {
                     stack.push((e.clone(), e_pos.clone()));
                     // call function and push it's result on the stack.
                     let (result, result_pos) = decorate_call!(pos =>
-                        VM::fcall_impl(f, self.strict, stack, env.clone(), import_stack))?;
+                        VM::fcall_impl(f, self.strict, stack, env, import_stack))?;
                     pos_elems.push(result_pos);
                     result_elems.push(result);
                     counter += 1;
@@ -446,7 +446,7 @@ impl Builtins {
                     stack.push((Rc::new(P(Str(name.clone()))), name_pos));
                     stack.push((val.clone(), val_pos));
                     let (result, result_pos) = decorate_call!(pos =>
-                        VM::fcall_impl(f, self.strict, stack, env.clone(), import_stack))?;
+                        VM::fcall_impl(f, self.strict, stack, env, import_stack))?;
                     if let &C(List(ref fval, _)) = result.as_ref() {
                         // we expect them to be a list of exactly 2 items.
                         if fval.len() != 2 {
@@ -476,7 +476,7 @@ impl Builtins {
                     stack.push((Rc::new(P(Str(c.to_string().into()))), list_pos.clone()));
                     // call function and push it's result on the stack.
                     let (result, result_pos) = decorate_call!(pos =>
-                        VM::fcall_impl(f, self.strict, stack, env.clone(), import_stack))?;
+                        VM::fcall_impl(f, self.strict, stack, env, import_stack))?;
                     if let &P(Str(ref s)) = result.as_ref() {
                         buf.push_str(s);
                     } else {
@@ -539,7 +539,7 @@ impl Builtins {
                     stack.push((e.clone(), e_pos.clone()));
                     // call function and push it's result on the stack.
                     let (condition, _) = decorate_call!(pos =>
-                        VM::fcall_impl(f, self.strict, stack, env.clone(), import_stack))?;
+                        VM::fcall_impl(f, self.strict, stack, env, import_stack))?;
                     // Check for empty or boolean results and only push e back in
                     // if they are non empty and true
                     counter += 1;
@@ -565,7 +565,7 @@ impl Builtins {
                     stack.push((Rc::new(P(Str(name.clone()))), name_pos.clone()));
                     stack.push((val.clone(), val_pos.clone()));
                     let (condition, _) = decorate_call!(pos =>
-                        VM::fcall_impl(f, self.strict, stack, env.clone(), import_stack))?;
+                        VM::fcall_impl(f, self.strict, stack, env, import_stack))?;
                     // Check for empty or boolean results and only push e back in
                     // if they are non empty and true
                     counter += 1;
@@ -587,7 +587,7 @@ impl Builtins {
                     stack.push((Rc::new(P(Str(c.to_string().into()))), list_pos.clone()));
                     // call function and push it's result on the stack.
                     let (condition, _) = decorate_call!(pos =>
-                        VM::fcall_impl(f, self.strict, stack, env.clone(), import_stack))?;
+                        VM::fcall_impl(f, self.strict, stack, env, import_stack))?;
                     // Check for empty or boolean results and only push c back in
                     // if they are non empty and true
                     match condition.as_ref() {
@@ -690,7 +690,7 @@ impl Builtins {
                     stack.push((e.clone(), e_pos.clone()));
                     // call function and push it's result on the stack.
                     let (new_acc, new_acc_pos) = decorate_call!(pos =>
-                        VM::fcall_impl(f, self.strict, stack, env.clone(), import_stack))?;
+                        VM::fcall_impl(f, self.strict, stack, env, import_stack))?;
                     acc = new_acc;
                     acc_pos = new_acc_pos;
                     counter += 1;
@@ -707,7 +707,7 @@ impl Builtins {
                     stack.push((val.clone(), val_pos));
                     // call function and push it's result on the stack.
                     let (new_acc, new_acc_pos) = decorate_call!(pos =>
-                        VM::fcall_impl(f, self.strict, stack, env.clone(), import_stack))?;
+                        VM::fcall_impl(f, self.strict, stack, env, import_stack))?;
                     acc = new_acc;
                     acc_pos = new_acc_pos;
                     counter += 1;
@@ -720,7 +720,7 @@ impl Builtins {
                     stack.push((Rc::new(P(Str(c.to_string().into()))), list_pos.clone()));
                     // call function and push it's result on the stack.
                     let (new_acc, new_acc_pos) = decorate_call!(pos =>
-                        VM::fcall_impl(f, self.strict, stack, env.clone(), import_stack))?;
+                        VM::fcall_impl(f, self.strict, stack, env, import_stack))?;
                     acc = new_acc;
                     acc_pos = new_acc_pos;
                 }

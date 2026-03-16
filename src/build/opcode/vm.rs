@@ -549,7 +549,7 @@ impl VM {
                 }
             }
             let (val, _) = decorate_call!(f_pos =>
-                Self::fcall_impl(f, self.runtime.strict, &mut self.stack, env.clone(), &self.import_stack))?;
+                Self::fcall_impl(f, self.runtime.strict, &mut self.stack, env, &self.import_stack))?;
             self.push(val, pos.clone())?;
         } else {
             return Err(Error::new(format!("Not a function! {:?}", f,).into(), pos));
