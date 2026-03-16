@@ -1,6 +1,5 @@
 +++
 title = "Overview"
-slug = "overview"
 weight = 0
 sort_by = "weight"
 in_search_index = true

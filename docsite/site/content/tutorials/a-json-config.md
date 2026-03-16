@@ -1,6 +1,5 @@
 +++
 title = "A simple JSON configuration"
-slug = "a-json-config"
 weight = 1
 in_search_index = true
 +++

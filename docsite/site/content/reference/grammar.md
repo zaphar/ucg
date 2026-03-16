@@ -1,6 +1,5 @@
 +++
 title = "Formal Grammar"
-slug = "grammar"
 weight = 1
 sort_by = "weight"
 in_search_index = true

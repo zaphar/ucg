@@ -1,6 +1,5 @@
 +++
 title = "The UCG Language Reference"
-slug = "reference"
 weight = 3
 sort_by = "weight"
 in_search_index = true

@@ -1,6 +1,6 @@
 +++
 title = "Introduction to UCG"
-in_seach_index = true
+in_search_index = true
 +++
 
 [UCG](https://crates.io/crates/ucg) is a universal grammar for configuration.

@@ -1,6 +1,5 @@
 +++
 title = "Getting Started"
-slug = "getting-started"
 weight = 1
 sort_by = "weight"
 in_search_index = true

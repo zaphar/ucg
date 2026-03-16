@@ -1,6 +1,5 @@
 +++
 title = "Recursive Modules and their Uses"
-slug = "recursive-modules"
 weight = 3
 in_search_index = true
 +++

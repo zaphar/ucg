@@ -1,6 +1,5 @@
 +++
 title = "The UCG Standard Library"
-slug = "stdlib"
 weight = 4
 sort_by = "weight"
 in_search_index = true
