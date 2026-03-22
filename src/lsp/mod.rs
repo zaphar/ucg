@@ -445,32 +445,24 @@ fn find_hover(
     })
 }
 
-/// If the cursor sits on a BAREWORD that immediately follows a `.` token,
-/// return `(import_binding_name, field_name)` so we can jump into the imported file.
-fn find_dot_context(doc: &AnalysisResult, line: u32, character: u32) -> Option<(Rc<str>, Rc<str>)> {
-    use crate::ast::TokenType;
-    let target_line = (line + 1) as usize;
-    let target_col = (character + 1) as usize;
-    let idx = doc.tokens.iter().position(|tok| {
-        tok.pos.line == target_line
-            && tok.pos.column <= target_col
-            && target_col < tok.pos.column + tok.fragment.len()
-    })?;
-    if idx < 2 {
-        return None;
+/// Returns the definition position of a named field within a shape.
+/// For `Tuple` and resolved `Import`, returns the `PositionedItem::pos` of the field key.
+/// For `Module`, descends into its return type.
+fn lookup_field_definition(shape: &crate::ast::Shape, field: &str) -> Option<crate::ast::Position> {
+    use crate::ast::{ImportShape, Shape};
+    match shape {
+        Shape::Tuple(pi) => pi
+            .val
+            .iter()
+            .find(|(n, _)| n.val.as_ref() == field)
+            .map(|(n, _)| n.pos.clone()),
+        Shape::Import(ImportShape::Resolved(_, fields)) => fields
+            .iter()
+            .find(|(n, _)| n.val.as_ref() == field)
+            .map(|(n, _)| n.pos.clone()),
+        Shape::Module(mdef) => lookup_field_definition(mdef.ret(), field),
+        _ => None,
     }
-    let dot = &doc.tokens[idx - 1];
-    if dot.typ != TokenType::PUNCT || dot.fragment.as_ref() != "." {
-        return None;
-    }
-    let import_tok = &doc.tokens[idx - 2];
-    if import_tok.typ != TokenType::BAREWORD {
-        return None;
-    }
-    Some((
-        import_tok.fragment.clone(),
-        doc.tokens[idx].fragment.clone(),
-    ))
 }
 
 /// Walk backwards from the cursor token through `.`-separated BAREWORDs and
@@ -606,18 +598,75 @@ fn find_definition(
     character: u32,
     workspace: &WorkspaceIndex,
 ) -> Option<Location> {
-    // Cross-file go-to-definition: cursor on `import_name.field_name`.
-    if let Some((import_name, field_name)) = find_dot_context(doc, line, character) {
-        if let Some(import_path) = doc.import_map.get(&import_name) {
-            if import_path.is_absolute() {
+    // Dot-expression go-to-definition: handles arbitrary-depth chains like
+    // `import.field`, `local_tuple.field`, and `import.tuple_binding.nested_field`.
+    if let Some((path, root_pos)) = collect_dot_path(doc, line, character) {
+        let root_name = &path[0];
+        let fields = &path[1..]; // always non-empty (collect_dot_path requires len >= 2)
+
+        // If the root is an absolute import, navigate within the imported file.
+        if let Some(import_path) = doc.import_map.get(root_name).filter(|p| p.is_absolute()) {
+            if let Ok(import_uri) = Url::from_file_path(import_path) {
                 if let Some(imported_doc) = workspace.get(import_path) {
-                    if let Some((_, def_pos)) = imported_doc.symbol_table.get(&field_name) {
-                        if let Ok(uri) = Url::from_file_path(import_path) {
+                    let first_field = &fields[0];
+                    if let Some((first_shape, first_pos)) =
+                        imported_doc.symbol_table.get(first_field)
+                    {
+                        if fields.len() == 1 {
                             return Some(Location {
-                                uri,
-                                range: ucg_pos_to_range(def_pos),
+                                uri: import_uri,
+                                range: ucg_pos_to_range(first_pos),
                             });
                         }
+                        // Multi-level: walk through intermediate fields then resolve last.
+                        let mut current = first_shape.clone();
+                        let mut ok = true;
+                        for f in &fields[1..fields.len() - 1] {
+                            if let Some(next) = lookup_field_in_shape(&current, f) {
+                                current = next;
+                            } else {
+                                ok = false;
+                                break;
+                            }
+                        }
+                        if ok {
+                            if let Some(pos) =
+                                lookup_field_definition(&current, &fields[fields.len() - 1])
+                            {
+                                return Some(Location {
+                                    uri: import_uri,
+                                    range: ucg_pos_to_range(&pos),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // Local: resolve root shape from token_types (inner scope) or symbol_table.
+            let root_shape = doc
+                .token_types
+                .get(&root_pos)
+                .cloned()
+                .or_else(|| doc.symbol_table.get(root_name).map(|(s, _)| s.clone()));
+            if let Some(mut current) = root_shape {
+                let mut ok = true;
+                for f in &fields[..fields.len() - 1] {
+                    if let Some(next) = lookup_field_in_shape(&current, f) {
+                        current = next;
+                    } else {
+                        ok = false;
+                        break;
+                    }
+                }
+                if ok {
+                    if let Some(pos) =
+                        lookup_field_definition(&current, &fields[fields.len() - 1])
+                    {
+                        return Some(Location {
+                            uri: current_uri.clone(),
+                            range: ucg_pos_to_range(&pos),
+                        });
                     }
                 }
             }
@@ -1084,33 +1133,34 @@ mod test {
         assert!(result.is_none());
     }
 
-    // --- find_dot_context ---
+    // --- collect_dot_path ---
 
     #[test]
-    fn test_find_dot_context_success() {
+    fn test_collect_dot_path_success() {
         // "let l = import "f"; let y = l.x;"
         //  col (1-based): l=5, "f"=16..18, l=29, .=30, x=31
         // LSP 0-based cursor on x: (line=0, char=30)
         let doc = analyze(r#"let l = import "f"; let y = l.x;"#, None);
-        let result = find_dot_context(&doc, 0, 30);
-        assert!(result.is_some(), "should detect dot context");
-        let (import_name, field_name) = result.unwrap();
-        assert_eq!(import_name.as_ref(), "l");
-        assert_eq!(field_name.as_ref(), "x");
+        let result = collect_dot_path(&doc, 0, 30);
+        assert!(result.is_some(), "should detect dot path");
+        let (path, _) = result.unwrap();
+        assert_eq!(path.len(), 2);
+        assert_eq!(path[0].as_ref(), "l");
+        assert_eq!(path[1].as_ref(), "x");
     }
 
     #[test]
-    fn test_find_dot_context_not_on_dot() {
+    fn test_collect_dot_path_not_on_dot() {
         // Cursor is on a plain bareword with no preceding dot
         let doc = analyze("let x = 1;", None);
-        assert!(find_dot_context(&doc, 0, 4).is_none());
+        assert!(collect_dot_path(&doc, 0, 4).is_none());
     }
 
     #[test]
-    fn test_find_dot_context_too_few_tokens() {
-        // Single-token document — can't have idx >= 2
+    fn test_collect_dot_path_too_few_tokens() {
+        // Single-token document — can't form a dot path
         let doc = analyze("1;", None);
-        assert!(find_dot_context(&doc, 0, 0).is_none());
+        assert!(collect_dot_path(&doc, 0, 0).is_none());
     }
 
     // --- find_hover ---
@@ -1316,6 +1366,54 @@ mod test {
         // `missing` is not in the imported doc's symbol_table, and not in the current
         // file's symbol_table either → None
         assert!(def.is_none());
+    }
+
+    #[test]
+    fn test_find_definition_local_tuple_field() {
+        // Cursor on `x` in `foo.x` where `foo` is a local tuple — should jump to
+        // the `x` field key inside the tuple literal.
+        // "let foo = {x = 1}; let y = foo.x;"
+        //  0         1         2         3
+        //  0123456789012345678901234567890123
+        // `x` in `{x = 1}` is at char 11 (0-based); `x` in `foo.x` is at char 31.
+        let doc = analyze("let foo = {x = 1}; let y = foo.x;", None);
+        let ws = empty_workspace();
+        let def = find_definition(&doc, &fake_uri(), 0, 31, &ws);
+        assert!(def.is_some(), "should find definition for tuple field");
+        let loc = def.unwrap();
+        assert_eq!(loc.uri, fake_uri(), "should stay in the same file");
+        // `x` in `{x = 1}` is at 0-based char 11 → LSP char 11
+        assert_eq!(loc.range.start.line, 0);
+        assert_eq!(loc.range.start.character, 11);
+    }
+
+    #[test]
+    fn test_find_definition_multi_level_dot_cross_file() {
+        // Cursor on `x` in `lib.data.x` where `lib` is an absolute import and
+        // `data` is a tuple binding in the imported file.
+        // Imported: "let data = {x = 1};"
+        //            x in {x = 1} is at char 12 (0-based)
+        // Current:  "let lib = import \"/tmp/lib.ucg\"; let r = lib.data.x;"
+        //            x at char 50 (0-based)
+        let import_path = PathBuf::from("/tmp/lib.ucg");
+        let mut ws = WorkspaceIndex::new(PathBuf::from("/tmp"));
+        ws.update_from_content(&import_path, "let data = {x = 1};");
+
+        let doc = analyze(
+            r#"let lib = import "/tmp/lib.ucg"; let r = lib.data.x;"#,
+            None,
+        );
+        let def = find_definition(&doc, &fake_uri(), 0, 50, &ws);
+        assert!(def.is_some(), "should find multi-level cross-file definition");
+        let loc = def.unwrap();
+        assert_eq!(
+            loc.uri,
+            Url::from_file_path(&import_path).unwrap(),
+            "should jump to imported file"
+        );
+        // `x` in `{x = 1}` in the imported file is at line 0, char 12 (0-based LSP)
+        assert_eq!(loc.range.start.line, 0);
+        assert_eq!(loc.range.start.character, 12);
     }
 
     // --- encode_semantic_tokens ---
