@@ -5,7 +5,11 @@
       "Bash(make integration:*)",
       "Bash(cargo fmt:*)",
       "Bash(cargo run:*)",
-      "Bash(cargo generate-lockfile:*)"
+      "Bash(cargo generate-lockfile:*)",
+      "Bash(jj status:*)",
+      "Bash(rustc --version)",
+      "Bash(./target/release/ucg --help)",
+      "Bash(find /Users/zaphar/projects/personal/ucg/integration_tests -name \"*.ucg\" -exec grep -l \"import\" {})"
     ]
   }
 }

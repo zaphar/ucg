@@ -40,6 +40,7 @@ pub mod convert;
 pub mod error;
 pub mod io;
 pub mod iter;
+pub mod lsp;
 pub mod parse;
 
 pub use crate::ast::Expression;

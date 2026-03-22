@@ -69,6 +69,9 @@ fn do_flags<'a, 'b>() -> clap::App<'a, 'b> {
             (@subcommand env =>
              (about: "Describe the environment variables ucg uses.")
             )
+            (@subcommand lsp =>
+             (about: "Start the UCG language server (LSP) communicating over stdio.")
+            )
     )
 }
 
@@ -535,6 +538,11 @@ fn main() {
     } else if let Some(matches) = app_matches.subcommand_matches("fmt") {
         if let Err(e) = fmt_command(matches) {
             eprintln!("{}", e);
+            process::exit(1);
+        }
+    } else if let Some(_) = app_matches.subcommand_matches("lsp") {
+        if let Err(e) = ucglib::lsp::run_server() {
+            eprintln!("lsp server error: {}", e);
             process::exit(1);
         }
     } else {

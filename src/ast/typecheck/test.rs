@@ -1,4 +1,5 @@
 use std::convert::Into;
+use std::rc::Rc;
 
 use abortable_parser::SliceIter;
 
@@ -589,14 +590,14 @@ fn let_stmt_inference() {
         int_stmt,
         Shape::Int(Position::new(1, 11, 10)),
         BTreeMap::new(),
-        "foo".into()
+        &Rc::<str>::from("foo")
     );
     let float_stmt = "let foo = 1.0;";
     assert_type_success!(
         float_stmt,
         Shape::Float(Position::new(1, 11, 10)),
         BTreeMap::new(),
-        "foo".into()
+        &Rc::<str>::from("foo")
     );
 }
 
