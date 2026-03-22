@@ -204,6 +204,11 @@ fn handle_notification(
         let params: lsp_types::DidCloseTextDocumentParams = serde_json::from_value(notif.params)?;
         let uri = params.text_document.uri;
         state.documents.remove(&uri);
+        // Re-sync the workspace cache from disk now that the editor's in-memory
+        // version is gone.
+        if let Some(path) = uri_to_path(&uri) {
+            state.workspace.update_from_disk(&path);
+        }
         let clear = PublishDiagnosticsParams {
             uri,
             diagnostics: Vec::new(),
