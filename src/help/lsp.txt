@@ -1,0 +1,68 @@
+The UCG language server speaks the Language Server Protocol (LSP) over
+stdio.  Your editor launches it automatically — you just need to point it
+at the command `ucg lsp`.
+
+FEATURES:
+
+    Diagnostics       Parse and type errors shown inline as you edit.
+    Hover             Inferred type and definition location on hover.
+    Go-to-definition  Jump to a binding's definition, including bindings
+                      inside imported files (e.g. lists.len).
+    Completions       Local bindings, imported module fields, and stdlib
+                      import paths inside string literals.
+                      Trigger characters: .  "  /
+    Workspace symbols Search all bindings across every .ucg file in the
+                      workspace by name.
+    Semantic tokens   Keyword, variable, string, number, comment,
+                      operator, and namespace (import) classification
+                      for richer editor highlighting.
+
+NEOVIM (nvim-lspconfig):
+
+    local lspconfig = require('lspconfig')
+    local configs   = require('lspconfig.configs')
+
+    if not configs.ucg then
+      configs.ucg = {
+        default_config = {
+          cmd       = { 'ucg', 'lsp' },
+          filetypes = { 'ucg' },
+          root_dir  = lspconfig.util.root_pattern('.git', 'Cargo.toml'),
+          single_file_support = true,
+        },
+      }
+    end
+    lspconfig.ucg.setup({})
+
+    -- Filetype detection (.ucg files are not recognized by default):
+    vim.filetype.add({ extension = { ucg = 'ucg' } })
+
+NEOVIM (built-in client, no plugin):
+
+    vim.api.nvim_create_autocmd('FileType', {
+      pattern = 'ucg',
+      callback = function(ev)
+        vim.lsp.start({
+          name     = 'ucg',
+          cmd      = { 'ucg', 'lsp' },
+          root_dir = vim.fs.root(ev.buf, { '.git', 'Cargo.toml' }),
+        })
+      end,
+    })
+
+EMACS (Eglot, built into Emacs 29+):
+
+    (require 'eglot)
+    (define-derived-mode ucg-mode prog-mode "UCG")
+    (add-to-list 'auto-mode-alist '("\\.ucg\\'" . ucg-mode))
+    (add-to-list 'eglot-server-programs '(ucg-mode . ("ucg" "lsp")))
+    (add-hook 'ucg-mode-hook #'eglot-ensure)
+
+GENERIC LSP CLIENT:
+
+    Command   : ucg lsp
+    Transport : stdio
+    Files     : *.ucg
+
+For full editor setup documentation see:
+    https://ucg.marzhillstudios.com/editor-setup

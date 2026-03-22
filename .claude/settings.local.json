@@ -9,7 +9,8 @@
       "Bash(jj status:*)",
       "Bash(rustc --version)",
       "Bash(./target/release/ucg --help)",
-      "Bash(find /Users/zaphar/projects/personal/ucg/integration_tests -name \"*.ucg\" -exec grep -l \"import\" {})"
+      "Bash(find /Users/zaphar/projects/personal/ucg/integration_tests -name \"*.ucg\" -exec grep -l \"import\" {})",
+      "Bash(make test:*)"
     ]
   }
 }

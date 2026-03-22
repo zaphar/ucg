@@ -78,6 +78,11 @@ impl WorkspaceIndex {
     pub fn get(&self, path: &PathBuf) -> Option<&AnalysisResult> {
         self.files.get(path)
     }
+
+    /// Iterate over all indexed files and their analysis results.
+    pub fn iter_files(&self) -> impl Iterator<Item = (&PathBuf, &AnalysisResult)> {
+        self.files.iter()
+    }
 }
 
 /// Returns true for `.ucg` files that are not test files (`*_test.ucg`).

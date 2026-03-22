@@ -71,6 +71,7 @@ fn do_flags<'a, 'b>() -> clap::App<'a, 'b> {
             )
             (@subcommand lsp =>
              (about: "Start the UCG language server (LSP) communicating over stdio.")
+             (after_help: include_str!("help/lsp.txt"))
             )
     )
 }

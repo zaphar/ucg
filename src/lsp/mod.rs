@@ -33,12 +33,18 @@ use lsp_types::notification::{
     DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification,
     PublishDiagnostics,
 };
-use lsp_types::request::{Completion, GotoDefinition, HoverRequest, Request};
+use lsp_types::request::{
+    Completion, GotoDefinition, HoverRequest, Request, SemanticTokensFullRequest,
+    WorkspaceSymbolRequest,
+};
 use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionList, CompletionOptions, CompletionResponse,
     GotoDefinitionResponse, Hover, HoverContents, HoverProviderCapability, Location, MarkupContent,
-    MarkupKind, OneOf, Position as LspPosition, PublishDiagnosticsParams, Range,
-    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, Url,
+    MarkupKind, OneOf, Position as LspPosition, PublishDiagnosticsParams, Range, SemanticToken,
+    SemanticTokenModifier, SemanticTokenType, SemanticTokens, SemanticTokensFullOptions,
+    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
+    ServerCapabilities, SymbolInformation, SymbolKind, TextDocumentSyncCapability,
+    TextDocumentSyncKind, Url, WorkspaceSymbolOptions,
 };
 
 use self::analysis::{ucg_pos_to_range, AnalysisResult};
@@ -82,6 +88,29 @@ pub fn run_server() -> Result<(), Box<dyn Error + Send + Sync>> {
             trigger_characters: Some(vec![".".to_string(), "\"".to_string(), "/".to_string()]),
             ..Default::default()
         }),
+        semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(
+            SemanticTokensOptions {
+                legend: SemanticTokensLegend {
+                    token_types: vec![
+                        SemanticTokenType::KEYWORD,
+                        SemanticTokenType::VARIABLE,
+                        SemanticTokenType::STRING,
+                        SemanticTokenType::NUMBER,
+                        SemanticTokenType::COMMENT,
+                        SemanticTokenType::OPERATOR,
+                        SemanticTokenType::NAMESPACE,
+                    ],
+                    token_modifiers: vec![SemanticTokenModifier::DECLARATION],
+                },
+                full: Some(SemanticTokensFullOptions::Bool(true)),
+                range: None,
+                work_done_progress_options: Default::default(),
+            },
+        )),
+        workspace_symbol_provider: Some(OneOf::Right(WorkspaceSymbolOptions {
+            work_done_progress_options: Default::default(),
+            resolve_provider: None,
+        })),
         ..Default::default()
     })?;
 
@@ -231,6 +260,27 @@ fn handle_request(
         });
         conn.sender
             .send(Message::Response(Response::new_ok(id, response)))?;
+    } else if req.method == WorkspaceSymbolRequest::METHOD {
+        let (id, params): (RequestId, lsp_types::WorkspaceSymbolParams) =
+            req.extract(WorkspaceSymbolRequest::METHOD)?;
+        let symbols = collect_workspace_symbols(&state.workspace, &params.query);
+        conn.sender
+            .send(Message::Response(Response::new_ok(id, symbols)))?;
+    } else if req.method == SemanticTokensFullRequest::METHOD {
+        let (id, params): (RequestId, lsp_types::SemanticTokensParams) =
+            req.extract(SemanticTokensFullRequest::METHOD)?;
+        let uri = &params.text_document.uri;
+        let data = state
+            .documents
+            .get(uri)
+            .map(|doc| encode_semantic_tokens(doc))
+            .unwrap_or_default();
+        let response = SemanticTokens {
+            result_id: None,
+            data,
+        };
+        conn.sender
+            .send(Message::Response(Response::new_ok(id, response)))?;
     }
     Ok(())
 }
@@ -333,13 +383,59 @@ fn find_hover(doc: &AnalysisResult, line: u32, character: u32) -> Option<Hover> 
     })
 }
 
+/// If the cursor sits on a BAREWORD that immediately follows a `.` token,
+/// return `(import_binding_name, field_name)` so we can jump into the imported file.
+fn find_dot_context(doc: &AnalysisResult, line: u32, character: u32) -> Option<(Rc<str>, Rc<str>)> {
+    use crate::ast::TokenType;
+    let target_line = (line + 1) as usize;
+    let target_col = (character + 1) as usize;
+    let idx = doc.tokens.iter().position(|tok| {
+        tok.pos.line == target_line
+            && tok.pos.column <= target_col
+            && target_col < tok.pos.column + tok.fragment.len()
+    })?;
+    if idx < 2 {
+        return None;
+    }
+    let dot = &doc.tokens[idx - 1];
+    if dot.typ != TokenType::PUNCT || dot.fragment.as_ref() != "." {
+        return None;
+    }
+    let import_tok = &doc.tokens[idx - 2];
+    if import_tok.typ != TokenType::BAREWORD {
+        return None;
+    }
+    Some((
+        import_tok.fragment.clone(),
+        doc.tokens[idx].fragment.clone(),
+    ))
+}
+
 fn find_definition(
     doc: &AnalysisResult,
     current_uri: &Url,
     line: u32,
     character: u32,
-    _workspace: &WorkspaceIndex,
+    workspace: &WorkspaceIndex,
 ) -> Option<Location> {
+    // Cross-file go-to-definition: cursor on `import_name.field_name`.
+    if let Some((import_name, field_name)) = find_dot_context(doc, line, character) {
+        if let Some(import_path) = doc.import_map.get(&import_name) {
+            if import_path.is_absolute() {
+                if let Some(imported_doc) = workspace.get(import_path) {
+                    if let Some((_, def_pos)) = imported_doc.symbol_table.get(&field_name) {
+                        if let Ok(uri) = Url::from_file_path(import_path) {
+                            return Some(Location {
+                                uri,
+                                range: ucg_pos_to_range(def_pos),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     let name = token_at(doc, line, character)?;
 
     // If this binding is an import, jump to the imported file.
@@ -437,6 +533,110 @@ fn collect_completions(
     }
 
     items
+}
+
+fn collect_workspace_symbols(workspace: &WorkspaceIndex, query: &str) -> Vec<SymbolInformation> {
+    let mut results = Vec::new();
+    for (path, doc) in workspace.iter_files() {
+        let uri = match Url::from_file_path(path) {
+            Ok(u) => u,
+            Err(_) => continue,
+        };
+        for (name, (shape, pos)) in &doc.symbol_table {
+            if query.is_empty() || name.contains(query) {
+                #[allow(deprecated)]
+                results.push(SymbolInformation {
+                    name: name.to_string(),
+                    kind: shape_to_symbol_kind(shape),
+                    location: Location {
+                        uri: uri.clone(),
+                        range: ucg_pos_to_range(pos),
+                    },
+                    container_name: None,
+                    deprecated: None,
+                    tags: None,
+                });
+            }
+        }
+    }
+    results
+}
+
+fn shape_to_symbol_kind(shape: &crate::ast::Shape) -> SymbolKind {
+    use crate::ast::Shape;
+    match shape {
+        Shape::Func(_) => SymbolKind::FUNCTION,
+        Shape::Module(_) => SymbolKind::MODULE,
+        Shape::Tuple(_) => SymbolKind::STRUCT,
+        _ => SymbolKind::VARIABLE,
+    }
+}
+
+fn encode_semantic_tokens(doc: &AnalysisResult) -> Vec<SemanticToken> {
+    use crate::ast::TokenType;
+    const KEYWORDS: &[&str] = &[
+        "let", "import", "func", "module", "select", "cast", "map", "filter", "reduce", "format",
+        "include", "assert", "out", "convert", "range", "fail", "debug", "is", "in", "true",
+        "false", "NULL",
+    ];
+    const OPERATORS: &[&str] = &[
+        "+", "-", "*", "/", "==", "!=", ">", "<", ">=", "<=", "%", "!",
+    ];
+
+    let definition_positions: std::collections::HashSet<(usize, usize)> = doc
+        .symbol_table
+        .values()
+        .map(|(_, pos)| (pos.line, pos.column))
+        .collect();
+
+    let mut data: Vec<SemanticToken> = Vec::new();
+    let mut prev_line = 0u32;
+    let mut prev_col = 0u32;
+
+    for tok in &doc.tokens {
+        let (token_type, token_modifiers_bitset): (u32, u32) = match tok.typ {
+            TokenType::WS | TokenType::END => continue,
+            TokenType::COMMENT => (4, 0),
+            TokenType::QUOTED | TokenType::PIPEQUOTE => (2, 0),
+            TokenType::DIGIT => (3, 0),
+            TokenType::BOOLEAN | TokenType::EMPTY => (0, 0),
+            TokenType::PUNCT => {
+                if OPERATORS.contains(&tok.fragment.as_ref()) {
+                    (5, 0)
+                } else {
+                    continue;
+                }
+            }
+            TokenType::BAREWORD => {
+                let text: &str = tok.fragment.as_ref();
+                if KEYWORDS.contains(&text) {
+                    (0, 0)
+                } else if doc.import_map.contains_key(text) {
+                    (6, 0)
+                } else {
+                    let is_decl = definition_positions.contains(&(tok.pos.line, tok.pos.column));
+                    (1, if is_decl { 1 } else { 0 })
+                }
+            }
+        };
+
+        let line = tok.pos.line.saturating_sub(1) as u32;
+        let col = tok.pos.column.saturating_sub(1) as u32;
+        let delta_line = line - prev_line;
+        let delta_start = if delta_line == 0 { col - prev_col } else { col };
+
+        data.push(SemanticToken {
+            delta_line,
+            delta_start,
+            length: tok.fragment.len() as u32,
+            token_type,
+            token_modifiers_bitset,
+        });
+
+        prev_line = line;
+        prev_col = col;
+    }
+    data
 }
 
 fn format_shape(shape: &crate::ast::Shape) -> String {

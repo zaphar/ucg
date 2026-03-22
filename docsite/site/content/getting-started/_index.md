@@ -119,4 +119,4 @@ SUBCOMMANDS:
 
 You can get more information about the options for each command by running `ucg help $command`
 
-Next: <a href="/reference">Reference</a>
+Next: <a href="/editor-setup">Editor Setup</a> | <a href="/reference">Reference</a>
