@@ -661,6 +661,22 @@ fn encode_semantic_tokens(doc: &AnalysisResult) -> Vec<SemanticToken> {
     data
 }
 
+fn format_narrowing_shape(ns: &crate::ast::NarrowingShape) -> String {
+    use crate::ast::NarrowingShape;
+    match ns {
+        NarrowingShape::Any => "any".to_string(),
+        NarrowingShape::Narrowed(types) => {
+            let mut seen = std::collections::HashSet::new();
+            let inner: Vec<String> = types
+                .iter()
+                .map(format_shape)
+                .filter(|s| seen.insert(s.clone()))
+                .collect();
+            inner.join(" | ")
+        }
+    }
+}
+
 fn format_shape(shape: &crate::ast::Shape) -> String {
     use crate::ast::Shape;
     match shape {
@@ -676,21 +692,8 @@ fn format_shape(shape: &crate::ast::Shape) -> String {
                 .collect();
             format!("{{{}}}", fields.join(", "))
         }
-        Shape::List(ns) => {
-            use crate::ast::NarrowingShape;
-            match &ns.types {
-                NarrowingShape::Any => "[any]".to_string(),
-                NarrowingShape::Narrowed(types) => {
-                    let mut seen = std::collections::HashSet::new();
-                    let inner: Vec<String> = types
-                        .iter()
-                        .map(format_shape)
-                        .filter(|s| seen.insert(s.clone()))
-                        .collect();
-                    format!("[{}]", inner.join(" | "))
-                }
-            }
-        }
+        Shape::List(ns) => format!("[{}]", format_narrowing_shape(&ns.types)),
+        Shape::Narrowed(ns) => format_narrowing_shape(&ns.types),
         Shape::Func(fdef) => {
             let args: Vec<String> = fdef
                 .arg_order
@@ -708,7 +711,6 @@ fn format_shape(shape: &crate::ast::Shape) -> String {
         }
         Shape::Module(mdef) => format!("Module => {}", format_shape(mdef.ret())),
         Shape::Hole(pi) => format!("?({})", pi.val),
-        Shape::Narrowed(_) => "Narrowed".to_string(),
         Shape::Import(crate::ast::ImportShape::Resolved(_, fields)) => {
             let parts: Vec<String> = fields
                 .iter()
@@ -1158,6 +1160,19 @@ mod test {
         let (shape, _) = doc.symbol_table.get(&Rc::from("t")).unwrap();
         let s = format_shape(shape);
         assert_eq!(s, "{inner: {a: Float}}");
+    }
+
+    #[test]
+    fn test_format_shape_narrowed_shows_union() {
+        // select expressions produce Shape::Narrowed across their branches
+        let doc = analyze(
+            r#"let x = select ("a", 0) => {a = 1, b = "hi"};"#,
+            None,
+        );
+        let (shape, _) = doc.symbol_table.get(&Rc::from("x")).unwrap();
+        let s = format_shape(shape);
+        // Should show a union of the branch types, not the raw word "Narrowed"
+        assert_ne!(s, "Narrowed", "should not show raw 'Narrowed', got: {}", s);
     }
 
     #[test]
