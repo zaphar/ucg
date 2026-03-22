@@ -353,33 +353,53 @@ fn cursor_in_string(doc: &AnalysisResult, line: u32, character: u32) -> Option<S
 }
 
 fn find_hover(doc: &AnalysisResult, line: u32, character: u32) -> Option<Hover> {
-    let name = token_at(doc, line, character)?;
-    let (shape, def_pos) = doc.symbol_table.get(&name)?;
-
-    let shape_str = format_shape(shape);
-    let contents = format!(
-        "**type**: `{}`\n\n**binding**: `{}`\n\n*defined at line {}, col {}*",
-        shape_str, name, def_pos.line, def_pos.column
-    );
-
     let target_line = (line + 1) as usize;
     let target_col = (character + 1) as usize;
-    let tok_range = doc
-        .tokens
-        .iter()
-        .find(|tok| {
-            tok.pos.line == target_line
-                && tok.pos.column <= target_col
-                && target_col < tok.pos.column + tok.fragment.len()
-        })
-        .map(|tok| ucg_pos_to_range(&tok.pos));
 
+    // Find the exact token under the cursor.
+    let tok = doc.tokens.iter().find(|tok| {
+        tok.pos.line == target_line
+            && tok.pos.column <= target_col
+            && target_col < tok.pos.column + tok.fragment.len()
+    })?;
+    let tok_range = ucg_pos_to_range(&tok.pos);
+    let name = tok.fragment.clone();
+
+    // 1. Check the position-keyed map first — covers function/module args and
+    //    inner let bindings without any name-collision risk.
+    if let Some(shape) = doc.token_types.get(&(tok.pos.line, tok.pos.column)) {
+        let def_pos = shape.pos();
+        let contents = format!(
+            "**type**: `{}`\n\n**binding**: `{}`\n\n*defined at line {}, col {}*",
+            format_shape(shape),
+            name,
+            def_pos.line,
+            def_pos.column
+        );
+        return Some(Hover {
+            contents: HoverContents::Markup(MarkupContent {
+                kind: MarkupKind::Markdown,
+                value: contents,
+            }),
+            range: Some(tok_range),
+        });
+    }
+
+    // 2. Fall back to the top-level symbol table (name-keyed).
+    let (shape, def_pos) = doc.symbol_table.get(&name)?;
+    let contents = format!(
+        "**type**: `{}`\n\n**binding**: `{}`\n\n*defined at line {}, col {}*",
+        format_shape(shape),
+        name,
+        def_pos.line,
+        def_pos.column
+    );
     Some(Hover {
         contents: HoverContents::Markup(MarkupContent {
             kind: MarkupKind::Markdown,
             value: contents,
         }),
-        range: tok_range,
+        range: Some(tok_range),
     })
 }
 

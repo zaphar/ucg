@@ -30,13 +30,18 @@ use crate::tokenizer::tokenize;
 pub struct AnalysisResult {
     pub ast: Option<Vec<Statement>>,
     pub diagnostics: Vec<Diagnostic>,
-    /// Maps binding name → (shape, definition position).
+    /// Maps binding name → (shape, definition position) for top-level `let` bindings.
     pub symbol_table: BTreeMap<Rc<str>, (Shape, Position)>,
     /// All tokens from the document (used for hover/definition position lookup).
     pub tokens: Vec<Token>,
     /// Maps binding name → resolved path for `let x = import "..."` bindings.
     /// Path is absolute for user files; relative (e.g. "std/lists.ucg") for stdlib.
     pub import_map: HashMap<Rc<str>, PathBuf>,
+    /// Position-keyed shape map for scoped names (function/module args, inner lets).
+    /// Key is `(line, column)` using 1-based UCG coordinates matching `Token::pos`.
+    /// Indexed by every token occurrence within a name's scope, not just definition
+    /// sites — so hovering on a use of `x` inside a function body works too.
+    pub token_types: HashMap<(usize, usize), Shape>,
 }
 
 impl AnalysisResult {
@@ -47,6 +52,7 @@ impl AnalysisResult {
             symbol_table: BTreeMap::new(),
             tokens: Vec::new(),
             import_map: HashMap::new(),
+            token_types: HashMap::new(),
         }
     }
 }
@@ -122,8 +128,33 @@ pub fn analyze(content: &str, working_dir: Option<&Path>) -> AnalysisResult {
     };
 
     // --- Build symbol table from Let bindings + collect type errors + track imports ---
+    // Compute per-let offset ranges so the scope collector can bound token scans.
+    // let_ranges[i] = (start_offset, end_offset) for the i-th top-level Let.
+    let let_stmts: Vec<&crate::ast::LetDef> = ast
+        .iter()
+        .filter_map(|s| {
+            if let Statement::Let(d) = s {
+                Some(d)
+            } else {
+                None
+            }
+        })
+        .collect();
+    let let_ranges: Vec<(usize, usize)> = let_stmts
+        .iter()
+        .enumerate()
+        .map(|(i, def)| {
+            let start = def.name.pos.offset;
+            let end = let_stmts
+                .get(i + 1)
+                .map(|next| next.name.pos.offset)
+                .unwrap_or(usize::MAX);
+            (start, end)
+        })
+        .collect();
+
     let mut sym_map: BTreeMap<Rc<str>, Shape> = BTreeMap::new();
-    for stmt in &ast {
+    for (i, stmt) in ast.iter().enumerate() {
         if let Statement::Let(def) = stmt {
             let shape = def.value.derive_shape(&mut sym_map);
             let name: Rc<str> = def.name.fragment.clone();
@@ -131,7 +162,7 @@ pub fn analyze(content: &str, working_dir: Option<&Path>) -> AnalysisResult {
             result
                 .symbol_table
                 .insert(name.clone(), (shape.clone(), def.name.pos.clone()));
-            sym_map.insert(name.clone(), shape);
+            sym_map.insert(name.clone(), shape.clone());
 
             // Track import bindings for go-to-definition.
             if let Expression::Import(import_def) = &def.value {
@@ -143,9 +174,164 @@ pub fn analyze(content: &str, working_dir: Option<&Path>) -> AnalysisResult {
                 };
                 result.import_map.insert(name, resolved);
             }
+
+            // Collect scoped names (func/module args, inner lets) into token_types.
+            let scope_range = let_ranges[i];
+            collect_scoped_names(
+                &def.value,
+                &mut sym_map.clone(),
+                scope_range,
+                &result.tokens,
+                &mut result.token_types,
+            );
         }
     }
 
     result.ast = Some(ast);
     result
+}
+
+/// Record every token occurrence of `name` within `scope_range` (offset-bounded)
+/// into `token_types` with `shape`.
+fn record_token_occurrences(
+    name: &Rc<str>,
+    shape: &Shape,
+    scope_range: (usize, usize),
+    tokens: &[Token],
+    token_types: &mut HashMap<(usize, usize), Shape>,
+) {
+    use crate::ast::TokenType;
+    let (start, end) = scope_range;
+    for tok in tokens {
+        if tok.typ == TokenType::BAREWORD
+            && tok.fragment == *name
+            && tok.pos.offset >= start
+            && tok.pos.offset < end
+        {
+            token_types.insert((tok.pos.line, tok.pos.column), shape.clone());
+        }
+    }
+}
+
+/// Walk an expression, collecting all scoped names (function args, module args,
+/// inner `let` bindings) into `token_types` using position-keyed entries.
+///
+/// `scope_range` is the `(start_offset, end_offset)` of the enclosing top-level
+/// let binding, used to bound token scans so that two different functions with
+/// the same argument name don't overwrite each other's entries.
+fn collect_scoped_names(
+    expr: &Expression,
+    sym_map: &mut BTreeMap<Rc<str>, Shape>,
+    scope_range: (usize, usize),
+    tokens: &[Token],
+    token_types: &mut HashMap<(usize, usize), Shape>,
+) {
+    match expr {
+        Expression::Func(func_def) => {
+            let shape = expr.derive_shape(sym_map);
+            if let Shape::Func(fdef) = &shape {
+                for (arg_name, arg_shape) in fdef.args() {
+                    record_token_occurrences(arg_name, arg_shape, scope_range, tokens, token_types);
+                }
+            }
+            // Descend into the body with args in scope so inner lets see them.
+            let mut inner_sym = sym_map.clone();
+            if let Shape::Func(fdef) = &shape {
+                for (arg_name, arg_shape) in fdef.args() {
+                    inner_sym.insert(arg_name.clone(), arg_shape.clone());
+                }
+            }
+            collect_scoped_names(
+                &func_def.fields,
+                &mut inner_sym,
+                scope_range,
+                tokens,
+                token_types,
+            );
+        }
+
+        Expression::Module(mod_def) => {
+            let shape = expr.derive_shape(sym_map);
+            if let Shape::Module(mdef) = &shape {
+                for (name_pi, item_shape) in mdef.items() {
+                    record_token_occurrences(
+                        &name_pi.val,
+                        item_shape,
+                        scope_range,
+                        tokens,
+                        token_types,
+                    );
+                }
+            }
+            // Walk module body statements.
+            let mut inner_sym = sym_map.clone();
+            for stmt in &mod_def.statements {
+                if let Statement::Let(inner_def) = stmt {
+                    let inner_shape = inner_def.value.derive_shape(&mut inner_sym);
+                    let inner_name: Rc<str> = inner_def.name.fragment.clone();
+                    record_token_occurrences(
+                        &inner_name,
+                        &inner_shape,
+                        scope_range,
+                        tokens,
+                        token_types,
+                    );
+                    inner_sym.insert(inner_name, inner_shape.clone());
+                    collect_scoped_names(
+                        &inner_def.value,
+                        &mut inner_sym,
+                        scope_range,
+                        tokens,
+                        token_types,
+                    );
+                }
+            }
+            if let Some(out_expr) = &mod_def.out_expr {
+                collect_scoped_names(out_expr, &mut inner_sym, scope_range, tokens, token_types);
+            }
+        }
+
+        // Descend through expression wrappers that can contain funcs/modules.
+        Expression::Binary(def) => {
+            collect_scoped_names(&def.left, sym_map, scope_range, tokens, token_types);
+            collect_scoped_names(&def.right, sym_map, scope_range, tokens, token_types);
+        }
+        Expression::Grouped(inner, _) => {
+            collect_scoped_names(inner, sym_map, scope_range, tokens, token_types);
+        }
+        Expression::Call(call_def) => {
+            for arg in &call_def.arglist {
+                collect_scoped_names(arg, sym_map, scope_range, tokens, token_types);
+            }
+        }
+        Expression::Copy(copy_def) => {
+            for (_, _, field_expr) in &copy_def.fields {
+                collect_scoped_names(field_expr, sym_map, scope_range, tokens, token_types);
+            }
+        }
+        Expression::FuncOp(op_def) => {
+            use crate::ast::FuncOpDef;
+            match op_def {
+                FuncOpDef::Map(def) | FuncOpDef::Filter(def) => {
+                    collect_scoped_names(&def.func, sym_map, scope_range, tokens, token_types);
+                    collect_scoped_names(&def.target, sym_map, scope_range, tokens, token_types);
+                }
+                FuncOpDef::Reduce(def) => {
+                    collect_scoped_names(&def.func, sym_map, scope_range, tokens, token_types);
+                    collect_scoped_names(&def.acc, sym_map, scope_range, tokens, token_types);
+                    collect_scoped_names(&def.target, sym_map, scope_range, tokens, token_types);
+                }
+            }
+        }
+        Expression::Select(sel_def) => {
+            collect_scoped_names(&sel_def.val, sym_map, scope_range, tokens, token_types);
+            if let Some(default) = &sel_def.default {
+                collect_scoped_names(default, sym_map, scope_range, tokens, token_types);
+            }
+            for (_, _, field_expr) in &sel_def.tuple {
+                collect_scoped_names(field_expr, sym_map, scope_range, tokens, token_types);
+            }
+        }
+        _ => {}
+    }
 }

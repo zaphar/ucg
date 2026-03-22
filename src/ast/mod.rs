@@ -234,10 +234,27 @@ pub struct FuncShapeDef {
     ret: Box<Shape>,
 }
 
+impl FuncShapeDef {
+    /// The inferred shapes for each argument, keyed by argument name.
+    /// Each shape's position (`shape.pos()`) is the argument's definition site.
+    pub fn args(&self) -> &BTreeMap<Rc<str>, Shape> {
+        &self.args
+    }
+}
+
 #[derive(PartialEq, Debug, Clone)]
 pub struct ModuleShape {
     items: TupleShape,
     ret: Box<Shape>,
+}
+
+impl ModuleShape {
+    /// The parameter shapes for the module's arg set.
+    /// Each entry is `(PositionedItem<Rc<str>>, Shape)` where the positioned item
+    /// carries the parameter's definition-site position.
+    pub fn items(&self) -> &TupleShape {
+        &self.items
+    }
 }
 
 #[doc = "Value types represent the Values that UCG can have."]
