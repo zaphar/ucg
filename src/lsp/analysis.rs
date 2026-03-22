@@ -264,7 +264,24 @@ fn collect_scoped_names(
                 }
             }
             // Walk module body statements.
+            // Inject the `mod` binding so inner lets that reference `mod.field`
+            // resolve to the correct shapes rather than Shape::Hole.
             let mut inner_sym = sym_map.clone();
+            if let Shape::Module(mdef) = &shape {
+                let mod_key: Rc<str> = "mod".into();
+                let mod_pos = mod_def
+                    .arg_set
+                    .first()
+                    .map(|(tok, _, _)| tok.pos.clone())
+                    .unwrap_or_else(|| mod_def.pos.clone());
+                inner_sym.insert(
+                    mod_key,
+                    Shape::Tuple(crate::ast::PositionedItem {
+                        pos: mod_pos,
+                        val: mdef.items().clone(),
+                    }),
+                );
+            }
             for stmt in &mod_def.statements {
                 if let Statement::Let(inner_def) = stmt {
                     let inner_shape = inner_def.value.derive_shape(&mut inner_sym);
@@ -333,5 +350,174 @@ fn collect_scoped_names(
             }
         }
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::path::Path;
+    use std::rc::Rc;
+
+    use super::*;
+
+    // --- ucg_pos_to_range ---
+
+    #[test]
+    fn test_ucg_pos_to_range_line1_col1() {
+        let pos = Position { line: 1, column: 1, offset: 0, file: None };
+        let range = ucg_pos_to_range(&pos);
+        assert_eq!(range.start.line, 0);
+        assert_eq!(range.start.character, 0);
+        assert_eq!(range.end.line, 0);
+        assert_eq!(range.end.character, 1);
+    }
+
+    #[test]
+    fn test_ucg_pos_to_range_interior() {
+        let pos = Position { line: 5, column: 10, offset: 0, file: None };
+        let range = ucg_pos_to_range(&pos);
+        assert_eq!(range.start.line, 4);
+        assert_eq!(range.start.character, 9);
+        assert_eq!(range.end.line, 4);
+        assert_eq!(range.end.character, 10);
+    }
+
+    // --- analyze: basic ---
+
+    #[test]
+    fn test_analyze_empty_document() {
+        let result = analyze("", None);
+        assert!(result.diagnostics.is_empty());
+        assert!(result.symbol_table.is_empty());
+        // The tokenizer emits an END sentinel even for empty input, so tokens is non-empty.
+        // What matters is the symbol table is empty and there are no diagnostics.
+        assert!(result.ast.is_some());
+    }
+
+    #[test]
+    fn test_analyze_simple_let_int() {
+        let result = analyze("let x = 1;", None);
+        assert!(result.diagnostics.is_empty(), "unexpected diagnostics: {:?}", result.diagnostics);
+        let key: Rc<str> = "x".into();
+        assert!(result.symbol_table.contains_key(&key));
+        let (shape, pos) = result.symbol_table.get(&key).unwrap();
+        assert!(matches!(shape, Shape::Int(_)), "expected Int, got {:?}", shape);
+        assert_eq!(pos.line, 1);
+        assert_eq!(pos.column, 5);
+        assert!(!result.tokens.is_empty());
+    }
+
+    #[test]
+    fn test_analyze_multiple_lets() {
+        let result = analyze("let x = 1;\nlet y = \"hello\";", None);
+        assert!(result.diagnostics.is_empty());
+        assert!(result.symbol_table.contains_key(&Rc::from("x")));
+        assert!(result.symbol_table.contains_key(&Rc::from("y")));
+    }
+
+    // --- analyze: error paths ---
+
+    #[test]
+    fn test_analyze_parse_error_becomes_diagnostic() {
+        // "let = 1;" is a parse error (missing name)
+        let result = analyze("let = 1;", None);
+        assert!(
+            !result.diagnostics.is_empty(),
+            "parse error should produce a diagnostic"
+        );
+        assert_eq!(
+            result.diagnostics[0].severity,
+            Some(lsp_types::DiagnosticSeverity::ERROR)
+        );
+    }
+
+    #[test]
+    fn test_analyze_type_error_becomes_diagnostic() {
+        // Adding an Int and a Str is a type error
+        let result = analyze("let x = 1 + \"hello\";", None);
+        assert!(
+            !result.diagnostics.is_empty(),
+            "type error should produce a diagnostic"
+        );
+    }
+
+    // --- analyze: import tracking ---
+
+    #[test]
+    fn test_analyze_import_with_working_dir() {
+        let result = analyze(
+            r#"let lists = import "std/lists.ucg";"#,
+            Some(Path::new("/project")),
+        );
+        let key: Rc<str> = "lists".into();
+        assert!(result.import_map.contains_key(&key));
+        let path = result.import_map.get(&key).unwrap();
+        assert_eq!(path, &std::path::PathBuf::from("/project/std/lists.ucg"));
+        assert!(path.is_absolute());
+    }
+
+    #[test]
+    fn test_analyze_import_no_working_dir() {
+        let result = analyze(r#"let lists = import "std/lists.ucg";"#, None);
+        let key: Rc<str> = "lists".into();
+        assert!(result.import_map.contains_key(&key));
+        let path = result.import_map.get(&key).unwrap();
+        // Without working_dir the path is relative
+        assert!(!path.is_absolute());
+        assert_eq!(path, &std::path::PathBuf::from("std/lists.ucg"));
+    }
+
+    // --- analyze: token_types for scoped names ---
+
+    #[test]
+    fn test_analyze_func_arg_at_definition_site() {
+        // "let f = func(x) => x + 1;"
+        //  col:  5        14    20
+        let result = analyze("let f = func(x) => x + 1;", None);
+        assert!(result.diagnostics.is_empty());
+        // x at col 14 (arg def) should be in token_types
+        assert!(
+            result.token_types.contains_key(&(1, 14)),
+            "arg def position (1,14) missing from token_types; keys: {:?}",
+            result.token_types.keys().collect::<Vec<_>>()
+        );
+        // x at col 20 (body use) should also be indexed
+        assert!(
+            result.token_types.contains_key(&(1, 20)),
+            "arg use position (1,20) missing from token_types"
+        );
+        // Both should have the same Int shape
+        let def_shape = result.token_types.get(&(1, 14)).unwrap();
+        let use_shape = result.token_types.get(&(1, 20)).unwrap();
+        assert!(matches!(def_shape, Shape::Int(_)));
+        assert!(matches!(use_shape, Shape::Int(_)));
+    }
+
+    #[test]
+    fn test_analyze_scope_bounding_two_funcs_same_arg() {
+        // Two functions with the same arg name must not share token_types entries.
+        // Each `x` token should be attributed to its own function's scope.
+        let src = "let f = func(x) => x + 1;\nlet g = func(x) => x + 2;";
+        let result = analyze(src, None);
+        assert!(result.diagnostics.is_empty());
+        // f's x is at line 1 col 14 (def) and col 20 (use)
+        // g's x is at line 2 col 14 (def) and col 20 (use)
+        assert!(result.token_types.contains_key(&(1, 14)), "f's arg def missing");
+        assert!(result.token_types.contains_key(&(1, 20)), "f's arg use missing");
+        assert!(result.token_types.contains_key(&(2, 14)), "g's arg def missing");
+        assert!(result.token_types.contains_key(&(2, 20)), "g's arg use missing");
+    }
+
+    #[test]
+    fn test_analyze_module_arg_in_token_types() {
+        // "let m = module { x = 0, } => (mod.x) {};"
+        // x at the arg def position should be in token_types
+        let result = analyze("let m = module { x = 0, } => (mod.x) {};", None);
+        assert!(result.diagnostics.is_empty());
+        // There should be at least one entry in token_types from the module arg
+        assert!(
+            !result.token_types.is_empty(),
+            "module arg should populate token_types"
+        );
     }
 }

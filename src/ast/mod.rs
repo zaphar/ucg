@@ -258,6 +258,11 @@ impl ModuleShape {
     pub fn items(&self) -> &TupleShape {
         &self.items
     }
+
+    /// The inferred return type of the module.
+    pub fn ret(&self) -> &Shape {
+        &self.ret
+    }
 }
 
 #[doc = "Value types represent the Values that UCG can have."]

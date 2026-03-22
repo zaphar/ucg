@@ -1105,3 +1105,118 @@ fn test_bool_constraint() {
 fn test_bool_constraint_mismatch() {
     assert_type_err!("let x :: true = 42;");
 }
+
+// --- include expression ---
+
+#[test]
+fn test_include_expression_shape() {
+    // derive_include_shape always returns Narrowed(Tuple | List) regardless of path
+    let mut sym_table = BTreeMap::new();
+    let expr = parse_expression("include json \"some/path.ucg\"").unwrap();
+    let shape = expr.derive_shape(&mut sym_table);
+    assert!(
+        matches!(shape, Shape::Narrowed(_)),
+        "include should produce a Narrowed shape, got {:?}",
+        shape
+    );
+    if let Shape::Narrowed(ns) = &shape {
+        if let NarrowingShape::Narrowed(types) = &ns.types {
+            assert_eq!(types.len(), 2, "should have two candidates: Tuple and List");
+            assert!(
+                types.iter().any(|s| matches!(s, Shape::Tuple(_))),
+                "should include Tuple"
+            );
+            assert!(
+                types.iter().any(|s| matches!(s, Shape::List(_))),
+                "should include List"
+            );
+        } else {
+            panic!("Expected Narrowed candidates, got Any");
+        }
+    }
+}
+
+#[test]
+fn test_include_in_let_binding() {
+    // include expression used as a let binding typechecks without error
+    assert_type_ok!("let x = include json \"some/path.ucg\";");
+}
+
+// --- module without out_expr ---
+
+#[test]
+fn test_module_no_out_expr_uses_last_let() {
+    // A module with no explicit out_expr falls back to the last let binding's shape.
+    assert_type_ok!("let m = module {} => { let x = 1; };");
+}
+
+#[test]
+fn test_module_no_out_expr_empty_body() {
+    // A module with no out_expr and no body produces an Any return type.
+    assert_type_ok!("let m = module {} => {};");
+}
+
+// --- module output constraint ---
+
+#[test]
+fn test_module_out_constraint_ok() {
+    // Constraint matches the out expression's type — should succeed.
+    assert_type_ok!("let m = module {} => (1 :: 0) {};");
+}
+
+#[test]
+fn test_module_out_constraint_mismatch() {
+    // Constraint clashes with the out expression's type — should fail.
+    assert_type_err!("let m = module {} => (1 :: \"\") {};");
+}
+
+// --- copy on module ---
+
+#[test]
+fn test_copy_module_ok() {
+    // Copying a module with a correctly-typed field override should succeed.
+    assert_type_ok!("let m = module { x = 0, } => (mod.x) {};\nlet n = m { x = 42 };");
+}
+
+#[test]
+fn test_copy_module_wrong_field_type() {
+    // Copying a module with a wrong-typed override should produce a type error.
+    assert_type_err!("let m = module { x = 0, } => (mod.x) {};\nlet n = m { x = \"wrong\" };");
+}
+
+#[test]
+fn test_copy_non_copyable_type() {
+    // Copying an Int binding should produce a type error.
+    assert_type_err!("let x = 1;\nlet y = x { foo = 1 };");
+}
+
+// --- output / convert statements ---
+
+#[test]
+fn test_output_statement() {
+    assert_type_ok!("out json {x = 1};");
+}
+
+#[test]
+fn test_convert_statement() {
+    assert_type_ok!("convert json {x = 1};");
+}
+
+// --- assert statement ---
+
+#[test]
+fn test_assert_statement_bool() {
+    assert_type_ok!("assert true;");
+}
+
+#[test]
+fn test_assert_statement_tuple() {
+    assert_type_ok!("assert {ok = true, desc = \"passes\"};");
+}
+
+// --- calling non-callable type ---
+
+#[test]
+fn test_call_non_callable() {
+    assert_type_err!("let x = 1;\nlet y = x(1);");
+}

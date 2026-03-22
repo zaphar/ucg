@@ -126,15 +126,15 @@ impl DeriveShape for ModuleDef {
                     })),
             )
         };
-        // Enforce output constraint if present
+        // Enforce output constraint if present.
+        // If narrowing fails, return the TypeErr directly so it surfaces to the caller.
         if let Some(ref constraint_expr) = self.out_constraint {
             let constraint_shape = constraint_expr.derive_shape(symbol_table);
             let narrowed = ret.narrow(&constraint_shape, symbol_table);
             if let Shape::TypeErr(_, _) = &narrowed {
-                ret = Box::new(narrowed);
-            } else {
-                ret = Box::new(narrowed);
+                return narrowed;
             }
+            ret = Box::new(narrowed);
         }
         // Read back narrowed arg shapes from the checker's symbol table
         if let Some(Shape::Tuple(mod_tuple)) = checker.symbol_table.get(&mod_key) {

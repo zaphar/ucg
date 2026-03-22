@@ -11,7 +11,10 @@
       "Bash(./target/release/ucg --help)",
       "Bash(find /Users/zaphar/projects/personal/ucg/integration_tests -name \"*.ucg\" -exec grep -l \"import\" {})",
       "Bash(make test:*)",
-      "Bash(make unit:*)"
+      "Bash(make unit:*)",
+      "Bash(wc:*)",
+      "Bash(find:*)",
+      "Bash(node:*)"
     ]
   }
 }

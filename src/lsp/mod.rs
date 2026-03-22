@@ -669,7 +669,7 @@ fn format_shape(shape: &crate::ast::Shape) -> String {
         Shape::Tuple(_) => "Tuple".to_string(),
         Shape::List(_) => "List".to_string(),
         Shape::Func(_) => "Func".to_string(),
-        Shape::Module(_) => "Module".to_string(),
+        Shape::Module(mdef) => format!("Module => {}", format_shape(mdef.ret())),
         Shape::Hole(pi) => format!("?({})", pi.val),
         Shape::Narrowed(_) => "Narrowed".to_string(),
         Shape::Import(_) => "Import".to_string(),
@@ -694,4 +694,441 @@ fn zero_range() -> Range {
         character: 0,
     };
     Range { start, end: start }
+}
+
+#[cfg(test)]
+mod test {
+    use std::path::PathBuf;
+    use std::rc::Rc;
+
+    use lsp_types::{HoverContents, SymbolKind};
+
+    use super::*;
+    use super::analysis::analyze;
+
+    fn empty_workspace() -> WorkspaceIndex {
+        WorkspaceIndex::new(PathBuf::from("/"))
+    }
+
+    fn fake_uri() -> Url {
+        Url::parse("file:///tmp/test.ucg").unwrap()
+    }
+
+    // --- token_at ---
+
+    #[test]
+    fn test_token_at_found() {
+        // "let x = 1;"  x is at 0-based (line=0, char=4)
+        let doc = analyze("let x = 1;", None);
+        let name = token_at(&doc, 0, 4);
+        assert_eq!(name.as_deref(), Some("x"));
+    }
+
+    #[test]
+    fn test_token_at_end_of_token() {
+        // Cursor at the last char of the token still matches
+        let doc = analyze("let foo = 1;", None);
+        // "foo" starts at col 5 (1-based) = char 4 (0-based), len=3, covers chars 4-6
+        assert_eq!(token_at(&doc, 0, 6).as_deref(), Some("foo"));
+    }
+
+    #[test]
+    fn test_token_at_not_found() {
+        let doc = analyze("let x = 1;", None);
+        // Cursor past end of line
+        assert!(token_at(&doc, 0, 100).is_none());
+    }
+
+    #[test]
+    fn test_token_at_wrong_line() {
+        let doc = analyze("let x = 1;", None);
+        assert!(token_at(&doc, 5, 4).is_none());
+    }
+
+    // --- token_prefix_at ---
+
+    #[test]
+    fn test_token_prefix_at_mid_token() {
+        // "let foo = 1;" — cursor mid-way through "foo" (char=5, 0-based = after 'fo')
+        let doc = analyze("let foo = 1;", None);
+        // "foo" starts at 1-based col 5 = 0-based char 4
+        // cursor at char 5 (0-based) → target_col=6 (1-based)
+        // chars_before = 6 - 5 = 1  → "f"
+        let prefix = token_prefix_at(&doc, 0, 5);
+        assert_eq!(prefix, "f");
+    }
+
+    #[test]
+    fn test_token_prefix_at_before_any_token() {
+        let doc = analyze("let x = 1;", None);
+        // Cursor at very start before any token
+        let prefix = token_prefix_at(&doc, 5, 0);
+        assert_eq!(prefix, "");
+    }
+
+    // --- cursor_in_string ---
+
+    #[test]
+    fn test_cursor_in_string_inside() {
+        // r#"let x = "hello";"# — cursor inside the string at char 10 (0-based)
+        // "hello" starts at col 10 (1-based), fragment = "hello"
+        // target_col = 11, tok.col=10, 10<=11 && 11<10+5+2=17 → inside
+        let doc = analyze(r#"let x = "hello";"#, None);
+        let result = cursor_in_string(&doc, 0, 10);
+        assert!(result.is_some(), "cursor inside string should return Some");
+    }
+
+    #[test]
+    fn test_cursor_in_string_outside() {
+        let doc = analyze(r#"let x = "hello";"#, None);
+        // Cursor on "let" token, not in a string
+        let result = cursor_in_string(&doc, 0, 1);
+        assert!(result.is_none());
+    }
+
+    // --- find_dot_context ---
+
+    #[test]
+    fn test_find_dot_context_success() {
+        // "let l = import "f"; let y = l.x;"
+        //  col (1-based): l=5, "f"=16..18, l=29, .=30, x=31
+        // LSP 0-based cursor on x: (line=0, char=30)
+        let doc = analyze(r#"let l = import "f"; let y = l.x;"#, None);
+        let result = find_dot_context(&doc, 0, 30);
+        assert!(result.is_some(), "should detect dot context");
+        let (import_name, field_name) = result.unwrap();
+        assert_eq!(import_name.as_ref(), "l");
+        assert_eq!(field_name.as_ref(), "x");
+    }
+
+    #[test]
+    fn test_find_dot_context_not_on_dot() {
+        // Cursor is on a plain bareword with no preceding dot
+        let doc = analyze("let x = 1;", None);
+        assert!(find_dot_context(&doc, 0, 4).is_none());
+    }
+
+    #[test]
+    fn test_find_dot_context_too_few_tokens() {
+        // Single-token document — can't have idx >= 2
+        let doc = analyze("1;", None);
+        assert!(find_dot_context(&doc, 0, 0).is_none());
+    }
+
+    // --- find_hover ---
+
+    #[test]
+    fn test_find_hover_symbol_table_lookup() {
+        // Hovering on a top-level binding name returns its type
+        let doc = analyze("let x = 1;", None);
+        // x is at 0-based (line=0, char=4)
+        let hover = find_hover(&doc, 0, 4);
+        assert!(hover.is_some(), "should return hover for known binding");
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("Int"), "hover should mention type Int");
+            assert!(mc.value.contains('x'), "hover should mention binding name");
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
+    #[test]
+    fn test_find_hover_token_types_lookup() {
+        // Hovering on a function arg (in token_types) returns the inferred type
+        // "let f = func(x) => x + 1;" — hover on body x at (0, 19)
+        let doc = analyze("let f = func(x) => x + 1;", None);
+        let hover = find_hover(&doc, 0, 19);
+        assert!(hover.is_some(), "should return hover for scoped arg");
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("Int"), "hover should show inferred Int type");
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
+    #[test]
+    fn test_find_hover_unknown_position() {
+        let doc = analyze("let x = 1;", None);
+        // Cursor past end of content — no token there
+        assert!(find_hover(&doc, 99, 99).is_none());
+    }
+
+    // --- find_definition ---
+
+    #[test]
+    fn test_find_definition_local_binding() {
+        // Hovering on a use of `x` should jump to its definition site
+        // "let x = 1; let y = x;" — x use at (0, 19)
+        let doc = analyze("let x = 1; let y = x;", None);
+        let ws = empty_workspace();
+        let def = find_definition(&doc, &fake_uri(), 0, 19, &ws);
+        assert!(def.is_some(), "should find definition for local binding");
+        let loc = def.unwrap();
+        assert_eq!(loc.uri, fake_uri());
+        // x is defined at line 1 col 5 (1-based) → LSP line 0 char 4
+        assert_eq!(loc.range.start.line, 0);
+        assert_eq!(loc.range.start.character, 4);
+    }
+
+    #[test]
+    fn test_find_definition_relative_import_no_jump() {
+        // Relative import paths (e.g. stdlib) don't produce a file jump
+        let doc = analyze(r#"let lists = import "std/lists.ucg";"#, None);
+        let ws = empty_workspace();
+        // Hover on "lists" at (0, 4)
+        let def = find_definition(&doc, &fake_uri(), 0, 4, &ws);
+        // Relative path → falls through to symbol_table lookup, returns current file
+        assert!(def.is_some());
+        assert_eq!(def.unwrap().uri, fake_uri());
+    }
+
+    #[test]
+    fn test_find_definition_absolute_import_jumps() {
+        // An absolute import path produces a jump to the imported file
+        let doc = analyze(r#"let mylib = import "/tmp/mylib.ucg";"#, None);
+        let ws = empty_workspace();
+        let def = find_definition(&doc, &fake_uri(), 0, 4, &ws);
+        assert!(def.is_some());
+        let loc = def.unwrap();
+        assert_eq!(loc.uri, Url::from_file_path("/tmp/mylib.ucg").unwrap());
+    }
+
+    #[test]
+    fn test_find_definition_unknown_position_returns_none() {
+        // Cursor on whitespace (between tokens) should return None
+        let doc = analyze("let x = 1;", None);
+        let ws = empty_workspace();
+        // position 3 is the space between "let" and "x"
+        let def = find_definition(&doc, &fake_uri(), 0, 3, &ws);
+        assert!(def.is_none(), "whitespace position should return None");
+    }
+
+    #[test]
+    fn test_find_definition_cross_file_dot_context_via_workspace() {
+        // Cursor on the field name in `lib.foo` where `lib` is an absolute import
+        // that the workspace has indexed. Should jump to `foo`'s definition in the
+        // imported file.
+        let imported_content = "let foo = 42;";
+        let import_path = PathBuf::from("/tmp/mylib.ucg");
+
+        let mut ws = WorkspaceIndex::new(PathBuf::from("/tmp"));
+        ws.update_from_content(&import_path, imported_content);
+
+        // The doc imports /tmp/mylib.ucg as `lib` then accesses `lib.foo`.
+        let doc = analyze(
+            r#"let lib = import "/tmp/mylib.ucg"; let y = lib.foo;"#,
+            None,
+        );
+
+        // "lib.foo" — `foo` starts at char 47 (0-based) in the source above.
+        // l=0, "let lib = import \"/tmp/mylib.ucg\"; let y = lib.foo;"
+        //  0123456789...
+        // "let lib = import \"/tmp/mylib.ucg\"; let y = lib." is 47 chars, foo at 47.
+        let def = find_definition(&doc, &fake_uri(), 0, 47, &ws);
+        assert!(def.is_some(), "should find cross-file dot definition");
+        let loc = def.unwrap();
+        assert_eq!(
+            loc.uri,
+            Url::from_file_path(&import_path).unwrap(),
+            "should jump to the imported file"
+        );
+        // `foo` is defined at line 1 col 5 (1-based) → LSP (0, 4)
+        assert_eq!(loc.range.start.line, 0);
+        assert_eq!(loc.range.start.character, 4);
+    }
+
+    #[test]
+    fn test_find_definition_dot_context_field_not_in_imported_doc() {
+        // Cursor on a field that doesn't exist in the indexed imported doc.
+        // find_definition should fall through and return None (not in symbol_table either).
+        let import_path = PathBuf::from("/tmp/mylib.ucg");
+        let mut ws = WorkspaceIndex::new(PathBuf::from("/tmp"));
+        ws.update_from_content(&import_path, "let bar = 1;");
+
+        let doc = analyze(
+            r#"let lib = import "/tmp/mylib.ucg"; let y = lib.missing;"#,
+            None,
+        );
+        // "missing" starts at char 47
+        let def = find_definition(&doc, &fake_uri(), 0, 47, &ws);
+        // `missing` is not in the imported doc's symbol_table, and not in the current
+        // file's symbol_table either → None
+        assert!(def.is_none());
+    }
+
+    // --- encode_semantic_tokens ---
+
+    #[test]
+    fn test_encode_semantic_tokens_basic() {
+        // "let x = 1;" should produce: let(keyword), x(variable+decl), 1(number)
+        let doc = analyze("let x = 1;", None);
+        let tokens = encode_semantic_tokens(&doc);
+        assert_eq!(tokens.len(), 3, "expected 3 semantic tokens, got {:?}", tokens);
+        // let — keyword (type 0), no modifier
+        assert_eq!(tokens[0].token_type, 0);
+        assert_eq!(tokens[0].token_modifiers_bitset, 0);
+        assert_eq!(tokens[0].length, 3);
+        // x — variable (type 1), declaration modifier (bit 0 = 1)
+        assert_eq!(tokens[1].token_type, 1);
+        assert_eq!(tokens[1].token_modifiers_bitset, 1);
+        assert_eq!(tokens[1].length, 1);
+        // 1 — number (type 3)
+        assert_eq!(tokens[2].token_type, 3);
+        assert_eq!(tokens[2].token_modifiers_bitset, 0);
+    }
+
+    #[test]
+    fn test_encode_semantic_tokens_delta_encoding_same_line() {
+        // Two tokens on the same line: second delta_start is relative to first
+        let doc = analyze("let x = 1;", None);
+        let tokens = encode_semantic_tokens(&doc);
+        // let at col 0, x at col 4: delta_start for x = 4 - 0 = 4
+        assert_eq!(tokens[0].delta_line, 0);
+        assert_eq!(tokens[0].delta_start, 0); // first token: absolute col 0
+        assert_eq!(tokens[1].delta_line, 0);
+        assert_eq!(tokens[1].delta_start, 4); // col 4 - col 0 = 4
+        assert_eq!(tokens[2].delta_line, 0);
+        assert_eq!(tokens[2].delta_start, 4); // col 8 - col 4 = 4
+    }
+
+    #[test]
+    fn test_encode_semantic_tokens_delta_encoding_new_line() {
+        // Token on a new line: delta_line > 0, delta_start is absolute col
+        let doc = analyze("let x = 1;\nlet y = 2;", None);
+        let tokens = encode_semantic_tokens(&doc);
+        // First line: let(0,0), x(0,4), 1(0,8)
+        // Second line: let(1, *), y(1, *), 2(1, *)
+        // The 4th token (let on line 2) should have delta_line=1
+        assert!(tokens.len() >= 4);
+        assert_eq!(tokens[3].delta_line, 1);
+        assert_eq!(tokens[3].delta_start, 0); // "let" starts at col 0 on new line
+    }
+
+    #[test]
+    fn test_encode_semantic_tokens_string() {
+        let doc = analyze(r#"let x = "hello";"#, None);
+        let tokens = encode_semantic_tokens(&doc);
+        // Should have: let(kw), x(var+decl), "hello"(string)
+        assert_eq!(tokens.len(), 3);
+        assert_eq!(tokens[2].token_type, 2); // string
+    }
+
+    #[test]
+    fn test_encode_semantic_tokens_operator() {
+        let doc = analyze("let x = 1 + 2;", None);
+        let tokens = encode_semantic_tokens(&doc);
+        // let, x, 1, +, 2
+        assert_eq!(tokens.len(), 5);
+        // "+" should be operator (type 5)
+        let op = tokens.iter().find(|t| t.token_type == 5);
+        assert!(op.is_some(), "should have an operator token");
+    }
+
+    #[test]
+    fn test_encode_semantic_tokens_import_namespace() {
+        let doc = analyze(r#"let lists = import "std/lists.ucg";"#, None);
+        let tokens = encode_semantic_tokens(&doc);
+        // "lists" after the binding is established should be namespace (type 6)
+        // But in this binding it's a declaration — let's check the string token type
+        // The "std/lists.ucg" string should be type 2
+        let string_tok = tokens.iter().find(|t| t.token_type == 2);
+        assert!(string_tok.is_some(), "should have string token for path");
+    }
+
+    // --- format_shape ---
+
+    #[test]
+    fn test_format_shape_primitives() {
+        use crate::ast::{Position, Shape};
+        let pos = Position::new(1, 1, 0);
+        assert_eq!(format_shape(&Shape::Boolean(pos.clone())), "Bool");
+        assert_eq!(format_shape(&Shape::Int(pos.clone())), "Int");
+        assert_eq!(format_shape(&Shape::Float(pos.clone())), "Float");
+        assert_eq!(format_shape(&Shape::Str(pos.clone())), "Str");
+    }
+
+    #[test]
+    fn test_format_shape_module_shows_return_type() {
+        // Derive a real module shape via analyze to avoid constructing private fields.
+        let doc = analyze("let m = module {} => (1) {};", None);
+        let (shape, _) = doc.symbol_table.get(&Rc::from("m")).unwrap();
+        assert_eq!(format_shape(shape), "Module => Int");
+    }
+
+    #[test]
+    fn test_format_shape_module_no_out_expr() {
+        let doc = analyze("let m = module {} => { let x = 1; };", None);
+        let (shape, _) = doc.symbol_table.get(&Rc::from("m")).unwrap();
+        let s = format_shape(shape);
+        assert!(s.starts_with("Module => "), "got: {}", s);
+    }
+
+    // --- shape_to_symbol_kind ---
+
+    #[test]
+    fn test_shape_to_symbol_kind() {
+        // Derive real shapes via analyze to avoid constructing private struct fields.
+        let func_doc = analyze("let f = func(x) => x + 1;", None);
+        let (func_shape, _) = func_doc.symbol_table.get(&Rc::from("f")).unwrap();
+        assert_eq!(shape_to_symbol_kind(func_shape), SymbolKind::FUNCTION);
+
+        let mod_doc = analyze("let m = module {} => (1) {};", None);
+        let (mod_shape, _) = mod_doc.symbol_table.get(&Rc::from("m")).unwrap();
+        assert_eq!(shape_to_symbol_kind(mod_shape), SymbolKind::MODULE);
+
+        let tuple_doc = analyze("let t = {x = 1};", None);
+        let (tuple_shape, _) = tuple_doc.symbol_table.get(&Rc::from("t")).unwrap();
+        assert_eq!(shape_to_symbol_kind(tuple_shape), SymbolKind::STRUCT);
+
+        let int_doc = analyze("let n = 1;", None);
+        let (int_shape, _) = int_doc.symbol_table.get(&Rc::from("n")).unwrap();
+        assert_eq!(shape_to_symbol_kind(int_shape), SymbolKind::VARIABLE);
+    }
+
+    // --- collect_workspace_symbols ---
+
+    #[test]
+    fn test_collect_workspace_symbols_empty_query() {
+        let mut ws = empty_workspace();
+        ws.update_from_content(
+            &PathBuf::from("/tmp/test.ucg"),
+            "let x = 1;\nlet y = \"hello\";",
+        );
+        let results = collect_workspace_symbols(&ws, "");
+        assert_eq!(results.len(), 2, "empty query should return all symbols");
+        let names: Vec<&str> = results.iter().map(|s| s.name.as_str()).collect();
+        assert!(names.contains(&"x"));
+        assert!(names.contains(&"y"));
+    }
+
+    #[test]
+    fn test_collect_workspace_symbols_filtered() {
+        let mut ws = empty_workspace();
+        ws.update_from_content(
+            &PathBuf::from("/tmp/test.ucg"),
+            "let foo = 1;\nlet bar = 2;\nlet foobar = 3;",
+        );
+        let results = collect_workspace_symbols(&ws, "foo");
+        assert_eq!(results.len(), 2, "should match 'foo' and 'foobar'");
+    }
+
+    #[test]
+    fn test_collect_workspace_symbols_no_match() {
+        let mut ws = empty_workspace();
+        ws.update_from_content(&PathBuf::from("/tmp/test.ucg"), "let x = 1;");
+        let results = collect_workspace_symbols(&ws, "zzz");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_collect_workspace_symbols_kind() {
+        let mut ws = empty_workspace();
+        ws.update_from_content(
+            &PathBuf::from("/tmp/test.ucg"),
+            "let f = func(x) => x + 1;",
+        );
+        let results = collect_workspace_symbols(&ws, "f");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].kind, SymbolKind::FUNCTION);
+    }
 }
