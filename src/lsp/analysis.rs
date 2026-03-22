@@ -51,6 +51,12 @@ pub struct AnalysisResult {
     /// File-level doc comment: the first consecutive comment block in the file,
     /// provided it is separated from the first binding by at least 2 blank lines.
     pub file_doc: Option<String>,
+    /// Position-keyed file path for inner `let x = import "..."` bindings that appear
+    /// inside module or func bodies (not at the top level).
+    /// Key is `(line, column)` of every token occurrence of the binding name within
+    /// its scope — same coordinate system as `token_types` — so that hover and
+    /// go-to-definition can look up the file path from any use or definition site.
+    pub inner_import_map: HashMap<(usize, usize), PathBuf>,
 }
 
 impl AnalysisResult {
@@ -65,6 +71,7 @@ impl AnalysisResult {
             path_map: HashMap::new(),
             comment_map: CommentMap::new(),
             file_doc: None,
+            inner_import_map: HashMap::new(),
         }
     }
 }
@@ -185,6 +192,93 @@ fn compute_file_doc(comment_map: &CommentMap, first_code_line: usize) -> Option<
         None
     } else {
         Some(groups.join("\n"))
+    }
+}
+
+/// Walk `expr` looking for `Expression::Import` nodes inside module/func bodies.
+/// For each one, record every token occurrence of the binding name (within
+/// `scope_range`) in `inner_import_map` so that hover and go-to-definition can
+/// resolve the file path from any use site, not just the definition site.
+fn collect_imports_in_expr(
+    expr: &Expression,
+    working_dir: Option<&Path>,
+    tokens: &[Token],
+    scope_range: (usize, usize),
+    inner_import_map: &mut HashMap<(usize, usize), PathBuf>,
+) {
+    use crate::ast::TokenType;
+    match expr {
+        Expression::Module(mod_def) => {
+            for stmt in &mod_def.statements {
+                if let Statement::Let(inner_def) = stmt {
+                    if let Expression::Import(import_def) = &inner_def.value {
+                        let path_str = import_def.path.fragment.as_ref();
+                        let import_path = if let Some(dir) = working_dir {
+                            dir.join(path_str)
+                        } else {
+                            PathBuf::from(path_str)
+                        };
+                        if import_path.is_absolute() {
+                            let name: Rc<str> = inner_def.name.fragment.clone();
+                            let (start, end) = scope_range;
+                            for tok in tokens {
+                                if tok.typ == TokenType::BAREWORD
+                                    && tok.fragment == name
+                                    && tok.pos.offset >= start
+                                    && tok.pos.offset < end
+                                {
+                                    inner_import_map.insert(
+                                        (tok.pos.line, tok.pos.column),
+                                        import_path.clone(),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    // Recurse for nested modules inside this module body.
+                    collect_imports_in_expr(
+                        &inner_def.value,
+                        working_dir,
+                        tokens,
+                        scope_range,
+                        inner_import_map,
+                    );
+                }
+            }
+        }
+        // Could appear in other expression wrappers — recurse through the common ones.
+        Expression::Func(func_def) => {
+            collect_imports_in_expr(
+                &func_def.fields,
+                working_dir,
+                tokens,
+                scope_range,
+                inner_import_map,
+            );
+        }
+        _ => {}
+    }
+}
+
+/// Walk the top-level AST and populate `inner_import_map` for every inner
+/// `let x = import "..."` binding found inside module or func bodies.
+fn collect_inner_import_paths(
+    ast: &[Statement],
+    let_ranges: &[(usize, usize)],
+    working_dir: Option<&Path>,
+    tokens: &[Token],
+    inner_import_map: &mut HashMap<(usize, usize), PathBuf>,
+) {
+    for (i, stmt) in ast.iter().enumerate() {
+        if let Statement::Let(def) = stmt {
+            collect_imports_in_expr(
+                &def.value,
+                working_dir,
+                tokens,
+                let_ranges[i],
+                inner_import_map,
+            );
+        }
     }
 }
 
@@ -329,6 +423,15 @@ pub fn analyze(
         .map(|(pos, shape)| (pos, resolve_imports_in_shape(shape, working_dir, resolved)))
         .collect();
     result.token_types = resolved_token_types;
+
+    // Populate inner_import_map for imports inside module/func bodies.
+    collect_inner_import_paths(
+        &ast,
+        &let_ranges,
+        working_dir,
+        &result.tokens,
+        &mut result.inner_import_map,
+    );
 
     result.ast = Some(ast);
     result

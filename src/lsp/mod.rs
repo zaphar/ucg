@@ -404,7 +404,17 @@ fn find_hover(
         } else {
             "binding"
         };
-        let doc_str = analysis::doc_comment_for_binding(&doc.comment_map, def_pos.line);
+        // For inner import bindings show the imported file's doc comment;
+        // for everything else fall back to the local comment above the definition.
+        let doc_str = if let crate::ast::Shape::Import(_) = shape {
+            doc.inner_import_map
+                .get(&(tok.pos.line, tok.pos.column))
+                .and_then(|p| workspace.get(p))
+                .and_then(|imported| imported.file_doc.clone())
+                .or_else(|| analysis::doc_comment_for_binding(&doc.comment_map, def_pos.line))
+        } else {
+            analysis::doc_comment_for_binding(&doc.comment_map, def_pos.line)
+        };
         let type_info = format!(
             "**type**: {}\n\n**{}**: `{}`\n\n*defined at line {}, col {}*",
             hover_type_display(shape),
@@ -565,7 +575,14 @@ fn find_hover_dot_expr(
     // current.pos() is the position of the *value's shape* which may point to an
     // unrelated earlier binding (e.g. the module being called, not the call site).
     let last_field = &path[path.len() - 1];
-    let doc_str = if let Some(import_path) = doc.import_map.get(root_name) {
+    // Resolve the import path for the root: top-level import_map first, then
+    // inner_import_map for imports inside module/func bodies.
+    let root_import_path = doc
+        .import_map
+        .get(root_name)
+        .cloned()
+        .or_else(|| doc.inner_import_map.get(&root_pos).cloned());
+    let doc_str = if let Some(ref import_path) = root_import_path {
         workspace.get(import_path).and_then(|imported| {
             let def_line = imported
                 .symbol_table
@@ -620,10 +637,20 @@ fn find_definition(
         let root_name = &path[0];
         let fields = &path[1..]; // always non-empty (collect_dot_path requires len >= 2)
 
-        // If the root is an absolute import, navigate within the imported file.
-        if let Some(import_path) = doc.import_map.get(root_name).filter(|p| p.is_absolute()) {
-            if let Ok(import_uri) = Url::from_file_path(import_path) {
-                if let Some(imported_doc) = workspace.get(import_path) {
+        // Resolve the import path for the root: check top-level import_map first,
+        // then inner_import_map (for imports inside module/func bodies).
+        let root_import_path = doc
+            .import_map
+            .get(root_name)
+            .filter(|p| p.is_absolute())
+            .cloned()
+            .or_else(|| {
+                doc.inner_import_map.get(&root_pos).cloned()
+            });
+
+        if let Some(import_path) = root_import_path {
+            if let Ok(import_uri) = Url::from_file_path(&import_path) {
+                if let Some(imported_doc) = workspace.get(&import_path) {
                     let first_field = &fields[0];
                     if let Some((first_shape, first_pos)) =
                         imported_doc.symbol_table.get(first_field)
@@ -689,9 +716,18 @@ fn find_definition(
         }
     }
 
+    // Find the token under the cursor (needed for inner_import_map lookup).
+    let target_line = (line + 1) as usize;
+    let target_col = (character + 1) as usize;
+    let tok_pos = doc.tokens.iter().find(|tok| {
+        tok.pos.line == target_line
+            && tok.pos.column <= target_col
+            && target_col < tok.pos.column + tok.fragment.len()
+    }).map(|tok| (tok.pos.line, tok.pos.column));
+
     let name = token_at(doc, line, character)?;
 
-    // If this binding is an import, jump to the imported file.
+    // If this binding is a top-level import, jump to the imported file.
     if let Some(import_path) = doc.import_map.get(&name) {
         // For stdlib imports the path is relative ("std/lists.ucg"); for user
         // files it is absolute (resolved in analyze()).
@@ -705,6 +741,21 @@ fn find_definition(
         }
         // Stdlib: we can't navigate into an embedded file, so fall through to
         // the definition position in the current file.
+    }
+
+    // If this binding is an inner import (inside a module/func body), jump to the
+    // imported file.  inner_import_map is keyed by every token occurrence position.
+    if let Some(pos) = tok_pos {
+        if let Some(import_path) = doc.inner_import_map.get(&pos) {
+            if import_path.is_absolute() {
+                if let Ok(uri) = Url::from_file_path(import_path) {
+                    return Some(Location {
+                        uri,
+                        range: zero_range(),
+                    });
+                }
+            }
+        }
     }
 
     // Otherwise jump to the definition site in the current file.
@@ -1430,6 +1481,82 @@ mod test {
         // `x` in `{x = 1}` in the imported file is at line 0, char 12 (0-based LSP)
         assert_eq!(loc.range.start.line, 0);
         assert_eq!(loc.range.start.character, 12);
+    }
+
+    // --- inner import bindings (module body) ---
+
+    #[test]
+    fn test_find_definition_inner_import_dot_expr() {
+        // Gap 1: go-to-def on `site_mod.site_mod` where `site_mod` is an inner import
+        // inside a module body.
+        // Module body: let site_mod = import "/tmp/site.ucg"; let x = site_mod.foo;
+        // Cursor on `foo` (the field) — should jump to `foo`'s definition in /tmp/site.ucg.
+        let import_path = PathBuf::from("/tmp/site.ucg");
+        let mut ws = WorkspaceIndex::new(PathBuf::from("/tmp"));
+        ws.update_from_content(&import_path, "let foo = 42;");
+
+        // The module body imports /tmp/site.ucg as `site_mod` then accesses site_mod.foo.
+        // "let outer = module{} => { let site_mod = import \"/tmp/site.ucg\"; let x = site_mod.foo; };"
+        let src = r#"let outer = module{} => { let site_mod = import "/tmp/site.ucg"; let x = site_mod.foo; };"#;
+        let doc = analysis::analyze(src, None, ws.resolved_files());
+
+        // `foo` is at the end of `site_mod.foo`
+        let foo_col = src.rfind("foo").unwrap() as u32;
+        let def = find_definition(&doc, &fake_uri(), 0, foo_col, &ws);
+        assert!(def.is_some(), "should find definition for inner import dot expr");
+        let loc = def.unwrap();
+        assert_eq!(loc.uri, Url::from_file_path(&import_path).unwrap());
+        assert_eq!(loc.range.start.line, 0);
+        assert_eq!(loc.range.start.character, 4); // `foo` at col 5 (1-based) → 4 (0-based)
+    }
+
+    #[test]
+    fn test_find_definition_inner_import_standalone() {
+        // Gap 2: go-to-def on a standalone inner import binding token.
+        // Cursor on `site_mod` itself (not in a dot expr) — should jump to /tmp/site.ucg.
+        let import_path = PathBuf::from("/tmp/site.ucg");
+        let mut ws = WorkspaceIndex::new(PathBuf::from("/tmp"));
+        ws.update_from_content(&import_path, "let foo = 42;");
+
+        let src = r#"let outer = module{} => { let site_mod = import "/tmp/site.ucg"; let x = site_mod.foo; };"#;
+        let doc = analysis::analyze(src, None, ws.resolved_files());
+
+        // First occurrence of `site_mod` after the `let` keyword (the binding definition).
+        // "let outer = module{} => { let site_mod = ..."
+        //  0         1         2         3
+        let site_mod_col = src.find("site_mod").unwrap() as u32;
+        let def = find_definition(&doc, &fake_uri(), 0, site_mod_col, &ws);
+        assert!(def.is_some(), "should find definition for inner import binding");
+        let loc = def.unwrap();
+        assert_eq!(loc.uri, Url::from_file_path(&import_path).unwrap());
+    }
+
+    #[test]
+    fn test_hover_inner_import_shows_file_doc() {
+        // Gap 3: hover on an inner import binding should show the imported file's doc.
+        let import_path = PathBuf::from("/tmp/site.ucg");
+        let mut ws = WorkspaceIndex::new(PathBuf::from("/tmp"));
+        ws.update_from_content(
+            &import_path,
+            "// Site module utilities.\n\n\nlet foo = 42;",
+        );
+
+        let src = r#"let outer = module{} => { let site_mod = import "/tmp/site.ucg"; let x = site_mod.foo; };"#;
+        let doc = analysis::analyze(src, None, ws.resolved_files());
+
+        // Hover on the first `site_mod` occurrence (the binding definition site).
+        let site_mod_col = src.find("site_mod").unwrap() as u32;
+        let hover = super::find_hover(&doc, &ws, 0, site_mod_col);
+        assert!(hover.is_some(), "should have hover for inner import binding");
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(
+                mc.value.contains("Site module utilities."),
+                "should show imported file doc, got: {}",
+                mc.value
+            );
+        } else {
+            panic!("expected Markup hover");
+        }
     }
 
     // --- encode_semantic_tokens ---
