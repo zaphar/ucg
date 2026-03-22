@@ -42,6 +42,10 @@ pub struct AnalysisResult {
     /// Indexed by every token occurrence within a name's scope, not just definition
     /// sites — so hovering on a use of `x` inside a function body works too.
     pub token_types: HashMap<(usize, usize), Shape>,
+    /// Position-keyed dotted path for tuple field tokens, e.g. `"config.host"`.
+    /// Only populated for field name tokens inside tuple literals; absent for
+    /// function/module args and inner lets where the bare name is sufficient.
+    pub path_map: HashMap<(usize, usize), Rc<str>>,
 }
 
 impl AnalysisResult {
@@ -53,6 +57,7 @@ impl AnalysisResult {
             tokens: Vec::new(),
             import_map: HashMap::new(),
             token_types: HashMap::new(),
+            path_map: HashMap::new(),
         }
     }
 }
@@ -198,7 +203,8 @@ pub fn analyze(
                 }
             }
 
-            // Collect scoped names (func/module args, inner lets) into token_types.
+            // Collect scoped names (func/module args, inner lets, tuple fields) into
+            // token_types and path_map, using the binding name as the path root.
             let scope_range = let_ranges[i];
             collect_scoped_names(
                 &def.value,
@@ -206,6 +212,8 @@ pub fn analyze(
                 scope_range,
                 &result.tokens,
                 &mut result.token_types,
+                &mut result.path_map,
+                def.name.fragment.as_ref(),
             );
         }
     }
@@ -248,6 +256,8 @@ fn collect_scoped_names(
     scope_range: (usize, usize),
     tokens: &[Token],
     token_types: &mut HashMap<(usize, usize), Shape>,
+    path_map: &mut HashMap<(usize, usize), Rc<str>>,
+    path: &str,
 ) {
     match expr {
         Expression::Func(func_def) => {
@@ -270,6 +280,8 @@ fn collect_scoped_names(
                 scope_range,
                 tokens,
                 token_types,
+                path_map,
+                path,
             );
         }
 
@@ -323,53 +335,88 @@ fn collect_scoped_names(
                         scope_range,
                         tokens,
                         token_types,
+                        path_map,
+                        path,
                     );
                 }
             }
             if let Some(out_expr) = &mod_def.out_expr {
-                collect_scoped_names(out_expr, &mut inner_sym, scope_range, tokens, token_types);
+                collect_scoped_names(
+                    out_expr,
+                    &mut inner_sym,
+                    scope_range,
+                    tokens,
+                    token_types,
+                    path_map,
+                    path,
+                );
             }
         }
 
-        // Descend through expression wrappers that can contain funcs/modules.
+        Expression::Simple(crate::ast::Value::Tuple(pi)) => {
+            for (field_tok, _constraint, field_expr) in &pi.val {
+                let field_name: Rc<str> = field_tok.fragment.clone();
+                let field_shape = field_expr.derive_shape(sym_map);
+                // Register the field name token at its exact definition position.
+                token_types.insert(
+                    (field_tok.pos.line, field_tok.pos.column),
+                    field_shape.clone(),
+                );
+                // Record the dotted path for hover display.
+                let field_path: Rc<str> = format!("{}.{}", path, field_name).into();
+                path_map.insert((field_tok.pos.line, field_tok.pos.column), field_path.clone());
+                // Recurse into the field value with the extended path.
+                collect_scoped_names(
+                    field_expr,
+                    sym_map,
+                    scope_range,
+                    tokens,
+                    token_types,
+                    path_map,
+                    &field_path,
+                );
+            }
+        }
+
+        // Descend through expression wrappers that can contain funcs/modules/tuples.
         Expression::Binary(def) => {
-            collect_scoped_names(&def.left, sym_map, scope_range, tokens, token_types);
-            collect_scoped_names(&def.right, sym_map, scope_range, tokens, token_types);
+            collect_scoped_names(&def.left, sym_map, scope_range, tokens, token_types, path_map, path);
+            collect_scoped_names(&def.right, sym_map, scope_range, tokens, token_types, path_map, path);
         }
         Expression::Grouped(inner, _) => {
-            collect_scoped_names(inner, sym_map, scope_range, tokens, token_types);
+            collect_scoped_names(inner, sym_map, scope_range, tokens, token_types, path_map, path);
         }
         Expression::Call(call_def) => {
             for arg in &call_def.arglist {
-                collect_scoped_names(arg, sym_map, scope_range, tokens, token_types);
+                collect_scoped_names(arg, sym_map, scope_range, tokens, token_types, path_map, path);
             }
         }
         Expression::Copy(copy_def) => {
             for (_, _, field_expr) in &copy_def.fields {
-                collect_scoped_names(field_expr, sym_map, scope_range, tokens, token_types);
+                collect_scoped_names(field_expr, sym_map, scope_range, tokens, token_types, path_map, path);
             }
         }
         Expression::FuncOp(op_def) => {
             use crate::ast::FuncOpDef;
             match op_def {
                 FuncOpDef::Map(def) | FuncOpDef::Filter(def) => {
-                    collect_scoped_names(&def.func, sym_map, scope_range, tokens, token_types);
-                    collect_scoped_names(&def.target, sym_map, scope_range, tokens, token_types);
+                    collect_scoped_names(&def.func, sym_map, scope_range, tokens, token_types, path_map, path);
+                    collect_scoped_names(&def.target, sym_map, scope_range, tokens, token_types, path_map, path);
                 }
                 FuncOpDef::Reduce(def) => {
-                    collect_scoped_names(&def.func, sym_map, scope_range, tokens, token_types);
-                    collect_scoped_names(&def.acc, sym_map, scope_range, tokens, token_types);
-                    collect_scoped_names(&def.target, sym_map, scope_range, tokens, token_types);
+                    collect_scoped_names(&def.func, sym_map, scope_range, tokens, token_types, path_map, path);
+                    collect_scoped_names(&def.acc, sym_map, scope_range, tokens, token_types, path_map, path);
+                    collect_scoped_names(&def.target, sym_map, scope_range, tokens, token_types, path_map, path);
                 }
             }
         }
         Expression::Select(sel_def) => {
-            collect_scoped_names(&sel_def.val, sym_map, scope_range, tokens, token_types);
+            collect_scoped_names(&sel_def.val, sym_map, scope_range, tokens, token_types, path_map, path);
             if let Some(default) = &sel_def.default {
-                collect_scoped_names(default, sym_map, scope_range, tokens, token_types);
+                collect_scoped_names(default, sym_map, scope_range, tokens, token_types, path_map, path);
             }
             for (_, _, field_expr) in &sel_def.tuple {
-                collect_scoped_names(field_expr, sym_map, scope_range, tokens, token_types);
+                collect_scoped_names(field_expr, sym_map, scope_range, tokens, token_types, path_map, path);
             }
         }
         _ => {}
@@ -589,6 +636,53 @@ mod test {
         assert!(
             matches!(shape, Shape::Import(ImportShape::Unresolved(_))),
             "should remain Unresolved without cache"
+        );
+    }
+
+    // --- analyze: tuple field path_map ---
+
+    #[test]
+    fn test_analyze_tuple_field_in_token_types() {
+        // "let t = {x = 1, y = \"hi\"};"
+        //          ^ x is at col 10 (1-based)
+        let result = analyze("let t = {x = 1, y = \"hi\"};", None);
+        assert!(result.diagnostics.is_empty());
+        // x should be in token_types
+        let x_pos = result
+            .token_types
+            .iter()
+            .find(|(_, s)| matches!(s, Shape::Int(_)));
+        assert!(x_pos.is_some(), "x field should be in token_types as Int");
+    }
+
+    #[test]
+    fn test_analyze_tuple_field_path_map() {
+        let result = analyze("let t = {x = 1, y = \"hi\"};", None);
+        assert!(result.diagnostics.is_empty());
+        // path_map should contain "t.x" and "t.y"
+        let paths: Vec<&str> = result.path_map.values().map(|s| s.as_ref()).collect();
+        assert!(paths.contains(&"t.x"), "expected t.x in path_map, got: {:?}", paths);
+        assert!(paths.contains(&"t.y"), "expected t.y in path_map, got: {:?}", paths);
+    }
+
+    #[test]
+    fn test_analyze_nested_tuple_field_path_map() {
+        let result = analyze("let t = {outer = {inner = 1}};", None);
+        assert!(result.diagnostics.is_empty());
+        let paths: Vec<&str> = result.path_map.values().map(|s| s.as_ref()).collect();
+        assert!(paths.contains(&"t.outer"), "expected t.outer, got: {:?}", paths);
+        assert!(paths.contains(&"t.outer.inner"), "expected t.outer.inner, got: {:?}", paths);
+    }
+
+    #[test]
+    fn test_analyze_func_args_not_in_path_map() {
+        // Function args should appear in token_types but NOT in path_map
+        let result = analyze("let f = func(x) => x + 1;", None);
+        assert!(result.diagnostics.is_empty());
+        assert!(
+            result.path_map.is_empty(),
+            "func args should not populate path_map, got: {:?}",
+            result.path_map
         );
     }
 }

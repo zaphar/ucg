@@ -367,14 +367,27 @@ fn find_hover(doc: &AnalysisResult, line: u32, character: u32) -> Option<Hover> 
     let tok_range = ucg_pos_to_range(&tok.pos);
     let name = tok.fragment.clone();
 
-    // 1. Check the position-keyed map first — covers function/module args and
-    //    inner let bindings without any name-collision risk.
+    // 1. Check the position-keyed map first — covers function/module args,
+    //    inner let bindings, and tuple field names without name-collision risk.
     if let Some(shape) = doc.token_types.get(&(tok.pos.line, tok.pos.column)) {
         let def_pos = shape.pos();
+        // Use the dotted path (e.g. "config.host") for tuple fields; fall back
+        // to the bare token name for func/module args and inner lets.
+        let label = doc
+            .path_map
+            .get(&(tok.pos.line, tok.pos.column))
+            .map(|p| p.as_ref())
+            .unwrap_or_else(|| name.as_ref());
+        let label_kind = if doc.path_map.contains_key(&(tok.pos.line, tok.pos.column)) {
+            "path"
+        } else {
+            "binding"
+        };
         let contents = format!(
-            "**type**: `{}`\n\n**binding**: `{}`\n\n*defined at line {}, col {}*",
+            "**type**: `{}`\n\n**{}**: `{}`\n\n*defined at line {}, col {}*",
             format_shape(shape),
-            name,
+            label_kind,
+            label,
             def_pos.line,
             def_pos.column
         );
@@ -915,6 +928,43 @@ mod test {
     }
 
     #[test]
+    fn test_find_hover_tuple_field_shows_path() {
+        // Hovering on a field name inside a tuple literal should show the dotted path.
+        // "let t = {x = 1, y = \"hi\"};"
+        //          ^ x is at 0-based (line=0, char=9)
+        let doc = analyze("let t = {x = 1, y = \"hi\"};", None);
+        // Find x's position from path_map
+        let x_entry = doc.path_map.iter().find(|(_, p)| p.as_ref() == "t.x");
+        assert!(x_entry.is_some(), "t.x should be in path_map");
+        let ((line, col), _) = x_entry.unwrap();
+        // Convert from 1-based UCG coords to 0-based LSP coords
+        let hover = find_hover(&doc, (line - 1) as u32, (col - 1) as u32);
+        assert!(hover.is_some(), "should return hover for tuple field");
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("path"), "should use 'path' label, got: {}", mc.value);
+            assert!(mc.value.contains("t.x"), "should show dotted path t.x, got: {}", mc.value);
+            assert!(mc.value.contains("Int"), "should show field type, got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
+    #[test]
+    fn test_find_hover_nested_tuple_field_shows_full_path() {
+        let doc = analyze("let t = {outer = {inner = 1}};", None);
+        let inner_entry = doc.path_map.iter().find(|(_, p)| p.as_ref() == "t.outer.inner");
+        assert!(inner_entry.is_some(), "t.outer.inner should be in path_map");
+        let ((line, col), _) = inner_entry.unwrap();
+        let hover = find_hover(&doc, (line - 1) as u32, (col - 1) as u32);
+        assert!(hover.is_some());
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("t.outer.inner"), "got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
+    #[test]
     fn test_find_hover_token_types_lookup() {
         // Hovering on a function arg (in token_types) returns the inferred type
         // "let f = func(x) => x + 1;" — hover on body x at (0, 19)
@@ -1209,10 +1259,11 @@ mod test {
 
     #[test]
     fn test_format_shape_module_no_out_expr() {
+        // Without an explicit out_expr, the module returns a tuple of all let bindings.
         let doc = analyze("let m = module {} => { let x = 1; };", None);
         let (shape, _) = doc.symbol_table.get(&Rc::from("m")).unwrap();
         let s = format_shape(shape);
-        assert!(s.starts_with("Module => "), "got: {}", s);
+        assert_eq!(s, "Module => {x: Int}", "got: {}", s);
     }
 
     #[test]

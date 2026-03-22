@@ -117,14 +117,23 @@ impl DeriveShape for ModuleDef {
         let mut ret = if let Some(out_expr) = &self.out_expr {
             Box::new(out_expr.derive_shape(&mut checker.symbol_table))
         } else {
-            Box::new(
-                checker
-                    .pop_shape()
-                    .unwrap_or(Shape::Narrowed(NarrowedShape {
-                        pos: self.pos.clone(),
-                        types: NarrowingShape::Any,
-                    })),
-            )
+            // No explicit out expression: the module implicitly returns all its let
+            // bindings as a tuple (excluding the "mod" arg parameter).
+            let pos = self.pos.clone();
+            let tuple_fields: TupleShape = checker
+                .symbol_table
+                .iter()
+                .filter(|(k, _)| k.as_ref() != "mod")
+                .map(|(k, v)| (PositionedItem::new(k.clone(), pos.clone()), v.clone()))
+                .collect();
+            if tuple_fields.is_empty() {
+                Box::new(checker.pop_shape().unwrap_or(Shape::Narrowed(NarrowedShape {
+                    pos: self.pos.clone(),
+                    types: NarrowingShape::Any,
+                })))
+            } else {
+                Box::new(Shape::Tuple(PositionedItem::new(tuple_fields, pos)))
+            }
         };
         // Enforce output constraint if present.
         // If narrowing fails, return the TypeErr directly so it surfaces to the caller.
