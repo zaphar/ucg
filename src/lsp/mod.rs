@@ -672,7 +672,11 @@ fn format_narrowing_shape(ns: &crate::ast::NarrowingShape) -> String {
                 .map(format_shape)
                 .filter(|s| seen.insert(s.clone()))
                 .collect();
-            inner.join(" | ")
+            if inner.is_empty() {
+                "any".to_string()
+            } else {
+                inner.join(" | ")
+            }
         }
     }
 }
@@ -710,7 +714,7 @@ fn format_shape(shape: &crate::ast::Shape) -> String {
             format!("func({}) => {}", args.join(", "), format_shape(fdef.ret()))
         }
         Shape::Module(mdef) => format!("Module => {}", format_shape(mdef.ret())),
-        Shape::Hole(pi) => format!("?({})", pi.val),
+        Shape::Hole(_) => "any".to_string(),
         Shape::Import(crate::ast::ImportShape::Resolved(_, fields)) => {
             let parts: Vec<String> = fields
                 .iter()
