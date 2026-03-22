@@ -243,6 +243,11 @@ impl FuncShapeDef {
     pub fn args(&self) -> &BTreeMap<Rc<str>, Shape> {
         &self.args
     }
+
+    /// The inferred return type of the function.
+    pub fn ret(&self) -> &Shape {
+        &self.ret
+    }
 }
 
 #[derive(PartialEq, Debug, Clone)]

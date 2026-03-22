@@ -691,7 +691,21 @@ fn format_shape(shape: &crate::ast::Shape) -> String {
                 }
             }
         }
-        Shape::Func(_) => "Func".to_string(),
+        Shape::Func(fdef) => {
+            let args: Vec<String> = fdef
+                .arg_order
+                .iter()
+                .map(|name| {
+                    let ty = fdef
+                        .args()
+                        .get(name)
+                        .map(format_shape)
+                        .unwrap_or_else(|| "?".to_string());
+                    format!("{}: {}", name, ty)
+                })
+                .collect();
+            format!("func({}) => {}", args.join(", "), format_shape(fdef.ret()))
+        }
         Shape::Module(mdef) => format!("Module => {}", format_shape(mdef.ret())),
         Shape::Hole(pi) => format!("?({})", pi.val),
         Shape::Narrowed(_) => "Narrowed".to_string(),
@@ -1144,6 +1158,26 @@ mod test {
         let (shape, _) = doc.symbol_table.get(&Rc::from("t")).unwrap();
         let s = format_shape(shape);
         assert_eq!(s, "{inner: {a: Float}}");
+    }
+
+    #[test]
+    fn test_format_shape_func_shows_signature() {
+        let doc = analyze("let f = func(x, y) => x + y;", None);
+        let (shape, _) = doc.symbol_table.get(&Rc::from("f")).unwrap();
+        let s = format_shape(shape);
+        // Should show arg names, inferred types, and return type
+        assert!(s.starts_with("func("), "got: {}", s);
+        assert!(s.contains("x:"), "got: {}", s);
+        assert!(s.contains("y:"), "got: {}", s);
+        assert!(s.contains("=>"), "got: {}", s);
+    }
+
+    #[test]
+    fn test_format_shape_func_typed_args() {
+        let doc = analyze("let f = func(x) => x + 1;", None);
+        let (shape, _) = doc.symbol_table.get(&Rc::from("f")).unwrap();
+        let s = format_shape(shape);
+        assert_eq!(s, "func(x: Int) => Int");
     }
 
     #[test]
