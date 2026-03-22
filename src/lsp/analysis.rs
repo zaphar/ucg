@@ -268,6 +268,15 @@ pub fn analyze(
         }
     }
 
+    // Post-process token_types: resolve any unresolved imports so that hovering
+    // on import bindings inside module/func bodies shows the exported fields.
+    let resolved_token_types: HashMap<(usize, usize), Shape> = result
+        .token_types
+        .into_iter()
+        .map(|(pos, shape)| (pos, resolve_imports_in_shape(shape, working_dir, resolved)))
+        .collect();
+    result.token_types = resolved_token_types;
+
     result.ast = Some(ast);
     result
 }
@@ -767,5 +776,31 @@ mod test {
         } else {
             panic!("expected Module shape, got {:?}", shape);
         }
+    }
+
+    #[test]
+    fn test_token_types_import_inside_module_body_resolves() {
+        // Hovering on an import binding INSIDE a module body should show resolved fields,
+        // not "import(path)". This requires post-processing of token_types.
+        let import_path = std::path::PathBuf::from("/tmp/innerlib.ucg");
+        let mut resolved: HashMap<std::path::PathBuf, AnalysisResult> = HashMap::new();
+        let imported = super::analyze("let answer = 42;", None, &HashMap::new());
+        resolved.insert(import_path.clone(), imported);
+
+        let result = super::analyze(
+            r#"let m = module {} => { let lib = import "/tmp/innerlib.ucg"; };"#,
+            None,
+            &resolved,
+        );
+        // Find the token_types entry for `lib` — its shape should be Resolved.
+        let lib_entry = result
+            .token_types
+            .values()
+            .find(|s| matches!(s, Shape::Import(ImportShape::Resolved(_, _))));
+        assert!(
+            lib_entry.is_some(),
+            "lib in token_types should be Resolved; got: {:?}",
+            result.token_types.values().collect::<Vec<_>>()
+        );
     }
 }

@@ -733,7 +733,7 @@ fn format_shape(shape: &crate::ast::Shape) -> String {
                 .iter()
                 .map(|(name, shape)| format!("{}: {}", name.val, format_shape(shape)))
                 .collect();
-            format!("{{{}}}", parts.join(", "))
+            format!("import {{{}}}", parts.join(", "))
         }
         Shape::Import(crate::ast::ImportShape::Unresolved(pi)) => {
             format!("import(\"{}\")", pi.val)
