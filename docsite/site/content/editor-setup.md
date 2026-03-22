@@ -35,48 +35,10 @@ indexes all non-test `.ucg` files under that root.
 
 ## Neovim
 
-The recommended approach for Neovim is to use
-[nvim-lspconfig](https://github.com/neovim/nvim-lspconfig) together with
-the built-in `vim.lsp` client.
-
-### With nvim-lspconfig (custom server entry)
-
-`nvim-lspconfig` does not (yet) include a built-in UCG configuration, so
-add a custom server entry in your Neovim config:
-
-```lua
-local lspconfig = require('lspconfig')
-local configs   = require('lspconfig.configs')
-
--- Register the UCG language server if it hasn't been registered yet.
-if not configs.ucg then
-  configs.ucg = {
-    default_config = {
-      cmd        = { 'ucg', 'lsp' },
-      filetypes  = { 'ucg' },
-      root_dir   = lspconfig.util.root_pattern('.git', 'Cargo.toml'),
-      single_file_support = true,
-      settings   = {},
-    },
-  }
-end
-
-lspconfig.ucg.setup({
-  -- Optional: override capabilities to enable semantic tokens.
-  capabilities = require('cmp_nvim_lsp').default_capabilities(),
-  on_attach = function(client, bufnr)
-    local opts = { buffer = bufnr }
-    vim.keymap.set('n', 'gd', vim.lsp.buf.definition,      opts)
-    vim.keymap.set('n', 'K',  vim.lsp.buf.hover,           opts)
-    vim.keymap.set('n', 'gs', vim.lsp.buf.workspace_symbol, opts)
-  end,
-})
-```
-
 ### Filetype detection
 
 Neovim does not recognize `.ucg` files by default.  Add this to your
-config so that Neovim sets the filetype correctly:
+config before any LSP setup so that Neovim sets the filetype correctly:
 
 ```lua
 vim.filetype.add({
@@ -91,20 +53,51 @@ Or, if you prefer a `ftdetect` file, create
 au BufRead,BufNewFile *.ucg set filetype=ucg
 ```
 
-### Standalone (no plugin manager)
+### Neovim 0.11+ (native, no plugins required)
 
-If you prefer not to use `nvim-lspconfig` you can configure the client
-directly:
+Neovim 0.11 introduced `vim.lsp.config` and `vim.lsp.enable` as the
+preferred way to register language servers without any plugins:
 
 ```lua
-vim.api.nvim_create_autocmd('FileType', {
-  pattern = 'ucg',
-  callback = function(ev)
-    vim.lsp.start({
-      name    = 'ucg',
-      cmd     = { 'ucg', 'lsp' },
-      root_dir = vim.fs.root(ev.buf, { '.git', 'Cargo.toml' }),
-    })
+vim.lsp.config('ucg', {
+  cmd          = { 'ucg', 'lsp' },
+  filetypes    = { 'ucg' },
+  root_markers = { '.git', 'Cargo.toml' },
+})
+
+vim.lsp.enable('ucg')
+```
+
+Place this in your `init.lua` (after the filetype detection above).
+No autocmd or `vim.lsp.start` call is needed.
+
+### Neovim 0.10 and earlier (nvim-lspconfig)
+
+For older Neovim versions use
+[nvim-lspconfig](https://github.com/neovim/nvim-lspconfig).
+UCG does not yet have a built-in entry there, so register a custom server:
+
+```lua
+local lspconfig = require('lspconfig')
+local configs   = require('lspconfig.configs')
+
+if not configs.ucg then
+  configs.ucg = {
+    default_config = {
+      cmd        = { 'ucg', 'lsp' },
+      filetypes  = { 'ucg' },
+      root_dir   = lspconfig.util.root_pattern('.git', 'Cargo.toml'),
+      single_file_support = true,
+    },
+  }
+end
+
+lspconfig.ucg.setup({
+  on_attach = function(client, bufnr)
+    local opts = { buffer = bufnr }
+    vim.keymap.set('n', 'gd', vim.lsp.buf.definition,       opts)
+    vim.keymap.set('n', 'K',  vim.lsp.buf.hover,            opts)
+    vim.keymap.set('n', 'gs', vim.lsp.buf.workspace_symbol, opts)
   end,
 })
 ```
@@ -114,11 +107,16 @@ vim.api.nvim_create_autocmd('FileType', {
 Semantic token support is enabled automatically when the LSP client
 advertises the capability.  In Neovim 0.9+ the built-in LSP client does
 this by default.  If highlights appear missing, check that
-`vim.lsp.semantic_tokens` is active:
+`semanticTokensProvider` was received:
 
 ```lua
--- Inside on_attach:
-print(vim.inspect(client.server_capabilities.semanticTokensProvider))
+-- Inside on_attach (lspconfig) or after vim.lsp.enable:
+vim.api.nvim_create_autocmd('LspAttach', {
+  callback = function(ev)
+    local client = vim.lsp.get_client_by_id(ev.data.client_id)
+    print(vim.inspect(client.server_capabilities.semanticTokensProvider))
+  end,
+})
 ```
 
 You can customize the highlight groups that Neovim maps to semantic token

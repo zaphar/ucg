@@ -17,7 +17,20 @@ FEATURES:
                       operator, and namespace (import) classification
                       for richer editor highlighting.
 
-NEOVIM (nvim-lspconfig):
+NEOVIM 0.11+ (native, no plugins):
+
+    -- Filetype detection (add before LSP setup):
+    vim.filetype.add({ extension = { ucg = 'ucg' } })
+
+    -- LSP registration:
+    vim.lsp.config('ucg', {
+      cmd          = { 'ucg', 'lsp' },
+      filetypes    = { 'ucg' },
+      root_markers = { '.git', 'Cargo.toml' },
+    })
+    vim.lsp.enable('ucg')
+
+NEOVIM 0.10 AND EARLIER (nvim-lspconfig):
 
     local lspconfig = require('lspconfig')
     local configs   = require('lspconfig.configs')
@@ -36,19 +49,6 @@ NEOVIM (nvim-lspconfig):
 
     -- Filetype detection (.ucg files are not recognized by default):
     vim.filetype.add({ extension = { ucg = 'ucg' } })
-
-NEOVIM (built-in client, no plugin):
-
-    vim.api.nvim_create_autocmd('FileType', {
-      pattern = 'ucg',
-      callback = function(ev)
-        vim.lsp.start({
-          name     = 'ucg',
-          cmd      = { 'ucg', 'lsp' },
-          root_dir = vim.fs.root(ev.buf, { '.git', 'Cargo.toml' }),
-        })
-      end,
-    })
 
 EMACS (Eglot, built into Emacs 29+):
 
