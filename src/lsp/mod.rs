@@ -355,6 +355,11 @@ fn cursor_in_string(doc: &AnalysisResult, line: u32, character: u32) -> Option<S
 }
 
 fn find_hover(doc: &AnalysisResult, line: u32, character: u32) -> Option<Hover> {
+    // 0. Dot-expression field hover (e.g. `lists.len`, `a.b.c`).
+    if let Some(hover) = find_hover_dot_expr(doc, line, character) {
+        return Some(hover);
+    }
+
     let target_line = (line + 1) as usize;
     let target_col = (character + 1) as usize;
 
@@ -444,6 +449,113 @@ fn find_dot_context(doc: &AnalysisResult, line: u32, character: u32) -> Option<(
         import_tok.fragment.clone(),
         doc.tokens[idx].fragment.clone(),
     ))
+}
+
+/// Walk backwards from the cursor token through `.`-separated BAREWORDs and
+/// return `(path, root_token_pos)` where `path` is the full dot chain from root
+/// to cursor (e.g. `["a","b","c"]` for cursor on `c` in `a.b.c`) and
+/// `root_token_pos` is the `(line, col)` key of the root token in the token stream.
+/// Returns `None` if the cursor isn't part of a dot expression (path length < 2).
+fn collect_dot_path(
+    doc: &AnalysisResult,
+    line: u32,
+    character: u32,
+) -> Option<(Vec<Rc<str>>, (usize, usize))> {
+    use crate::ast::TokenType;
+    let target_line = (line + 1) as usize;
+    let target_col = (character + 1) as usize;
+    let idx = doc.tokens.iter().position(|tok| {
+        tok.pos.line == target_line
+            && tok.pos.column <= target_col
+            && target_col < tok.pos.column + tok.fragment.len()
+    })?;
+    if doc.tokens[idx].typ != TokenType::BAREWORD {
+        return None;
+    }
+    let mut path = vec![doc.tokens[idx].fragment.clone()];
+    let mut i = idx;
+    while i >= 2 {
+        let dot = &doc.tokens[i - 1];
+        if dot.typ != TokenType::PUNCT || dot.fragment.as_ref() != "." {
+            break;
+        }
+        let prev = &doc.tokens[i - 2];
+        if prev.typ != TokenType::BAREWORD {
+            break;
+        }
+        path.push(prev.fragment.clone());
+        i -= 2;
+    }
+    path.reverse();
+    if path.len() < 2 {
+        return None;
+    }
+    // `i` now points at the root token's index.
+    let root_tok = &doc.tokens[i];
+    Some((path, (root_tok.pos.line, root_tok.pos.column)))
+}
+
+/// Given a shape, look up a named field and return its shape.
+/// Handles `Tuple`, resolved `Import`, and `Module` (by descending into the return type).
+fn lookup_field_in_shape(shape: &crate::ast::Shape, field: &str) -> Option<crate::ast::Shape> {
+    use crate::ast::{ImportShape, Shape};
+    match shape {
+        Shape::Tuple(pi) => pi
+            .val
+            .iter()
+            .find(|(name_pi, _)| name_pi.val.as_ref() == field)
+            .map(|(_, s)| s.clone()),
+        Shape::Import(ImportShape::Resolved(_, fields)) => fields
+            .iter()
+            .find(|(name_pi, _)| name_pi.val.as_ref() == field)
+            .map(|(_, s)| s.clone()),
+        // A module's fields are its return type (what you get after calling it).
+        Shape::Module(mdef) => lookup_field_in_shape(mdef.ret(), field),
+        _ => None,
+    }
+}
+
+/// Build a hover response for a dot-expression field access (e.g. cursor on
+/// `len` in `lists.len`, or on `c` in `a.b.c`).
+fn find_hover_dot_expr(doc: &AnalysisResult, line: u32, character: u32) -> Option<Hover> {
+    let (path, root_pos) = collect_dot_path(doc, line, character)?;
+
+    // Resolve root shape: prefer position-keyed map (inner scopes) over symbol table.
+    let root_name = &path[0];
+    let root_shape = doc
+        .token_types
+        .get(&root_pos)
+        .cloned()
+        .or_else(|| doc.symbol_table.get(root_name).map(|(s, _)| s.clone()))?;
+
+    // Walk the shape through each field segment.
+    let mut current = root_shape;
+    for field in &path[1..] {
+        current = lookup_field_in_shape(&current, field)?;
+    }
+
+    // Find the cursor token for the hover range.
+    let target_line = (line + 1) as usize;
+    let target_col = (character + 1) as usize;
+    let tok = doc.tokens.iter().find(|tok| {
+        tok.pos.line == target_line
+            && tok.pos.column <= target_col
+            && target_col < tok.pos.column + tok.fragment.len()
+    })?;
+
+    let full_path = path.iter().map(|s| s.as_ref()).collect::<Vec<_>>().join(".");
+    let contents = format!(
+        "**type**: {}\n\n**path**: `{}`",
+        hover_type_display(&current),
+        full_path,
+    );
+    Some(Hover {
+        contents: HoverContents::Markup(MarkupContent {
+            kind: MarkupKind::Markdown,
+            value: contents,
+        }),
+        range: Some(ucg_pos_to_range(&tok.pos)),
+    })
 }
 
 fn find_definition(
@@ -1378,6 +1490,63 @@ mod test {
         } else {
             panic!("expected Markup hover");
         }
+    }
+
+    // --- find_hover_dot_expr ---
+
+    #[test]
+    fn test_find_hover_dot_expr_one_level() {
+        // `lib.foo` — cursor on `foo` → should show Int
+        let import_path = PathBuf::from("/tmp/mylib.ucg");
+        let mut resolved = std::collections::HashMap::new();
+        let imported =
+            analysis::analyze("let foo = 1;", None, &std::collections::HashMap::new());
+        resolved.insert(import_path.clone(), imported);
+        let src = r#"let lib = import "/tmp/mylib.ucg"; let x = lib.foo;"#;
+        // `foo` starts at col 47 (0-based)
+        let doc = analysis::analyze(src, None, &resolved);
+        let hover = find_hover(&doc, 0, 47);
+        assert!(hover.is_some(), "expected hover on dot field");
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("Int"), "got: {}", mc.value);
+            assert!(mc.value.contains("lib.foo"), "got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
+    #[test]
+    fn test_find_hover_dot_expr_two_levels() {
+        // `t.inner.y` — cursor on `y` → should show Str
+        let src = "let t = {inner = {y = \"hi\"}};  let z = t.inner.y;";
+        // `y` is at the end: "t.inner.y" starts at col 40 for `t`, `.inner` at 41, `.y` at 47
+        // Let's compute: "let z = t.inner.y;" starts at col 31
+        // t=31+8=39 (0-based), '.inner' is 39+1=40, 'y'=40+5+1=46 for `.y`
+        // Actually let's just search
+        let doc = analysis::analyze(src, None, &std::collections::HashMap::new());
+        // Find the position of the last `y` token
+        let y_col = src.rfind('y').unwrap() as u32;
+        let hover = find_hover(&doc, 0, y_col);
+        assert!(hover.is_some(), "expected hover on nested dot field");
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("Str"), "got: {}", mc.value);
+            assert!(mc.value.contains("t.inner.y"), "got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
+    #[test]
+    fn test_find_hover_dot_expr_missing_field_falls_through() {
+        // `t.missing` — cursor on `missing` → dot hover returns None, falls through to symbol_table
+        // Since `missing` is not a key there either, hover should be None.
+        let src = "let t = {x = 1}; let z = t.missing;";
+        let doc = analysis::analyze(src, None, &std::collections::HashMap::new());
+        let missing_col = src.find("missing").unwrap() as u32;
+        let hover = find_hover(&doc, 0, missing_col);
+        // `missing` is not in the tuple shape → dot hover fails
+        // `missing` is not in symbol_table either → overall None
+        assert!(hover.is_none());
     }
 
     // --- shape_to_symbol_kind ---
