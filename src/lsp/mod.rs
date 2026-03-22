@@ -666,8 +666,29 @@ fn format_shape(shape: &crate::ast::Shape) -> String {
         Shape::Int(_) => "Int".to_string(),
         Shape::Float(_) => "Float".to_string(),
         Shape::Str(_) => "Str".to_string(),
-        Shape::Tuple(_) => "Tuple".to_string(),
-        Shape::List(_) => "List".to_string(),
+        Shape::Tuple(pi) => {
+            let fields: Vec<String> = pi
+                .val
+                .iter()
+                .map(|(name, shape)| format!("{}: {}", name.val, format_shape(shape)))
+                .collect();
+            format!("{{{}}}", fields.join(", "))
+        }
+        Shape::List(ns) => {
+            use crate::ast::NarrowingShape;
+            match &ns.types {
+                NarrowingShape::Any => "[any]".to_string(),
+                NarrowingShape::Narrowed(types) => {
+                    let mut seen = std::collections::HashSet::new();
+                    let inner: Vec<String> = types
+                        .iter()
+                        .map(format_shape)
+                        .filter(|s| seen.insert(s.clone()))
+                        .collect();
+                    format!("[{}]", inner.join(" | "))
+                }
+            }
+        }
         Shape::Func(_) => "Func".to_string(),
         Shape::Module(mdef) => format!("Module => {}", format_shape(mdef.ret())),
         Shape::Hole(pi) => format!("?({})", pi.val),
@@ -827,6 +848,32 @@ mod test {
         if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
             assert!(mc.value.contains("Int"), "hover should mention type Int");
             assert!(mc.value.contains('x'), "hover should mention binding name");
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
+    #[test]
+    fn test_find_hover_tuple_shows_fields() {
+        let doc = analyze("let t = {x = 1, y = \"hi\"};", None);
+        // hover on `t` at (0, 4)
+        let hover = find_hover(&doc, 0, 4);
+        assert!(hover.is_some());
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("{x: Int, y: Str}"), "got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
+    #[test]
+    fn test_find_hover_list_shows_element_type() {
+        let doc = analyze("let l = [1, 2, 3];", None);
+        // hover on `l` at (0, 4)
+        let hover = find_hover(&doc, 0, 4);
+        assert!(hover.is_some());
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("[Int]"), "got: {}", mc.value);
         } else {
             panic!("expected Markup hover");
         }
@@ -1045,6 +1092,43 @@ mod test {
         assert_eq!(format_shape(&Shape::Int(pos.clone())), "Int");
         assert_eq!(format_shape(&Shape::Float(pos.clone())), "Float");
         assert_eq!(format_shape(&Shape::Str(pos.clone())), "Str");
+    }
+
+    #[test]
+    fn test_format_shape_list_uniform() {
+        let doc = analyze("let l = [1, 2, 3];", None);
+        let (shape, _) = doc.symbol_table.get(&Rc::from("l")).unwrap();
+        assert_eq!(format_shape(shape), "[Int]");
+    }
+
+    #[test]
+    fn test_format_shape_list_of_tuples() {
+        let doc = analyze("let l = [{x = 1, y = 2}, {x = 3, y = 4}];", None);
+        let (shape, _) = doc.symbol_table.get(&Rc::from("l")).unwrap();
+        assert_eq!(format_shape(shape), "[{x: Int, y: Int}]");
+    }
+
+    #[test]
+    fn test_format_shape_list_mixed() {
+        let doc = analyze("let l = [1, \"hi\"];", None);
+        let (shape, _) = doc.symbol_table.get(&Rc::from("l")).unwrap();
+        assert_eq!(format_shape(shape), "[Int | Str]");
+    }
+
+    #[test]
+    fn test_format_shape_tuple_shows_fields() {
+        let doc = analyze("let t = {x = 1, y = \"hi\"};", None);
+        let (shape, _) = doc.symbol_table.get(&Rc::from("t")).unwrap();
+        let s = format_shape(shape);
+        assert_eq!(s, "{x: Int, y: Str}");
+    }
+
+    #[test]
+    fn test_format_shape_nested_tuple() {
+        let doc = analyze("let t = {inner = {a = 1.0}};", None);
+        let (shape, _) = doc.symbol_table.get(&Rc::from("t")).unwrap();
+        let s = format_shape(shape);
+        assert_eq!(s, "{inner: {a: Float}}");
     }
 
     #[test]
