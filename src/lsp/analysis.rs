@@ -102,6 +102,48 @@ fn collect_shape_errors(shape: &Shape, diagnostics: &mut Vec<Diagnostic>) {
     }
 }
 
+/// Recursively walk `shape` and replace any `ImportShape::Unresolved` with
+/// `ImportShape::Resolved` using the workspace cache `resolved`.
+/// This fixes imports that appear nested inside module return types (or tuples),
+/// where `derive_shape` cannot access the LSP workspace cache.
+fn resolve_imports_in_shape(
+    shape: Shape,
+    working_dir: Option<&Path>,
+    resolved: &HashMap<PathBuf, AnalysisResult>,
+) -> Shape {
+    match shape {
+        Shape::Import(ImportShape::Unresolved(ref pi)) => {
+            let import_path = working_dir
+                .map(|d| d.join(pi.val.as_ref()))
+                .unwrap_or_else(|| PathBuf::from(pi.val.as_ref()));
+            if let Some(imported) = resolved.get(&import_path) {
+                let tuple_items: crate::ast::TupleShape = imported
+                    .symbol_table
+                    .iter()
+                    .map(|(n, (s, p))| (PositionedItem::new(n.clone(), p.clone()), s.clone()))
+                    .collect();
+                Shape::Import(ImportShape::Resolved(pi.pos.clone(), tuple_items))
+            } else {
+                shape
+            }
+        }
+        Shape::Tuple(pi) => {
+            let new_val = pi
+                .val
+                .into_iter()
+                .map(|(name, s)| (name, resolve_imports_in_shape(s, working_dir, resolved)))
+                .collect();
+            Shape::Tuple(PositionedItem::new(new_val, pi.pos))
+        }
+        Shape::Module(mshape) => {
+            let new_ret =
+                resolve_imports_in_shape(mshape.ret().clone(), working_dir, resolved);
+            Shape::Module(mshape.with_ret(new_ret))
+        }
+        _ => shape,
+    }
+}
+
 /// Analyze a UCG document given its text content.
 ///
 /// `working_dir` is the directory containing the document — used to resolve
@@ -201,6 +243,14 @@ pub fn analyze(
                         .insert(name.clone(), (resolved_shape.clone(), def.name.pos.clone()));
                     sym_map.insert(name.clone(), resolved_shape);
                 }
+            }
+
+            // Resolve any unresolved imports that are nested inside the shape
+            // (e.g., import bindings inside a module return type).
+            if let Some((shape, pos)) = result.symbol_table.get(&name).map(|(s, p)| (s.clone(), p.clone())) {
+                let fully_resolved = resolve_imports_in_shape(shape, working_dir, resolved);
+                result.symbol_table.insert(name.clone(), (fully_resolved.clone(), pos));
+                sym_map.insert(name.clone(), fully_resolved);
             }
 
             // Collect scoped names (func/module args, inner lets, tuple fields) into
@@ -684,5 +734,38 @@ mod test {
             "func args should not populate path_map, got: {:?}",
             result.path_map
         );
+    }
+
+    #[test]
+    fn test_analyze_import_inside_module_body_resolves_from_cache() {
+        // Imports inside module bodies should be resolved from the workspace cache.
+        let import_path = std::path::PathBuf::from("/tmp/libmod.ucg");
+        let mut resolved: HashMap<std::path::PathBuf, AnalysisResult> = HashMap::new();
+        let imported = super::analyze("let val = 42;", None, &HashMap::new());
+        resolved.insert(import_path.clone(), imported);
+
+        let result = super::analyze(
+            r#"let m = module {} => { let lib = import "/tmp/libmod.ucg"; };"#,
+            None,
+            &resolved,
+        );
+        let (shape, _) = result.symbol_table.get(&Rc::from("m")).unwrap();
+        // The module return type should be a Tuple containing a Resolved import for 'lib'.
+        if let Shape::Module(mshape) = shape {
+            if let Shape::Tuple(pi) = mshape.ret() {
+                let lib_shape = pi.val.iter().find(|(n, _)| n.val.as_ref() == "lib");
+                assert!(lib_shape.is_some(), "lib field should be in module return tuple");
+                let (_, lib_s) = lib_shape.unwrap();
+                assert!(
+                    matches!(lib_s, Shape::Import(ImportShape::Resolved(_, _))),
+                    "lib should be Resolved, got {:?}",
+                    lib_s
+                );
+            } else {
+                panic!("expected Module return to be Tuple, got {:?}", mshape.ret());
+            }
+        } else {
+            panic!("expected Module shape, got {:?}", shape);
+        }
     }
 }

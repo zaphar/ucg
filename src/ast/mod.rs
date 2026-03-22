@@ -268,6 +268,14 @@ impl ModuleShape {
     pub fn ret(&self) -> &Shape {
         &self.ret
     }
+
+    /// Return a new `ModuleShape` with a different return type.
+    pub fn with_ret(self, ret: Shape) -> Self {
+        ModuleShape {
+            items: self.items,
+            ret: Box::new(ret),
+        }
+    }
 }
 
 #[doc = "Value types represent the Values that UCG can have."]
