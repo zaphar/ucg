@@ -384,8 +384,8 @@ fn find_hover(doc: &AnalysisResult, line: u32, character: u32) -> Option<Hover> 
             "binding"
         };
         let contents = format!(
-            "**type**: `{}`\n\n**{}**: `{}`\n\n*defined at line {}, col {}*",
-            format_shape(shape),
+            "**type**: {}\n\n**{}**: `{}`\n\n*defined at line {}, col {}*",
+            hover_type_display(shape),
             label_kind,
             label,
             def_pos.line,
@@ -403,8 +403,8 @@ fn find_hover(doc: &AnalysisResult, line: u32, character: u32) -> Option<Hover> 
     // 2. Fall back to the top-level symbol table (name-keyed).
     let (shape, def_pos) = doc.symbol_table.get(&name)?;
     let contents = format!(
-        "**type**: `{}`\n\n**binding**: `{}`\n\n*defined at line {}, col {}*",
-        format_shape(shape),
+        "**type**: {}\n\n**binding**: `{}`\n\n*defined at line {}, col {}*",
+        hover_type_display(shape),
         name,
         def_pos.line,
         def_pos.column
@@ -742,6 +742,77 @@ fn format_shape(shape: &crate::ast::Shape) -> String {
     }
 }
 
+/// Indented pretty-printer for shapes (used in hover).
+/// `indent` is the current nesting level (0 = top-level).
+fn format_shape_pretty(shape: &crate::ast::Shape, indent: usize) -> String {
+    use crate::ast::Shape;
+    let pad = "  ".repeat(indent);
+    let inner = "  ".repeat(indent + 1);
+    match shape {
+        Shape::Tuple(pi) => {
+            if pi.val.is_empty() {
+                return "{}".to_string();
+            }
+            let fields: Vec<String> = pi
+                .val
+                .iter()
+                .map(|(name, s)| {
+                    format!("{}{}: {}", inner, name.val, format_shape_pretty(s, indent + 1))
+                })
+                .collect();
+            format!("{{\n{}\n{}}}", fields.join(",\n"), pad)
+        }
+        Shape::Func(fdef) => {
+            let args: Vec<String> = fdef
+                .arg_order
+                .iter()
+                .map(|name| {
+                    let ty = fdef
+                        .args()
+                        .get(name)
+                        .map(|s| format_shape_pretty(s, indent))
+                        .unwrap_or_else(|| "?".to_string());
+                    format!("{}: {}", name, ty)
+                })
+                .collect();
+            format!(
+                "func({}) => {}",
+                args.join(", "),
+                format_shape_pretty(fdef.ret(), indent)
+            )
+        }
+        Shape::Module(mdef) => {
+            format!("Module => {}", format_shape_pretty(mdef.ret(), indent))
+        }
+        Shape::Import(crate::ast::ImportShape::Resolved(_, fields)) => {
+            if fields.is_empty() {
+                return "import {}".to_string();
+            }
+            let parts: Vec<String> = fields
+                .iter()
+                .map(|(name, s)| {
+                    format!("{}{}: {}", inner, name.val, format_shape_pretty(s, indent + 1))
+                })
+                .collect();
+            format!("import {{\n{}\n{}}}", parts.join(",\n"), pad)
+        }
+        // For scalar/simple shapes fall back to compact formatter.
+        other => format_shape(other),
+    }
+}
+
+/// Renders a shape for use in a hover response.
+/// Returns an inline code span for simple (single-line) types,
+/// or a fenced code block for multi-line types.
+fn hover_type_display(shape: &crate::ast::Shape) -> String {
+    let s = format_shape_pretty(shape, 0);
+    if s.contains('\n') {
+        format!("```\n{}\n```", s)
+    } else {
+        format!("`{}`", s)
+    }
+}
+
 /// Convert a file-system path to an LSP `Url`, returning the original on failure.
 fn _path_to_uri(path: &std::path::Path) -> Option<Url> {
     Url::from_file_path(path).ok()
@@ -908,7 +979,8 @@ mod test {
         let hover = find_hover(&doc, 0, 4);
         assert!(hover.is_some());
         if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
-            assert!(mc.value.contains("{x: Int, y: Str}"), "got: {}", mc.value);
+            assert!(mc.value.contains("x: Int"), "got: {}", mc.value);
+            assert!(mc.value.contains("y: Str"), "got: {}", mc.value);
         } else {
             panic!("expected Markup hover");
         }
