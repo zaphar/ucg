@@ -273,7 +273,11 @@ fn infer_func_type_test() {
     .into();
     assert_type_success!(
         "func(foo) => foo + 1;",
-        Shape::Func(FuncShapeDef { args, ret })
+        Shape::Func(FuncShapeDef {
+            args,
+            arg_order: vec![foo.clone()],
+            ret,
+        })
     );
     let mut symbol_table = BTreeMap::new();
     symbol_table.insert(
@@ -299,6 +303,7 @@ fn infer_func_type_test() {
         "func(foo) => foo + bar;",
         Shape::Func(FuncShapeDef {
             args: args,
+            arg_order: vec![foo.clone()],
             ret: Shape::Int(Position {
                 file: None,
                 line: 1,
@@ -756,6 +761,21 @@ fn test_call_wrong_arity() {
 }
 
 #[test]
+fn test_call_wrong_arg_type() {
+    // Calling a constrained function with a wrong-type argument should produce a type error.
+    assert_type_err!("let f = func(x :: 0) => x + 1; let y = f(\"hello\");");
+}
+
+#[test]
+fn test_call_correct_arg_type() {
+    // Calling a constrained function with the correct type should succeed.
+    assert_type_success!(
+        "let f = func(x :: 0) => x + 1; let y = f(2);",
+        Shape::Int(Position::new(1, 9, 8))
+    );
+}
+
+#[test]
 fn test_func_narrowing() {
     // Two functions with same arity and compatible types can narrow
     let mut symbol_table = BTreeMap::new();
@@ -1048,7 +1068,11 @@ fn test_func_arg_constraint() {
     let ret = Box::new(Shape::Int(Position::new(1, 1, 0)));
     assert_type_success!(
         "func(x :: 0) => x + 1;",
-        Shape::Func(FuncShapeDef { args, ret })
+        Shape::Func(FuncShapeDef {
+            args,
+            arg_order: vec!["x".into()],
+            ret,
+        })
     );
 }
 

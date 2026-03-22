@@ -58,6 +58,8 @@ impl DeriveShape for FuncDef {
         let shape = self.fields.derive_shape(&mut sym_table);
         // 3. Finally determine what the return shape can be.
         // only include the closed over shapes.
+        // Capture declaration order before collecting into BTreeMap (which sorts alphabetically).
+        let arg_order: Vec<Rc<str>> = self.argdefs.iter().map(|(sym, _)| sym.val.clone()).collect();
         let table = self
             .argdefs
             .iter()
@@ -74,6 +76,7 @@ impl DeriveShape for FuncDef {
             .collect::<BTreeMap<Rc<str>, Shape>>();
         Shape::Func(FuncShapeDef {
             args: table,
+            arg_order,
             ret: shape.with_pos(self.pos.clone()).into(),
         })
     }
@@ -349,12 +352,17 @@ fn derive_call_shape(def: &CallDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>)
                     ),
                 );
             }
-            // Derive arg shapes for side effects (symbol narrowing)
-            // Note: We don't check arg types against the function's declared arg types
-            // because FuncShapeDef.args is a BTreeMap (alphabetical order) while call
-            // args are positional. The function body already constrains types internally.
-            for arg_expr in def.arglist.iter() {
-                arg_expr.derive_shape(symbol_table);
+            // Check each positional argument against its declared type.
+            // arg_order preserves declaration order so we can zip with the positional arglist.
+            for (arg_name, arg_expr) in fdef.arg_order.iter().zip(def.arglist.iter()) {
+                let actual_shape = arg_expr.derive_shape(symbol_table);
+                if let Some(declared_shape) = fdef.args.get(arg_name) {
+                    if let Shape::TypeErr(pos, msg) =
+                        declared_shape.narrow(&actual_shape, symbol_table)
+                    {
+                        return Shape::TypeErr(pos, msg);
+                    }
+                }
             }
             // Return the function's return type
             fdef.ret.as_ref().clone()

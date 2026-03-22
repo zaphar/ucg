@@ -231,6 +231,9 @@ pub type ShapeList = Vec<Shape>;
 #[derive(PartialEq, Debug, Clone)]
 pub struct FuncShapeDef {
     args: BTreeMap<Rc<str>, Shape>,
+    /// Argument names in declaration order. Enables positional callsite type checking
+    /// (BTreeMap alone stores names alphabetically, losing declaration order).
+    pub arg_order: Vec<Rc<str>>,
     ret: Box<Shape>,
 }
 
@@ -617,15 +620,21 @@ impl Shape {
                         ),
                     );
                 }
-                let left_args: Vec<&Shape> = left_opshape.args.values().collect();
-                let right_args: Vec<&Shape> = right_opshape.args.values().collect();
-                for idx in 0..left_args.len() {
-                    let narrowed = left_args[idx].narrow(right_args[idx], symbol_table);
-                    if let Shape::TypeErr(_, _) = narrowed {
-                        return Shape::TypeErr(
-                            right.pos().clone(),
-                            "Incompatible function argument types".to_owned(),
-                        );
+                // Use arg_order for both sides to compare in declaration order.
+                for (left_name, right_name) in
+                    left_opshape.arg_order.iter().zip(right_opshape.arg_order.iter())
+                {
+                    if let (Some(ls), Some(rs)) = (
+                        left_opshape.args.get(left_name),
+                        right_opshape.args.get(right_name),
+                    ) {
+                        let narrowed = ls.narrow(rs, symbol_table);
+                        if let Shape::TypeErr(_, _) = narrowed {
+                            return Shape::TypeErr(
+                                right.pos().clone(),
+                                "Incompatible function argument types".to_owned(),
+                            );
+                        }
                     }
                 }
                 let ret_narrowed = left_opshape.ret.narrow(&right_opshape.ret, symbol_table);
