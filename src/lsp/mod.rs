@@ -231,7 +231,7 @@ fn handle_request(
         let hover = state
             .documents
             .get(uri)
-            .and_then(|doc| find_hover(doc, pos.line, pos.character));
+            .and_then(|doc| find_hover(doc, &state.workspace, pos.line, pos.character));
         conn.sender
             .send(Message::Response(Response::new_ok(id, hover)))?;
     } else if req.method == GotoDefinition::METHOD {
@@ -354,9 +354,22 @@ fn cursor_in_string(doc: &AnalysisResult, line: u32, character: u32) -> Option<S
         .map(|tok| tok.fragment.to_string())
 }
 
-fn find_hover(doc: &AnalysisResult, line: u32, character: u32) -> Option<Hover> {
+/// Prepend an optional doc comment (in markdown) above `type_info`.
+fn prepend_doc(doc_str: Option<String>, type_info: String) -> String {
+    match doc_str {
+        Some(d) if !d.is_empty() => format!("{}\n\n{}", d, type_info),
+        _ => type_info,
+    }
+}
+
+fn find_hover(
+    doc: &AnalysisResult,
+    workspace: &WorkspaceIndex,
+    line: u32,
+    character: u32,
+) -> Option<Hover> {
     // 0. Dot-expression field hover (e.g. `lists.len`, `a.b.c`).
-    if let Some(hover) = find_hover_dot_expr(doc, line, character) {
+    if let Some(hover) = find_hover_dot_expr(doc, workspace, line, character) {
         return Some(hover);
     }
 
@@ -376,8 +389,6 @@ fn find_hover(doc: &AnalysisResult, line: u32, character: u32) -> Option<Hover> 
     //    inner let bindings, and tuple field names without name-collision risk.
     if let Some(shape) = doc.token_types.get(&(tok.pos.line, tok.pos.column)) {
         let def_pos = shape.pos();
-        // Use the dotted path (e.g. "config.host") for tuple fields; fall back
-        // to the bare token name for func/module args and inner lets.
         let label = doc
             .path_map
             .get(&(tok.pos.line, tok.pos.column))
@@ -388,7 +399,8 @@ fn find_hover(doc: &AnalysisResult, line: u32, character: u32) -> Option<Hover> 
         } else {
             "binding"
         };
-        let contents = format!(
+        let doc_str = analysis::doc_comment_for_binding(&doc.comment_map, def_pos.line);
+        let type_info = format!(
             "**type**: {}\n\n**{}**: `{}`\n\n*defined at line {}, col {}*",
             hover_type_display(shape),
             label_kind,
@@ -399,7 +411,7 @@ fn find_hover(doc: &AnalysisResult, line: u32, character: u32) -> Option<Hover> 
         return Some(Hover {
             contents: HoverContents::Markup(MarkupContent {
                 kind: MarkupKind::Markdown,
-                value: contents,
+                value: prepend_doc(doc_str, type_info),
             }),
             range: Some(tok_range),
         });
@@ -407,7 +419,17 @@ fn find_hover(doc: &AnalysisResult, line: u32, character: u32) -> Option<Hover> 
 
     // 2. Fall back to the top-level symbol table (name-keyed).
     let (shape, def_pos) = doc.symbol_table.get(&name)?;
-    let contents = format!(
+    // For import bindings use the imported file's file-level doc comment;
+    // for regular bindings use the comment immediately above the definition.
+    let doc_str = if let crate::ast::Shape::Import(_) = shape {
+        doc.import_map
+            .get(&name)
+            .and_then(|p| workspace.get(p))
+            .and_then(|imported| imported.file_doc.clone())
+    } else {
+        analysis::doc_comment_for_binding(&doc.comment_map, def_pos.line)
+    };
+    let type_info = format!(
         "**type**: {}\n\n**binding**: `{}`\n\n*defined at line {}, col {}*",
         hover_type_display(shape),
         name,
@@ -417,7 +439,7 @@ fn find_hover(doc: &AnalysisResult, line: u32, character: u32) -> Option<Hover> 
     Some(Hover {
         contents: HoverContents::Markup(MarkupContent {
             kind: MarkupKind::Markdown,
-            value: contents,
+            value: prepend_doc(doc_str, type_info),
         }),
         range: Some(tok_range),
     })
@@ -517,7 +539,12 @@ fn lookup_field_in_shape(shape: &crate::ast::Shape, field: &str) -> Option<crate
 
 /// Build a hover response for a dot-expression field access (e.g. cursor on
 /// `len` in `lists.len`, or on `c` in `a.b.c`).
-fn find_hover_dot_expr(doc: &AnalysisResult, line: u32, character: u32) -> Option<Hover> {
+fn find_hover_dot_expr(
+    doc: &AnalysisResult,
+    workspace: &WorkspaceIndex,
+    line: u32,
+    character: u32,
+) -> Option<Hover> {
     let (path, root_pos) = collect_dot_path(doc, line, character)?;
 
     // Resolve root shape: prefer position-keyed map (inner scopes) over symbol table.
@@ -534,6 +561,20 @@ fn find_hover_dot_expr(doc: &AnalysisResult, line: u32, character: u32) -> Optio
         current = lookup_field_in_shape(&current, field)?;
     }
 
+    // Look up the doc comment for the field.  When the root is an import binding,
+    // the field definition lives in the imported file — look there.  Otherwise
+    // check the current document.
+    let doc_str = doc
+        .import_map
+        .get(root_name)
+        .and_then(|p| workspace.get(p))
+        .and_then(|imported| {
+            analysis::doc_comment_for_binding(&imported.comment_map, current.pos().line)
+        })
+        .or_else(|| {
+            analysis::doc_comment_for_binding(&doc.comment_map, current.pos().line)
+        });
+
     // Find the cursor token for the hover range.
     let target_line = (line + 1) as usize;
     let target_col = (character + 1) as usize;
@@ -544,7 +585,7 @@ fn find_hover_dot_expr(doc: &AnalysisResult, line: u32, character: u32) -> Optio
     })?;
 
     let full_path = path.iter().map(|s| s.as_ref()).collect::<Vec<_>>().join(".");
-    let contents = format!(
+    let type_info = format!(
         "**type**: {}\n\n**path**: `{}`",
         hover_type_display(&current),
         full_path,
@@ -552,7 +593,7 @@ fn find_hover_dot_expr(doc: &AnalysisResult, line: u32, character: u32) -> Optio
     Some(Hover {
         contents: HoverContents::Markup(MarkupContent {
             kind: MarkupKind::Markdown,
-            value: contents,
+            value: prepend_doc(doc_str, type_info),
         }),
         range: Some(ucg_pos_to_range(&tok.pos)),
     })
@@ -960,6 +1001,11 @@ mod test {
 
     fn empty_workspace() -> WorkspaceIndex {
         WorkspaceIndex::new(PathBuf::from("/"))
+    }
+
+    /// Test helper: find_hover with an empty workspace.
+    fn find_hover(doc: &analysis::AnalysisResult, line: u32, character: u32) -> Option<Hover> {
+        super::find_hover(doc, &empty_workspace(), line, character)
     }
 
     fn fake_uri() -> Url {
@@ -1547,6 +1593,105 @@ mod test {
         // `missing` is not in the tuple shape → dot hover fails
         // `missing` is not in symbol_table either → overall None
         assert!(hover.is_none());
+    }
+
+    // --- doc comments in hover ---
+
+    #[test]
+    fn test_hover_shows_binding_doc_comment() {
+        // Comment immediately above binding should appear in hover.
+        let src = "// Returns the answer.\nlet x = 42;";
+        let doc = analyze(src, None);
+        let hover = find_hover(&doc, 1, 4); // line 1 (0-based), col 4 = `x`
+        assert!(hover.is_some());
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("Returns the answer."), "got: {}", mc.value);
+            // Doc comment should appear before the type line.
+            let doc_pos = mc.value.find("Returns the answer.").unwrap();
+            let type_pos = mc.value.find("**type**").unwrap();
+            assert!(doc_pos < type_pos, "doc comment should precede type info");
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
+    #[test]
+    fn test_hover_no_doc_comment_when_blank_line_between() {
+        // A blank line between comment and binding disqualifies the comment.
+        let src = "// Unrelated comment.\n\nlet x = 42;";
+        let doc = analyze(src, None);
+        let hover = find_hover(&doc, 2, 4); // `x` on line 2 (0-based)
+        assert!(hover.is_some());
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(!mc.value.contains("Unrelated comment."), "got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
+    #[test]
+    fn test_hover_import_shows_file_doc() {
+        // Imported file has a file-level doc (2 blank lines before first binding).
+        let import_path = PathBuf::from("/tmp/mylib.ucg");
+        let mut resolved = std::collections::HashMap::new();
+        let imported = analysis::analyze(
+            "// Utilities for working with lists.\n// Use freely.\n\n\nlet foo = 1;",
+            None,
+            &std::collections::HashMap::new(),
+        );
+        resolved.insert(import_path.clone(), imported);
+        let mut ws = WorkspaceIndex::new(PathBuf::from("/tmp"));
+        ws.update_from_content(
+            &import_path,
+            "// Utilities for working with lists.\n// Use freely.\n\n\nlet foo = 1;",
+        );
+        let src = r#"let lib = import "/tmp/mylib.ucg";"#;
+        let doc = analysis::analyze(src, None, &resolved);
+        let hover = super::find_hover(&doc, &ws, 0, 4); // hover on `lib`
+        assert!(hover.is_some());
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("Utilities for working with lists."), "got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
+    #[test]
+    fn test_hover_import_no_file_doc_when_only_one_blank_line() {
+        // Only 1 blank line before first binding: not a file-level doc.
+        let import_path = PathBuf::from("/tmp/mylib.ucg");
+        let mut ws = WorkspaceIndex::new(PathBuf::from("/tmp"));
+        ws.update_from_content(
+            &import_path,
+            "// Not a file doc.\n\nlet foo = 1;",
+        );
+        let src = r#"let lib = import "/tmp/mylib.ucg";"#;
+        let doc = analysis::analyze(src, None, ws.resolved_files());
+        let hover = super::find_hover(&doc, &ws, 0, 4);
+        assert!(hover.is_some());
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(!mc.value.contains("Not a file doc."), "got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
+    #[test]
+    fn test_hover_dot_expr_shows_field_doc_comment() {
+        // `lib.foo` — `foo` has a doc comment in the imported file.
+        let import_path = PathBuf::from("/tmp/mylib.ucg");
+        let mut ws = WorkspaceIndex::new(PathBuf::from("/tmp"));
+        ws.update_from_content(&import_path, "// The answer.\nlet foo = 42;");
+        let src = r#"let lib = import "/tmp/mylib.ucg"; let x = lib.foo;"#;
+        let doc = analysis::analyze(src, None, ws.resolved_files());
+        let foo_col = src.rfind("foo").unwrap() as u32;
+        let hover = super::find_hover(&doc, &ws, 0, foo_col);
+        assert!(hover.is_some());
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("The answer."), "got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
     }
 
     // --- shape_to_symbol_kind ---

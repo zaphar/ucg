@@ -24,7 +24,7 @@ use crate::ast::{Expression, ImportShape, Position, PositionedItem, Shape, State
 use crate::error::{BuildError, ErrorType};
 use crate::iter::OffsetStrIter;
 use crate::parse::parse;
-use crate::tokenizer::tokenize;
+use crate::tokenizer::{tokenize, CommentMap};
 
 /// Results of analyzing a single UCG document in memory.
 pub struct AnalysisResult {
@@ -46,6 +46,11 @@ pub struct AnalysisResult {
     /// Only populated for field name tokens inside tuple literals; absent for
     /// function/module args and inner lets where the bare name is sufficient.
     pub path_map: HashMap<(usize, usize), Rc<str>>,
+    /// All comment groups in the document, keyed by the last comment line (1-based).
+    pub comment_map: CommentMap,
+    /// File-level doc comment: the first consecutive comment block in the file,
+    /// provided it is separated from the first binding by at least 2 blank lines.
+    pub file_doc: Option<String>,
 }
 
 impl AnalysisResult {
@@ -58,6 +63,8 @@ impl AnalysisResult {
             import_map: HashMap::new(),
             token_types: HashMap::new(),
             path_map: HashMap::new(),
+            comment_map: CommentMap::new(),
+            file_doc: None,
         }
     }
 }
@@ -144,6 +151,43 @@ fn resolve_imports_in_shape(
     }
 }
 
+/// Render a comment group as plain text, stripping the `//` marker.
+fn format_comment_group(group: &[crate::ast::Token]) -> String {
+    group
+        .iter()
+        .map(|tok| tok.fragment.trim().to_string())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Return the doc comment for a binding defined at `def_line` (1-based).
+/// The comment group must end on the line immediately above (`def_line - 1`);
+/// any blank line between comment and binding disqualifies it.
+pub fn doc_comment_for_binding(comment_map: &CommentMap, def_line: usize) -> Option<String> {
+    if def_line == 0 {
+        return None;
+    }
+    comment_map
+        .get(&(def_line - 1))
+        .map(|g| format_comment_group(g))
+}
+
+/// Return the file-level doc comment: all comment groups that appear before
+/// `first_code_line` and are separated from it by at least 2 blank lines
+/// (`first_code_line >= group_last_line + 3`).
+fn compute_file_doc(comment_map: &CommentMap, first_code_line: usize) -> Option<String> {
+    let groups: Vec<String> = comment_map
+        .iter()
+        .filter(|(&last_line, _)| last_line + 3 <= first_code_line)
+        .map(|(_, g)| format_comment_group(g))
+        .collect();
+    if groups.is_empty() {
+        None
+    } else {
+        Some(groups.join("\n"))
+    }
+}
+
 /// Analyze a UCG document given its text content.
 ///
 /// `working_dir` is the directory containing the document — used to resolve
@@ -159,8 +203,9 @@ pub fn analyze(
 ) -> AnalysisResult {
     let mut result = AnalysisResult::empty();
 
-    // --- Tokenize ---
-    let tokens = match tokenize(OffsetStrIter::new(content), None) {
+    // --- Tokenize (also capture comments) ---
+    let mut comment_map = CommentMap::new();
+    let tokens = match tokenize(OffsetStrIter::new(content), Some(&mut comment_map)) {
         Ok(toks) => toks,
         Err(e) => {
             result.diagnostics.push(build_error_to_diagnostic(&e));
@@ -168,6 +213,7 @@ pub fn analyze(
         }
     };
     result.tokens = tokens;
+    result.comment_map = comment_map;
 
     // --- Parse ---
     let ast = match parse(OffsetStrIter::new(content), None) {
@@ -203,6 +249,13 @@ pub fn analyze(
             (start, end)
         })
         .collect();
+
+    // Compute file-level doc comment using the 2-blank-line rule.
+    let first_code_line = let_stmts
+        .first()
+        .map(|def| def.name.pos.line)
+        .unwrap_or(usize::MAX);
+    result.file_doc = compute_file_doc(&result.comment_map, first_code_line);
 
     let mut sym_map: BTreeMap<Rc<str>, Shape> = BTreeMap::new();
     for (i, stmt) in ast.iter().enumerate() {
