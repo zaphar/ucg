@@ -20,7 +20,7 @@ use std::rc::Rc;
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position as LspPosition, Range};
 
 use crate::ast::typecheck::DeriveShape;
-use crate::ast::{Expression, Position, Shape, Statement, Token};
+use crate::ast::{Expression, ImportShape, Position, PositionedItem, Shape, Statement, Token};
 use crate::error::{BuildError, ErrorType};
 use crate::iter::OffsetStrIter;
 use crate::parse::parse;
@@ -105,7 +105,11 @@ fn collect_shape_errors(shape: &Shape, diagnostics: &mut Vec<Diagnostic>) {
 /// Runs the tokenizer, parser, and type checker leniently:
 /// errors at each stage are collected as LSP diagnostics rather than
 /// aborting analysis.
-pub fn analyze(content: &str, working_dir: Option<&Path>) -> AnalysisResult {
+pub fn analyze(
+    content: &str,
+    working_dir: Option<&Path>,
+    resolved: &HashMap<PathBuf, AnalysisResult>,
+) -> AnalysisResult {
     let mut result = AnalysisResult::empty();
 
     // --- Tokenize ---
@@ -164,15 +168,34 @@ pub fn analyze(content: &str, working_dir: Option<&Path>) -> AnalysisResult {
                 .insert(name.clone(), (shape.clone(), def.name.pos.clone()));
             sym_map.insert(name.clone(), shape.clone());
 
-            // Track import bindings for go-to-definition.
+            // Track import bindings for go-to-definition, and resolve the import
+            // shape from the pre-analyzed cache when available.
             if let Expression::Import(import_def) = &def.value {
                 let path_str = import_def.path.fragment.as_ref();
-                let resolved = if let Some(dir) = working_dir {
+                let import_path = if let Some(dir) = working_dir {
                     dir.join(path_str)
                 } else {
                     PathBuf::from(path_str)
                 };
-                result.import_map.insert(name, resolved);
+                result.import_map.insert(name.clone(), import_path.clone());
+
+                if let Some(imported) = resolved.get(&import_path) {
+                    let tuple_items: crate::ast::TupleShape = imported
+                        .symbol_table
+                        .iter()
+                        .map(|(n, (s, p))| {
+                            (PositionedItem::new(n.clone(), p.clone()), s.clone())
+                        })
+                        .collect();
+                    let resolved_shape = Shape::Import(ImportShape::Resolved(
+                        import_def.path.pos.clone(),
+                        tuple_items,
+                    ));
+                    result
+                        .symbol_table
+                        .insert(name.clone(), (resolved_shape.clone(), def.name.pos.clone()));
+                    sym_map.insert(name.clone(), resolved_shape);
+                }
             }
 
             // Collect scoped names (func/module args, inner lets) into token_types.
@@ -360,6 +383,11 @@ mod test {
 
     use super::*;
 
+    /// Test helper: analyze without a resolved-imports cache.
+    fn analyze(content: &str, working_dir: Option<&Path>) -> AnalysisResult {
+        super::analyze(content, working_dir, &HashMap::new())
+    }
+
     // --- ucg_pos_to_range ---
 
     #[test]
@@ -518,6 +546,49 @@ mod test {
         assert!(
             !result.token_types.is_empty(),
             "module arg should populate token_types"
+        );
+    }
+
+    // --- analyze: resolved import shapes ---
+
+    #[test]
+    fn test_analyze_with_resolved_import_shapes_fields() {
+        // Simulate having already analyzed an imported file.
+        let import_path = std::path::PathBuf::from("/tmp/mylib.ucg");
+        let mut resolved: HashMap<std::path::PathBuf, AnalysisResult> = HashMap::new();
+        let imported = super::analyze("let foo = 42; let bar = \"hi\";", None, &HashMap::new());
+        resolved.insert(import_path.clone(), imported);
+
+        let result = super::analyze(
+            r#"let lib = import "/tmp/mylib.ucg";"#,
+            None,
+            &resolved,
+        );
+        assert!(result.diagnostics.is_empty());
+        let (shape, _) = result.symbol_table.get(&Rc::from("lib")).unwrap();
+        // Should be Resolved, not Unresolved
+        match shape {
+            Shape::Import(ImportShape::Resolved(_, fields)) => {
+                let names: Vec<&str> = fields.iter().map(|(n, _)| n.val.as_ref()).collect();
+                assert!(names.contains(&"foo"), "should include foo field");
+                assert!(names.contains(&"bar"), "should include bar field");
+            }
+            other => panic!("expected ImportShape::Resolved, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_analyze_without_resolved_import_stays_unresolved() {
+        // Without a cache entry, the shape stays Unresolved.
+        let result = super::analyze(
+            r#"let lib = import "/tmp/mylib.ucg";"#,
+            None,
+            &HashMap::new(),
+        );
+        let (shape, _) = result.symbol_table.get(&Rc::from("lib")).unwrap();
+        assert!(
+            matches!(shape, Shape::Import(ImportShape::Unresolved(_))),
+            "should remain Unresolved without cache"
         );
     }
 }

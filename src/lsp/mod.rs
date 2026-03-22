@@ -66,11 +66,13 @@ impl ServerState {
 
     fn update_document(&mut self, uri: Url, content: &str) -> &AnalysisResult {
         let working_dir = uri_to_path(&uri).and_then(|p| p.parent().map(|d| d.to_path_buf()));
-        let result = analysis::analyze(content, working_dir.as_deref());
-        // Also keep the workspace index up to date.
+        // Update workspace first so its resolved-imports cache is current.
         if let Some(path) = uri_to_path(&uri) {
             self.workspace.update_from_content(&path, content);
         }
+        // Analyze with the workspace's resolved cache so import shapes are populated.
+        let result =
+            analysis::analyze(content, working_dir.as_deref(), self.workspace.resolved_files());
         self.documents.insert(uri.clone(), result);
         self.documents.get(&uri).unwrap()
     }
@@ -693,7 +695,16 @@ fn format_shape(shape: &crate::ast::Shape) -> String {
         Shape::Module(mdef) => format!("Module => {}", format_shape(mdef.ret())),
         Shape::Hole(pi) => format!("?({})", pi.val),
         Shape::Narrowed(_) => "Narrowed".to_string(),
-        Shape::Import(_) => "Import".to_string(),
+        Shape::Import(crate::ast::ImportShape::Resolved(_, fields)) => {
+            let parts: Vec<String> = fields
+                .iter()
+                .map(|(name, shape)| format!("{}: {}", name.val, format_shape(shape)))
+                .collect();
+            format!("{{{}}}", parts.join(", "))
+        }
+        Shape::Import(crate::ast::ImportShape::Unresolved(pi)) => {
+            format!("import(\"{}\")", pi.val)
+        }
         Shape::TypeErr(_, msg) => format!("TypeError({})", msg),
     }
 }
@@ -725,7 +736,11 @@ mod test {
     use lsp_types::{HoverContents, SymbolKind};
 
     use super::*;
-    use super::analysis::analyze;
+
+    /// Test helper: analyze without a resolved-imports cache.
+    fn analyze(content: &str, working_dir: Option<&std::path::Path>) -> analysis::AnalysisResult {
+        analysis::analyze(content, working_dir, &std::collections::HashMap::new())
+    }
 
     fn empty_workspace() -> WorkspaceIndex {
         WorkspaceIndex::new(PathBuf::from("/"))
@@ -1145,6 +1160,48 @@ mod test {
         let (shape, _) = doc.symbol_table.get(&Rc::from("m")).unwrap();
         let s = format_shape(shape);
         assert!(s.starts_with("Module => "), "got: {}", s);
+    }
+
+    #[test]
+    fn test_format_shape_resolved_import_shows_fields() {
+        let import_path = PathBuf::from("/tmp/mylib.ucg");
+        let mut resolved = std::collections::HashMap::new();
+        let imported =
+            analysis::analyze("let foo = 1; let bar = \"hi\";", None, &std::collections::HashMap::new());
+        resolved.insert(import_path.clone(), imported);
+        let doc = analysis::analyze(r#"let lib = import "/tmp/mylib.ucg";"#, None, &resolved);
+        let (shape, _) = doc.symbol_table.get(&Rc::from("lib")).unwrap();
+        let s = format_shape(shape);
+        // Should show the exported fields, not just "import(...)"
+        assert!(s.contains("foo"), "got: {}", s);
+        assert!(s.contains("bar"), "got: {}", s);
+    }
+
+    #[test]
+    fn test_format_shape_unresolved_import_shows_path() {
+        let doc = analyze(r#"let lib = import "/tmp/mylib.ucg";"#, None);
+        let (shape, _) = doc.symbol_table.get(&Rc::from("lib")).unwrap();
+        let s = format_shape(shape);
+        assert!(s.contains("/tmp/mylib.ucg"), "got: {}", s);
+    }
+
+    #[test]
+    fn test_find_hover_resolved_import_shows_fields() {
+        let import_path = PathBuf::from("/tmp/mylib.ucg");
+        let mut resolved = std::collections::HashMap::new();
+        let imported =
+            analysis::analyze("let foo = 1; let bar = \"hi\";", None, &std::collections::HashMap::new());
+        resolved.insert(import_path.clone(), imported);
+        let doc = analysis::analyze(r#"let lib = import "/tmp/mylib.ucg";"#, None, &resolved);
+        // hover on `lib` at (0, 4)
+        let hover = find_hover(&doc, 0, 4);
+        assert!(hover.is_some());
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("foo"), "got: {}", mc.value);
+            assert!(mc.value.contains("bar"), "got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
     }
 
     // --- shape_to_symbol_kind ---
