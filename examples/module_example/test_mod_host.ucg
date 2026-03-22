@@ -1,3 +1,5 @@
 let unified = import "modules/unified.ucg";
 
+unified.unified;
+
 out yaml unified.host_conf;

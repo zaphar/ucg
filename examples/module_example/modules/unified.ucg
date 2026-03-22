@@ -1,3 +1,8 @@
+// A test module that unifies two other modules
+
+
+// # composed
+// A module that composes two other modules
 let composed = module{} => {
     let host_mod = import "host_module.ucg";
     let site_mod = import "site_module.ucg";
@@ -6,6 +11,7 @@ let composed = module{} => {
     let host_conf = host_mod.host_mod{hostname="example.com"};
 };
 
+// Instantiate the composed module
 let unified = composed{};
 
 let site_conf = unified.site_conf;

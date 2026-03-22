@@ -561,16 +561,27 @@ fn find_hover_dot_expr(
     // Look up the doc comment for the field.  When the root is an import binding,
     // the field definition lives in the imported file — look there.  Otherwise
     // check the current document.
-    let doc_str = doc
-        .import_map
-        .get(root_name)
-        .and_then(|p| workspace.get(p))
-        .and_then(|imported| {
-            analysis::doc_comment_for_binding(&imported.comment_map, current.pos().line)
+    // Use the symbol_table binding position (the `let` line) when available, since
+    // current.pos() is the position of the *value's shape* which may point to an
+    // unrelated earlier binding (e.g. the module being called, not the call site).
+    let last_field = &path[path.len() - 1];
+    let doc_str = if let Some(import_path) = doc.import_map.get(root_name) {
+        workspace.get(import_path).and_then(|imported| {
+            let def_line = imported
+                .symbol_table
+                .get(last_field)
+                .map(|(_, pos)| pos.line)
+                .unwrap_or_else(|| current.pos().line);
+            analysis::doc_comment_for_binding(&imported.comment_map, def_line)
         })
-        .or_else(|| {
-            analysis::doc_comment_for_binding(&doc.comment_map, current.pos().line)
-        });
+    } else {
+        let def_line = doc
+            .symbol_table
+            .get(last_field)
+            .map(|(_, pos)| pos.line)
+            .unwrap_or_else(|| current.pos().line);
+        analysis::doc_comment_for_binding(&doc.comment_map, def_line)
+    };
 
     // Find the cursor token for the hover range.
     let target_line = (line + 1) as usize;
@@ -1792,6 +1803,44 @@ mod test {
         assert!(hover.is_some());
         if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
             assert!(mc.value.contains("The answer."), "got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
+    #[test]
+    fn test_hover_dot_expr_binding_doc_not_value_doc() {
+        // Regression: hovering on `lib.result` where `result = mod_call{}` must show
+        // the comment above `let result = ...`, not the comment above `mod_call`.
+        // Imported file has:
+        //   // Doc for the module
+        //   let maker = module{} => {};
+        //
+        //
+        //   // Doc for result binding
+        //   let result = maker{};
+        let import_path = PathBuf::from("/tmp/mylib.ucg");
+        let mut ws = WorkspaceIndex::new(PathBuf::from("/tmp"));
+        ws.update_from_content(
+            &import_path,
+            "// Doc for the module\nlet maker = module{} => {};\n\n\n// Doc for result binding\nlet result = maker{};",
+        );
+        let src = r#"let lib = import "/tmp/mylib.ucg"; let x = lib.result;"#;
+        let doc = analysis::analyze(src, None, ws.resolved_files());
+        let result_col = src.rfind("result").unwrap() as u32;
+        let hover = super::find_hover(&doc, &ws, 0, result_col);
+        assert!(hover.is_some());
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(
+                mc.value.contains("Doc for result binding"),
+                "should show binding doc, got: {}",
+                mc.value
+            );
+            assert!(
+                !mc.value.contains("Doc for the module"),
+                "should NOT show module doc, got: {}",
+                mc.value
+            );
         } else {
             panic!("expected Markup hover");
         }
