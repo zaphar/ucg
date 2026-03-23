@@ -174,3 +174,94 @@ impl Importer for YamlConverter {
         Ok(Rc::new(self.convert_yaml_val(&json_val)?))
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::io::Cursor;
+
+    fn convert_to_string(v: Val) -> String {
+        let conv = YamlConverter::new();
+        let mut buf = Cursor::new(vec![]);
+        conv.convert(Rc::new(v), &mut buf).unwrap();
+        String::from_utf8(buf.into_inner()).unwrap()
+    }
+
+    #[test]
+    fn convert_bool() {
+        assert_eq!(convert_to_string(Val::Boolean(true)).trim(), "true");
+    }
+
+    #[test]
+    fn convert_null() {
+        assert_eq!(convert_to_string(Val::Empty).trim(), "null");
+    }
+
+    #[test]
+    fn convert_int() {
+        assert_eq!(convert_to_string(Val::Int(42)).trim(), "42");
+    }
+
+    #[test]
+    fn convert_float() {
+        let out = convert_to_string(Val::Float(3.14));
+        assert!(out.trim().starts_with("3.14"));
+    }
+
+    #[test]
+    fn convert_string() {
+        let out = convert_to_string(Val::Str(Rc::from("hello")));
+        assert!(out.contains("hello"));
+    }
+
+    #[test]
+    fn convert_list() {
+        let v = Val::List(vec![Rc::new(Val::Int(1)), Rc::new(Val::Int(2))]);
+        let out = convert_to_string(v);
+        assert!(out.contains("- 1"));
+        assert!(out.contains("- 2"));
+    }
+
+    #[test]
+    fn convert_tuple() {
+        let v = Val::Tuple(vec![
+            (Rc::from("name"), Rc::new(Val::Str(Rc::from("alice")))),
+        ]);
+        let out = convert_to_string(v);
+        assert!(out.contains("name:"));
+        assert!(out.contains("alice"));
+    }
+
+    #[test]
+    fn convert_env() {
+        let v = Val::Env(vec![(Rc::from("K"), Rc::from("V"))]);
+        let out = convert_to_string(v);
+        assert!(out.contains("K:"));
+    }
+
+    #[test]
+    fn import_yaml_mapping() {
+        let conv = YamlConverter::new();
+        let val = conv.import(b"key: value\nnum: 42").unwrap();
+        assert!(val.is_tuple());
+    }
+
+    #[test]
+    fn import_yaml_sequence() {
+        let conv = YamlConverter::new();
+        let val = conv.import(b"- 1\n- 2\n- 3").unwrap();
+        assert!(val.is_list());
+    }
+
+    #[test]
+    fn import_yaml_null() {
+        let conv = YamlConverter::new();
+        let val = conv.import(b"null").unwrap();
+        assert!(val.is_empty());
+    }
+
+    #[test]
+    fn file_ext() {
+        assert_eq!(YamlConverter::new().file_ext(), "yaml");
+    }
+}

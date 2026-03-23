@@ -142,3 +142,91 @@ impl Converter for FlagConverter {
         include_str!("flags_help.txt").to_string()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::io::Cursor;
+
+    fn convert_to_string(v: Val) -> String {
+        let conv = FlagConverter::new();
+        let mut buf = Cursor::new(vec![]);
+        conv.convert(Rc::new(v), &mut buf).unwrap();
+        String::from_utf8(buf.into_inner()).unwrap()
+    }
+
+    #[test]
+    fn convert_long_flag() {
+        let v = Val::Tuple(vec![
+            (Rc::from("verbose"), Rc::new(Val::Boolean(true))),
+        ]);
+        let out = convert_to_string(v);
+        assert!(out.contains("--verbose"));
+        assert!(out.contains("true"));
+    }
+
+    #[test]
+    fn convert_short_flag() {
+        let v = Val::Tuple(vec![
+            (Rc::from("v"), Rc::new(Val::Boolean(true))),
+        ]);
+        let out = convert_to_string(v);
+        assert!(out.contains("-v"));
+    }
+
+    #[test]
+    fn convert_string_value() {
+        let v = Val::Tuple(vec![
+            (Rc::from("name"), Rc::new(Val::Str(Rc::from("test")))),
+        ]);
+        let out = convert_to_string(v);
+        assert!(out.contains("--name"));
+        assert!(out.contains("'test'"));
+    }
+
+    #[test]
+    fn convert_int_value() {
+        let v = Val::Tuple(vec![
+            (Rc::from("count"), Rc::new(Val::Int(5))),
+        ]);
+        let out = convert_to_string(v);
+        assert!(out.contains("--count"));
+        assert!(out.contains("5"));
+    }
+
+    #[test]
+    fn convert_empty_flag_no_value() {
+        let v = Val::Tuple(vec![
+            (Rc::from("help"), Rc::new(Val::Empty)),
+        ]);
+        let out = convert_to_string(v);
+        assert_eq!(out.trim(), "--help");
+    }
+
+    #[test]
+    fn convert_list_flag_repeats() {
+        let v = Val::Tuple(vec![(
+            Rc::from("tag"),
+            Rc::new(Val::List(vec![
+                Rc::new(Val::Str(Rc::from("a"))),
+                Rc::new(Val::Str(Rc::from("b"))),
+            ])),
+        )]);
+        let out = convert_to_string(v);
+        // Each list item should produce its own --tag flag
+        assert_eq!(out.matches("--tag").count(), 2);
+    }
+
+    #[test]
+    fn convert_non_tuple_errors() {
+        let conv = FlagConverter::new();
+        let mut buf = Cursor::new(vec![]);
+        let result = conv.convert(Rc::new(Val::Int(1)), &mut buf);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn file_ext() {
+        assert_eq!(FlagConverter::new().file_ext(), "txt");
+    }
+}

@@ -240,3 +240,123 @@ impl Converter for XmlConverter {
         include_str!("xml_help.txt").to_string()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::io::Cursor;
+
+    fn convert_to_string(v: Val) -> String {
+        let conv = XmlConverter {};
+        let mut buf = Cursor::new(vec![]);
+        conv.convert(Rc::new(v), &mut buf).unwrap();
+        String::from_utf8(buf.into_inner()).unwrap()
+    }
+
+    fn xml_doc(root: Val) -> Val {
+        Val::Tuple(vec![(Rc::from("root"), Rc::new(root))])
+    }
+
+    fn xml_element(name: &str, children: Vec<Val>) -> Val {
+        let mut fields: Vec<(Rc<str>, Rc<Val>)> = vec![
+            (Rc::from("name"), Rc::new(Val::Str(Rc::from(name)))),
+        ];
+        if !children.is_empty() {
+            fields.push((
+                Rc::from("children"),
+                Rc::new(Val::List(children.into_iter().map(Rc::new).collect())),
+            ));
+        }
+        Val::Tuple(fields)
+    }
+
+    fn xml_text(s: &str) -> Val {
+        Val::Tuple(vec![
+            (Rc::from("text"), Rc::new(Val::Str(Rc::from(s)))),
+        ])
+    }
+
+    #[test]
+    fn convert_simple_element() {
+        let doc = xml_doc(xml_element("root", vec![xml_text("hello")]));
+        let out = convert_to_string(doc);
+        assert!(out.contains("<root>"));
+        assert!(out.contains("hello"));
+        assert!(out.contains("</root>"));
+    }
+
+    #[test]
+    fn convert_element_with_attrs() {
+        let root = Val::Tuple(vec![
+            (Rc::from("name"), Rc::new(Val::Str(Rc::from("div")))),
+            (
+                Rc::from("attrs"),
+                Rc::new(Val::Tuple(vec![(
+                    Rc::from("class"),
+                    Rc::new(Val::Str(Rc::from("main"))),
+                )])),
+            ),
+        ]);
+        let doc = xml_doc(root);
+        let out = convert_to_string(doc);
+        assert!(out.contains("class=\"main\""));
+    }
+
+    #[test]
+    fn convert_nested_elements() {
+        let inner = xml_element("inner", vec![]);
+        let outer = xml_element("outer", vec![inner]);
+        let doc = xml_doc(outer);
+        let out = convert_to_string(doc);
+        assert!(out.contains("<outer>"));
+        assert!(out.contains("<inner"));
+        assert!(out.contains("</outer>"));
+    }
+
+    #[test]
+    fn convert_with_version() {
+        let doc = Val::Tuple(vec![
+            (Rc::from("version"), Rc::new(Val::Str(Rc::from("1.1")))),
+            (Rc::from("root"), Rc::new(xml_element("root", vec![]))),
+        ]);
+        let out = convert_to_string(doc);
+        assert!(out.contains("version=\"1.1\""));
+    }
+
+    #[test]
+    fn convert_name_and_text_errors() {
+        let bad_node = Val::Tuple(vec![
+            (Rc::from("name"), Rc::new(Val::Str(Rc::from("tag")))),
+            (Rc::from("text"), Rc::new(Val::Str(Rc::from("content")))),
+        ]);
+        let doc = xml_doc(bad_node);
+        let conv = XmlConverter {};
+        let mut buf = Cursor::new(vec![]);
+        let result = conv.convert(Rc::new(doc), &mut buf);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn convert_no_root_errors() {
+        let doc = Val::Tuple(vec![
+            (Rc::from("version"), Rc::new(Val::Str(Rc::from("1.0")))),
+        ]);
+        let conv = XmlConverter {};
+        let mut buf = Cursor::new(vec![]);
+        let result = conv.convert(Rc::new(doc), &mut buf);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn convert_non_tuple_errors() {
+        let conv = XmlConverter {};
+        let mut buf = Cursor::new(vec![]);
+        let result = conv.convert(Rc::new(Val::Int(1)), &mut buf);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn file_ext() {
+        assert_eq!((XmlConverter {}).file_ext(), "xml");
+    }
+}

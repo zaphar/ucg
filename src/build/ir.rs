@@ -227,3 +227,216 @@ impl From<Rc<str>> for Val {
         Val::Str(s)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::rc::Rc;
+
+    fn str_val(s: &str) -> Val {
+        Val::Str(Rc::from(s))
+    }
+
+    fn int_val(i: i64) -> Val {
+        Val::Int(i)
+    }
+
+    fn tuple_val(fields: Vec<(&str, Val)>) -> Val {
+        Val::Tuple(
+            fields
+                .into_iter()
+                .map(|(k, v)| (Rc::from(k), Rc::new(v)))
+                .collect(),
+        )
+    }
+
+    fn list_val(items: Vec<Val>) -> Val {
+        Val::List(items.into_iter().map(Rc::new).collect())
+    }
+
+    // type_name tests
+
+    #[test]
+    fn type_name_all_variants() {
+        assert_eq!(Val::Empty.type_name(), "EmptyValue");
+        assert_eq!(Val::Boolean(true).type_name(), "Boolean");
+        assert_eq!(int_val(1).type_name(), "Integer");
+        assert_eq!(Val::Float(1.0).type_name(), "Float");
+        assert_eq!(str_val("hi").type_name(), "String");
+        assert_eq!(list_val(vec![]).type_name(), "List");
+        assert_eq!(tuple_val(vec![]).type_name(), "Tuple");
+        assert_eq!(Val::Env(vec![]).type_name(), "Env");
+    }
+
+    // type_equal tests
+
+    #[test]
+    fn type_equal_same_types() {
+        assert!(Val::Empty.type_equal(&Val::Empty));
+        assert!(Val::Boolean(true).type_equal(&Val::Boolean(false)));
+        assert!(int_val(1).type_equal(&int_val(2)));
+        assert!(Val::Float(1.0).type_equal(&Val::Float(2.0)));
+        assert!(str_val("a").type_equal(&str_val("b")));
+        assert!(list_val(vec![]).type_equal(&list_val(vec![int_val(1)])));
+        assert!(tuple_val(vec![]).type_equal(&tuple_val(vec![("x", int_val(1))])));
+        assert!(Val::Env(vec![]).type_equal(&Val::Env(vec![(Rc::from("k"), Rc::from("v"))])));
+    }
+
+    #[test]
+    fn type_equal_different_types() {
+        assert!(!Val::Empty.type_equal(&int_val(0)));
+        assert!(!Val::Boolean(true).type_equal(&int_val(1)));
+        assert!(!int_val(1).type_equal(&Val::Float(1.0)));
+        assert!(!str_val("a").type_equal(&list_val(vec![])));
+        assert!(!tuple_val(vec![]).type_equal(&Val::Env(vec![])));
+    }
+
+    // equal tests
+
+    #[test]
+    fn equal_empty() {
+        assert!(Val::Empty.equal(&Val::Empty).unwrap());
+    }
+
+    #[test]
+    fn equal_empty_vs_other_is_false() {
+        assert!(!Val::Empty.equal(&int_val(0)).unwrap());
+        assert!(!int_val(0).equal(&Val::Empty).unwrap());
+    }
+
+    #[test]
+    fn equal_primitives() {
+        assert!(int_val(42).equal(&int_val(42)).unwrap());
+        assert!(!int_val(1).equal(&int_val(2)).unwrap());
+
+        assert!(Val::Float(3.14).equal(&Val::Float(3.14)).unwrap());
+        assert!(!Val::Float(1.0).equal(&Val::Float(2.0)).unwrap());
+
+        assert!(Val::Boolean(true).equal(&Val::Boolean(true)).unwrap());
+        assert!(!Val::Boolean(true).equal(&Val::Boolean(false)).unwrap());
+
+        assert!(str_val("hello").equal(&str_val("hello")).unwrap());
+        assert!(!str_val("a").equal(&str_val("b")).unwrap());
+    }
+
+    #[test]
+    fn equal_lists() {
+        let a = list_val(vec![int_val(1), int_val(2)]);
+        let b = list_val(vec![int_val(1), int_val(2)]);
+        assert!(a.equal(&b).unwrap());
+
+        let c = list_val(vec![int_val(1), int_val(3)]);
+        assert!(!a.equal(&c).unwrap());
+
+        let d = list_val(vec![int_val(1)]);
+        assert!(!a.equal(&d).unwrap());
+    }
+
+    #[test]
+    fn equal_tuples() {
+        let a = tuple_val(vec![("x", int_val(1)), ("y", str_val("hi"))]);
+        let b = tuple_val(vec![("x", int_val(1)), ("y", str_val("hi"))]);
+        assert!(a.equal(&b).unwrap());
+
+        let c = tuple_val(vec![("x", int_val(1)), ("z", str_val("hi"))]);
+        assert!(!a.equal(&c).unwrap()); // different field name
+
+        let d = tuple_val(vec![("x", int_val(1)), ("y", str_val("bye"))]);
+        assert!(!a.equal(&d).unwrap()); // different field value
+    }
+
+    #[test]
+    fn equal_type_mismatch_is_error() {
+        let result = int_val(1).equal(&str_val("1"));
+        assert!(result.is_err());
+    }
+
+    // is_* predicate tests
+
+    #[test]
+    fn is_predicates() {
+        assert!(Val::Empty.is_empty());
+        assert!(!Val::Empty.is_int());
+
+        assert!(int_val(1).is_int());
+        assert!(!int_val(1).is_float());
+
+        assert!(Val::Float(1.0).is_float());
+        assert!(str_val("x").is_string());
+        assert!(str_val("x").is_str());
+        assert!(Val::Boolean(true).is_bool());
+        assert!(list_val(vec![]).is_list());
+        assert!(tuple_val(vec![]).is_tuple());
+        assert!(Val::Env(vec![]).is_env());
+    }
+
+    // get_fields tests
+
+    #[test]
+    fn get_fields_tuple() {
+        let t = tuple_val(vec![("a", int_val(1))]);
+        assert!(t.get_fields().is_some());
+        assert_eq!(t.get_fields().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn get_fields_non_tuple() {
+        assert!(int_val(1).get_fields().is_none());
+    }
+
+    // Display tests
+
+    #[test]
+    fn display_primitives() {
+        assert_eq!(format!("{}", Val::Empty), "NULL");
+        assert_eq!(format!("{}", Val::Boolean(true)), "true");
+        assert_eq!(format!("{}", int_val(42)), "42");
+        assert_eq!(format!("{}", Val::Float(3.14)), "3.14");
+        assert_eq!(format!("{}", str_val("hello")), "\"hello\"");
+    }
+
+    #[test]
+    fn display_str_escapes_quotes() {
+        assert_eq!(format!("{}", str_val("say \"hi\"")), "\"say \\\"hi\\\"\"");
+    }
+
+    #[test]
+    fn display_list() {
+        let l = list_val(vec![int_val(1), int_val(2)]);
+        assert_eq!(format!("{}", l), "[1, 2, ]");
+    }
+
+    #[test]
+    fn display_tuple() {
+        let t = tuple_val(vec![("x", int_val(1))]);
+        assert_eq!(format!("{}", t), "{\n\tx = 1,\n}");
+    }
+
+    // From conversion tests
+
+    #[test]
+    fn from_val_to_rc_str() {
+        let s: Rc<str> = int_val(42).into();
+        assert_eq!(&*s, "42");
+
+        let s: Rc<str> = Val::Float(3.14).into();
+        assert_eq!(&*s, "3.14");
+
+        let s: Rc<str> = str_val("hello").into();
+        assert_eq!(&*s, "hello");
+
+        let s: Rc<str> = Val::Boolean(true).into();
+        assert_eq!(&*s, "true");
+
+        let s: Rc<str> = Val::Empty.into();
+        assert_eq!(&*s, "NULL");
+    }
+
+    #[test]
+    fn from_rc_str_to_val() {
+        let s: Rc<str> = Rc::from("test");
+        let v: Val = s.into();
+        assert!(v.is_str());
+        assert!(v.equal(&str_val("test")).unwrap());
+    }
+}

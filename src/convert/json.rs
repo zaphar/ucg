@@ -140,3 +140,100 @@ impl Importer for JsonConverter {
         Ok(Rc::new(self.convert_json_val(&json_val)?))
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::io::Cursor;
+
+    fn convert_to_string(v: Val) -> String {
+        let conv = JsonConverter::new();
+        let mut buf = Cursor::new(vec![]);
+        conv.convert(Rc::new(v), &mut buf).unwrap();
+        String::from_utf8(buf.into_inner()).unwrap()
+    }
+
+    #[test]
+    fn convert_bool() {
+        assert_eq!(convert_to_string(Val::Boolean(true)), "true");
+    }
+
+    #[test]
+    fn convert_null() {
+        assert_eq!(convert_to_string(Val::Empty), "null");
+    }
+
+    #[test]
+    fn convert_int() {
+        assert_eq!(convert_to_string(Val::Int(42)), "42.0");
+    }
+
+    #[test]
+    fn convert_float() {
+        assert_eq!(convert_to_string(Val::Float(3.14)), "3.14");
+    }
+
+    #[test]
+    fn convert_string() {
+        assert_eq!(convert_to_string(Val::Str(Rc::from("hello"))), "\"hello\"");
+    }
+
+    #[test]
+    fn convert_list() {
+        let v = Val::List(vec![
+            Rc::new(Val::Int(1)),
+            Rc::new(Val::Str(Rc::from("two"))),
+        ]);
+        let out = convert_to_string(v);
+        let parsed: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert!(parsed.is_array());
+        assert_eq!(parsed.as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn convert_tuple() {
+        let v = Val::Tuple(vec![
+            (Rc::from("name"), Rc::new(Val::Str(Rc::from("alice")))),
+            (Rc::from("age"), Rc::new(Val::Int(30))),
+        ]);
+        let out = convert_to_string(v);
+        let parsed: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(parsed["name"], "alice");
+    }
+
+    #[test]
+    fn convert_env() {
+        let v = Val::Env(vec![(Rc::from("HOME"), Rc::from("/home"))]);
+        let out = convert_to_string(v);
+        let parsed: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(parsed["HOME"], "/home");
+    }
+
+    #[test]
+    fn import_json_object() {
+        let conv = JsonConverter::new();
+        let input = b"{\"key\": \"value\", \"num\": 42}";
+        let val = conv.import(input).unwrap();
+        assert!(val.is_tuple());
+    }
+
+    #[test]
+    fn import_json_array() {
+        let conv = JsonConverter::new();
+        let input = b"[1, 2, 3]";
+        let val = conv.import(input).unwrap();
+        assert!(val.is_list());
+    }
+
+    #[test]
+    fn import_json_null() {
+        let conv = JsonConverter::new();
+        let val = conv.import(b"null").unwrap();
+        assert!(val.is_empty());
+    }
+
+    #[test]
+    fn file_ext() {
+        assert_eq!(JsonConverter::new().file_ext(), "json");
+    }
+}

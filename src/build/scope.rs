@@ -222,3 +222,254 @@ impl Scope {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::rc::Rc;
+
+    fn test_pos() -> Position {
+        Position::new(0, 0, 0)
+    }
+
+    fn positioned<T: Clone>(val: T) -> PositionedItem<T> {
+        PositionedItem {
+            pos: test_pos(),
+            val,
+        }
+    }
+
+    fn make_env() -> Rc<Val> {
+        Rc::new(Val::Env(vec![
+            (Rc::from("HOME"), Rc::from("/home/user")),
+            (Rc::from("PATH"), Rc::from("/usr/bin")),
+        ]))
+    }
+
+    // Construction and builder tests
+
+    #[test]
+    fn new_scope_defaults() {
+        let scope = Scope::new(make_env());
+        assert!(!scope.strict);
+        assert!(!scope.search_curr_val);
+        assert!(scope.curr_val.is_none());
+        assert!(scope.build_output.is_empty());
+        assert!(scope.import_stack.is_empty());
+    }
+
+    #[test]
+    fn use_strict_sets_flag() {
+        let scope = Scope::new(make_env()).use_strict();
+        assert!(scope.strict);
+    }
+
+    #[test]
+    fn use_curr_val_sets_flag() {
+        let scope = Scope::new(make_env()).use_curr_val();
+        assert!(scope.search_curr_val);
+    }
+
+    #[test]
+    fn set_curr_val() {
+        let val = Rc::new(Val::Int(42));
+        let scope = Scope::new(make_env()).set_curr_val(val.clone());
+        assert_eq!(scope.curr_val, Some(val));
+    }
+
+    // spawn_child / spawn_clean tests
+
+    #[test]
+    fn spawn_child_inherits_output() {
+        let mut scope = Scope::new(make_env()).use_strict();
+        scope
+            .build_output
+            .insert(positioned(Rc::from("x")), Rc::new(Val::Int(1)));
+        scope.push_import("file.ucg");
+
+        let child = scope.spawn_child();
+        assert!(child.strict);
+        assert!(!child.search_curr_val);
+        assert!(child.curr_val.is_none());
+        assert_eq!(child.build_output.len(), 1);
+        assert_eq!(child.import_stack, vec!["file.ucg".to_string()]);
+    }
+
+    #[test]
+    fn spawn_clean_has_empty_output() {
+        let mut scope = Scope::new(make_env()).use_strict();
+        scope
+            .build_output
+            .insert(positioned(Rc::from("x")), Rc::new(Val::Int(1)));
+
+        let clean = scope.spawn_clean();
+        assert!(clean.strict);
+        assert!(clean.build_output.is_empty());
+    }
+
+    // Import stack tests
+
+    #[test]
+    fn push_import() {
+        let mut scope = Scope::new(make_env());
+        scope.push_import("a.ucg");
+        scope.push_import("b.ucg");
+        assert_eq!(scope.import_stack, vec!["a.ucg", "b.ucg"]);
+    }
+
+    #[test]
+    fn prepend_import_stack() {
+        let mut scope = Scope::new(make_env());
+        scope.push_import("a.ucg");
+        scope.prepend_import_stack(&vec!["b.ucg".to_string(), "c.ucg".to_string()]);
+        assert_eq!(scope.import_stack, vec!["a.ucg", "b.ucg", "c.ucg"]);
+    }
+
+    // lookup_sym tests
+
+    #[test]
+    fn lookup_sym_env() {
+        let scope = Scope::new(make_env());
+        let sym = positioned(Rc::from("env"));
+        let result = scope.lookup_sym(&sym, true);
+        assert!(result.is_some());
+        assert!(result.unwrap().is_env());
+    }
+
+    #[test]
+    fn lookup_sym_env_not_symbol_skips() {
+        let scope = Scope::new(make_env());
+        let sym = positioned(Rc::from("env"));
+        // is_symbol=false means "env" is treated as a regular field name
+        let result = scope.lookup_sym(&sym, false);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn lookup_sym_self_with_curr_val() {
+        let val = Rc::new(Val::Int(99));
+        let scope = Scope::new(make_env()).set_curr_val(val.clone());
+        let sym = positioned(Rc::from("self"));
+        let result = scope.lookup_sym(&sym, true);
+        assert_eq!(result, Some(val));
+    }
+
+    #[test]
+    fn lookup_sym_self_without_curr_val() {
+        let scope = Scope::new(make_env());
+        let sym = positioned(Rc::from("self"));
+        let result = scope.lookup_sym(&sym, true);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn lookup_sym_in_tuple_curr_val() {
+        let tuple = Rc::new(Val::Tuple(vec![
+            (Rc::from("name"), Rc::new(Val::Str(Rc::from("alice")))),
+        ]));
+        let scope = Scope::new(make_env())
+            .set_curr_val(tuple)
+            .use_curr_val();
+        let sym = positioned(Rc::from("name"));
+        let result = scope.lookup_sym(&sym, false);
+        assert!(result.is_some());
+        assert!(result.unwrap().equal(&Val::Str(Rc::from("alice"))).unwrap());
+    }
+
+    #[test]
+    fn lookup_sym_in_build_output() {
+        let mut scope = Scope::new(make_env());
+        let key = positioned(Rc::from("myvar"));
+        scope
+            .build_output
+            .insert(key.clone(), Rc::new(Val::Int(7)));
+        let result = scope.lookup_sym(&key, true);
+        assert_eq!(result, Some(Rc::new(Val::Int(7))));
+    }
+
+    #[test]
+    fn lookup_sym_missing_returns_none() {
+        let scope = Scope::new(make_env());
+        let sym = positioned(Rc::from("nonexistent"));
+        assert!(scope.lookup_sym(&sym, true).is_none());
+    }
+
+    #[test]
+    fn lookup_sym_in_env_curr_val() {
+        let scope = Scope::new(make_env())
+            .set_curr_val(make_env())
+            .use_curr_val();
+        let sym = positioned(Rc::from("HOME"));
+        let result = scope.lookup_sym(&sym, false);
+        assert!(result.is_some());
+        assert!(result
+            .unwrap()
+            .equal(&Val::Str(Rc::from("/home/user")))
+            .unwrap());
+    }
+
+    #[test]
+    fn lookup_sym_in_env_curr_val_missing_nonstrict_returns_empty() {
+        let scope = Scope::new(make_env())
+            .set_curr_val(make_env())
+            .use_curr_val();
+        let sym = positioned(Rc::from("MISSING"));
+        let result = scope.lookup_sym(&sym, false);
+        assert_eq!(result, Some(Rc::new(Val::Empty)));
+    }
+
+    // lookup_idx tests
+
+    #[test]
+    fn lookup_idx_valid() {
+        let list = Rc::new(Val::List(vec![
+            Rc::new(Val::Int(10)),
+            Rc::new(Val::Int(20)),
+        ]));
+        let scope = Scope::new(make_env()).set_curr_val(list).use_curr_val();
+        let result = scope.lookup_idx(&test_pos(), &Val::Int(1)).unwrap();
+        assert_eq!(*result, Val::Int(20));
+    }
+
+    #[test]
+    fn lookup_idx_out_of_bounds() {
+        let list = Rc::new(Val::List(vec![Rc::new(Val::Int(10))]));
+        let scope = Scope::new(make_env()).set_curr_val(list).use_curr_val();
+        assert!(scope.lookup_idx(&test_pos(), &Val::Int(5)).is_err());
+    }
+
+    #[test]
+    fn lookup_idx_not_a_list() {
+        let scope = Scope::new(make_env())
+            .set_curr_val(Rc::new(Val::Int(1)))
+            .use_curr_val();
+        assert!(scope.lookup_idx(&test_pos(), &Val::Int(0)).is_err());
+    }
+
+    #[test]
+    fn lookup_idx_string_index() {
+        let list = Rc::new(Val::List(vec![
+            Rc::new(Val::Str(Rc::from("a"))),
+            Rc::new(Val::Str(Rc::from("b"))),
+        ]));
+        let scope = Scope::new(make_env()).set_curr_val(list).use_curr_val();
+        let result = scope
+            .lookup_idx(&test_pos(), &Val::Str(Rc::from("1")))
+            .unwrap();
+        assert_eq!(*result, Val::Str(Rc::from("b")));
+    }
+
+    // find_in_fieldlist tests
+
+    #[test]
+    fn find_in_fieldlist_found() {
+        let fields = vec![(Rc::from("a"), Rc::new(Val::Int(1)))];
+        assert!(find_in_fieldlist("a", &fields).is_some());
+    }
+
+    #[test]
+    fn find_in_fieldlist_not_found() {
+        let fields = vec![(Rc::from("a"), Rc::new(Val::Int(1)))];
+        assert!(find_in_fieldlist("b", &fields).is_none());
+    }
+}

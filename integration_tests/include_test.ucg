@@ -55,3 +55,22 @@ assert t.equal{
         list = [1, true, NULL],
     },
  };
+
+let toml_conf = include toml "./include_example.toml";
+
+assert t.equal{
+    left = toml_conf.foo,
+    right = "bar",
+};
+
+assert t.equal{
+    left = toml_conf.one,
+    right = 1,
+};
+
+assert t.equal{
+    left = toml_conf.inner,
+    right = {
+        list = [1, 2, 3],
+    },
+};
