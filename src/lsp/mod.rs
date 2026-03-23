@@ -758,6 +758,16 @@ fn find_definition(
         }
     }
 
+    // Check def_positions for scoped bindings (func args, module args, inner lets).
+    if let Some(pos) = tok_pos {
+        if let Some(def_pos) = doc.def_positions.get(&pos) {
+            return Some(Location {
+                uri: current_uri.clone(),
+                range: ucg_pos_to_range(def_pos),
+            });
+        }
+    }
+
     // Otherwise jump to the definition site in the current file.
     let (_, def_pos) = doc.symbol_table.get(&name)?;
 

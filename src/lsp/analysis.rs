@@ -57,6 +57,11 @@ pub struct AnalysisResult {
     /// its scope — same coordinate system as `token_types` — so that hover and
     /// go-to-definition can look up the file path from any use or definition site.
     pub inner_import_map: HashMap<(usize, usize), PathBuf>,
+    /// Maps every scoped token occurrence to the *binding definition position*
+    /// (the `let` name token or function/module arg token), not the shape value's
+    /// position.  Covers func args, module args, and inner let bindings.
+    /// Keyed by `(line, column)` of each use or definition occurrence.
+    pub def_positions: HashMap<(usize, usize), Position>,
 }
 
 impl AnalysisResult {
@@ -72,6 +77,7 @@ impl AnalysisResult {
             comment_map: CommentMap::new(),
             file_doc: None,
             inner_import_map: HashMap::new(),
+            def_positions: HashMap::new(),
         }
     }
 }
@@ -410,6 +416,7 @@ pub fn analyze(
                 &result.tokens,
                 &mut result.token_types,
                 &mut result.path_map,
+                &mut result.def_positions,
                 def.name.fragment.as_ref(),
             );
         }
@@ -459,6 +466,30 @@ fn record_token_occurrences(
     }
 }
 
+/// Record the binding definition position for every token occurrence of `name`
+/// within `scope_range`.  `def_pos` is the position of the binding or arg name
+/// token itself — not the shape value's position — so go-to-definition jumps to
+/// the right place regardless of what the shape's `pos()` points to.
+fn record_def_position(
+    name: &Rc<str>,
+    def_pos: &Position,
+    scope_range: (usize, usize),
+    tokens: &[Token],
+    def_positions: &mut HashMap<(usize, usize), Position>,
+) {
+    use crate::ast::TokenType;
+    let (start, end) = scope_range;
+    for tok in tokens {
+        if tok.typ == TokenType::BAREWORD
+            && tok.fragment == *name
+            && tok.pos.offset >= start
+            && tok.pos.offset < end
+        {
+            def_positions.insert((tok.pos.line, tok.pos.column), def_pos.clone());
+        }
+    }
+}
+
 /// Walk an expression, collecting all scoped names (function args, module args,
 /// inner `let` bindings) into `token_types` using position-keyed entries.
 ///
@@ -472,6 +503,7 @@ fn collect_scoped_names(
     tokens: &[Token],
     token_types: &mut HashMap<(usize, usize), Shape>,
     path_map: &mut HashMap<(usize, usize), Rc<str>>,
+    def_positions: &mut HashMap<(usize, usize), Position>,
     path: &str,
 ) {
     match expr {
@@ -481,6 +513,12 @@ fn collect_scoped_names(
                 for (arg_name, arg_shape) in fdef.args() {
                     record_token_occurrences(arg_name, arg_shape, scope_range, tokens, token_types);
                 }
+            }
+            // Record the arg definition positions using the actual arg token positions
+            // from the AST (shape.pos() is reliable for func args, but being explicit
+            // here keeps the pattern consistent with module args and inner lets).
+            for (sym, _) in &func_def.argdefs {
+                record_def_position(&sym.val, &sym.pos, scope_range, tokens, def_positions);
             }
             // Descend into the body with args in scope so inner lets see them.
             let mut inner_sym = sym_map.clone();
@@ -496,6 +534,7 @@ fn collect_scoped_names(
                 tokens,
                 token_types,
                 path_map,
+                def_positions,
                 path,
             );
         }
@@ -512,6 +551,11 @@ fn collect_scoped_names(
                         token_types,
                     );
                 }
+            }
+            // Record module arg definition positions using the arg token positions.
+            for (tok, _, _) in &mod_def.arg_set {
+                let name: Rc<str> = tok.fragment.clone();
+                record_def_position(&name, &tok.pos, scope_range, tokens, def_positions);
             }
             // Walk module body statements.
             // Inject the `mod` binding so inner lets that reference `mod.field`
@@ -543,6 +587,14 @@ fn collect_scoped_names(
                         tokens,
                         token_types,
                     );
+                    // Record the inner let binding's definition position.
+                    record_def_position(
+                        &inner_name,
+                        &inner_def.name.pos,
+                        scope_range,
+                        tokens,
+                        def_positions,
+                    );
                     inner_sym.insert(inner_name, inner_shape.clone());
                     collect_scoped_names(
                         &inner_def.value,
@@ -551,6 +603,7 @@ fn collect_scoped_names(
                         tokens,
                         token_types,
                         path_map,
+                        def_positions,
                         path,
                     );
                 }
@@ -563,6 +616,7 @@ fn collect_scoped_names(
                     tokens,
                     token_types,
                     path_map,
+                    def_positions,
                     path,
                 );
             }
@@ -588,6 +642,7 @@ fn collect_scoped_names(
                     tokens,
                     token_types,
                     path_map,
+                    def_positions,
                     &field_path,
                 );
             }
@@ -595,43 +650,43 @@ fn collect_scoped_names(
 
         // Descend through expression wrappers that can contain funcs/modules/tuples.
         Expression::Binary(def) => {
-            collect_scoped_names(&def.left, sym_map, scope_range, tokens, token_types, path_map, path);
-            collect_scoped_names(&def.right, sym_map, scope_range, tokens, token_types, path_map, path);
+            collect_scoped_names(&def.left, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+            collect_scoped_names(&def.right, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
         }
         Expression::Grouped(inner, _) => {
-            collect_scoped_names(inner, sym_map, scope_range, tokens, token_types, path_map, path);
+            collect_scoped_names(inner, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
         }
         Expression::Call(call_def) => {
             for arg in &call_def.arglist {
-                collect_scoped_names(arg, sym_map, scope_range, tokens, token_types, path_map, path);
+                collect_scoped_names(arg, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
             }
         }
         Expression::Copy(copy_def) => {
             for (_, _, field_expr) in &copy_def.fields {
-                collect_scoped_names(field_expr, sym_map, scope_range, tokens, token_types, path_map, path);
+                collect_scoped_names(field_expr, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
             }
         }
         Expression::FuncOp(op_def) => {
             use crate::ast::FuncOpDef;
             match op_def {
                 FuncOpDef::Map(def) | FuncOpDef::Filter(def) => {
-                    collect_scoped_names(&def.func, sym_map, scope_range, tokens, token_types, path_map, path);
-                    collect_scoped_names(&def.target, sym_map, scope_range, tokens, token_types, path_map, path);
+                    collect_scoped_names(&def.func, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+                    collect_scoped_names(&def.target, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
                 }
                 FuncOpDef::Reduce(def) => {
-                    collect_scoped_names(&def.func, sym_map, scope_range, tokens, token_types, path_map, path);
-                    collect_scoped_names(&def.acc, sym_map, scope_range, tokens, token_types, path_map, path);
-                    collect_scoped_names(&def.target, sym_map, scope_range, tokens, token_types, path_map, path);
+                    collect_scoped_names(&def.func, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+                    collect_scoped_names(&def.acc, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+                    collect_scoped_names(&def.target, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
                 }
             }
         }
         Expression::Select(sel_def) => {
-            collect_scoped_names(&sel_def.val, sym_map, scope_range, tokens, token_types, path_map, path);
+            collect_scoped_names(&sel_def.val, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
             if let Some(default) = &sel_def.default {
-                collect_scoped_names(default, sym_map, scope_range, tokens, token_types, path_map, path);
+                collect_scoped_names(default, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
             }
             for (_, _, field_expr) in &sel_def.tuple {
-                collect_scoped_names(field_expr, sym_map, scope_range, tokens, token_types, path_map, path);
+                collect_scoped_names(field_expr, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
             }
         }
         _ => {}
@@ -931,6 +986,75 @@ mod test {
             }
         } else {
             panic!("expected Module shape, got {:?}", shape);
+        }
+    }
+
+    // --- analyze: def_positions for scoped names ---
+
+    #[test]
+    fn test_def_positions_func_arg_def_and_use() {
+        // "let f = func(x) => x + 1;"
+        //  col:  5        14    20
+        // The arg `x` is defined at col 14; use at col 20.
+        // Both should map to the definition position (1, 14).
+        let result = analyze("let f = func(x) => x + 1;", None);
+        assert!(result.diagnostics.is_empty());
+
+        let def_pos = result.def_positions.get(&(1, 14));
+        assert!(def_pos.is_some(), "arg def (1,14) missing from def_positions; keys: {:?}", result.def_positions.keys().collect::<Vec<_>>());
+        let def_pos = def_pos.unwrap();
+        assert_eq!(def_pos.line, 1, "def position line should be 1");
+        assert_eq!(def_pos.column, 14, "def position column should be 14");
+
+        let use_pos = result.def_positions.get(&(1, 20));
+        assert!(use_pos.is_some(), "arg use (1,20) missing from def_positions");
+        let use_pos = use_pos.unwrap();
+        // Both def and use site should point to the same definition.
+        assert_eq!(use_pos.line, 1);
+        assert_eq!(use_pos.column, 14);
+    }
+
+    #[test]
+    fn test_def_positions_module_arg() {
+        // "let m = module { x = 0, } => (mod.x) {};"
+        // x at the arg position should have a def_positions entry.
+        let result = analyze("let m = module { x = 0, } => (mod.x) {};", None);
+        assert!(result.diagnostics.is_empty());
+        // The arg `x` should appear in def_positions with its definition column.
+        let x_entry = result
+            .def_positions
+            .iter()
+            .find(|(_, pos)| pos.line == 1 && pos.column > 15 && pos.column < 25);
+        assert!(
+            x_entry.is_some(),
+            "module arg x should be in def_positions; entries: {:?}",
+            result.def_positions.keys().collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_def_positions_inner_let_in_module() {
+        // "let m = module {} => { let inner = 42; };"
+        // `inner` inside the module body is an inner let.
+        let result = analyze("let m = module {} => { let inner = 42; };", None);
+        assert!(result.diagnostics.is_empty());
+        // There should be a def_positions entry for `inner`; all occurrences should
+        // point to the definition site.
+        let inner_entries: Vec<_> = result
+            .def_positions
+            .iter()
+            .filter(|(_, pos)| pos.line == 1)
+            .collect();
+        assert!(
+            !inner_entries.is_empty(),
+            "inner let `inner` should be in def_positions; keys: {:?}",
+            result.def_positions.keys().collect::<Vec<_>>()
+        );
+        // Every entry should point to the same definition position.
+        let def = inner_entries[0].1;
+        for (_, pos) in &inner_entries {
+            assert_eq!(pos.line, def.line);
+            assert_eq!(pos.column, def.column);
         }
     }
 
