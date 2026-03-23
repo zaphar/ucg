@@ -19,6 +19,26 @@ use std::rc::Rc;
 
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position as LspPosition, Range};
 
+/// Normalize a path by resolving `.` and `..` components in-place, without
+/// touching the filesystem.  This keeps map keys consistent between the
+/// workspace index (which stores clean walked paths) and import resolution
+/// (which may join `../../relative.ucg` onto a directory, producing `..`
+/// components).
+pub(crate) fn normalize_path(p: PathBuf) -> PathBuf {
+    use std::path::Component;
+    let mut out = PathBuf::new();
+    for c in p.components() {
+        match c {
+            Component::ParentDir => {
+                out.pop();
+            }
+            Component::CurDir => {}
+            other => out.push(other),
+        }
+    }
+    out
+}
+
 use crate::ast::typecheck::DeriveShape;
 use crate::ast::{Expression, ImportShape, Position, PositionedItem, Shape, Statement, Token};
 use crate::error::{BuildError, ErrorType};
@@ -219,11 +239,11 @@ fn collect_imports_in_expr(
                 if let Statement::Let(inner_def) = stmt {
                     if let Expression::Import(import_def) = &inner_def.value {
                         let path_str = import_def.path.fragment.as_ref();
-                        let import_path = if let Some(dir) = working_dir {
+                        let import_path = normalize_path(if let Some(dir) = working_dir {
                             dir.join(path_str)
                         } else {
                             PathBuf::from(path_str)
-                        };
+                        });
                         if import_path.is_absolute() {
                             let name: Rc<str> = inner_def.name.fragment.clone();
                             let (start, end) = scope_range;
@@ -372,11 +392,11 @@ pub fn analyze(
             // shape from the pre-analyzed cache when available.
             if let Expression::Import(import_def) = &def.value {
                 let path_str = import_def.path.fragment.as_ref();
-                let import_path = if let Some(dir) = working_dir {
+                let import_path = normalize_path(if let Some(dir) = working_dir {
                     dir.join(path_str)
                 } else {
                     PathBuf::from(path_str)
-                };
+                });
                 result.import_map.insert(name.clone(), import_path.clone());
 
                 if let Some(imported) = resolved.get(&import_path) {

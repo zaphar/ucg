@@ -130,11 +130,11 @@ pub fn scan_imports(content: &str, file_path: &Path) -> Vec<PathBuf> {
             }
             if j < tokens.len() && tokens[j].typ == TokenType::QUOTED {
                 let path_str = tokens[j].fragment.as_ref();
-                let resolved = if let Some(dir) = working_dir {
+                let resolved = super::analysis::normalize_path(if let Some(dir) = working_dir {
                     dir.join(path_str)
                 } else {
                     PathBuf::from(path_str)
-                };
+                });
                 if resolved.is_absolute() {
                     imports.push(resolved);
                 }

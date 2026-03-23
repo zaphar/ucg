@@ -1504,6 +1504,33 @@ mod test {
     }
 
     #[test]
+    fn test_find_definition_top_level_import_dotdot_relative_path() {
+        // Top-level import with "../" — the resolved path has ".." components that
+        // don't match the clean workspace key.
+        let canonical_path = PathBuf::from("/proj/shared.ucg");
+        let mut ws = WorkspaceIndex::new(PathBuf::from("/proj"));
+        ws.update_from_content(&canonical_path, "let foo = 42;");
+
+        let src = r#"let lib = import "../shared.ucg"; let y = lib.foo;"#;
+        let working_dir = std::path::Path::new("/proj/sub");
+        let doc = analysis::analyze(src, Some(working_dir), ws.resolved_files());
+
+        // `foo` in `lib.foo`
+        let col = src.rfind("foo").unwrap() as u32;
+        let def = find_definition(&doc, &fake_uri(), 0, col, &ws);
+        assert!(
+            def.is_some(),
+            "should find definition for dotdot relative top-level import; import_map: {:?}",
+            doc.import_map
+        );
+        let loc = def.unwrap();
+        assert_eq!(
+            loc.uri,
+            Url::from_file_path(&canonical_path).unwrap(),
+        );
+    }
+
+    #[test]
     fn test_find_definition_local_tuple_field() {
         // Cursor on `x` in `foo.x` where `foo` is a local tuple — should jump to
         // the `x` field key inside the tuple literal.
@@ -1686,6 +1713,61 @@ mod test {
         );
         assert_eq!(loc.range.start.line, 0);
         assert_eq!(loc.range.start.character, 4); // `m` at col 5 (1-based) → 4 (0-based)
+    }
+
+    #[test]
+    fn test_find_definition_top_level_import_dot_relative_path() {
+        // Import with "./" prefix — the joined path has a redundant "." component
+        // that must be normalized for the workspace lookup to succeed.
+        let canonical_path = PathBuf::from("/proj/shared.ucg");
+        let mut ws = WorkspaceIndex::new(PathBuf::from("/proj"));
+        ws.update_from_content(&canonical_path, "let foo = 42;");
+
+        let src = r#"let lib = import "./shared.ucg"; let y = lib.foo;"#;
+        let working_dir = std::path::Path::new("/proj");
+        let doc = analysis::analyze(src, Some(working_dir), ws.resolved_files());
+
+        let col = src.rfind("foo").unwrap() as u32;
+        let def = find_definition(&doc, &fake_uri(), 0, col, &ws);
+        assert!(
+            def.is_some(),
+            "should find definition for dot-slash relative import; import_map: {:?}",
+            doc.import_map
+        );
+        let loc = def.unwrap();
+        assert_eq!(loc.uri, Url::from_file_path(&canonical_path).unwrap());
+    }
+
+    #[test]
+    fn test_find_definition_inner_import_dotdot_relative_path() {
+        // Reproduces the real bug: import "../../shared.ucg" inside a module body.
+        // The working_dir.join("../../shared.ucg") produces a path with ".."
+        // components (e.g. /proj/a/b/../../shared.ucg) that doesn't match the
+        // clean workspace key (/proj/shared.ucg). Go-to-definition must normalize
+        // the path so the workspace lookup succeeds.
+        let canonical_path = PathBuf::from("/proj/shared.ucg");
+        let mut ws = WorkspaceIndex::new(PathBuf::from("/proj"));
+        ws.update_from_content(&canonical_path, "let mk_site_config = func(h, p) => { host = h, port = p };");
+
+        let src = r#"let outer = module{} => { let shared = import "../../shared.ucg"; let cfg = shared.mk_site_config; };"#;
+        // working_dir simulates the file being in /proj/a/b/
+        let working_dir = std::path::Path::new("/proj/a/b");
+        let doc = analysis::analyze(src, Some(working_dir), ws.resolved_files());
+
+        // Cursor on `mk_site_config` in `shared.mk_site_config`
+        let col = src.rfind("mk_site_config").unwrap() as u32;
+        let def = find_definition(&doc, &fake_uri(), 0, col, &ws);
+        assert!(
+            def.is_some(),
+            "should find definition for dotdot relative inner import; inner_import_map: {:?}",
+            doc.inner_import_map
+        );
+        let loc = def.unwrap();
+        assert_eq!(
+            loc.uri,
+            Url::from_file_path(&canonical_path).unwrap(),
+            "should jump to the imported file"
+        );
     }
 
     #[test]
