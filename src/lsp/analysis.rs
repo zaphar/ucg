@@ -1059,6 +1059,30 @@ mod test {
     }
 
     #[test]
+    fn test_inner_import_map_use_site_with_working_dir() {
+        // Mirrors unified.ucg: module body imports a file using a relative path.
+        // The import binding is used in a dot expression INSIDE the module body.
+        // Both the definition site and the use site should be in inner_import_map.
+        let src = "let composed = module{} => {\n    let site_mod = import \"site_module.ucg\";\n    let site_conf = site_mod.site_mod{x=1};\n};";
+        let result = analyze(src, Some(Path::new("/tmp/modules")));
+
+        // The inner_import_map should have entries for both the definition and use of site_mod.
+        // line 2 col 9: `site_mod` definition (let site_mod = import ...)
+        // line 3 col 21: `site_mod` use (first one in site_mod.site_mod)
+        // line 3 col 30: `site_mod` use (second one after dot)
+        assert!(
+            !result.inner_import_map.is_empty(),
+            "inner_import_map should be populated; keys: {:?}",
+            result.inner_import_map.keys().collect::<Vec<_>>()
+        );
+        assert!(
+            result.inner_import_map.contains_key(&(3, 21)),
+            "use site (3,21) should be in inner_import_map; keys: {:?}",
+            result.inner_import_map.keys().collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
     fn test_token_types_import_inside_module_body_resolves() {
         // Hovering on an import binding INSIDE a module body should show resolved fields,
         // not "import(path)". This requires post-processing of token_types.
