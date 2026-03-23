@@ -1953,6 +1953,46 @@ mod test {
         assert!(mod_tok.is_some(), "should have a 3-char keyword token");
     }
 
+    /// Regression: opening files with assert statements crashed the LSP because
+    /// `let_ranges` was indexed by total statement count instead of let-only count.
+    /// Run analysis + semantic tokens + hover on every integration test file to
+    /// catch panics.
+    macro_rules! lsp_no_panic_test {
+        ($name:ident, $path:expr) => {
+            #[test]
+            fn $name() {
+                let src = include_str!($path);
+                let doc = analyze(src, None);
+                let _tokens = encode_semantic_tokens(&doc);
+                // Also exercise hover on every token position in the first 5 lines.
+                for line in 0..5u32 {
+                    for col in 0..80u32 {
+                        let _ = find_hover(&doc, line, col);
+                    }
+                }
+            }
+        };
+    }
+
+    lsp_no_panic_test!(test_lsp_no_panic_comparisons, "../../integration_tests/comparisons_test.ucg");
+    lsp_no_panic_test!(test_lsp_no_panic_concatenation, "../../integration_tests/concatenation_test.ucg");
+    lsp_no_panic_test!(test_lsp_no_panic_empty, "../../integration_tests/empty_test.ucg");
+    lsp_no_panic_test!(test_lsp_no_panic_format, "../../integration_tests/format_test.ucg");
+    lsp_no_panic_test!(test_lsp_no_panic_func, "../../integration_tests/func_test.ucg");
+    lsp_no_panic_test!(test_lsp_no_panic_functional_processing, "../../integration_tests/functional_processing_test.ucg");
+    lsp_no_panic_test!(test_lsp_no_panic_import, "../../integration_tests/import_test.ucg");
+    lsp_no_panic_test!(test_lsp_no_panic_include, "../../integration_tests/include_test.ucg");
+    lsp_no_panic_test!(test_lsp_no_panic_list, "../../integration_tests/list_test.ucg");
+    lsp_no_panic_test!(test_lsp_no_panic_modules, "../../integration_tests/modules_test.ucg");
+    lsp_no_panic_test!(test_lsp_no_panic_operator_precedence, "../../integration_tests/operator_precedence_test.ucg");
+    lsp_no_panic_test!(test_lsp_no_panic_pkg_func_module, "../../integration_tests/pkg_func_module.ucg");
+    lsp_no_panic_test!(test_lsp_no_panic_pkg_func_module_test, "../../integration_tests/pkg_func_module_test.ucg");
+    lsp_no_panic_test!(test_lsp_no_panic_select_expressions, "../../integration_tests/select_expressions_test.ucg");
+    lsp_no_panic_test!(test_lsp_no_panic_selectors, "../../integration_tests/selectors_test.ucg");
+    lsp_no_panic_test!(test_lsp_no_panic_simple_values, "../../integration_tests/simple_values_test.ucg");
+    lsp_no_panic_test!(test_lsp_no_panic_tuple, "../../integration_tests/tuple_test.ucg");
+    lsp_no_panic_test!(test_lsp_no_panic_types, "../../integration_tests/types_test.ucg");
+
     #[test]
     fn test_encode_semantic_tokens_include_format_specifier() {
         let doc = analyze(r#"let x = include json "./file.json";"#, None);

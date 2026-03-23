@@ -295,15 +295,17 @@ fn collect_inner_import_paths(
     tokens: &[Token],
     inner_import_map: &mut HashMap<(usize, usize), PathBuf>,
 ) {
-    for (i, stmt) in ast.iter().enumerate() {
+    let mut let_idx = 0usize;
+    for stmt in ast.iter() {
         if let Statement::Let(def) = stmt {
             collect_imports_in_expr(
                 &def.value,
                 working_dir,
                 tokens,
-                let_ranges[i],
+                let_ranges[let_idx],
                 inner_import_map,
             );
+            let_idx += 1;
         }
     }
 }
@@ -378,7 +380,8 @@ pub fn analyze(
     result.file_doc = compute_file_doc(&result.comment_map, first_code_line);
 
     let mut sym_map: BTreeMap<Rc<str>, Shape> = BTreeMap::new();
-    for (i, stmt) in ast.iter().enumerate() {
+    let mut let_idx = 0usize;
+    for stmt in ast.iter() {
         if let Statement::Let(def) = stmt {
             let shape = def.value.derive_shape(&mut sym_map);
             let name: Rc<str> = def.name.fragment.clone();
@@ -428,7 +431,8 @@ pub fn analyze(
 
             // Collect scoped names (func/module args, inner lets, tuple fields) into
             // token_types and path_map, using the binding name as the path root.
-            let scope_range = let_ranges[i];
+            let scope_range = let_ranges[let_idx];
+            let_idx += 1;
             collect_scoped_names(
                 &def.value,
                 &mut sym_map.clone(),
