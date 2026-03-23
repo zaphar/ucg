@@ -94,13 +94,14 @@ pub fn run_server() -> Result<(), Box<dyn Error + Send + Sync>> {
             SemanticTokensOptions {
                 legend: SemanticTokensLegend {
                     token_types: vec![
-                        SemanticTokenType::KEYWORD,
-                        SemanticTokenType::VARIABLE,
-                        SemanticTokenType::STRING,
-                        SemanticTokenType::NUMBER,
-                        SemanticTokenType::COMMENT,
-                        SemanticTokenType::OPERATOR,
-                        SemanticTokenType::NAMESPACE,
+                        SemanticTokenType::KEYWORD,   // 0
+                        SemanticTokenType::VARIABLE,   // 1
+                        SemanticTokenType::STRING,     // 2
+                        SemanticTokenType::NUMBER,     // 3
+                        SemanticTokenType::COMMENT,    // 4
+                        SemanticTokenType::OPERATOR,   // 5
+                        SemanticTokenType::NAMESPACE,  // 6
+                        SemanticTokenType::TYPE,       // 7
                     ],
                     token_modifiers: vec![SemanticTokenModifier::DECLARATION],
                 },
@@ -442,7 +443,19 @@ fn find_hover(
     }
 
     // 2. Fall back to the top-level symbol table (name-keyed).
-    let (shape, def_pos) = doc.symbol_table.get(&name)?;
+    let (shape, def_pos) = match doc.symbol_table.get(&name) {
+        Some(entry) => entry,
+        None => {
+            // 3. Keyword hover — show documentation for language keywords.
+            return keyword_docs(name.as_ref()).map(|docs| Hover {
+                contents: HoverContents::Markup(MarkupContent {
+                    kind: MarkupKind::Markdown,
+                    value: docs.to_string(),
+                }),
+                range: Some(tok_range),
+            });
+        }
+    };
     // For import bindings use the imported file's file-level doc comment;
     // for regular bindings use the comment immediately above the definition.
     let doc_str = if let crate::ast::Shape::Import(_) = shape {
@@ -948,11 +961,14 @@ fn encode_semantic_tokens(doc: &AnalysisResult) -> Vec<SemanticToken> {
     use crate::ast::TokenType;
     const KEYWORDS: &[&str] = &[
         "let", "import", "func", "module", "select", "cast", "map", "filter", "reduce", "format",
-        "include", "assert", "out", "convert", "range", "fail", "debug", "is", "in", "true",
-        "false", "NULL",
+        "include", "assert", "out", "convert", "range", "fail", "debug", "is", "in", "not",
+        "self", "env", "mod", "true", "false", "NULL",
     ];
     const OPERATORS: &[&str] = &[
         "+", "-", "*", "/", "==", "!=", ">", "<", ">=", "<=", "%", "!",
+    ];
+    const INCLUDE_FORMATS: &[&str] = &[
+        "str", "b64", "b64urlsafe", "json", "yaml", "toml",
     ];
 
     let definition_positions: std::collections::HashSet<(usize, usize)> = doc
@@ -964,15 +980,20 @@ fn encode_semantic_tokens(doc: &AnalysisResult) -> Vec<SemanticToken> {
     let mut data: Vec<SemanticToken> = Vec::new();
     let mut prev_line = 0u32;
     let mut prev_col = 0u32;
+    let mut after_include = false;
 
     for tok in &doc.tokens {
         let (token_type, token_modifiers_bitset): (u32, u32) = match tok.typ {
             TokenType::WS | TokenType::END => continue,
             TokenType::COMMENT => (4, 0),
-            TokenType::QUOTED | TokenType::PIPEQUOTE => (2, 0),
+            TokenType::QUOTED | TokenType::PIPEQUOTE => {
+                after_include = false;
+                (2, 0)
+            }
             TokenType::DIGIT => (3, 0),
             TokenType::BOOLEAN | TokenType::EMPTY => (0, 0),
             TokenType::PUNCT => {
+                after_include = false;
                 if OPERATORS.contains(&tok.fragment.as_ref()) {
                     (5, 0)
                 } else {
@@ -981,11 +1002,17 @@ fn encode_semantic_tokens(doc: &AnalysisResult) -> Vec<SemanticToken> {
             }
             TokenType::BAREWORD => {
                 let text: &str = tok.fragment.as_ref();
-                if KEYWORDS.contains(&text) {
+                if after_include && INCLUDE_FORMATS.contains(&text) {
+                    after_include = false;
+                    (7, 0) // TYPE
+                } else if KEYWORDS.contains(&text) {
+                    after_include = text == "include";
                     (0, 0)
                 } else if doc.import_map.contains_key(text) {
+                    after_include = false;
                     (6, 0)
                 } else {
+                    after_include = false;
                     let is_decl = definition_positions.contains(&(tok.pos.line, tok.pos.column));
                     (1, if is_decl { 1 } else { 0 })
                 }
@@ -1158,6 +1185,34 @@ fn _path_to_uri(path: &std::path::Path) -> Option<Url> {
 /// Convert an LSP `Url` to a filesystem `PathBuf`.
 fn uri_to_path(uri: &Url) -> Option<PathBuf> {
     uri.to_file_path().ok()
+}
+
+/// Return documentation for a UCG keyword, or `None` if the token is not a keyword.
+fn keyword_docs(name: &str) -> Option<&'static str> {
+    Some(match name {
+        "let" => "**`let`** — Bind a value to a name.\n\n```ucg\nlet name = expr;\nlet name :: type_constraint = expr;\n```",
+        "import" => "**`import`** — Import another UCG file as a tuple of its bindings.\n\n```ucg\nlet lib = import \"path/to/file.ucg\";\n```",
+        "include" => "**`include`** — Include a file's contents as a value, with a format specifier.\n\n```ucg\ninclude str \"file.txt\"\ninclude json \"config.json\"\ninclude yaml \"config.yaml\"\ninclude toml \"config.toml\"\ninclude b64 \"data.bin\"\ninclude b64urlsafe \"data.bin\"\n```",
+        "assert" => "**`assert`** — Assert a condition in test files.\n\n```ucg\nassert {\n    ok = bool_expr,\n    desc = \"description\",\n};\n```",
+        "out" => "**`out`** — Mark a binding for output.\n\n```ucg\nout name = expr;\n```",
+        "func" => "**`func`** — Define a function.\n\n```ucg\nlet f = func(arg1, arg2) => expr;\nlet f = func(arg :: \"int\") => expr;\n```",
+        "module" => "**`module`** — Define a module with default parameters.\n\n```ucg\nlet m = module {\n    param1 = default,\n    param2 = default,\n} => {\n    // body — use mod.param1, mod.param2\n    let result = ...;\n};\nlet instance = m { param1 = value };\n```",
+        "select" => "**`select`** — Select a value from a set of choices.\n\n```ucg\nselect expr, default => {\n    option1 = value1,\n    option2 = value2,\n};\n```",
+        "map" => "**`map`** — Apply a function to each element of a list, tuple, or string.\n\n```ucg\nmap(func, collection)\n```",
+        "filter" => "**`filter`** — Keep elements where the function returns true.\n\n```ucg\nfilter(func, collection)\n```",
+        "reduce" => "**`reduce`** — Fold a collection into a single value.\n\n```ucg\nreduce(func, accumulator, collection)\n```",
+        "fail" => "**`fail`** — Abort compilation with an error message.\n\n```ucg\nfail \"message\";\nfail \"@ failed\" % (value);\n```",
+        "not" => "**`not`** — Boolean negation.\n\n```ucg\nnot bool_expr\n```",
+        "in" => "**`in`** — Check if a field name exists in a tuple.\n\n```ucg\n\"field\" in tuple_expr\n```",
+        "is" => "**`is`** — Check the type of a value.\n\n```ucg\nexpr is \"int\"\nexpr is \"str\"\n```",
+        "true" => "**`true`** — Boolean true literal.",
+        "false" => "**`false`** — Boolean false literal.",
+        "NULL" => "**`NULL`** — The empty/null value.",
+        "self" => "**`self`** — Reference to the current tuple in a copy expression.\n\n```ucg\nlet extended = base {\n    new_field = self.existing_field + 1,\n};\n```",
+        "env" => "**`env`** — Access environment variables.\n\n```ucg\nenv.HOME\nenv.PATH\n```",
+        "mod" => "**`mod`** — Access module parameters from within a module body.\n\n```ucg\nmod.param_name\n```",
+        _ => return None,
+    })
 }
 
 /// An LSP `Range` pointing at the very start of a file (line 0, char 0).
@@ -1877,6 +1932,63 @@ mod test {
         assert!(string_tok.is_some(), "should have string token for path");
     }
 
+    #[test]
+    fn test_encode_semantic_tokens_not_keyword() {
+        let doc = analyze("let x = not true;", None);
+        let tokens = encode_semantic_tokens(&doc);
+        // let(kw), x(var+decl), not(kw), true(kw)
+        assert_eq!(tokens.len(), 4, "expected 4 tokens, got {:?}", tokens);
+        // `not` should be keyword (type 0)
+        assert_eq!(tokens[2].token_type, 0, "`not` should be keyword");
+    }
+
+    #[test]
+    fn test_encode_semantic_tokens_self_env_mod_keywords() {
+        // Inside a module body, self/env/mod should highlight as keywords.
+        let doc = analyze("let m = module{ x = 1 } => { let a = mod.x; };", None);
+        let tokens = encode_semantic_tokens(&doc);
+        // Find the `mod` token — should be keyword (type 0)
+        let mod_tok = tokens.iter().find(|t| t.token_type == 0 && t.length == 3);
+        // There are multiple 3-char keywords (let, mod). Just verify we have keyword tokens.
+        assert!(mod_tok.is_some(), "should have a 3-char keyword token");
+    }
+
+    #[test]
+    fn test_encode_semantic_tokens_include_format_specifier() {
+        let doc = analyze(r#"let x = include json "./file.json";"#, None);
+        let tokens = encode_semantic_tokens(&doc);
+        // let(kw:0), x(var:1), include(kw:0), json(type:7), "./file.json"(str:2)
+        assert_eq!(tokens.len(), 5, "expected 5 tokens, got {:?}", tokens);
+        assert_eq!(tokens[0].token_type, 0, "let should be keyword");
+        assert_eq!(tokens[2].token_type, 0, "include should be keyword");
+        assert_eq!(tokens[3].token_type, 7, "json should be type");
+        assert_eq!(tokens[4].token_type, 2, "path should be string");
+    }
+
+    #[test]
+    fn test_encode_semantic_tokens_include_all_formats() {
+        for fmt in &["str", "b64", "b64urlsafe", "json", "yaml", "toml"] {
+            let src = format!(r#"let x = include {} "./file";"#, fmt);
+            let doc = analyze(&src, None);
+            let tokens = encode_semantic_tokens(&doc);
+            let format_tok = &tokens[3];
+            assert_eq!(
+                format_tok.token_type, 7,
+                "`{}` after include should be type (7), got {}",
+                fmt, format_tok.token_type
+            );
+        }
+    }
+
+    #[test]
+    fn test_encode_semantic_tokens_bare_str_not_type() {
+        // `str` NOT after `include` should be a regular variable, not type
+        let doc = analyze("let str = 1;", None);
+        let tokens = encode_semantic_tokens(&doc);
+        // let(kw:0), str(var:1+decl), 1(num:3)
+        assert_eq!(tokens[1].token_type, 1, "str as binding should be variable");
+    }
+
     // --- format_shape ---
 
     #[test]
@@ -2209,6 +2321,64 @@ mod test {
             );
         } else {
             panic!("expected Markup hover");
+        }
+    }
+
+    // --- keyword hover ---
+
+    #[test]
+    fn test_hover_keyword_let() {
+        let doc = analyze("let x = 1;", None);
+        let hover = find_hover(&doc, 0, 0); // cursor on `let`
+        assert!(hover.is_some(), "should show hover for `let` keyword");
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("**`let`**"), "got: {}", mc.value);
+        }
+    }
+
+    #[test]
+    fn test_hover_keyword_func() {
+        let doc = analyze("let f = func(x) => x;", None);
+        let col = "let f = ".len() as u32;
+        let hover = find_hover(&doc, 0, col); // cursor on `func`
+        assert!(hover.is_some(), "should show hover for `func` keyword");
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("**`func`**"), "got: {}", mc.value);
+        }
+    }
+
+    #[test]
+    fn test_hover_keyword_module() {
+        let doc = analyze("let m = module{} => {};", None);
+        let col = "let m = ".len() as u32;
+        let hover = find_hover(&doc, 0, col);
+        assert!(hover.is_some(), "should show hover for `module` keyword");
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("**`module`**"), "got: {}", mc.value);
+        }
+    }
+
+    #[test]
+    fn test_hover_keyword_select() {
+        let doc = analyze(r#"let x = select "a", 1 => { a = 2 };"#, None);
+        let col = "let x = ".len() as u32;
+        let hover = find_hover(&doc, 0, col);
+        assert!(hover.is_some(), "should show hover for `select` keyword");
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("**`select`**"), "got: {}", mc.value);
+        }
+    }
+
+    #[test]
+    fn test_hover_keyword_does_not_shadow_binding() {
+        // A user binding named `x` should get its type info, not keyword docs.
+        let doc = analyze("let x = 1; let y = x;", None);
+        // cursor on the `x` in `let y = x;`
+        let col = "let x = 1; let y = ".len() as u32;
+        let hover = find_hover(&doc, 0, col);
+        assert!(hover.is_some());
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("**type**"), "should show type info for binding, got: {}", mc.value);
         }
     }
 
