@@ -14,7 +14,9 @@
       "Bash(make unit:*)",
       "Bash(wc:*)",
       "Bash(find:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(cargo doc:*)",
+      "Bash(cargo check:*)"
     ]
   }
 }

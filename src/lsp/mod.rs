@@ -30,7 +30,7 @@ use lsp_server::{
     Response,
 };
 use lsp_types::notification::{
-    DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification,
+    DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Exit, Notification,
     PublishDiagnostics,
 };
 use lsp_types::request::{
@@ -136,6 +136,10 @@ pub fn run_server() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     let mut state = ServerState::new(workspace);
     main_loop(&connection, &mut state)?;
+    // Drop the connection before joining IO threads. This drops the sender
+    // end of the writer channel, allowing the writer thread to exit when
+    // the editor disconnects without a clean shutdown sequence.
+    drop(connection);
     io_threads.join()?;
     Ok(())
 }
@@ -174,7 +178,9 @@ fn main_loop(
                 handle_request(conn, state, req)?;
             }
             Message::Notification(notif) => {
-                handle_notification(conn, state, notif)?;
+                if handle_notification(conn, state, notif)? {
+                    break;
+                }
             }
             Message::Response(_) => {}
         }
@@ -182,12 +188,15 @@ fn main_loop(
     Ok(())
 }
 
+/// Handle a notification message. Returns `true` if the server should exit.
 fn handle_notification(
     conn: &Connection,
     state: &mut ServerState,
     notif: LspNotification,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
-    if notif.method == DidOpenTextDocument::METHOD {
+) -> Result<bool, Box<dyn Error + Send + Sync>> {
+    if notif.method == Exit::METHOD {
+        return Ok(true);
+    } else if notif.method == DidOpenTextDocument::METHOD {
         let params: lsp_types::DidOpenTextDocumentParams = serde_json::from_value(notif.params)?;
         let uri = params.text_document.uri;
         let content = params.text_document.text;
@@ -220,7 +229,7 @@ fn handle_notification(
                 clear,
             )))?;
     }
-    Ok(())
+    Ok(false)
 }
 
 fn handle_request(
