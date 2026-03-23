@@ -16,7 +16,8 @@
       "Bash(find:*)",
       "Bash(node:*)",
       "Bash(cargo doc:*)",
-      "Bash(cargo check:*)"
+      "Bash(cargo check:*)",
+      "Bash(cargo tarpaulin:*)"
     ]
   }
 }
