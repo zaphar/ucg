@@ -18,7 +18,8 @@
       "Bash(cargo doc:*)",
       "Bash(cargo check:*)",
       "Bash(cargo tarpaulin:*)",
-      "Bash(basenc --base64url)"
+      "Bash(basenc --base64url)",
+      "Bash(git tag:*)"
     ]
   }
 }

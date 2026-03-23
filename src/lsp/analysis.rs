@@ -382,6 +382,26 @@ pub fn analyze(
     let mut sym_map: BTreeMap<Rc<str>, Shape> = BTreeMap::new();
     let mut let_idx = 0usize;
     for stmt in ast.iter() {
+        match stmt {
+            Statement::Expression(expr) | Statement::Assert(_, expr) => {
+                let scope_range = (0, usize::MAX);
+                let path = match stmt {
+                    Statement::Assert(_, _) => "<assert>",
+                    _ => "<out>",
+                };
+                collect_scoped_names(
+                    expr,
+                    &mut sym_map.clone(),
+                    scope_range,
+                    &result.tokens,
+                    &mut result.token_types,
+                    &mut result.path_map,
+                    &mut result.def_positions,
+                    path,
+                );
+            }
+            _ => {}
+        }
         if let Statement::Let(def) = stmt {
             let shape = def.value.derive_shape(&mut sym_map);
             let name: Rc<str> = def.name.fragment.clone();
@@ -669,6 +689,12 @@ fn collect_scoped_names(
                     def_positions,
                     &field_path,
                 );
+            }
+        }
+
+        Expression::Simple(crate::ast::Value::List(list_def)) => {
+            for elem in &list_def.elems {
+                collect_scoped_names(elem, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
             }
         }
 
@@ -977,6 +1003,66 @@ mod test {
             result.path_map.is_empty(),
             "func args should not populate path_map, got: {:?}",
             result.path_map
+        );
+    }
+
+    #[test]
+    fn test_analyze_out_expression_tuple_in_token_types() {
+        // Tuple fields in a bare expression statement (no let binding) should
+        // still appear in token_types.
+        let result = analyze("{x = 1, y = \"hi\"};", None);
+        assert!(result.diagnostics.is_empty());
+        let has_int = result
+            .token_types
+            .values()
+            .any(|s| matches!(s, Shape::Int(_)));
+        assert!(has_int, "x field in out-expression tuple should be in token_types");
+    }
+
+    #[test]
+    fn test_analyze_out_expression_tuple_in_path_map() {
+        // Tuple fields in a bare expression statement should appear in path_map.
+        let result = analyze("{x = 1, y = \"hi\"};", None);
+        assert!(result.diagnostics.is_empty());
+        let paths: Vec<&str> = result.path_map.values().map(|s| s.as_ref()).collect();
+        assert!(!paths.is_empty(), "out-expression tuple fields should populate path_map, got: {:?}", paths);
+    }
+
+    #[test]
+    fn test_analyze_assert_inline_tuple_in_token_types() {
+        // Inline tuple fields inside an assert (not via a let binding) should
+        // appear in token_types.
+        let result = analyze("assert {x = 1}.x == 1;", None);
+        assert!(result.diagnostics.is_empty());
+        let has_int = result
+            .token_types
+            .values()
+            .any(|s| matches!(s, Shape::Int(_)));
+        assert!(has_int, "x field in assert inline tuple should be in token_types");
+    }
+
+    #[test]
+    fn test_analyze_list_element_tuple_in_token_types() {
+        // Tuple fields inside list elements should appear in token_types.
+        let result = analyze("let l = [{x = 1}];", None);
+        assert!(result.diagnostics.is_empty());
+        let has_int = result
+            .token_types
+            .values()
+            .any(|s| matches!(s, Shape::Int(_)));
+        assert!(has_int, "x field in list element tuple should be in token_types");
+    }
+
+    #[test]
+    fn test_analyze_list_element_tuple_in_path_map() {
+        // Tuple fields inside list elements should appear in path_map.
+        let result = analyze("let l = [{x = 1}];", None);
+        assert!(result.diagnostics.is_empty());
+        let paths: Vec<&str> = result.path_map.values().map(|s| s.as_ref()).collect();
+        assert!(
+            paths.iter().any(|p| p.contains("x")),
+            "list element tuple field x should be in path_map, got: {:?}",
+            paths
         );
     }
 

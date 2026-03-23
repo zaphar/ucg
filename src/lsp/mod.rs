@@ -1455,6 +1455,70 @@ mod test {
         assert!(find_hover(&doc, 99, 99).is_none());
     }
 
+    #[test]
+    fn test_find_hover_out_expression_tuple_field() {
+        // A bare expression statement (out expression) with a tuple — hovering on
+        // a field name should show type info even without a let binding.
+        let src = "{x = 1, y = \"hi\"};";
+        let doc = analyze(src, None);
+        // x should be in token_types with type Int
+        let x_col = src.find("x =").unwrap();
+        let hover = find_hover(&doc, 0, x_col as u32);
+        assert!(hover.is_some(), "should return hover for tuple field in out expression");
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("Int"), "should show Int type for x, got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
+    #[test]
+    fn test_find_hover_assert_inline_tuple_field() {
+        // Inline tuple fields inside an assert should have hover type info.
+        let src = "assert {x = 1}.x == 1;";
+        let doc = analyze(src, None);
+        // 'x' field name at col 8 (0-based) inside the tuple literal
+        let x_col = src.find("x =").unwrap();
+        let hover = find_hover(&doc, 0, x_col as u32);
+        assert!(hover.is_some(), "should return hover for tuple field in assert expression");
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("Int"), "should show Int type for x in assert, got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
+    #[test]
+    fn test_find_hover_list_element_tuple_field() {
+        // Tuple fields inside a list should have hover type info.
+        let src = "let l = [{x = 1}, {x = 2}];";
+        let doc = analyze(src, None);
+        // Find the first 'x' field inside the list (after "[{")
+        let first_x = src.find("x =").unwrap();
+        let hover = find_hover(&doc, 0, first_x as u32);
+        assert!(hover.is_some(), "should return hover for tuple field inside list element");
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("Int"), "should show Int type for x in list, got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
+    #[test]
+    fn test_find_hover_out_expression_nested_tuple_field() {
+        // Nested tuple fields in an out expression should have hover type info.
+        let src = "{outer = {inner = 42}};";
+        let doc = analyze(src, None);
+        let inner_offset = src.find("inner").unwrap();
+        let hover = find_hover(&doc, 0, inner_offset as u32);
+        assert!(hover.is_some(), "should return hover for nested tuple field in out expression");
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("Int"), "should show Int for inner, got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
     // --- find_definition ---
 
     #[test]
