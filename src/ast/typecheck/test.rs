@@ -1220,3 +1220,97 @@ fn test_assert_statement_tuple() {
 fn test_call_non_callable() {
     assert_type_err!("let x = 1;\nlet y = x(1);");
 }
+
+// --- function call-site constraint checking ---
+
+#[test]
+fn test_func_call_constraint_ok() {
+    // Calling a constrained function with matching types should succeed.
+    assert_type_ok!("let add = func(a :: 0, b :: 0) => a + b;\nlet result = add(1, 2);");
+}
+
+#[test]
+fn test_func_call_constraint_mismatch() {
+    // Calling a constrained function with wrong type should fail.
+    assert_type_err!("let add = func(a :: 0, b :: 0) => a + b;\nlet result = add(1, \"wrong\");");
+}
+
+#[test]
+fn test_func_call_constraint_all_args_wrong() {
+    // All arguments wrong type.
+    assert_type_err!("let add = func(a :: 0, b :: 0) => a + b;\nlet result = add(\"x\", \"y\");");
+}
+
+#[test]
+fn test_func_call_constraint_string_ok() {
+    // String-constrained function called with strings should succeed.
+    assert_type_ok!("let greet = func(name :: \"\") => \"hello \" + name;\nlet r = greet(\"world\");");
+}
+
+#[test]
+fn test_func_call_constraint_string_mismatch() {
+    // String-constrained function called with int should fail.
+    assert_type_err!("let greet = func(name :: \"\") => \"hello \" + name;\nlet r = greet(42);");
+}
+
+#[test]
+fn test_func_call_constraint_tuple_ok() {
+    // Tuple-constrained function called with matching tuple should succeed.
+    assert_type_ok!("let f = func(cfg :: {host = \"\", port = 0}) => cfg.host;\nlet r = f({host = \"localhost\", port = 80});");
+}
+
+#[test]
+fn test_func_call_constraint_tuple_mismatch() {
+    // Tuple-constrained function called with wrong field type should fail.
+    assert_type_err!("let f = func(cfg :: {host = \"\", port = 0}) => cfg.host;\nlet r = f({host = \"localhost\", port = \"wrong\"});");
+}
+
+#[test]
+fn test_func_call_mixed_constrained_unconstrained() {
+    // Only some args constrained — unconstrained args accept anything.
+    assert_type_ok!("let f = func(a :: 0, b) => a;\nlet r = f(1, \"anything\");");
+}
+
+#[test]
+fn test_func_call_wrong_arg_count() {
+    // Wrong number of arguments should fail.
+    assert_type_err!("let f = func(a :: 0, b :: 0) => a + b;\nlet r = f(1);");
+}
+
+// --- module instantiation constraint checking ---
+
+#[test]
+fn test_module_copy_constraint_ok() {
+    // Module with constrained args, instantiated with matching types.
+    assert_type_ok!("let m = module { host :: \"\" = \"localhost\", port :: 0 = 80, } => (mod.host) {};\nlet n = m { host = \"example.com\", port = 443 };");
+}
+
+#[test]
+fn test_module_copy_constraint_mismatch() {
+    // Module with constrained args, instantiated with wrong type.
+    assert_type_err!("let m = module { host :: \"\" = \"localhost\", port :: 0 = 80, } => (mod.host) {};\nlet n = m { host = \"example.com\", port = \"wrong\" };");
+}
+
+#[test]
+fn test_module_copy_constraint_partial_override() {
+    // Only override some args — defaults should still pass.
+    assert_type_ok!("let m = module { host :: \"\" = \"localhost\", port :: 0 = 80, } => (mod.host) {};\nlet n = m { host = \"example.com\" };");
+}
+
+#[test]
+fn test_module_copy_constraint_wrong_field() {
+    // Override with wrong type for the constrained field.
+    assert_type_err!("let m = module { host :: \"\" = \"localhost\", port :: 0 = 80, } => (mod.host) {};\nlet n = m { host = 42 };");
+}
+
+#[test]
+fn test_module_copy_no_constraints_same_type() {
+    // Module without explicit constraints — default value's type is the implicit shape.
+    assert_type_ok!("let m = module { x = 0, } => (mod.x) {};\nlet n = m { x = 42 };");
+}
+
+#[test]
+fn test_module_copy_no_constraints_wrong_type() {
+    // Module without explicit constraints — default value's type is still enforced.
+    assert_type_err!("let m = module { x = 0, } => (mod.x) {};\nlet n = m { x = \"wrong\" };");
+}

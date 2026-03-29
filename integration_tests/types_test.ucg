@@ -191,3 +191,52 @@ assert t.ok{
     test = mytuple.x == 1,
     desc = "Tuple constraint accepts valid tuple value",
 };
+
+// Function call-site constraint checking
+
+let add = func(a :: 0, b :: 0) => a + b;
+
+assert t.ok{
+    test = add(1, 2) == 3,
+    desc = "Constrained func called with matching int args works",
+};
+
+let greet = func(name :: "") => "hello " + name;
+
+assert t.ok{
+    test = greet("world") == "hello world",
+    desc = "Constrained func called with matching string arg works",
+};
+
+let config_func = func(cfg :: {host = "", port = 0}) => cfg.host;
+
+assert t.ok{
+    test = config_func({host = "localhost", port = 80}) == "localhost",
+    desc = "Constrained func with tuple arg works with matching tuple",
+};
+
+// Module instantiation constraint checking
+
+let server = module {
+    host :: "" = "localhost",
+    port :: 0 = 80,
+} => ({url = "http://" + mod.host, port = mod.port}) {};
+
+let prod = server{host = "example.com", port = 443};
+
+assert t.ok{
+    test = prod.url == "http://example.com",
+    desc = "Module with constrained args instantiated with valid types",
+};
+
+assert t.ok{
+    test = prod.port == 443,
+    desc = "Module constrained port accepts valid int override",
+};
+
+let dev = server{host = "dev.local"};
+
+assert t.ok{
+    test = dev.port == 80,
+    desc = "Module partial override keeps default for unspecified args",
+};
