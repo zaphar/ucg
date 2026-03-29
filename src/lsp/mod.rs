@@ -1519,6 +1519,91 @@ mod test {
         }
     }
 
+    #[test]
+    fn test_find_hover_not_expression_tuple_field() {
+        // Tuple field inside a `not` expression should have hover type info.
+        let src = "let b = not {x = true}.x;";
+        let doc = analyze(src, None);
+        let x_col = src.find("x =").unwrap();
+        let hover = find_hover(&doc, 0, x_col as u32);
+        assert!(hover.is_some(), "should return hover for tuple field inside not expression");
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("Bool"), "should show Bool type for x, got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
+    #[test]
+    fn test_find_hover_format_args_tuple_field() {
+        // Tuple field inside format args should have hover type info.
+        let src = r#"let s = "@ @" % ({x = 1}.x, 2);"#;
+        let doc = analyze(src, None);
+        let x_col = src.find("x =").unwrap();
+        let hover = find_hover(&doc, 0, x_col as u32);
+        assert!(hover.is_some(), "should return hover for tuple field inside format args");
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("Int"), "should show Int type for x, got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
+    #[test]
+    fn test_find_hover_format_single_arg_tuple_field() {
+        // Tuple field as a single format arg (not parenthesized list) should have hover type info.
+        let src = r#"let s = "hello @{item.x}" % {x = 42};"#;
+        let doc = analyze(src, None);
+        let x_col = src.find("x =").unwrap();
+        let hover = find_hover(&doc, 0, x_col as u32);
+        assert!(hover.is_some(), "should return hover for tuple field in single format arg");
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("Int"), "should show Int type for x, got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
+    #[test]
+    fn test_find_hover_cast_target_tuple_field() {
+        // Tuple field inside a cast target should have hover type info.
+        let src = "let n = int({x = 1}.x);";
+        let doc = analyze(src, None);
+        let x_col = src.find("x =").unwrap();
+        let hover = find_hover(&doc, 0, x_col as u32);
+        assert!(hover.is_some(), "should return hover for tuple field inside cast target");
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("Int"), "should show Int type for x, got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
+    #[test]
+    fn test_find_hover_fail_message_tuple_field() {
+        // Tuple field inside a fail message should have hover type info.
+        let src = r#"let f = func(x) => fail "msg: @" % ({y = x}.y);"#;
+        let doc = analyze(src, None);
+        let y_col = src.find("y =").unwrap();
+        let hover = find_hover(&doc, 0, y_col as u32);
+        assert!(hover.is_some(), "should return hover for tuple field inside fail message");
+    }
+
+    #[test]
+    fn test_find_hover_debug_expression_tuple_field() {
+        // Tuple field inside a TRACE expression should have hover type info.
+        let src = "let t = TRACE {x = 1};";
+        let doc = analyze(src, None);
+        let x_col = src.find("x =").unwrap();
+        let hover = find_hover(&doc, 0, x_col as u32);
+        assert!(hover.is_some(), "should return hover for tuple field inside TRACE expression");
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("Int"), "should show Int type for x, got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
     // --- find_definition ---
 
     #[test]

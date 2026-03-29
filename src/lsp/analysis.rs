@@ -739,6 +739,30 @@ fn collect_scoped_names(
                 collect_scoped_names(field_expr, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
             }
         }
+        Expression::Not(not_def) => {
+            collect_scoped_names(&not_def.expr, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+        }
+        Expression::Format(fmt_def) => {
+            match &fmt_def.args {
+                crate::ast::FormatArgs::List(exprs) => {
+                    for expr in exprs {
+                        collect_scoped_names(expr, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+                    }
+                }
+                crate::ast::FormatArgs::Single(expr) => {
+                    collect_scoped_names(expr, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+                }
+            }
+        }
+        Expression::Cast(cast_def) => {
+            collect_scoped_names(&cast_def.target, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+        }
+        Expression::Fail(fail_def) => {
+            collect_scoped_names(&fail_def.message, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+        }
+        Expression::Debug(debug_def) => {
+            collect_scoped_names(&debug_def.expr, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+        }
         _ => {}
     }
 }
@@ -1064,6 +1088,85 @@ mod test {
             "list element tuple field x should be in path_map, got: {:?}",
             paths
         );
+    }
+
+    #[test]
+    fn test_analyze_not_expression_tuple_in_token_types() {
+        // Tuple fields inside a `not` expression should appear in token_types.
+        let result = analyze("let b = not {x = true}.x;", None);
+        assert!(result.diagnostics.is_empty());
+        let has_bool = result
+            .token_types
+            .values()
+            .any(|s| matches!(s, Shape::Boolean(_)));
+        assert!(has_bool, "x field in not expression tuple should be in token_types");
+    }
+
+    #[test]
+    fn test_analyze_format_list_args_tuple_in_token_types() {
+        // Tuple fields inside format list args should appear in token_types.
+        let result = analyze(r#"let s = "@ @" % ({x = 1}.x, 2);"#, None);
+        assert!(result.diagnostics.is_empty());
+        let has_int_in_token_types = result
+            .token_types
+            .values()
+            .any(|s| matches!(s, Shape::Int(_)));
+        assert!(has_int_in_token_types, "x field in format list arg tuple should be in token_types");
+    }
+
+    #[test]
+    fn test_analyze_format_single_arg_tuple_in_token_types() {
+        // Tuple fields as a single format arg should appear in token_types.
+        let result = analyze(r#"let s = "hello @{item.x}" % {x = 42};"#, None);
+        assert!(result.diagnostics.is_empty());
+        let has_int = result
+            .token_types
+            .values()
+            .any(|s| matches!(s, Shape::Int(_)));
+        assert!(has_int, "x field in single format arg tuple should be in token_types");
+    }
+
+    #[test]
+    fn test_analyze_cast_target_tuple_in_token_types() {
+        // Tuple fields inside a cast target should appear in token_types.
+        let result = analyze("let n = int({x = 1}.x);", None);
+        assert!(result.diagnostics.is_empty());
+        let has_int = result
+            .token_types
+            .values()
+            .any(|s| matches!(s, Shape::Int(_)));
+        assert!(has_int, "x field in cast target tuple should be in token_types");
+    }
+
+    #[test]
+    fn test_analyze_fail_message_tuple_in_token_types() {
+        // Tuple fields inside a fail message should appear in token_types.
+        let result = analyze(r#"let f = func(x) => fail "msg: @" % ({y = x}.y);"#, None);
+        assert!(result.diagnostics.is_empty());
+        let has_token = result
+            .token_types
+            .iter()
+            .any(|((_, _), _)| true);
+        // At minimum the func arg 'x' should be in token_types; the tuple field 'y' should also be.
+        assert!(has_token, "fail message tuple field should populate token_types");
+        let paths: Vec<&str> = result.path_map.values().map(|s| s.as_ref()).collect();
+        assert!(
+            paths.iter().any(|p| p.contains("y")),
+            "fail message tuple field y should be in path_map, got: {:?}",
+            paths
+        );
+    }
+
+    #[test]
+    fn test_analyze_debug_expression_tuple_in_token_types() {
+        // Tuple fields inside a TRACE expression should appear in token_types.
+        let result = analyze("let t = TRACE {x = 1};", None);
+        assert!(result.diagnostics.is_empty());
+        let has_int = result
+            .token_types
+            .values()
+            .any(|s| matches!(s, Shape::Int(_)));
+        assert!(has_int, "x field in TRACE expression tuple should be in token_types");
     }
 
     #[test]
