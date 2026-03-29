@@ -102,7 +102,7 @@ impl AST {
                 Self::translate_expr(expr, &mut ops, root);
                 ops.push(Op::Runtime(Hook::Out), pos);
             }
-            Statement::Print(pos, tok, expr) => {
+            Statement::Convert(pos, tok, expr) => {
                 ops.push(Op::Val(Primitive::Str(tok.fragment)), tok.pos);
                 Self::translate_expr(expr, &mut ops, root);
                 ops.push(Op::Runtime(Hook::Convert), pos.clone());

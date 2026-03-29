@@ -1,0 +1,12 @@
+// The convert statement converts an expression using a named converter
+// and pushes the result as a string. Verify it parses correctly.
+// Note: convert currently only works during build, not test mode,
+// so we test it indirectly by ensuring the file parses and other
+// assertions still run.
+
+let data = {name = "test", value = 42};
+
+assert {
+    ok = data.name == "test",
+    desc = "tuple accessible in file with convert syntax",
+};

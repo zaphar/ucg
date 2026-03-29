@@ -884,7 +884,7 @@ make_fn!(
         typ => wrap_err!(must!(match_type!(BAREWORD)), "Expected converter name"),
         expr => wrap_err!(must!(expression), "Expected Expression to print"),
         _ => must!(punct!(";")),
-        (Statement::Print(pos, typ.clone(), expr.clone()))
+        (Statement::Convert(pos, typ.clone(), expr.clone()))
     )
 );
 

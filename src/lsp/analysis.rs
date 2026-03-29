@@ -385,11 +385,13 @@ pub fn analyze(
         match stmt {
             Statement::Expression(expr)
             | Statement::Assert(_, expr)
-            | Statement::Output(_, _, expr) => {
+            | Statement::Output(_, _, expr)
+            | Statement::Convert(_, _, expr) => {
                 let scope_range = (0, usize::MAX);
                 let path = match stmt {
                     Statement::Assert(_, _) => "<assert>",
                     Statement::Output(_, _, _) => "<output>",
+                    Statement::Convert(_, _, _) => "<convert>",
                     _ => "<out>",
                 };
                 collect_scoped_names(

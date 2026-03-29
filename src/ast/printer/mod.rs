@@ -588,8 +588,8 @@ where
                 write!(&mut self.w, "out {} ", _tok.fragment)?;
                 self.render_expr(&_expr)?;
             }
-            Statement::Print(_, _tok, _expr) => {
-                write!(&mut self.w, "print {} ", _tok.fragment)?;
+            Statement::Convert(_, _tok, _expr) => {
+                write!(&mut self.w, "convert {} ", _tok.fragment)?;
                 self.render_expr(&_expr)?;
             }
         };

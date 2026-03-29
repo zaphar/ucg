@@ -1664,6 +1664,21 @@ mod test {
         }
     }
 
+    #[test]
+    fn test_find_hover_convert_statement_tuple_field() {
+        // Tuple fields in a convert statement should have hover type info.
+        let src = "convert json {x = 1, y = 2};";
+        let doc = analyze(src, None);
+        let x_col = src.find("x =").unwrap();
+        let hover = find_hover(&doc, 0, x_col as u32);
+        assert!(hover.is_some(), "should return hover for tuple field in convert statement");
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("Int"), "should show Int type for x, got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
     // --- find_definition ---
 
     #[test]

@@ -1374,7 +1374,7 @@ impl Visitor for Checker {
                 let shape = expr.derive_shape(&mut self.symbol_table);
                 self.push_shape_or_err(shape);
             }
-            Statement::Print(_pos, _tok, ref expr) => {
+            Statement::Convert(_pos, _tok, ref expr) => {
                 let shape = expr.derive_shape(&mut self.symbol_table);
                 self.push_shape_or_err(shape);
             }
