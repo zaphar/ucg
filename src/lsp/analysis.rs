@@ -383,10 +383,13 @@ pub fn analyze(
     let mut let_idx = 0usize;
     for stmt in ast.iter() {
         match stmt {
-            Statement::Expression(expr) | Statement::Assert(_, expr) => {
+            Statement::Expression(expr)
+            | Statement::Assert(_, expr)
+            | Statement::Output(_, _, expr) => {
                 let scope_range = (0, usize::MAX);
                 let path = match stmt {
                     Statement::Assert(_, _) => "<assert>",
+                    Statement::Output(_, _, _) => "<output>",
                     _ => "<out>",
                 };
                 collect_scoped_names(
@@ -596,10 +599,12 @@ fn collect_scoped_names(
                     );
                 }
             }
-            // Record module arg definition positions using the arg token positions.
-            for (tok, _, _) in &mod_def.arg_set {
+            // Record module arg definition positions using the arg token positions,
+            // and descend into default value expressions.
+            for (tok, _, default_expr) in &mod_def.arg_set {
                 let name: Rc<str> = tok.fragment.clone();
                 record_def_position(&name, &tok.pos, scope_range, tokens, def_positions);
+                collect_scoped_names(default_expr, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
             }
             // Walk module body statements.
             // Inject the `mod` binding so inner lets that reference `mod.field`
@@ -762,6 +767,13 @@ fn collect_scoped_names(
         }
         Expression::Debug(debug_def) => {
             collect_scoped_names(&debug_def.expr, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+        }
+        Expression::Range(range_def) => {
+            collect_scoped_names(&range_def.start, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+            if let Some(step) = &range_def.step {
+                collect_scoped_names(step, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+            }
+            collect_scoped_names(&range_def.end, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
         }
         _ => {}
     }
@@ -1167,6 +1179,68 @@ mod test {
             .values()
             .any(|s| matches!(s, Shape::Int(_)));
         assert!(has_int, "x field in TRACE expression tuple should be in token_types");
+    }
+
+    #[test]
+    fn test_analyze_range_with_func_in_step() {
+        // A function used inside a range step should have its args in token_types.
+        // Range bounds are simple or grouped expressions, so we use a grouped
+        // expression containing a func call to test descent.
+        let result = analyze("let f = func(n) => n + 1; let r = 1:(f(2)):10;", None);
+        assert!(result.diagnostics.is_empty(), "diagnostics: {:?}", result.diagnostics);
+        // The func arg 'n' should be in token_types from the func definition.
+        let has_shape = result
+            .token_types
+            .values()
+            .any(|s| !matches!(s, Shape::Hole(_)));
+        assert!(has_shape, "range with func call should populate token_types");
+    }
+
+    #[test]
+    fn test_analyze_range_end_grouped_tuple() {
+        // A grouped expression containing a tuple in range end should be descended.
+        let result = analyze("let r = 1:({x = 10});", None);
+        assert!(result.diagnostics.is_empty(), "diagnostics: {:?}", result.diagnostics);
+        let paths: Vec<&str> = result.path_map.values().map(|s| s.as_ref()).collect();
+        assert!(
+            paths.iter().any(|p| p.contains("x")),
+            "range end grouped tuple field x should be in path_map, got: {:?}",
+            paths
+        );
+    }
+
+    #[test]
+    fn test_analyze_output_statement_tuple_in_token_types() {
+        // Tuple fields in an out statement should appear in token_types.
+        let result = analyze("out json {x = 1, y = 2};", None);
+        assert!(result.diagnostics.is_empty());
+        let has_int = result
+            .token_types
+            .values()
+            .any(|s| matches!(s, Shape::Int(_)));
+        assert!(has_int, "x field in out statement tuple should be in token_types");
+    }
+
+    #[test]
+    fn test_analyze_output_statement_tuple_in_path_map() {
+        // Tuple fields in an out statement should appear in path_map.
+        let result = analyze("out json {x = 1, y = 2};", None);
+        assert!(result.diagnostics.is_empty());
+        let paths: Vec<&str> = result.path_map.values().map(|s| s.as_ref()).collect();
+        assert!(!paths.is_empty(), "out statement tuple fields should populate path_map, got: {:?}", paths);
+    }
+
+    #[test]
+    fn test_analyze_module_arg_default_tuple_in_token_types() {
+        // Tuple fields in module arg default values should appear in token_types.
+        let result = analyze("let m = module{cfg = {x = 1}} => {let out = mod.cfg;};", None);
+        assert!(result.diagnostics.is_empty());
+        let paths: Vec<&str> = result.path_map.values().map(|s| s.as_ref()).collect();
+        assert!(
+            paths.iter().any(|p| p.contains("x")),
+            "module arg default tuple field x should be in path_map, got: {:?}",
+            paths
+        );
     }
 
     #[test]

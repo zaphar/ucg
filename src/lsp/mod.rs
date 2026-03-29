@@ -1604,6 +1604,67 @@ mod test {
         }
     }
 
+    #[test]
+    #[ignore] // Parser bug: grouped_expression matches before range_expression gets a chance
+    fn test_find_hover_range_start_tuple_field() {
+        // Tuple field used in a grouped range start should have hover type info.
+        let src = "let r = ({x = 1}.x):10;";
+        let doc = analyze(src, None);
+        let x_col = src.find("x =").unwrap();
+        let hover = find_hover(&doc, 0, x_col as u32);
+        assert!(hover.is_some(), "should return hover for tuple field in range start");
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("Int"), "should show Int type for x, got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
+    #[test]
+    fn test_find_hover_range_end_tuple_field() {
+        // Tuple field used in a grouped range end should have hover type info.
+        let src = "let r = 1:({x = 10}.x);";
+        let doc = analyze(src, None);
+        let x_col = src.find("x =").unwrap();
+        let hover = find_hover(&doc, 0, x_col as u32);
+        assert!(hover.is_some(), "should return hover for tuple field in range end");
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("Int"), "should show Int type for x, got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
+    #[test]
+    fn test_find_hover_output_statement_tuple_field() {
+        // Tuple fields in an out statement should have hover type info.
+        let src = "out json {x = 1, y = 2};";
+        let doc = analyze(src, None);
+        let x_col = src.find("x =").unwrap();
+        let hover = find_hover(&doc, 0, x_col as u32);
+        assert!(hover.is_some(), "should return hover for tuple field in out statement");
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("Int"), "should show Int type for x, got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
+    #[test]
+    fn test_find_hover_module_arg_default_tuple_field() {
+        // Tuple fields in a module arg default value should have hover type info.
+        let src = "let m = module{cfg = {x = 1}} => {let out = mod.cfg;};";
+        let doc = analyze(src, None);
+        let x_col = src.find("x =").unwrap();
+        let hover = find_hover(&doc, 0, x_col as u32);
+        assert!(hover.is_some(), "should return hover for tuple field in module arg default");
+        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+            assert!(mc.value.contains("Int"), "should show Int type for x, got: {}", mc.value);
+        } else {
+            panic!("expected Markup hover");
+        }
+    }
+
     // --- find_definition ---
 
     #[test]
