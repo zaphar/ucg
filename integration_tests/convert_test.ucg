@@ -1,12 +1,22 @@
-// The convert statement converts an expression using a named converter
-// and pushes the result as a string. Verify it parses correctly.
-// Note: convert currently only works during build, not test mode,
-// so we test it indirectly by ensuring the file parses and other
-// assertions still run.
+// Test that convert works as both a statement and an expression.
 
 let data = {name = "test", value = 42};
 
+// convert as a statement (result discarded)
+convert json data;
+
+// convert as an expression (result bound to a variable)
+let result = convert json data;
+
 assert {
-    ok = data.name == "test",
-    desc = "tuple accessible in file with convert syntax",
+    ok = result == "{\n  \"name\": \"test\",\n  \"value\": 42.0\n}",
+    desc = "convert json produces expected JSON string",
+};
+
+// convert can be used inline in expressions
+let wrapped = "data: " + convert json [1, 2, 3];
+
+assert {
+    ok = wrapped == "data: [\n  1.0,\n  2.0,\n  3.0\n]",
+    desc = "convert expression can be used inline with concatenation",
 };

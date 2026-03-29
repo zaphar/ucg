@@ -385,13 +385,11 @@ pub fn analyze(
         match stmt {
             Statement::Expression(expr)
             | Statement::Assert(_, expr)
-            | Statement::Output(_, _, expr)
-            | Statement::Convert(_, _, expr) => {
+            | Statement::Output(_, _, expr) => {
                 let scope_range = (0, usize::MAX);
                 let path = match stmt {
                     Statement::Assert(_, _) => "<assert>",
                     Statement::Output(_, _, _) => "<output>",
-                    Statement::Convert(_, _, _) => "<convert>",
                     _ => "<out>",
                 };
                 collect_scoped_names(
@@ -769,6 +767,9 @@ fn collect_scoped_names(
         }
         Expression::Debug(debug_def) => {
             collect_scoped_names(&debug_def.expr, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+        }
+        Expression::Convert(convert_def) => {
+            collect_scoped_names(&convert_def.target, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
         }
         Expression::Range(range_def) => {
             collect_scoped_names(&range_def.start, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);

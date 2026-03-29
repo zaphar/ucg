@@ -316,6 +316,10 @@ where
                 }
                 self.render_expr(&_def.message)?;
             }
+            Expression::Convert(_def) => {
+                write!(self.w, "convert {} ", _def.converter.fragment)?;
+                self.render_expr(&_def.target)?;
+            }
             Expression::Format(_def) => {
                 write!(self.w, "\"{}\"", Self::escape_quotes(&_def.template))?;
                 write!(self.w, " % ")?;
@@ -586,10 +590,6 @@ where
             }
             Statement::Output(_, _tok, _expr) => {
                 write!(&mut self.w, "out {} ", _tok.fragment)?;
-                self.render_expr(&_expr)?;
-            }
-            Statement::Convert(_, _tok, _expr) => {
-                write!(&mut self.w, "convert {} ", _tok.fragment)?;
                 self.render_expr(&_expr)?;
             }
         };

@@ -1304,6 +1304,15 @@ pub struct DebugDef {
     pub expr: Box<Expression>,
 }
 
+/// Encodes a convert expression in the UCG AST.
+/// Converts a UCG value to a string using the specified converter format.
+#[derive(Debug, PartialEq, Clone)]
+pub struct ConvertDef {
+    pub pos: Position,
+    pub converter: Token,
+    pub target: Box<Expression>,
+}
+
 /// Encodes a ucg expression. Expressions compute a value from.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
@@ -1332,6 +1341,8 @@ pub enum Expression {
     Fail(FailDef),
     // Debugging assistance
     Debug(DebugDef),
+    // Convert expression - converts a value to string using a converter
+    Convert(ConvertDef),
 }
 
 impl Expression {
@@ -1355,6 +1366,7 @@ impl Expression {
             &Expression::Fail(ref def) => &def.pos,
             &Expression::Not(ref def) => &def.pos,
             &Expression::Debug(ref def) => &def.pos,
+            &Expression::Convert(ref def) => &def.pos,
         }
     }
 }
@@ -1413,6 +1425,9 @@ impl fmt::Display for Expression {
             &Expression::Debug(ref def) => {
                 write!(w, "!{}", def.expr)?;
             }
+            &Expression::Convert(ref _def) => {
+                write!(w, "<Convert>")?;
+            }
         }
         Ok(())
     }
@@ -1441,9 +1456,6 @@ pub enum Statement {
 
     // Identify an Expression for output.
     Output(Position, Token, Expression),
-
-    // Convert the expression and print to stdout.
-    Convert(Position, Token, Expression),
 }
 
 impl Statement {
@@ -1453,7 +1465,6 @@ impl Statement {
             Statement::Let(ref def) => &def.pos,
             Statement::Assert(ref pos, _) => pos,
             Statement::Output(ref pos, _, _) => pos,
-            Statement::Convert(ref pos, _, _) => pos,
         }
     }
 }

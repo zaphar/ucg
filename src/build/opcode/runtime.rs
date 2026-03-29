@@ -359,7 +359,7 @@ impl Builtins {
         if let Some((val, val_pos)) = val {
             let val = val.into();
             if let Some((c_type_val, c_typ_pos)) = stack.pop() {
-                if let &Value::S(ref c_type) = c_type_val.as_ref() {
+                if let &Value::P(Primitive::Str(ref c_type)) = c_type_val.as_ref() {
                     if let Some(c) = env.borrow().converter_registry.get_converter(c_type) {
                         let mut buf: Vec<u8> = Vec::new();
                         match c.convert(Rc::new(val), &mut buf) {

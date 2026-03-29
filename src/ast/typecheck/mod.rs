@@ -662,6 +662,10 @@ impl DeriveShape for Expression {
                 // Debug is transparent - return the shape of the inner expression
                 def.expr.derive_shape(symbol_table)
             }
+            Expression::Convert(def) => {
+                // Convert always produces a string
+                Shape::Str(def.pos.clone())
+            }
         }
     }
 }
@@ -1371,10 +1375,6 @@ impl Visitor for Checker {
                 self.push_shape_or_err(shape);
             }
             Statement::Output(_pos, _tok, ref expr) => {
-                let shape = expr.derive_shape(&mut self.symbol_table);
-                self.push_shape_or_err(shape);
-            }
-            Statement::Convert(_pos, _tok, ref expr) => {
                 let shape = expr.derive_shape(&mut self.symbol_table);
                 self.push_shape_or_err(shape);
             }

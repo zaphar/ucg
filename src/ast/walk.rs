@@ -72,9 +72,6 @@ pub trait Walker: Visitor {
             Statement::Output(_, _, ref mut expr) => {
                 self.walk_expression(expr);
             }
-            Statement::Convert(_, _, ref mut expr) => {
-                self.walk_expression(expr);
-            }
         }
         self.leave_statement(stmt);
     }
@@ -175,6 +172,9 @@ pub trait Walker: Visitor {
             }
             Expression::Debug(ref mut def) => {
                 self.walk_expression(&mut def.expr);
+            }
+            Expression::Convert(ref mut def) => {
+                self.walk_expression(&mut def.target);
             }
         }
         self.leave_expression(expr);

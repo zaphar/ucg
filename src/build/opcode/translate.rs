@@ -102,12 +102,6 @@ impl AST {
                 Self::translate_expr(expr, &mut ops, root);
                 ops.push(Op::Runtime(Hook::Out), pos);
             }
-            Statement::Convert(pos, tok, expr) => {
-                ops.push(Op::Val(Primitive::Str(tok.fragment)), tok.pos);
-                Self::translate_expr(expr, &mut ops, root);
-                ops.push(Op::Runtime(Hook::Convert), pos.clone());
-                ops.push(Op::Pop, pos);
-            }
         }
     }
 
@@ -574,6 +568,11 @@ impl AST {
                 ops.push(Op::Val(Primitive::Str(expr_pretty.into())), def.pos.clone());
                 Self::translate_expr(*def.expr, &mut ops, root);
                 ops.push(Op::Runtime(Hook::Trace(def.pos.clone())), def.pos);
+            }
+            Expression::Convert(def) => {
+                ops.push(Op::Val(Primitive::Str(def.converter.fragment)), def.converter.pos);
+                Self::translate_expr(*def.target, &mut ops, root);
+                ops.push(Op::Runtime(Hook::Convert), def.pos);
             }
         }
     }

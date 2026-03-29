@@ -751,6 +751,21 @@ make_fn!(
     )
 );
 
+make_fn!(
+    convert_expression<SliceIter<Token>, Expression>,
+    do_each!(
+        pos => pos,
+        _ => word!("convert"),
+        typ => wrap_err!(must!(match_type!(BAREWORD)), "Expected converter name"),
+        expr => wrap_err!(must!(expression), "Expected expression to convert"),
+        (Expression::Convert(ConvertDef{
+            pos: pos,
+            converter: typ.clone(),
+            target: Box::new(expr),
+        }))
+    )
+);
+
 fn unprefixed_expression(input: SliceIter<Token>) -> ParseResult<Expression> {
     let _input = input.clone();
     either!(
@@ -773,6 +788,7 @@ make_fn!(
         trace_parse!(trace_expression),
         trace_parse!(not_expression),
         trace_parse!(fail_expression),
+        trace_parse!(convert_expression),
         trace_parse!(module_expression),
         trace_parse!(alt_select_expression),
         trace_parse!(range_expression),
@@ -876,18 +892,6 @@ make_fn!(
     )
 );
 
-make_fn!(
-    print_statement<SliceIter<Token>, Statement>,
-    do_each!(
-        pos => pos,
-        _ => word!("convert"),
-        typ => wrap_err!(must!(match_type!(BAREWORD)), "Expected converter name"),
-        expr => wrap_err!(must!(expression), "Expected Expression to print"),
-        _ => must!(punct!(";")),
-        (Statement::Convert(pos, typ.clone(), expr.clone()))
-    )
-);
-
 //trace_macros!(true);
 fn statement(i: SliceIter<Token>) -> Result<SliceIter<Token>, Statement> {
     return either!(
@@ -895,7 +899,6 @@ fn statement(i: SliceIter<Token>) -> Result<SliceIter<Token>, Statement> {
         trace_parse!(assert_statement),
         trace_parse!(let_statement),
         trace_parse!(out_statement),
-        trace_parse!(print_statement),
         trace_parse!(expression_statement)
     );
 }
