@@ -2504,6 +2504,10 @@ mod test {
         test_lsp_no_panic_types,
         "../../integration_tests/types_test.ucg"
     );
+    lsp_no_panic_test!(
+        test_lsp_no_panic_constraints,
+        "../../integration_tests/constraint_test.ucg"
+    );
 
     #[test]
     fn test_encode_semantic_tokens_include_format_specifier() {
