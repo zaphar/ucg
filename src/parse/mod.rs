@@ -756,7 +756,6 @@ fn unprefixed_expression(input: SliceIter<Token>) -> ParseResult<Expression> {
     either!(
         input,
         trace_parse!(format_expression),
-        trace_parse!(range_expression),
         trace_parse!(simple_expression),
         // cast parse attempts must happen before call parse attempts.
         trace_parse!(cast_expression),
@@ -776,6 +775,7 @@ make_fn!(
         trace_parse!(fail_expression),
         trace_parse!(module_expression),
         trace_parse!(alt_select_expression),
+        trace_parse!(range_expression),
         trace_parse!(grouped_expression),
         trace_parse!(include_expression),
         trace_parse!(unprefixed_expression)

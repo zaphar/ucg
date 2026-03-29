@@ -1605,7 +1605,6 @@ mod test {
     }
 
     #[test]
-    #[ignore] // Parser bug: grouped_expression matches before range_expression gets a chance
     fn test_find_hover_range_start_tuple_field() {
         // Tuple field used in a grouped range start should have hover type info.
         let src = "let r = ({x = 1}.x):10;";
