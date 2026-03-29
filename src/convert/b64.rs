@@ -34,7 +34,10 @@ mod test {
     fn standard_and_urlsafe_differ_for_test_input() {
         let std_enc = STANDARD.encode(TEST_INPUT);
         let url_enc = URL_SAFE.encode(TEST_INPUT);
-        assert_ne!(std_enc, url_enc, "test input must produce differing encodings");
+        assert_ne!(
+            std_enc, url_enc,
+            "test input must produce differing encodings"
+        );
     }
 
     #[test]

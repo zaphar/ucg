@@ -27,7 +27,7 @@ use super::translate::OpsMap;
 use super::Composite::{List, Tuple};
 use super::Hook;
 use super::Primitive::{Bool, Empty, Float, Int, Str};
-use super::Value::{C, F, M, P, S, T};
+use super::Value::{C, F, K, M, P, S, T};
 use super::{Error, Op, Primitive, Value};
 use super::{Func, Module};
 
@@ -195,6 +195,8 @@ impl VM {
                 Op::Render => self.op_render()?,
                 Op::PushSelf => self.op_push_self()?,
                 Op::PopSelf => self.op_pop_self()?,
+                Op::CheckConstraint => self.op_check_constraint(pos)?,
+                Op::BuildConstraint(arm_types) => self.op_build_constraint(arm_types, pos)?,
             };
         }
         if let Some(p) = self.ops.path.as_ref() {
@@ -236,6 +238,7 @@ impl VM {
             M(_) => "module",
             S(_) => "sym",
             T(_) => "thunk",
+            K(_) => "constraint",
         };
         self.push(Rc::new(P(Str(typ_name.into()))), pos)?;
         Ok(())
@@ -744,6 +747,98 @@ impl VM {
     fn op_pop_self(&mut self) -> Result<(), Error> {
         // We'll need a self stack.
         self.self_stack.pop();
+        Ok(())
+    }
+
+    fn op_build_constraint(
+        &mut self,
+        arm_types: Vec<super::ConstraintArmType>,
+        pos: Position,
+    ) -> Result<(), Error> {
+        use crate::build::ir::{ConstraintBound, ConstraintVal, ConstraintValArm};
+
+        let mut arms = Vec::new();
+        // Pop values in reverse order — we pushed start then end for ranges,
+        // and arm order matches push order. So we process in reverse.
+        // Collect all values first, then process.
+        let mut values: Vec<(Rc<Value>, Position)> = Vec::new();
+        for arm_type in arm_types.iter() {
+            match arm_type {
+                super::ConstraintArmType::Range => {
+                    // 2 values: end (on top), start (below)
+                    values.push(self.pop()?);
+                    values.push(self.pop()?);
+                }
+                super::ConstraintArmType::Exact => {
+                    values.push(self.pop()?);
+                }
+            }
+        }
+        // Now process in reverse (values were popped in reverse order)
+        values.reverse();
+        let mut val_iter = values.into_iter();
+
+        for arm_type in arm_types.iter() {
+            match arm_type {
+                super::ConstraintArmType::Range => {
+                    let (start_val, _) = val_iter.next().unwrap();
+                    let (end_val, _) = val_iter.next().unwrap();
+                    let bound = match (start_val.as_ref(), end_val.as_ref()) {
+                        (P(Int(s)), P(Int(e))) => ConstraintBound::Int(Some(*s), Some(*e)),
+                        (P(Int(s)), P(Empty)) => ConstraintBound::Int(Some(*s), None),
+                        (P(Empty), P(Int(e))) => ConstraintBound::Int(None, Some(*e)),
+                        (P(Float(s)), P(Float(e))) => ConstraintBound::Float(Some(*s), Some(*e)),
+                        (P(Float(s)), P(Empty)) => ConstraintBound::Float(Some(*s), None),
+                        (P(Empty), P(Float(e))) => ConstraintBound::Float(None, Some(*e)),
+                        _ => {
+                            return Err(Error::new(
+                                "Range constraint bounds must be numeric (int or float)".into(),
+                                pos,
+                            ));
+                        }
+                    };
+                    arms.push(ConstraintValArm::Range(bound));
+                }
+                super::ConstraintArmType::Exact => {
+                    let (val, _) = val_iter.next().unwrap();
+                    let ir_val: crate::build::ir::Val = val.as_ref().into();
+                    arms.push(ConstraintValArm::Exact(Rc::new(ir_val)));
+                }
+            }
+        }
+
+        self.push(Rc::new(K(ConstraintVal { arms })), pos)?;
+        Ok(())
+    }
+
+    fn op_check_constraint(&mut self, pos: Position) -> Result<(), Error> {
+        // Pop constraint value from stack
+        let (constraint, _constraint_pos) = self.pop()?;
+        // Peek at the value (don't pop — Bind needs it)
+        if self.stack.is_empty() {
+            return Err(Error::new(
+                "No value on stack for constraint check".into(),
+                pos,
+            ));
+        }
+        let (val, val_pos) = self.stack.last().unwrap().clone();
+        if let K(ref cv) = constraint.as_ref() {
+            // Convert opcode Value to IR Val for checking
+            let ir_val: crate::build::ir::Val = val.as_ref().into();
+            if !cv.check(&ir_val) {
+                return Err(Error::new(
+                    format!(
+                        "Value {} does not satisfy constraint {}",
+                        ir_val,
+                        crate::build::ir::Val::Constraint(cv.clone())
+                    )
+                    .into(),
+                    val_pos,
+                ));
+            }
+        }
+        // For non-constraint values in constraint position (backward compat),
+        // this is a no-op since typecheck already verified shape compatibility
         Ok(())
     }
 

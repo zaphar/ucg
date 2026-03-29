@@ -73,10 +73,7 @@ mod test {
 
     #[test]
     fn convert_list_produces_multi_doc() {
-        let v = Val::List(vec![
-            Rc::new(Val::Int(1)),
-            Rc::new(Val::Int(2)),
-        ]);
+        let v = Val::List(vec![Rc::new(Val::Int(1)), Rc::new(Val::Int(2))]);
         let out = convert_to_string(v);
         // Each document should appear as a separate YAML value
         assert!(out.contains("1"));

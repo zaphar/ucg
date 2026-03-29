@@ -52,6 +52,29 @@ let my_config :: Config = {host = "example.com", port = 443};
 See <a href="/reference/typechecking">Type Checking & Shape Constraints</a>
 for full details.
 
+### Constraint statements
+
+The `constraint` statement defines a named constraint that can be reused across
+multiple let bindings. Constraints are contracts that describe what values are
+acceptable — they are not configuration values themselves and cannot appear in
+output.
+
+```
+constraint port_range = in 1..65535;
+constraint log_level = "debug" | "info" | "warn" | "error";
+constraint valid_port = in 1..1024 | 8080 | 8443;
+```
+
+Named constraints are used in constraint position with `::`:
+
+```
+let port :: port_range = 8080;
+let level :: log_level = "info";
+```
+
+See <a href="/reference/typechecking">Type Checking & Shape Constraints</a>
+for full details on range constraints and alternations.
+
 Output Statements
 -----------
 

@@ -1244,7 +1244,9 @@ fn test_func_call_constraint_all_args_wrong() {
 #[test]
 fn test_func_call_constraint_string_ok() {
     // String-constrained function called with strings should succeed.
-    assert_type_ok!("let greet = func(name :: \"\") => \"hello \" + name;\nlet r = greet(\"world\");");
+    assert_type_ok!(
+        "let greet = func(name :: \"\") => \"hello \" + name;\nlet r = greet(\"world\");"
+    );
 }
 
 #[test]

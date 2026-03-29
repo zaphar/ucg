@@ -176,8 +176,7 @@ fn resolve_imports_in_shape(
             Shape::Tuple(PositionedItem::new(new_val, pi.pos))
         }
         Shape::Module(mshape) => {
-            let new_ret =
-                resolve_imports_in_shape(mshape.ret().clone(), working_dir, resolved);
+            let new_ret = resolve_imports_in_shape(mshape.ret().clone(), working_dir, resolved);
             Shape::Module(mshape.with_ret(new_ret))
         }
         _ => shape,
@@ -429,9 +428,7 @@ pub fn analyze(
                     let tuple_items: crate::ast::TupleShape = imported
                         .symbol_table
                         .iter()
-                        .map(|(n, (s, p))| {
-                            (PositionedItem::new(n.clone(), p.clone()), s.clone())
-                        })
+                        .map(|(n, (s, p))| (PositionedItem::new(n.clone(), p.clone()), s.clone()))
                         .collect();
                     let resolved_shape = Shape::Import(ImportShape::Resolved(
                         import_def.path.pos.clone(),
@@ -446,9 +443,15 @@ pub fn analyze(
 
             // Resolve any unresolved imports that are nested inside the shape
             // (e.g., import bindings inside a module return type).
-            if let Some((shape, pos)) = result.symbol_table.get(&name).map(|(s, p)| (s.clone(), p.clone())) {
+            if let Some((shape, pos)) = result
+                .symbol_table
+                .get(&name)
+                .map(|(s, p)| (s.clone(), p.clone()))
+            {
                 let fully_resolved = resolve_imports_in_shape(shape, working_dir, resolved);
-                result.symbol_table.insert(name.clone(), (fully_resolved.clone(), pos));
+                result
+                    .symbol_table
+                    .insert(name.clone(), (fully_resolved.clone(), pos));
                 sym_map.insert(name.clone(), fully_resolved);
             }
 
@@ -604,7 +607,16 @@ fn collect_scoped_names(
             for (tok, _, default_expr) in &mod_def.arg_set {
                 let name: Rc<str> = tok.fragment.clone();
                 record_def_position(&name, &tok.pos, scope_range, tokens, def_positions);
-                collect_scoped_names(default_expr, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+                collect_scoped_names(
+                    default_expr,
+                    sym_map,
+                    scope_range,
+                    tokens,
+                    token_types,
+                    path_map,
+                    def_positions,
+                    path,
+                );
             }
             // Walk module body statements.
             // Inject the `mod` binding so inner lets that reference `mod.field`
@@ -682,7 +694,10 @@ fn collect_scoped_names(
                 );
                 // Record the dotted path for hover display.
                 let field_path: Rc<str> = format!("{}.{}", path, field_name).into();
-                path_map.insert((field_tok.pos.line, field_tok.pos.column), field_path.clone());
+                path_map.insert(
+                    (field_tok.pos.line, field_tok.pos.column),
+                    field_path.clone(),
+                );
                 // Recurse into the field value with the extended path.
                 collect_scoped_names(
                     field_expr,
@@ -699,84 +714,298 @@ fn collect_scoped_names(
 
         Expression::Simple(crate::ast::Value::List(list_def)) => {
             for elem in &list_def.elems {
-                collect_scoped_names(elem, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+                collect_scoped_names(
+                    elem,
+                    sym_map,
+                    scope_range,
+                    tokens,
+                    token_types,
+                    path_map,
+                    def_positions,
+                    path,
+                );
             }
         }
 
         // Descend through expression wrappers that can contain funcs/modules/tuples.
         Expression::Binary(def) => {
-            collect_scoped_names(&def.left, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
-            collect_scoped_names(&def.right, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+            collect_scoped_names(
+                &def.left,
+                sym_map,
+                scope_range,
+                tokens,
+                token_types,
+                path_map,
+                def_positions,
+                path,
+            );
+            collect_scoped_names(
+                &def.right,
+                sym_map,
+                scope_range,
+                tokens,
+                token_types,
+                path_map,
+                def_positions,
+                path,
+            );
         }
         Expression::Grouped(inner, _) => {
-            collect_scoped_names(inner, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+            collect_scoped_names(
+                inner,
+                sym_map,
+                scope_range,
+                tokens,
+                token_types,
+                path_map,
+                def_positions,
+                path,
+            );
         }
         Expression::Call(call_def) => {
             for arg in &call_def.arglist {
-                collect_scoped_names(arg, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+                collect_scoped_names(
+                    arg,
+                    sym_map,
+                    scope_range,
+                    tokens,
+                    token_types,
+                    path_map,
+                    def_positions,
+                    path,
+                );
             }
         }
         Expression::Copy(copy_def) => {
             for (_, _, field_expr) in &copy_def.fields {
-                collect_scoped_names(field_expr, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+                collect_scoped_names(
+                    field_expr,
+                    sym_map,
+                    scope_range,
+                    tokens,
+                    token_types,
+                    path_map,
+                    def_positions,
+                    path,
+                );
             }
         }
         Expression::FuncOp(op_def) => {
             use crate::ast::FuncOpDef;
             match op_def {
                 FuncOpDef::Map(def) | FuncOpDef::Filter(def) => {
-                    collect_scoped_names(&def.func, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
-                    collect_scoped_names(&def.target, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+                    collect_scoped_names(
+                        &def.func,
+                        sym_map,
+                        scope_range,
+                        tokens,
+                        token_types,
+                        path_map,
+                        def_positions,
+                        path,
+                    );
+                    collect_scoped_names(
+                        &def.target,
+                        sym_map,
+                        scope_range,
+                        tokens,
+                        token_types,
+                        path_map,
+                        def_positions,
+                        path,
+                    );
                 }
                 FuncOpDef::Reduce(def) => {
-                    collect_scoped_names(&def.func, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
-                    collect_scoped_names(&def.acc, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
-                    collect_scoped_names(&def.target, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+                    collect_scoped_names(
+                        &def.func,
+                        sym_map,
+                        scope_range,
+                        tokens,
+                        token_types,
+                        path_map,
+                        def_positions,
+                        path,
+                    );
+                    collect_scoped_names(
+                        &def.acc,
+                        sym_map,
+                        scope_range,
+                        tokens,
+                        token_types,
+                        path_map,
+                        def_positions,
+                        path,
+                    );
+                    collect_scoped_names(
+                        &def.target,
+                        sym_map,
+                        scope_range,
+                        tokens,
+                        token_types,
+                        path_map,
+                        def_positions,
+                        path,
+                    );
                 }
             }
         }
         Expression::Select(sel_def) => {
-            collect_scoped_names(&sel_def.val, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+            collect_scoped_names(
+                &sel_def.val,
+                sym_map,
+                scope_range,
+                tokens,
+                token_types,
+                path_map,
+                def_positions,
+                path,
+            );
             if let Some(default) = &sel_def.default {
-                collect_scoped_names(default, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+                collect_scoped_names(
+                    default,
+                    sym_map,
+                    scope_range,
+                    tokens,
+                    token_types,
+                    path_map,
+                    def_positions,
+                    path,
+                );
             }
             for (_, _, field_expr) in &sel_def.tuple {
-                collect_scoped_names(field_expr, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+                collect_scoped_names(
+                    field_expr,
+                    sym_map,
+                    scope_range,
+                    tokens,
+                    token_types,
+                    path_map,
+                    def_positions,
+                    path,
+                );
             }
         }
         Expression::Not(not_def) => {
-            collect_scoped_names(&not_def.expr, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+            collect_scoped_names(
+                &not_def.expr,
+                sym_map,
+                scope_range,
+                tokens,
+                token_types,
+                path_map,
+                def_positions,
+                path,
+            );
         }
-        Expression::Format(fmt_def) => {
-            match &fmt_def.args {
-                crate::ast::FormatArgs::List(exprs) => {
-                    for expr in exprs {
-                        collect_scoped_names(expr, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
-                    }
-                }
-                crate::ast::FormatArgs::Single(expr) => {
-                    collect_scoped_names(expr, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+        Expression::Format(fmt_def) => match &fmt_def.args {
+            crate::ast::FormatArgs::List(exprs) => {
+                for expr in exprs {
+                    collect_scoped_names(
+                        expr,
+                        sym_map,
+                        scope_range,
+                        tokens,
+                        token_types,
+                        path_map,
+                        def_positions,
+                        path,
+                    );
                 }
             }
-        }
+            crate::ast::FormatArgs::Single(expr) => {
+                collect_scoped_names(
+                    expr,
+                    sym_map,
+                    scope_range,
+                    tokens,
+                    token_types,
+                    path_map,
+                    def_positions,
+                    path,
+                );
+            }
+        },
         Expression::Cast(cast_def) => {
-            collect_scoped_names(&cast_def.target, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+            collect_scoped_names(
+                &cast_def.target,
+                sym_map,
+                scope_range,
+                tokens,
+                token_types,
+                path_map,
+                def_positions,
+                path,
+            );
         }
         Expression::Fail(fail_def) => {
-            collect_scoped_names(&fail_def.message, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+            collect_scoped_names(
+                &fail_def.message,
+                sym_map,
+                scope_range,
+                tokens,
+                token_types,
+                path_map,
+                def_positions,
+                path,
+            );
         }
         Expression::Debug(debug_def) => {
-            collect_scoped_names(&debug_def.expr, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+            collect_scoped_names(
+                &debug_def.expr,
+                sym_map,
+                scope_range,
+                tokens,
+                token_types,
+                path_map,
+                def_positions,
+                path,
+            );
         }
         Expression::Convert(convert_def) => {
-            collect_scoped_names(&convert_def.target, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+            collect_scoped_names(
+                &convert_def.target,
+                sym_map,
+                scope_range,
+                tokens,
+                token_types,
+                path_map,
+                def_positions,
+                path,
+            );
         }
         Expression::Range(range_def) => {
-            collect_scoped_names(&range_def.start, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+            collect_scoped_names(
+                &range_def.start,
+                sym_map,
+                scope_range,
+                tokens,
+                token_types,
+                path_map,
+                def_positions,
+                path,
+            );
             if let Some(step) = &range_def.step {
-                collect_scoped_names(step, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+                collect_scoped_names(
+                    step,
+                    sym_map,
+                    scope_range,
+                    tokens,
+                    token_types,
+                    path_map,
+                    def_positions,
+                    path,
+                );
             }
-            collect_scoped_names(&range_def.end, sym_map, scope_range, tokens, token_types, path_map, def_positions, path);
+            collect_scoped_names(
+                &range_def.end,
+                sym_map,
+                scope_range,
+                tokens,
+                token_types,
+                path_map,
+                def_positions,
+                path,
+            );
         }
         _ => {}
     }
@@ -798,7 +1027,12 @@ mod test {
 
     #[test]
     fn test_ucg_pos_to_range_line1_col1() {
-        let pos = Position { line: 1, column: 1, offset: 0, file: None };
+        let pos = Position {
+            line: 1,
+            column: 1,
+            offset: 0,
+            file: None,
+        };
         let range = ucg_pos_to_range(&pos);
         assert_eq!(range.start.line, 0);
         assert_eq!(range.start.character, 0);
@@ -808,7 +1042,12 @@ mod test {
 
     #[test]
     fn test_ucg_pos_to_range_interior() {
-        let pos = Position { line: 5, column: 10, offset: 0, file: None };
+        let pos = Position {
+            line: 5,
+            column: 10,
+            offset: 0,
+            file: None,
+        };
         let range = ucg_pos_to_range(&pos);
         assert_eq!(range.start.line, 4);
         assert_eq!(range.start.character, 9);
@@ -831,11 +1070,19 @@ mod test {
     #[test]
     fn test_analyze_simple_let_int() {
         let result = analyze("let x = 1;", None);
-        assert!(result.diagnostics.is_empty(), "unexpected diagnostics: {:?}", result.diagnostics);
+        assert!(
+            result.diagnostics.is_empty(),
+            "unexpected diagnostics: {:?}",
+            result.diagnostics
+        );
         let key: Rc<str> = "x".into();
         assert!(result.symbol_table.contains_key(&key));
         let (shape, pos) = result.symbol_table.get(&key).unwrap();
-        assert!(matches!(shape, Shape::Int(_)), "expected Int, got {:?}", shape);
+        assert!(
+            matches!(shape, Shape::Int(_)),
+            "expected Int, got {:?}",
+            shape
+        );
         assert_eq!(pos.line, 1);
         assert_eq!(pos.column, 5);
         assert!(!result.tokens.is_empty());
@@ -936,10 +1183,22 @@ mod test {
         assert!(result.diagnostics.is_empty());
         // f's x is at line 1 col 14 (def) and col 20 (use)
         // g's x is at line 2 col 14 (def) and col 20 (use)
-        assert!(result.token_types.contains_key(&(1, 14)), "f's arg def missing");
-        assert!(result.token_types.contains_key(&(1, 20)), "f's arg use missing");
-        assert!(result.token_types.contains_key(&(2, 14)), "g's arg def missing");
-        assert!(result.token_types.contains_key(&(2, 20)), "g's arg use missing");
+        assert!(
+            result.token_types.contains_key(&(1, 14)),
+            "f's arg def missing"
+        );
+        assert!(
+            result.token_types.contains_key(&(1, 20)),
+            "f's arg use missing"
+        );
+        assert!(
+            result.token_types.contains_key(&(2, 14)),
+            "g's arg def missing"
+        );
+        assert!(
+            result.token_types.contains_key(&(2, 20)),
+            "g's arg use missing"
+        );
     }
 
     #[test]
@@ -965,11 +1224,7 @@ mod test {
         let imported = super::analyze("let foo = 42; let bar = \"hi\";", None, &HashMap::new());
         resolved.insert(import_path.clone(), imported);
 
-        let result = super::analyze(
-            r#"let lib = import "/tmp/mylib.ucg";"#,
-            None,
-            &resolved,
-        );
+        let result = super::analyze(r#"let lib = import "/tmp/mylib.ucg";"#, None, &resolved);
         assert!(result.diagnostics.is_empty());
         let (shape, _) = result.symbol_table.get(&Rc::from("lib")).unwrap();
         // Should be Resolved, not Unresolved
@@ -1020,8 +1275,16 @@ mod test {
         assert!(result.diagnostics.is_empty());
         // path_map should contain "t.x" and "t.y"
         let paths: Vec<&str> = result.path_map.values().map(|s| s.as_ref()).collect();
-        assert!(paths.contains(&"t.x"), "expected t.x in path_map, got: {:?}", paths);
-        assert!(paths.contains(&"t.y"), "expected t.y in path_map, got: {:?}", paths);
+        assert!(
+            paths.contains(&"t.x"),
+            "expected t.x in path_map, got: {:?}",
+            paths
+        );
+        assert!(
+            paths.contains(&"t.y"),
+            "expected t.y in path_map, got: {:?}",
+            paths
+        );
     }
 
     #[test]
@@ -1029,8 +1292,16 @@ mod test {
         let result = analyze("let t = {outer = {inner = 1}};", None);
         assert!(result.diagnostics.is_empty());
         let paths: Vec<&str> = result.path_map.values().map(|s| s.as_ref()).collect();
-        assert!(paths.contains(&"t.outer"), "expected t.outer, got: {:?}", paths);
-        assert!(paths.contains(&"t.outer.inner"), "expected t.outer.inner, got: {:?}", paths);
+        assert!(
+            paths.contains(&"t.outer"),
+            "expected t.outer, got: {:?}",
+            paths
+        );
+        assert!(
+            paths.contains(&"t.outer.inner"),
+            "expected t.outer.inner, got: {:?}",
+            paths
+        );
     }
 
     #[test]
@@ -1055,7 +1326,10 @@ mod test {
             .token_types
             .values()
             .any(|s| matches!(s, Shape::Int(_)));
-        assert!(has_int, "x field in out-expression tuple should be in token_types");
+        assert!(
+            has_int,
+            "x field in out-expression tuple should be in token_types"
+        );
     }
 
     #[test]
@@ -1064,7 +1338,11 @@ mod test {
         let result = analyze("{x = 1, y = \"hi\"};", None);
         assert!(result.diagnostics.is_empty());
         let paths: Vec<&str> = result.path_map.values().map(|s| s.as_ref()).collect();
-        assert!(!paths.is_empty(), "out-expression tuple fields should populate path_map, got: {:?}", paths);
+        assert!(
+            !paths.is_empty(),
+            "out-expression tuple fields should populate path_map, got: {:?}",
+            paths
+        );
     }
 
     #[test]
@@ -1077,7 +1355,10 @@ mod test {
             .token_types
             .values()
             .any(|s| matches!(s, Shape::Int(_)));
-        assert!(has_int, "x field in assert inline tuple should be in token_types");
+        assert!(
+            has_int,
+            "x field in assert inline tuple should be in token_types"
+        );
     }
 
     #[test]
@@ -1089,7 +1370,10 @@ mod test {
             .token_types
             .values()
             .any(|s| matches!(s, Shape::Int(_)));
-        assert!(has_int, "x field in list element tuple should be in token_types");
+        assert!(
+            has_int,
+            "x field in list element tuple should be in token_types"
+        );
     }
 
     #[test]
@@ -1114,7 +1398,10 @@ mod test {
             .token_types
             .values()
             .any(|s| matches!(s, Shape::Boolean(_)));
-        assert!(has_bool, "x field in not expression tuple should be in token_types");
+        assert!(
+            has_bool,
+            "x field in not expression tuple should be in token_types"
+        );
     }
 
     #[test]
@@ -1126,7 +1413,10 @@ mod test {
             .token_types
             .values()
             .any(|s| matches!(s, Shape::Int(_)));
-        assert!(has_int_in_token_types, "x field in format list arg tuple should be in token_types");
+        assert!(
+            has_int_in_token_types,
+            "x field in format list arg tuple should be in token_types"
+        );
     }
 
     #[test]
@@ -1138,7 +1428,10 @@ mod test {
             .token_types
             .values()
             .any(|s| matches!(s, Shape::Int(_)));
-        assert!(has_int, "x field in single format arg tuple should be in token_types");
+        assert!(
+            has_int,
+            "x field in single format arg tuple should be in token_types"
+        );
     }
 
     #[test]
@@ -1150,7 +1443,10 @@ mod test {
             .token_types
             .values()
             .any(|s| matches!(s, Shape::Int(_)));
-        assert!(has_int, "x field in cast target tuple should be in token_types");
+        assert!(
+            has_int,
+            "x field in cast target tuple should be in token_types"
+        );
     }
 
     #[test]
@@ -1158,12 +1454,12 @@ mod test {
         // Tuple fields inside a fail message should appear in token_types.
         let result = analyze(r#"let f = func(x) => fail "msg: @" % ({y = x}.y);"#, None);
         assert!(result.diagnostics.is_empty());
-        let has_token = result
-            .token_types
-            .iter()
-            .any(|((_, _), _)| true);
+        let has_token = result.token_types.iter().any(|((_, _), _)| true);
         // At minimum the func arg 'x' should be in token_types; the tuple field 'y' should also be.
-        assert!(has_token, "fail message tuple field should populate token_types");
+        assert!(
+            has_token,
+            "fail message tuple field should populate token_types"
+        );
         let paths: Vec<&str> = result.path_map.values().map(|s| s.as_ref()).collect();
         assert!(
             paths.iter().any(|p| p.contains("y")),
@@ -1181,7 +1477,10 @@ mod test {
             .token_types
             .values()
             .any(|s| matches!(s, Shape::Int(_)));
-        assert!(has_int, "x field in TRACE expression tuple should be in token_types");
+        assert!(
+            has_int,
+            "x field in TRACE expression tuple should be in token_types"
+        );
     }
 
     #[test]
@@ -1190,20 +1489,31 @@ mod test {
         // Range bounds are simple or grouped expressions, so we use a grouped
         // expression containing a func call to test descent.
         let result = analyze("let f = func(n) => n + 1; let r = 1:(f(2)):10;", None);
-        assert!(result.diagnostics.is_empty(), "diagnostics: {:?}", result.diagnostics);
+        assert!(
+            result.diagnostics.is_empty(),
+            "diagnostics: {:?}",
+            result.diagnostics
+        );
         // The func arg 'n' should be in token_types from the func definition.
         let has_shape = result
             .token_types
             .values()
             .any(|s| !matches!(s, Shape::Hole(_)));
-        assert!(has_shape, "range with func call should populate token_types");
+        assert!(
+            has_shape,
+            "range with func call should populate token_types"
+        );
     }
 
     #[test]
     fn test_analyze_range_end_grouped_tuple() {
         // A grouped expression containing a tuple in range end should be descended.
         let result = analyze("let r = 1:({x = 10});", None);
-        assert!(result.diagnostics.is_empty(), "diagnostics: {:?}", result.diagnostics);
+        assert!(
+            result.diagnostics.is_empty(),
+            "diagnostics: {:?}",
+            result.diagnostics
+        );
         let paths: Vec<&str> = result.path_map.values().map(|s| s.as_ref()).collect();
         assert!(
             paths.iter().any(|p| p.contains("x")),
@@ -1221,7 +1531,10 @@ mod test {
             .token_types
             .values()
             .any(|s| matches!(s, Shape::Int(_)));
-        assert!(has_int, "x field in out statement tuple should be in token_types");
+        assert!(
+            has_int,
+            "x field in out statement tuple should be in token_types"
+        );
     }
 
     #[test]
@@ -1230,13 +1543,20 @@ mod test {
         let result = analyze("out json {x = 1, y = 2};", None);
         assert!(result.diagnostics.is_empty());
         let paths: Vec<&str> = result.path_map.values().map(|s| s.as_ref()).collect();
-        assert!(!paths.is_empty(), "out statement tuple fields should populate path_map, got: {:?}", paths);
+        assert!(
+            !paths.is_empty(),
+            "out statement tuple fields should populate path_map, got: {:?}",
+            paths
+        );
     }
 
     #[test]
     fn test_analyze_module_arg_default_tuple_in_token_types() {
         // Tuple fields in module arg default values should appear in token_types.
-        let result = analyze("let m = module{cfg = {x = 1}} => {let out = mod.cfg;};", None);
+        let result = analyze(
+            "let m = module{cfg = {x = 1}} => {let out = mod.cfg;};",
+            None,
+        );
         assert!(result.diagnostics.is_empty());
         let paths: Vec<&str> = result.path_map.values().map(|s| s.as_ref()).collect();
         assert!(
@@ -1264,7 +1584,10 @@ mod test {
         if let Shape::Module(mshape) = shape {
             if let Shape::Tuple(pi) = mshape.ret() {
                 let lib_shape = pi.val.iter().find(|(n, _)| n.val.as_ref() == "lib");
-                assert!(lib_shape.is_some(), "lib field should be in module return tuple");
+                assert!(
+                    lib_shape.is_some(),
+                    "lib field should be in module return tuple"
+                );
                 let (_, lib_s) = lib_shape.unwrap();
                 assert!(
                     matches!(lib_s, Shape::Import(ImportShape::Resolved(_, _))),
@@ -1291,13 +1614,20 @@ mod test {
         assert!(result.diagnostics.is_empty());
 
         let def_pos = result.def_positions.get(&(1, 14));
-        assert!(def_pos.is_some(), "arg def (1,14) missing from def_positions; keys: {:?}", result.def_positions.keys().collect::<Vec<_>>());
+        assert!(
+            def_pos.is_some(),
+            "arg def (1,14) missing from def_positions; keys: {:?}",
+            result.def_positions.keys().collect::<Vec<_>>()
+        );
         let def_pos = def_pos.unwrap();
         assert_eq!(def_pos.line, 1, "def position line should be 1");
         assert_eq!(def_pos.column, 14, "def position column should be 14");
 
         let use_pos = result.def_positions.get(&(1, 20));
-        assert!(use_pos.is_some(), "arg use (1,20) missing from def_positions");
+        assert!(
+            use_pos.is_some(),
+            "arg use (1,20) missing from def_positions"
+        );
         let use_pos = use_pos.unwrap();
         // Both def and use site should point to the same definition.
         assert_eq!(use_pos.line, 1);

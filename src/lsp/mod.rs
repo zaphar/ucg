@@ -71,8 +71,11 @@ impl ServerState {
             self.workspace.update_from_content(&path, content);
         }
         // Analyze with the workspace's resolved cache so import shapes are populated.
-        let result =
-            analysis::analyze(content, working_dir.as_deref(), self.workspace.resolved_files());
+        let result = analysis::analyze(
+            content,
+            working_dir.as_deref(),
+            self.workspace.resolved_files(),
+        );
         self.documents.insert(uri.clone(), result);
         self.documents.get(&uri).unwrap()
     }
@@ -95,13 +98,13 @@ pub fn run_server() -> Result<(), Box<dyn Error + Send + Sync>> {
                 legend: SemanticTokensLegend {
                     token_types: vec![
                         SemanticTokenType::KEYWORD,   // 0
-                        SemanticTokenType::VARIABLE,   // 1
-                        SemanticTokenType::STRING,     // 2
-                        SemanticTokenType::NUMBER,     // 3
-                        SemanticTokenType::COMMENT,    // 4
-                        SemanticTokenType::OPERATOR,   // 5
-                        SemanticTokenType::NAMESPACE,  // 6
-                        SemanticTokenType::TYPE,       // 7
+                        SemanticTokenType::VARIABLE,  // 1
+                        SemanticTokenType::STRING,    // 2
+                        SemanticTokenType::NUMBER,    // 3
+                        SemanticTokenType::COMMENT,   // 4
+                        SemanticTokenType::OPERATOR,  // 5
+                        SemanticTokenType::NAMESPACE, // 6
+                        SemanticTokenType::TYPE,      // 7
                     ],
                     token_modifiers: vec![SemanticTokenModifier::DECLARATION],
                 },
@@ -631,7 +634,11 @@ fn find_hover_dot_expr(
             && target_col < tok.pos.column + tok.fragment.len()
     })?;
 
-    let full_path = path.iter().map(|s| s.as_ref()).collect::<Vec<_>>().join(".");
+    let full_path = path
+        .iter()
+        .map(|s| s.as_ref())
+        .collect::<Vec<_>>()
+        .join(".");
     let type_info = format!(
         "**type**: {}\n\n**path**: `{}`",
         hover_type_display(&current),
@@ -666,9 +673,7 @@ fn find_definition(
             .get(root_name)
             .filter(|p| p.is_absolute())
             .cloned()
-            .or_else(|| {
-                doc.inner_import_map.get(&root_pos).cloned()
-            });
+            .or_else(|| doc.inner_import_map.get(&root_pos).cloned());
 
         if let Some(import_path) = root_import_path {
             if let Ok(import_uri) = Url::from_file_path(&import_path) {
@@ -746,10 +751,9 @@ fn find_definition(
                                         }
                                     }
                                     if ok {
-                                        if let Some(pos) = lookup_field_definition(
-                                            &cur,
-                                            &fields[fields.len() - 1],
-                                        ) {
+                                        if let Some(pos) =
+                                            lookup_field_definition(&cur, &fields[fields.len() - 1])
+                                        {
                                             return Some(Location {
                                                 uri: imp_uri,
                                                 range: ucg_pos_to_range(&pos),
@@ -790,11 +794,15 @@ fn find_definition(
     // Find the token under the cursor (needed for inner_import_map lookup).
     let target_line = (line + 1) as usize;
     let target_col = (character + 1) as usize;
-    let tok_pos = doc.tokens.iter().find(|tok| {
-        tok.pos.line == target_line
-            && tok.pos.column <= target_col
-            && target_col < tok.pos.column + tok.fragment.len()
-    }).map(|tok| (tok.pos.line, tok.pos.column));
+    let tok_pos = doc
+        .tokens
+        .iter()
+        .find(|tok| {
+            tok.pos.line == target_line
+                && tok.pos.column <= target_col
+                && target_col < tok.pos.column + tok.fragment.len()
+        })
+        .map(|tok| (tok.pos.line, tok.pos.column));
 
     let name = token_at(doc, line, character)?;
 
@@ -961,15 +969,13 @@ fn encode_semantic_tokens(doc: &AnalysisResult) -> Vec<SemanticToken> {
     use crate::ast::TokenType;
     const KEYWORDS: &[&str] = &[
         "let", "import", "func", "module", "select", "cast", "map", "filter", "reduce", "format",
-        "include", "assert", "out", "convert", "range", "fail", "debug", "is", "in", "not",
-        "self", "env", "mod", "true", "false", "NULL",
+        "include", "assert", "out", "convert", "range", "fail", "debug", "is", "in", "not", "self",
+        "env", "mod", "true", "false", "NULL",
     ];
     const OPERATORS: &[&str] = &[
         "+", "-", "*", "/", "==", "!=", ">", "<", ">=", "<=", "%", "!",
     ];
-    const INCLUDE_FORMATS: &[&str] = &[
-        "str", "b64", "b64urlsafe", "json", "yaml", "toml",
-    ];
+    const INCLUDE_FORMATS: &[&str] = &["str", "b64", "b64urlsafe", "json", "yaml", "toml"];
 
     let definition_positions: std::collections::HashSet<(usize, usize)> = doc
         .symbol_table
@@ -1121,7 +1127,12 @@ fn format_shape_pretty(shape: &crate::ast::Shape, indent: usize) -> String {
                 .val
                 .iter()
                 .map(|(name, s)| {
-                    format!("{}{}: {}", inner, name.val, format_shape_pretty(s, indent + 1))
+                    format!(
+                        "{}{}: {}",
+                        inner,
+                        name.val,
+                        format_shape_pretty(s, indent + 1)
+                    )
                 })
                 .collect();
             format!("{{\n{}\n{}}}", fields.join(",\n"), pad)
@@ -1155,7 +1166,12 @@ fn format_shape_pretty(shape: &crate::ast::Shape, indent: usize) -> String {
             let parts: Vec<String> = fields
                 .iter()
                 .map(|(name, s)| {
-                    format!("{}{}: {}", inner, name.val, format_shape_pretty(s, indent + 1))
+                    format!(
+                        "{}{}: {}",
+                        inner,
+                        name.val,
+                        format_shape_pretty(s, indent + 1)
+                    )
                 })
                 .collect();
             format!("import {{\n{}\n{}}}", parts.join(",\n"), pad)
@@ -1362,7 +1378,11 @@ mod test {
         // x is at 0-based (line=0, char=4)
         let hover = find_hover(&doc, 0, 4);
         assert!(hover.is_some(), "should return hover for known binding");
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
             assert!(mc.value.contains("Int"), "hover should mention type Int");
             assert!(mc.value.contains('x'), "hover should mention binding name");
         } else {
@@ -1376,7 +1396,11 @@ mod test {
         // hover on `t` at (0, 4)
         let hover = find_hover(&doc, 0, 4);
         assert!(hover.is_some());
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
             assert!(mc.value.contains("x: Int"), "got: {}", mc.value);
             assert!(mc.value.contains("y: Str"), "got: {}", mc.value);
         } else {
@@ -1390,7 +1414,11 @@ mod test {
         // hover on `l` at (0, 4)
         let hover = find_hover(&doc, 0, 4);
         assert!(hover.is_some());
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
             assert!(mc.value.contains("[Int]"), "got: {}", mc.value);
         } else {
             panic!("expected Markup hover");
@@ -1410,10 +1438,26 @@ mod test {
         // Convert from 1-based UCG coords to 0-based LSP coords
         let hover = find_hover(&doc, (line - 1) as u32, (col - 1) as u32);
         assert!(hover.is_some(), "should return hover for tuple field");
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
-            assert!(mc.value.contains("path"), "should use 'path' label, got: {}", mc.value);
-            assert!(mc.value.contains("t.x"), "should show dotted path t.x, got: {}", mc.value);
-            assert!(mc.value.contains("Int"), "should show field type, got: {}", mc.value);
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
+            assert!(
+                mc.value.contains("path"),
+                "should use 'path' label, got: {}",
+                mc.value
+            );
+            assert!(
+                mc.value.contains("t.x"),
+                "should show dotted path t.x, got: {}",
+                mc.value
+            );
+            assert!(
+                mc.value.contains("Int"),
+                "should show field type, got: {}",
+                mc.value
+            );
         } else {
             panic!("expected Markup hover");
         }
@@ -1422,12 +1466,19 @@ mod test {
     #[test]
     fn test_find_hover_nested_tuple_field_shows_full_path() {
         let doc = analyze("let t = {outer = {inner = 1}};", None);
-        let inner_entry = doc.path_map.iter().find(|(_, p)| p.as_ref() == "t.outer.inner");
+        let inner_entry = doc
+            .path_map
+            .iter()
+            .find(|(_, p)| p.as_ref() == "t.outer.inner");
         assert!(inner_entry.is_some(), "t.outer.inner should be in path_map");
         let ((line, col), _) = inner_entry.unwrap();
         let hover = find_hover(&doc, (line - 1) as u32, (col - 1) as u32);
         assert!(hover.is_some());
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
             assert!(mc.value.contains("t.outer.inner"), "got: {}", mc.value);
         } else {
             panic!("expected Markup hover");
@@ -1441,8 +1492,15 @@ mod test {
         let doc = analyze("let f = func(x) => x + 1;", None);
         let hover = find_hover(&doc, 0, 19);
         assert!(hover.is_some(), "should return hover for scoped arg");
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
-            assert!(mc.value.contains("Int"), "hover should show inferred Int type");
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
+            assert!(
+                mc.value.contains("Int"),
+                "hover should show inferred Int type"
+            );
         } else {
             panic!("expected Markup hover");
         }
@@ -1464,9 +1522,20 @@ mod test {
         // x should be in token_types with type Int
         let x_col = src.find("x =").unwrap();
         let hover = find_hover(&doc, 0, x_col as u32);
-        assert!(hover.is_some(), "should return hover for tuple field in out expression");
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
-            assert!(mc.value.contains("Int"), "should show Int type for x, got: {}", mc.value);
+        assert!(
+            hover.is_some(),
+            "should return hover for tuple field in out expression"
+        );
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
+            assert!(
+                mc.value.contains("Int"),
+                "should show Int type for x, got: {}",
+                mc.value
+            );
         } else {
             panic!("expected Markup hover");
         }
@@ -1480,9 +1549,20 @@ mod test {
         // 'x' field name at col 8 (0-based) inside the tuple literal
         let x_col = src.find("x =").unwrap();
         let hover = find_hover(&doc, 0, x_col as u32);
-        assert!(hover.is_some(), "should return hover for tuple field in assert expression");
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
-            assert!(mc.value.contains("Int"), "should show Int type for x in assert, got: {}", mc.value);
+        assert!(
+            hover.is_some(),
+            "should return hover for tuple field in assert expression"
+        );
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
+            assert!(
+                mc.value.contains("Int"),
+                "should show Int type for x in assert, got: {}",
+                mc.value
+            );
         } else {
             panic!("expected Markup hover");
         }
@@ -1496,9 +1576,20 @@ mod test {
         // Find the first 'x' field inside the list (after "[{")
         let first_x = src.find("x =").unwrap();
         let hover = find_hover(&doc, 0, first_x as u32);
-        assert!(hover.is_some(), "should return hover for tuple field inside list element");
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
-            assert!(mc.value.contains("Int"), "should show Int type for x in list, got: {}", mc.value);
+        assert!(
+            hover.is_some(),
+            "should return hover for tuple field inside list element"
+        );
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
+            assert!(
+                mc.value.contains("Int"),
+                "should show Int type for x in list, got: {}",
+                mc.value
+            );
         } else {
             panic!("expected Markup hover");
         }
@@ -1511,9 +1602,20 @@ mod test {
         let doc = analyze(src, None);
         let inner_offset = src.find("inner").unwrap();
         let hover = find_hover(&doc, 0, inner_offset as u32);
-        assert!(hover.is_some(), "should return hover for nested tuple field in out expression");
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
-            assert!(mc.value.contains("Int"), "should show Int for inner, got: {}", mc.value);
+        assert!(
+            hover.is_some(),
+            "should return hover for nested tuple field in out expression"
+        );
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
+            assert!(
+                mc.value.contains("Int"),
+                "should show Int for inner, got: {}",
+                mc.value
+            );
         } else {
             panic!("expected Markup hover");
         }
@@ -1526,9 +1628,20 @@ mod test {
         let doc = analyze(src, None);
         let x_col = src.find("x =").unwrap();
         let hover = find_hover(&doc, 0, x_col as u32);
-        assert!(hover.is_some(), "should return hover for tuple field inside not expression");
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
-            assert!(mc.value.contains("Bool"), "should show Bool type for x, got: {}", mc.value);
+        assert!(
+            hover.is_some(),
+            "should return hover for tuple field inside not expression"
+        );
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
+            assert!(
+                mc.value.contains("Bool"),
+                "should show Bool type for x, got: {}",
+                mc.value
+            );
         } else {
             panic!("expected Markup hover");
         }
@@ -1541,9 +1654,20 @@ mod test {
         let doc = analyze(src, None);
         let x_col = src.find("x =").unwrap();
         let hover = find_hover(&doc, 0, x_col as u32);
-        assert!(hover.is_some(), "should return hover for tuple field inside format args");
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
-            assert!(mc.value.contains("Int"), "should show Int type for x, got: {}", mc.value);
+        assert!(
+            hover.is_some(),
+            "should return hover for tuple field inside format args"
+        );
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
+            assert!(
+                mc.value.contains("Int"),
+                "should show Int type for x, got: {}",
+                mc.value
+            );
         } else {
             panic!("expected Markup hover");
         }
@@ -1556,9 +1680,20 @@ mod test {
         let doc = analyze(src, None);
         let x_col = src.find("x =").unwrap();
         let hover = find_hover(&doc, 0, x_col as u32);
-        assert!(hover.is_some(), "should return hover for tuple field in single format arg");
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
-            assert!(mc.value.contains("Int"), "should show Int type for x, got: {}", mc.value);
+        assert!(
+            hover.is_some(),
+            "should return hover for tuple field in single format arg"
+        );
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
+            assert!(
+                mc.value.contains("Int"),
+                "should show Int type for x, got: {}",
+                mc.value
+            );
         } else {
             panic!("expected Markup hover");
         }
@@ -1571,9 +1706,20 @@ mod test {
         let doc = analyze(src, None);
         let x_col = src.find("x =").unwrap();
         let hover = find_hover(&doc, 0, x_col as u32);
-        assert!(hover.is_some(), "should return hover for tuple field inside cast target");
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
-            assert!(mc.value.contains("Int"), "should show Int type for x, got: {}", mc.value);
+        assert!(
+            hover.is_some(),
+            "should return hover for tuple field inside cast target"
+        );
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
+            assert!(
+                mc.value.contains("Int"),
+                "should show Int type for x, got: {}",
+                mc.value
+            );
         } else {
             panic!("expected Markup hover");
         }
@@ -1586,7 +1732,10 @@ mod test {
         let doc = analyze(src, None);
         let y_col = src.find("y =").unwrap();
         let hover = find_hover(&doc, 0, y_col as u32);
-        assert!(hover.is_some(), "should return hover for tuple field inside fail message");
+        assert!(
+            hover.is_some(),
+            "should return hover for tuple field inside fail message"
+        );
     }
 
     #[test]
@@ -1596,9 +1745,20 @@ mod test {
         let doc = analyze(src, None);
         let x_col = src.find("x =").unwrap();
         let hover = find_hover(&doc, 0, x_col as u32);
-        assert!(hover.is_some(), "should return hover for tuple field inside TRACE expression");
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
-            assert!(mc.value.contains("Int"), "should show Int type for x, got: {}", mc.value);
+        assert!(
+            hover.is_some(),
+            "should return hover for tuple field inside TRACE expression"
+        );
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
+            assert!(
+                mc.value.contains("Int"),
+                "should show Int type for x, got: {}",
+                mc.value
+            );
         } else {
             panic!("expected Markup hover");
         }
@@ -1611,9 +1771,20 @@ mod test {
         let doc = analyze(src, None);
         let x_col = src.find("x =").unwrap();
         let hover = find_hover(&doc, 0, x_col as u32);
-        assert!(hover.is_some(), "should return hover for tuple field in range start");
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
-            assert!(mc.value.contains("Int"), "should show Int type for x, got: {}", mc.value);
+        assert!(
+            hover.is_some(),
+            "should return hover for tuple field in range start"
+        );
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
+            assert!(
+                mc.value.contains("Int"),
+                "should show Int type for x, got: {}",
+                mc.value
+            );
         } else {
             panic!("expected Markup hover");
         }
@@ -1626,9 +1797,20 @@ mod test {
         let doc = analyze(src, None);
         let x_col = src.find("x =").unwrap();
         let hover = find_hover(&doc, 0, x_col as u32);
-        assert!(hover.is_some(), "should return hover for tuple field in range end");
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
-            assert!(mc.value.contains("Int"), "should show Int type for x, got: {}", mc.value);
+        assert!(
+            hover.is_some(),
+            "should return hover for tuple field in range end"
+        );
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
+            assert!(
+                mc.value.contains("Int"),
+                "should show Int type for x, got: {}",
+                mc.value
+            );
         } else {
             panic!("expected Markup hover");
         }
@@ -1641,9 +1823,20 @@ mod test {
         let doc = analyze(src, None);
         let x_col = src.find("x =").unwrap();
         let hover = find_hover(&doc, 0, x_col as u32);
-        assert!(hover.is_some(), "should return hover for tuple field in out statement");
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
-            assert!(mc.value.contains("Int"), "should show Int type for x, got: {}", mc.value);
+        assert!(
+            hover.is_some(),
+            "should return hover for tuple field in out statement"
+        );
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
+            assert!(
+                mc.value.contains("Int"),
+                "should show Int type for x, got: {}",
+                mc.value
+            );
         } else {
             panic!("expected Markup hover");
         }
@@ -1656,9 +1849,20 @@ mod test {
         let doc = analyze(src, None);
         let x_col = src.find("x =").unwrap();
         let hover = find_hover(&doc, 0, x_col as u32);
-        assert!(hover.is_some(), "should return hover for tuple field in module arg default");
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
-            assert!(mc.value.contains("Int"), "should show Int type for x, got: {}", mc.value);
+        assert!(
+            hover.is_some(),
+            "should return hover for tuple field in module arg default"
+        );
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
+            assert!(
+                mc.value.contains("Int"),
+                "should show Int type for x, got: {}",
+                mc.value
+            );
         } else {
             panic!("expected Markup hover");
         }
@@ -1671,9 +1875,20 @@ mod test {
         let doc = analyze(src, None);
         let x_col = src.find("x =").unwrap();
         let hover = find_hover(&doc, 0, x_col as u32);
-        assert!(hover.is_some(), "should return hover for tuple field in convert statement");
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
-            assert!(mc.value.contains("Int"), "should show Int type for x, got: {}", mc.value);
+        assert!(
+            hover.is_some(),
+            "should return hover for tuple field in convert statement"
+        );
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
+            assert!(
+                mc.value.contains("Int"),
+                "should show Int type for x, got: {}",
+                mc.value
+            );
         } else {
             panic!("expected Markup hover");
         }
@@ -1803,10 +2018,7 @@ mod test {
             doc.import_map
         );
         let loc = def.unwrap();
-        assert_eq!(
-            loc.uri,
-            Url::from_file_path(&canonical_path).unwrap(),
-        );
+        assert_eq!(loc.uri, Url::from_file_path(&canonical_path).unwrap(),);
     }
 
     #[test]
@@ -1845,7 +2057,10 @@ mod test {
             None,
         );
         let def = find_definition(&doc, &fake_uri(), 0, 50, &ws);
-        assert!(def.is_some(), "should find multi-level cross-file definition");
+        assert!(
+            def.is_some(),
+            "should find multi-level cross-file definition"
+        );
         let loc = def.unwrap();
         assert_eq!(
             loc.uri,
@@ -1877,7 +2092,10 @@ mod test {
         // `foo` is at the end of `site_mod.foo`
         let foo_col = src.rfind("foo").unwrap() as u32;
         let def = find_definition(&doc, &fake_uri(), 0, foo_col, &ws);
-        assert!(def.is_some(), "should find definition for inner import dot expr");
+        assert!(
+            def.is_some(),
+            "should find definition for inner import dot expr"
+        );
         let loc = def.unwrap();
         assert_eq!(loc.uri, Url::from_file_path(&import_path).unwrap());
         assert_eq!(loc.range.start.line, 0);
@@ -1900,7 +2118,10 @@ mod test {
         //  0         1         2         3
         let site_mod_col = src.find("site_mod").unwrap() as u32;
         let def = find_definition(&doc, &fake_uri(), 0, site_mod_col, &ws);
-        assert!(def.is_some(), "should find definition for inner import binding");
+        assert!(
+            def.is_some(),
+            "should find definition for inner import binding"
+        );
         let loc = def.unwrap();
         assert_eq!(loc.uri, Url::from_file_path(&import_path).unwrap());
     }
@@ -1946,7 +2167,8 @@ mod test {
         ws.update_from_content(&import_path, "let val = 42;");
 
         // Use an absolute import path so inner_import_map IS populated (testing normal path):
-        let src = r#"let outer = module{} => { let m = import "/tmp/fallback.ucg"; let x = m.val; };"#;
+        let src =
+            r#"let outer = module{} => { let m = import "/tmp/fallback.ucg"; let x = m.val; };"#;
         let doc = analysis::analyze(src, None, ws.resolved_files());
 
         let val_col = src.rfind("val").unwrap() as u32;
@@ -2026,7 +2248,10 @@ mod test {
         // the path so the workspace lookup succeeds.
         let canonical_path = PathBuf::from("/proj/shared.ucg");
         let mut ws = WorkspaceIndex::new(PathBuf::from("/proj"));
-        ws.update_from_content(&canonical_path, "let mk_site_config = func(h, p) => { host = h, port = p };");
+        ws.update_from_content(
+            &canonical_path,
+            "let mk_site_config = func(h, p) => { host = h, port = p };",
+        );
 
         let src = r#"let outer = module{} => { let shared = import "../../shared.ucg"; let cfg = shared.mk_site_config; };"#;
         // working_dir simulates the file being in /proj/a/b/
@@ -2054,10 +2279,7 @@ mod test {
         // Gap 3: hover on an inner import binding should show the imported file's doc.
         let import_path = PathBuf::from("/tmp/site.ucg");
         let mut ws = WorkspaceIndex::new(PathBuf::from("/tmp"));
-        ws.update_from_content(
-            &import_path,
-            "// Site module utilities.\n\n\nlet foo = 42;",
-        );
+        ws.update_from_content(&import_path, "// Site module utilities.\n\n\nlet foo = 42;");
 
         let src = r#"let outer = module{} => { let site_mod = import "/tmp/site.ucg"; let x = site_mod.foo; };"#;
         let doc = analysis::analyze(src, None, ws.resolved_files());
@@ -2065,8 +2287,15 @@ mod test {
         // Hover on the first `site_mod` occurrence (the binding definition site).
         let site_mod_col = src.find("site_mod").unwrap() as u32;
         let hover = super::find_hover(&doc, &ws, 0, site_mod_col);
-        assert!(hover.is_some(), "should have hover for inner import binding");
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+        assert!(
+            hover.is_some(),
+            "should have hover for inner import binding"
+        );
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
             assert!(
                 mc.value.contains("Site module utilities."),
                 "should show imported file doc, got: {}",
@@ -2084,7 +2313,12 @@ mod test {
         // "let x = 1;" should produce: let(keyword), x(variable+decl), 1(number)
         let doc = analyze("let x = 1;", None);
         let tokens = encode_semantic_tokens(&doc);
-        assert_eq!(tokens.len(), 3, "expected 3 semantic tokens, got {:?}", tokens);
+        assert_eq!(
+            tokens.len(),
+            3,
+            "expected 3 semantic tokens, got {:?}",
+            tokens
+        );
         // let — keyword (type 0), no modifier
         assert_eq!(tokens[0].token_type, 0);
         assert_eq!(tokens[0].token_modifiers_bitset, 0);
@@ -2198,24 +2432,78 @@ mod test {
         };
     }
 
-    lsp_no_panic_test!(test_lsp_no_panic_comparisons, "../../integration_tests/comparisons_test.ucg");
-    lsp_no_panic_test!(test_lsp_no_panic_concatenation, "../../integration_tests/concatenation_test.ucg");
-    lsp_no_panic_test!(test_lsp_no_panic_empty, "../../integration_tests/empty_test.ucg");
-    lsp_no_panic_test!(test_lsp_no_panic_format, "../../integration_tests/format_test.ucg");
-    lsp_no_panic_test!(test_lsp_no_panic_func, "../../integration_tests/func_test.ucg");
-    lsp_no_panic_test!(test_lsp_no_panic_functional_processing, "../../integration_tests/functional_processing_test.ucg");
-    lsp_no_panic_test!(test_lsp_no_panic_import, "../../integration_tests/import_test.ucg");
-    lsp_no_panic_test!(test_lsp_no_panic_include, "../../integration_tests/include_test.ucg");
-    lsp_no_panic_test!(test_lsp_no_panic_list, "../../integration_tests/list_test.ucg");
-    lsp_no_panic_test!(test_lsp_no_panic_modules, "../../integration_tests/modules_test.ucg");
-    lsp_no_panic_test!(test_lsp_no_panic_operator_precedence, "../../integration_tests/operator_precedence_test.ucg");
-    lsp_no_panic_test!(test_lsp_no_panic_pkg_func_module, "../../integration_tests/pkg_func_module.ucg");
-    lsp_no_panic_test!(test_lsp_no_panic_pkg_func_module_test, "../../integration_tests/pkg_func_module_test.ucg");
-    lsp_no_panic_test!(test_lsp_no_panic_select_expressions, "../../integration_tests/select_expressions_test.ucg");
-    lsp_no_panic_test!(test_lsp_no_panic_selectors, "../../integration_tests/selectors_test.ucg");
-    lsp_no_panic_test!(test_lsp_no_panic_simple_values, "../../integration_tests/simple_values_test.ucg");
-    lsp_no_panic_test!(test_lsp_no_panic_tuple, "../../integration_tests/tuple_test.ucg");
-    lsp_no_panic_test!(test_lsp_no_panic_types, "../../integration_tests/types_test.ucg");
+    lsp_no_panic_test!(
+        test_lsp_no_panic_comparisons,
+        "../../integration_tests/comparisons_test.ucg"
+    );
+    lsp_no_panic_test!(
+        test_lsp_no_panic_concatenation,
+        "../../integration_tests/concatenation_test.ucg"
+    );
+    lsp_no_panic_test!(
+        test_lsp_no_panic_empty,
+        "../../integration_tests/empty_test.ucg"
+    );
+    lsp_no_panic_test!(
+        test_lsp_no_panic_format,
+        "../../integration_tests/format_test.ucg"
+    );
+    lsp_no_panic_test!(
+        test_lsp_no_panic_func,
+        "../../integration_tests/func_test.ucg"
+    );
+    lsp_no_panic_test!(
+        test_lsp_no_panic_functional_processing,
+        "../../integration_tests/functional_processing_test.ucg"
+    );
+    lsp_no_panic_test!(
+        test_lsp_no_panic_import,
+        "../../integration_tests/import_test.ucg"
+    );
+    lsp_no_panic_test!(
+        test_lsp_no_panic_include,
+        "../../integration_tests/include_test.ucg"
+    );
+    lsp_no_panic_test!(
+        test_lsp_no_panic_list,
+        "../../integration_tests/list_test.ucg"
+    );
+    lsp_no_panic_test!(
+        test_lsp_no_panic_modules,
+        "../../integration_tests/modules_test.ucg"
+    );
+    lsp_no_panic_test!(
+        test_lsp_no_panic_operator_precedence,
+        "../../integration_tests/operator_precedence_test.ucg"
+    );
+    lsp_no_panic_test!(
+        test_lsp_no_panic_pkg_func_module,
+        "../../integration_tests/pkg_func_module.ucg"
+    );
+    lsp_no_panic_test!(
+        test_lsp_no_panic_pkg_func_module_test,
+        "../../integration_tests/pkg_func_module_test.ucg"
+    );
+    lsp_no_panic_test!(
+        test_lsp_no_panic_select_expressions,
+        "../../integration_tests/select_expressions_test.ucg"
+    );
+    lsp_no_panic_test!(
+        test_lsp_no_panic_selectors,
+        "../../integration_tests/selectors_test.ucg"
+    );
+    lsp_no_panic_test!(
+        test_lsp_no_panic_simple_values,
+        "../../integration_tests/simple_values_test.ucg"
+    );
+    lsp_no_panic_test!(
+        test_lsp_no_panic_tuple,
+        "../../integration_tests/tuple_test.ucg"
+    );
+    lsp_no_panic_test!(
+        test_lsp_no_panic_types,
+        "../../integration_tests/types_test.ucg"
+    );
 
     #[test]
     fn test_encode_semantic_tokens_include_format_specifier() {
@@ -2305,10 +2593,7 @@ mod test {
     #[test]
     fn test_format_shape_narrowed_shows_union() {
         // select expressions produce Shape::Narrowed across their branches
-        let doc = analyze(
-            r#"let x = select ("a", 0) => {a = 1, b = "hi"};"#,
-            None,
-        );
+        let doc = analyze(r#"let x = select ("a", 0) => {a = 1, b = "hi"};"#, None);
         let (shape, _) = doc.symbol_table.get(&Rc::from("x")).unwrap();
         let s = format_shape(shape);
         // Should show a union of the branch types, not the raw word "Narrowed"
@@ -2356,8 +2641,11 @@ mod test {
     fn test_format_shape_resolved_import_shows_fields() {
         let import_path = PathBuf::from("/tmp/mylib.ucg");
         let mut resolved = std::collections::HashMap::new();
-        let imported =
-            analysis::analyze("let foo = 1; let bar = \"hi\";", None, &std::collections::HashMap::new());
+        let imported = analysis::analyze(
+            "let foo = 1; let bar = \"hi\";",
+            None,
+            &std::collections::HashMap::new(),
+        );
         resolved.insert(import_path.clone(), imported);
         let doc = analysis::analyze(r#"let lib = import "/tmp/mylib.ucg";"#, None, &resolved);
         let (shape, _) = doc.symbol_table.get(&Rc::from("lib")).unwrap();
@@ -2379,14 +2667,21 @@ mod test {
     fn test_find_hover_resolved_import_shows_fields() {
         let import_path = PathBuf::from("/tmp/mylib.ucg");
         let mut resolved = std::collections::HashMap::new();
-        let imported =
-            analysis::analyze("let foo = 1; let bar = \"hi\";", None, &std::collections::HashMap::new());
+        let imported = analysis::analyze(
+            "let foo = 1; let bar = \"hi\";",
+            None,
+            &std::collections::HashMap::new(),
+        );
         resolved.insert(import_path.clone(), imported);
         let doc = analysis::analyze(r#"let lib = import "/tmp/mylib.ucg";"#, None, &resolved);
         // hover on `lib` at (0, 4)
         let hover = find_hover(&doc, 0, 4);
         assert!(hover.is_some());
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
             assert!(mc.value.contains("foo"), "got: {}", mc.value);
             assert!(mc.value.contains("bar"), "got: {}", mc.value);
         } else {
@@ -2401,15 +2696,18 @@ mod test {
         // `lib.foo` — cursor on `foo` → should show Int
         let import_path = PathBuf::from("/tmp/mylib.ucg");
         let mut resolved = std::collections::HashMap::new();
-        let imported =
-            analysis::analyze("let foo = 1;", None, &std::collections::HashMap::new());
+        let imported = analysis::analyze("let foo = 1;", None, &std::collections::HashMap::new());
         resolved.insert(import_path.clone(), imported);
         let src = r#"let lib = import "/tmp/mylib.ucg"; let x = lib.foo;"#;
         // `foo` starts at col 47 (0-based)
         let doc = analysis::analyze(src, None, &resolved);
         let hover = find_hover(&doc, 0, 47);
         assert!(hover.is_some(), "expected hover on dot field");
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
             assert!(mc.value.contains("Int"), "got: {}", mc.value);
             assert!(mc.value.contains("lib.foo"), "got: {}", mc.value);
         } else {
@@ -2430,7 +2728,11 @@ mod test {
         let y_col = src.rfind('y').unwrap() as u32;
         let hover = find_hover(&doc, 0, y_col);
         assert!(hover.is_some(), "expected hover on nested dot field");
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
             assert!(mc.value.contains("Str"), "got: {}", mc.value);
             assert!(mc.value.contains("t.inner.y"), "got: {}", mc.value);
         } else {
@@ -2460,8 +2762,16 @@ mod test {
         let doc = analyze(src, None);
         let hover = find_hover(&doc, 1, 4); // line 1 (0-based), col 4 = `x`
         assert!(hover.is_some());
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
-            assert!(mc.value.contains("Returns the answer."), "got: {}", mc.value);
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
+            assert!(
+                mc.value.contains("Returns the answer."),
+                "got: {}",
+                mc.value
+            );
             // Doc comment should appear before the type line.
             let doc_pos = mc.value.find("Returns the answer.").unwrap();
             let type_pos = mc.value.find("**type**").unwrap();
@@ -2478,8 +2788,16 @@ mod test {
         let doc = analyze(src, None);
         let hover = find_hover(&doc, 2, 4); // `x` on line 2 (0-based)
         assert!(hover.is_some());
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
-            assert!(!mc.value.contains("Unrelated comment."), "got: {}", mc.value);
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
+            assert!(
+                !mc.value.contains("Unrelated comment."),
+                "got: {}",
+                mc.value
+            );
         } else {
             panic!("expected Markup hover");
         }
@@ -2505,8 +2823,16 @@ mod test {
         let doc = analysis::analyze(src, None, &resolved);
         let hover = super::find_hover(&doc, &ws, 0, 4); // hover on `lib`
         assert!(hover.is_some());
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
-            assert!(mc.value.contains("Utilities for working with lists."), "got: {}", mc.value);
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
+            assert!(
+                mc.value.contains("Utilities for working with lists."),
+                "got: {}",
+                mc.value
+            );
         } else {
             panic!("expected Markup hover");
         }
@@ -2517,15 +2843,16 @@ mod test {
         // Only 1 blank line before first binding: not a file-level doc.
         let import_path = PathBuf::from("/tmp/mylib.ucg");
         let mut ws = WorkspaceIndex::new(PathBuf::from("/tmp"));
-        ws.update_from_content(
-            &import_path,
-            "// Not a file doc.\n\nlet foo = 1;",
-        );
+        ws.update_from_content(&import_path, "// Not a file doc.\n\nlet foo = 1;");
         let src = r#"let lib = import "/tmp/mylib.ucg";"#;
         let doc = analysis::analyze(src, None, ws.resolved_files());
         let hover = super::find_hover(&doc, &ws, 0, 4);
         assert!(hover.is_some());
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
             assert!(!mc.value.contains("Not a file doc."), "got: {}", mc.value);
         } else {
             panic!("expected Markup hover");
@@ -2543,7 +2870,11 @@ mod test {
         let foo_col = src.rfind("foo").unwrap() as u32;
         let hover = super::find_hover(&doc, &ws, 0, foo_col);
         assert!(hover.is_some());
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
             assert!(mc.value.contains("The answer."), "got: {}", mc.value);
         } else {
             panic!("expected Markup hover");
@@ -2572,7 +2903,11 @@ mod test {
         let result_col = src.rfind("result").unwrap() as u32;
         let hover = super::find_hover(&doc, &ws, 0, result_col);
         assert!(hover.is_some());
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
             assert!(
                 mc.value.contains("Doc for result binding"),
                 "should show binding doc, got: {}",
@@ -2595,7 +2930,11 @@ mod test {
         let doc = analyze("let x = 1;", None);
         let hover = find_hover(&doc, 0, 0); // cursor on `let`
         assert!(hover.is_some(), "should show hover for `let` keyword");
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
             assert!(mc.value.contains("**`let`**"), "got: {}", mc.value);
         }
     }
@@ -2606,7 +2945,11 @@ mod test {
         let col = "let f = ".len() as u32;
         let hover = find_hover(&doc, 0, col); // cursor on `func`
         assert!(hover.is_some(), "should show hover for `func` keyword");
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
             assert!(mc.value.contains("**`func`**"), "got: {}", mc.value);
         }
     }
@@ -2617,7 +2960,11 @@ mod test {
         let col = "let m = ".len() as u32;
         let hover = find_hover(&doc, 0, col);
         assert!(hover.is_some(), "should show hover for `module` keyword");
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
             assert!(mc.value.contains("**`module`**"), "got: {}", mc.value);
         }
     }
@@ -2628,7 +2975,11 @@ mod test {
         let col = "let x = ".len() as u32;
         let hover = find_hover(&doc, 0, col);
         assert!(hover.is_some(), "should show hover for `select` keyword");
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
             assert!(mc.value.contains("**`select`**"), "got: {}", mc.value);
         }
     }
@@ -2641,8 +2992,16 @@ mod test {
         let col = "let x = 1; let y = ".len() as u32;
         let hover = find_hover(&doc, 0, col);
         assert!(hover.is_some());
-        if let Some(Hover { contents: HoverContents::Markup(mc), .. }) = hover {
-            assert!(mc.value.contains("**type**"), "should show type info for binding, got: {}", mc.value);
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
+            assert!(
+                mc.value.contains("**type**"),
+                "should show type info for binding, got: {}",
+                mc.value
+            );
         }
     }
 
@@ -2706,10 +3065,7 @@ mod test {
     #[test]
     fn test_collect_workspace_symbols_kind() {
         let mut ws = empty_workspace();
-        ws.update_from_content(
-            &PathBuf::from("/tmp/test.ucg"),
-            "let f = func(x) => x + 1;",
-        );
+        ws.update_from_content(&PathBuf::from("/tmp/test.ucg"), "let f = func(x) => x + 1;");
         let results = collect_workspace_symbols(&ws, "f");
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].kind, SymbolKind::FUNCTION);

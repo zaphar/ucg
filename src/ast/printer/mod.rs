@@ -557,6 +557,28 @@ where
             Expression::Simple(ref _def) => {
                 self.render_value(_def)?;
             }
+            Expression::Constraint(ref def) => {
+                for (i, arm) in def.arms.iter().enumerate() {
+                    if i > 0 {
+                        write!(self.w, " | ")?;
+                    }
+                    match arm {
+                        crate::ast::ConstraintArm::Range(ref rdef) => {
+                            write!(self.w, "in ")?;
+                            if let Some(ref start) = rdef.start {
+                                self.render_expr(start)?;
+                            }
+                            write!(self.w, "..")?;
+                            if let Some(ref end) = rdef.end {
+                                self.render_expr(end)?;
+                            }
+                        }
+                        crate::ast::ConstraintArm::Shape(ref expr) => {
+                            self.render_expr(expr)?;
+                        }
+                    }
+                }
+            }
         };
         if did_indent {
             self.curr_indent -= self.indent_size;
@@ -591,6 +613,10 @@ where
             Statement::Output(_, _tok, _expr) => {
                 write!(&mut self.w, "out {} ", _tok.fragment)?;
                 self.render_expr(&_expr)?;
+            }
+            Statement::Constraint(def) => {
+                write!(&mut self.w, "constraint {} = ", def.name.fragment)?;
+                self.render_expr(&def.value)?;
             }
         };
         write!(self.w, ";\n")?;

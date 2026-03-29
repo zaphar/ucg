@@ -31,6 +31,7 @@ pub use error::Error;
 pub use vm::VM;
 
 use crate::ast::{CastType, Position};
+use crate::build::ir::ConstraintVal;
 use pointer::OpPointer;
 use scope::Stack;
 
@@ -60,6 +61,7 @@ impl Value {
             M(_) => "Func",
             T(_) => "Expression",
             S(_) => "Symbol",
+            K(_) => "Constraint",
         }
     }
 }
@@ -102,9 +104,11 @@ pub enum Value {
     F(Func),
     // Module
     M(Module),
+    // Constraint
+    K(ConstraintVal),
 }
 
-use Value::{C, F, M, P, S, T};
+use Value::{C, F, K, M, P, S, T};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Hook {
@@ -185,6 +189,19 @@ pub enum Op {
     // The self lookup for tuples.
     PushSelf,
     PopSelf,
+    // Constraint checking
+    CheckConstraint,
+    // Build a constraint value from stack values.
+    // Each Range arm expects 2 values (start, end — Empty if open-ended).
+    // Each Exact arm expects 1 value.
+    BuildConstraint(Vec<ConstraintArmType>),
+}
+
+/// Describes one arm of a constraint for the BuildConstraint opcode.
+#[derive(Debug, PartialEq, Clone)]
+pub enum ConstraintArmType {
+    Range,
+    Exact,
 }
 
 use super::ir::Val;

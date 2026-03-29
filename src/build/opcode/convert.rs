@@ -6,7 +6,7 @@ use crate::ast::{CastType, Position};
 
 use Composite::{List, Tuple};
 use Primitive::{Bool, Empty, Float, Int, Str};
-use Value::{C, F, M, P, S, T};
+use Value::{C, F, K, M, P, S, T};
 
 pub struct Error {
     val: Primitive,
@@ -132,6 +132,7 @@ impl From<&Value> for Val {
                 }
                 Val::List(els)
             }
+            K(cv) => Val::Constraint(cv.clone()),
             S(_) | F(_) | M(_) | T(_) | P(Empty) => Val::Empty,
         }
     }
@@ -188,6 +189,7 @@ impl From<&Val> for Value {
                 }
                 C(Tuple(field_list, positions))
             }
+            Val::Constraint(cv) => K(cv.clone()),
         }
     }
 }
@@ -230,6 +232,7 @@ impl From<&Value> for Rc<str> {
             &T(_) => "<Thunk>".into(),
             &F(_) => "<Func>".into(),
             &M(_) => "<Module>".into(),
+            &K(_) => "<Constraint>".into(),
         }
     }
 }

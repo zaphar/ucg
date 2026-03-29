@@ -286,11 +286,100 @@ make_fn!(
     )
 );
 
+// Parses: `in <start> .. <end?>` — range with start bound
+fn constraint_range_with_start(input: SliceIter<Token>) -> ParseResult<ConstraintArm> {
+    let _input = input;
+    do_each!(_input,
+        pos => pos,
+        _ => word!("in"),
+        start => either!(simple_expression, grouped_expression),
+        _ => punct!(".."),
+        end => optional!(either!(simple_expression, grouped_expression)),
+        (ConstraintArm::Range(ConstraintRangeDef {
+            pos,
+            start: Some(Box::new(start)),
+            end: end.map(Box::new),
+        }))
+    )
+}
+
+// Parses: `in .. <end>` — range with only end bound (open start)
+fn constraint_range_open_start(input: SliceIter<Token>) -> ParseResult<ConstraintArm> {
+    let _input = input;
+    do_each!(_input,
+        pos => pos,
+        _ => word!("in"),
+        _ => punct!(".."),
+        end => must!(wrap_err!(either!(simple_expression, grouped_expression),
+                               "Expected end bound after '..' in range constraint")),
+        (ConstraintArm::Range(ConstraintRangeDef {
+            pos,
+            start: None,
+            end: Some(Box::new(end)),
+        }))
+    )
+}
+
+// Parses a constraint range arm: tries start-first, then open-start
+fn constraint_range_arm(input: SliceIter<Token>) -> ParseResult<ConstraintArm> {
+    either!(
+        input,
+        constraint_range_with_start,
+        constraint_range_open_start
+    )
+}
+
+// Parses a constraint shape arm: any non_op_expression
+fn constraint_shape_arm(input: SliceIter<Token>) -> ParseResult<ConstraintArm> {
+    let _input = input;
+    do_each!(_input,
+        expr => non_op_expression,
+        (ConstraintArm::Shape(Box::new(expr)))
+    )
+}
+
+// Parses a full constraint expression with alternation via |
+// constraint_expression := constraint_arm ("|" constraint_arm)*
+fn constraint_expression(input: SliceIter<Token>) -> ParseResult<Expression> {
+    let _input = input;
+    do_each!(_input,
+        pos => pos,
+        first => either!(constraint_range_arm, constraint_shape_arm),
+        rest => repeat!(do_each!(
+            _ => punct!("|"),
+            arm => must!(wrap_err!(either!(constraint_range_arm, constraint_shape_arm),
+                                   "Expected constraint arm after '|'")),
+            (arm)
+        )),
+        ({
+            if rest.is_empty() {
+                match first {
+                    ConstraintArm::Shape(expr) => {
+                        // Single shape arm, no alternation — unwrap for backward compat
+                        *expr
+                    }
+                    range_arm => {
+                        // Single range arm — keep as Constraint
+                        Expression::Constraint(ConstraintDef {
+                            pos,
+                            arms: vec![range_arm],
+                        })
+                    }
+                }
+            } else {
+                let mut arms = vec![first];
+                arms.extend(rest);
+                Expression::Constraint(ConstraintDef { pos, arms })
+            }
+        })
+    )
+}
+
 make_fn!(
     shape_suffix<SliceIter<Token>, Expression>,
     do_each!(
         _ => punct!("::"),
-        shape => non_op_expression,
+        shape => constraint_expression,
         (shape)
     )
 );
@@ -880,6 +969,25 @@ make_fn!(
     )
 );
 
+// Parses: constraint name = constraint_expr ;
+fn constraint_statement(input: SliceIter<Token>) -> ParseResult<Statement> {
+    let _input = input;
+    do_each!(
+        _input,
+        pos => pos,
+        _ => word!("constraint"),
+        name => must!(wrap_err!(match_binding_name!(), "Expected name for constraint")),
+        _ => must!(punct!("=")),
+        value => must!(wrap_err!(constraint_expression, "Expected constraint expression")),
+        _ => must!(punct!(";")),
+        (Statement::Constraint(ConstraintBindingDef {
+            pos,
+            name,
+            value,
+        }))
+    )
+}
+
 make_fn!(
     out_statement<SliceIter<Token>, Statement>,
     do_each!(
@@ -897,6 +1005,7 @@ fn statement(i: SliceIter<Token>) -> Result<SliceIter<Token>, Statement> {
     return either!(
         i,
         trace_parse!(assert_statement),
+        trace_parse!(constraint_statement),
         trace_parse!(let_statement),
         trace_parse!(out_statement),
         trace_parse!(expression_statement)

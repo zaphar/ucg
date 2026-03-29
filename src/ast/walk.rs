@@ -63,6 +63,9 @@ pub trait Walker: Visitor {
             Statement::Let(ref mut def) => {
                 self.walk_expression(&mut def.value);
             }
+            Statement::Constraint(ref mut def) => {
+                self.walk_expression(&mut def.value);
+            }
             Statement::Expression(ref mut expr) => {
                 self.walk_expression(expr);
             }
@@ -175,6 +178,23 @@ pub trait Walker: Visitor {
             }
             Expression::Convert(ref mut def) => {
                 self.walk_expression(&mut def.target);
+            }
+            Expression::Constraint(ref mut def) => {
+                for arm in def.arms.iter_mut() {
+                    match arm {
+                        ConstraintArm::Range(ref mut rdef) => {
+                            if let Some(ref mut start) = rdef.start {
+                                self.walk_expression(start);
+                            }
+                            if let Some(ref mut end) = rdef.end {
+                                self.walk_expression(end);
+                            }
+                        }
+                        ConstraintArm::Shape(ref mut expr) => {
+                            self.walk_expression(expr);
+                        }
+                    }
+                }
             }
         }
         self.leave_expression(expr);

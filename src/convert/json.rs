@@ -75,6 +75,12 @@ impl JsonConverter {
             &Val::Env(ref fs) => self.convert_env(fs)?,
             &Val::List(ref l) => self.convert_list(l)?,
             &Val::Tuple(ref t) => self.convert_tuple(t)?,
+            &Val::Constraint(_) => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Constraint values cannot be converted to JSON",
+                ));
+            }
         };
         Ok(jsn_val)
     }

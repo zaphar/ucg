@@ -41,5 +41,8 @@ Some words are reserved in UCG and can not be used as a named binding.
 * reduce
 * NULL
 * out
+* constraint
+* convert
+* TRACE
 
 Next: <a href="types">Types</a>

@@ -18,12 +18,12 @@ use std::rc::Rc;
 use crate::ast::rewrite::Rewriter;
 use crate::ast::walk::Walker;
 use crate::ast::{
-    BinaryExprType, BinaryOpDef, Expression, FormatArgs, FuncOpDef, Position, PositionedItem,
-    SelectDef, Shape, Statement, TemplatePart, Token, TokenType, Value,
+    BinaryExprType, BinaryOpDef, ConstraintArm, Expression, FormatArgs, FuncOpDef, Position,
+    PositionedItem, SelectDef, Shape, Statement, TemplatePart, Token, TokenType, Value,
 };
 use crate::build::format::{ExpressionTemplate, SimpleTemplate, TemplateParser};
 use crate::build::opcode::Primitive;
-use crate::build::opcode::{Hook, Op};
+use crate::build::opcode::{ConstraintArmType, Hook, Op};
 
 pub struct AST();
 
@@ -92,6 +92,16 @@ impl AST {
                 ops.push(Op::Runtime(Hook::Assert), pos);
             }
             Statement::Let(def) => {
+                let binding = def.name.fragment;
+                ops.push(Op::Sym(binding), def.name.pos);
+                Self::translate_expr(def.value, &mut ops, root);
+                if let Some(constraint) = def.constraint {
+                    Self::translate_expr(constraint, &mut ops, root);
+                    ops.push(Op::CheckConstraint, def.pos.clone());
+                }
+                ops.push(Op::Bind, def.pos);
+            }
+            Statement::Constraint(def) => {
                 let binding = def.name.fragment;
                 ops.push(Op::Sym(binding), def.name.pos);
                 Self::translate_expr(def.value, &mut ops, root);
@@ -570,9 +580,42 @@ impl AST {
                 ops.push(Op::Runtime(Hook::Trace(def.pos.clone())), def.pos);
             }
             Expression::Convert(def) => {
-                ops.push(Op::Val(Primitive::Str(def.converter.fragment)), def.converter.pos);
+                ops.push(
+                    Op::Val(Primitive::Str(def.converter.fragment)),
+                    def.converter.pos,
+                );
                 Self::translate_expr(*def.target, &mut ops, root);
                 ops.push(Op::Runtime(Hook::Convert), def.pos);
+            }
+            Expression::Constraint(def) => {
+                // Push values for each arm onto the stack, then BuildConstraint
+                // assembles them into a ConstraintVal.
+                // Values are pushed in arm order; each range pushes start then end.
+                let mut arm_types = Vec::new();
+                for arm in def.arms {
+                    match arm {
+                        ConstraintArm::Range(rdef) => {
+                            // Push start (or Empty if open-ended)
+                            if let Some(start) = rdef.start {
+                                Self::translate_expr(*start, &mut ops, root);
+                            } else {
+                                ops.push(Op::Val(Primitive::Empty), rdef.pos.clone());
+                            }
+                            // Push end (or Empty if open-ended)
+                            if let Some(end) = rdef.end {
+                                Self::translate_expr(*end, &mut ops, root);
+                            } else {
+                                ops.push(Op::Val(Primitive::Empty), rdef.pos);
+                            }
+                            arm_types.push(ConstraintArmType::Range);
+                        }
+                        ConstraintArm::Shape(expr) => {
+                            Self::translate_expr(*expr, &mut ops, root);
+                            arm_types.push(ConstraintArmType::Exact);
+                        }
+                    }
+                }
+                ops.push(Op::BuildConstraint(arm_types), def.pos);
             }
         }
     }

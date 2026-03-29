@@ -19,7 +19,7 @@ use super::Value;
 
 use Composite::{List, Tuple};
 use Primitive::{Bool, Empty, Float, Int, Str};
-use Value::{C, F, M, P, S, T};
+use Value::{C, F, K, M, P, S, T};
 
 impl fmt::Debug for Value {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
@@ -47,6 +47,7 @@ impl fmt::Debug for Value {
             M(_) => write!(w, "<Module>"),
             T(_) => write!(w, "<Expression>"),
             S(v) => write!(w, "Symbol({})", v),
+            K(_) => write!(w, "<Constraint>"),
         }
     }
 }

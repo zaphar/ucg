@@ -639,8 +639,10 @@ impl Shape {
                     );
                 }
                 // Use arg_order for both sides to compare in declaration order.
-                for (left_name, right_name) in
-                    left_opshape.arg_order.iter().zip(right_opshape.arg_order.iter())
+                for (left_name, right_name) in left_opshape
+                    .arg_order
+                    .iter()
+                    .zip(right_opshape.arg_order.iter())
                 {
                     if let (Some(ls), Some(rs)) = (
                         left_opshape.args.get(left_name),
@@ -1272,6 +1274,33 @@ pub struct RangeDef {
     pub end: Box<Expression>,
 }
 
+/// Defines a constraint range bound (e.g., `in 1..65535`).
+/// Distinct from RangeDef which generates lists.
+/// At least one of start/end must be Some.
+#[derive(Debug, PartialEq, Clone)]
+pub struct ConstraintRangeDef {
+    pub pos: Position,
+    pub start: Option<Box<Expression>>,
+    pub end: Option<Box<Expression>>,
+}
+
+/// A single arm of a constraint (before alternation).
+#[derive(Debug, PartialEq, Clone)]
+pub enum ConstraintArm {
+    /// A numeric range: `in 1..65535`
+    Range(ConstraintRangeDef),
+    /// A shape/value expression: any existing expression
+    Shape(Box<Expression>),
+}
+
+/// A full constraint, possibly with alternation.
+/// `let x :: in 1..1024 | 8080 | 8443 = ...;`
+#[derive(Debug, PartialEq, Clone)]
+pub struct ConstraintDef {
+    pub pos: Position,
+    pub arms: Vec<ConstraintArm>,
+}
+
 /// Encodes an import expression in the UCG AST.
 #[derive(Debug, PartialEq, Clone)]
 pub struct ImportDef {
@@ -1343,6 +1372,8 @@ pub enum Expression {
     Debug(DebugDef),
     // Convert expression - converts a value to string using a converter
     Convert(ConvertDef),
+    // Constraint expression - ranges and alternations
+    Constraint(ConstraintDef),
 }
 
 impl Expression {
@@ -1367,6 +1398,7 @@ impl Expression {
             &Expression::Not(ref def) => &def.pos,
             &Expression::Debug(ref def) => &def.pos,
             &Expression::Convert(ref def) => &def.pos,
+            &Expression::Constraint(ref def) => &def.pos,
         }
     }
 }
@@ -1428,6 +1460,9 @@ impl fmt::Display for Expression {
             &Expression::Convert(ref _def) => {
                 write!(w, "<Convert>")?;
             }
+            &Expression::Constraint(ref _def) => {
+                write!(w, "<Constraint>")?;
+            }
         }
         Ok(())
     }
@@ -1442,6 +1477,15 @@ pub struct LetDef {
     pub value: Expression,
 }
 
+/// Encodes a constraint binding in the UCG AST.
+/// `constraint name = constraint_expr;`
+#[derive(Debug, PartialEq, Clone)]
+pub struct ConstraintBindingDef {
+    pub pos: Position,
+    pub name: Token,
+    pub value: Expression,
+}
+
 /// Encodes a parsed statement in the UCG AST.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
@@ -1450,6 +1494,9 @@ pub enum Statement {
 
     // Named bindings
     Let(LetDef),
+
+    // Constraint bindings
+    Constraint(ConstraintBindingDef),
 
     // Assert statement
     Assert(Position, Expression),
@@ -1463,6 +1510,7 @@ impl Statement {
         match self {
             Statement::Expression(ref e) => e.pos(),
             Statement::Let(ref def) => &def.pos,
+            Statement::Constraint(ref def) => &def.pos,
             Statement::Assert(ref pos, _) => pos,
             Statement::Output(ref pos, _, _) => pos,
         }

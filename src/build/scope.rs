@@ -165,7 +165,12 @@ impl Scope {
                         }
                     }
                 }
-                Val::Boolean(_) | Val::Empty | Val::Float(_) | Val::Int(_) | Val::Str(_) => {
+                Val::Boolean(_)
+                | Val::Empty
+                | Val::Float(_)
+                | Val::Int(_)
+                | Val::Str(_)
+                | Val::Constraint(_) => {
                     // noop
                 }
             };
@@ -364,12 +369,11 @@ mod test {
 
     #[test]
     fn lookup_sym_in_tuple_curr_val() {
-        let tuple = Rc::new(Val::Tuple(vec![
-            (Rc::from("name"), Rc::new(Val::Str(Rc::from("alice")))),
-        ]));
-        let scope = Scope::new(make_env())
-            .set_curr_val(tuple)
-            .use_curr_val();
+        let tuple = Rc::new(Val::Tuple(vec![(
+            Rc::from("name"),
+            Rc::new(Val::Str(Rc::from("alice"))),
+        )]));
+        let scope = Scope::new(make_env()).set_curr_val(tuple).use_curr_val();
         let sym = positioned(Rc::from("name"));
         let result = scope.lookup_sym(&sym, false);
         assert!(result.is_some());
@@ -380,9 +384,7 @@ mod test {
     fn lookup_sym_in_build_output() {
         let mut scope = Scope::new(make_env());
         let key = positioned(Rc::from("myvar"));
-        scope
-            .build_output
-            .insert(key.clone(), Rc::new(Val::Int(7)));
+        scope.build_output.insert(key.clone(), Rc::new(Val::Int(7)));
         let result = scope.lookup_sym(&key, true);
         assert_eq!(result, Some(Rc::new(Val::Int(7))));
     }

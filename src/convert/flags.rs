@@ -86,7 +86,7 @@ impl FlagConverter {
             &Val::Str(ref s) => {
                 write!(w, "'{}' ", s)?;
             }
-            &Val::List(_) | &Val::Tuple(_) | &Val::Env(_) => {
+            &Val::List(_) | &Val::Tuple(_) | &Val::Env(_) | &Val::Constraint(_) => {
                 // This is ignored
                 eprintln!("Skipping {}...", v.type_name());
             }
@@ -101,7 +101,7 @@ impl FlagConverter {
                 continue;
             }
             match val.as_ref() {
-                &Val::Tuple(_) | &Val::Env(_) => {
+                &Val::Tuple(_) | &Val::Env(_) | &Val::Constraint(_) => {
                     eprintln!("Skipping {} in flag output tuple.", val.type_name());
                 }
                 &Val::List(ref def) => {
@@ -157,9 +157,7 @@ mod test {
 
     #[test]
     fn convert_long_flag() {
-        let v = Val::Tuple(vec![
-            (Rc::from("verbose"), Rc::new(Val::Boolean(true))),
-        ]);
+        let v = Val::Tuple(vec![(Rc::from("verbose"), Rc::new(Val::Boolean(true)))]);
         let out = convert_to_string(v);
         assert!(out.contains("--verbose"));
         assert!(out.contains("true"));
@@ -167,18 +165,17 @@ mod test {
 
     #[test]
     fn convert_short_flag() {
-        let v = Val::Tuple(vec![
-            (Rc::from("v"), Rc::new(Val::Boolean(true))),
-        ]);
+        let v = Val::Tuple(vec![(Rc::from("v"), Rc::new(Val::Boolean(true)))]);
         let out = convert_to_string(v);
         assert!(out.contains("-v"));
     }
 
     #[test]
     fn convert_string_value() {
-        let v = Val::Tuple(vec![
-            (Rc::from("name"), Rc::new(Val::Str(Rc::from("test")))),
-        ]);
+        let v = Val::Tuple(vec![(
+            Rc::from("name"),
+            Rc::new(Val::Str(Rc::from("test"))),
+        )]);
         let out = convert_to_string(v);
         assert!(out.contains("--name"));
         assert!(out.contains("'test'"));
@@ -186,9 +183,7 @@ mod test {
 
     #[test]
     fn convert_int_value() {
-        let v = Val::Tuple(vec![
-            (Rc::from("count"), Rc::new(Val::Int(5))),
-        ]);
+        let v = Val::Tuple(vec![(Rc::from("count"), Rc::new(Val::Int(5)))]);
         let out = convert_to_string(v);
         assert!(out.contains("--count"));
         assert!(out.contains("5"));
@@ -196,9 +191,7 @@ mod test {
 
     #[test]
     fn convert_empty_flag_no_value() {
-        let v = Val::Tuple(vec![
-            (Rc::from("help"), Rc::new(Val::Empty)),
-        ]);
+        let v = Val::Tuple(vec![(Rc::from("help"), Rc::new(Val::Empty))]);
         let out = convert_to_string(v);
         assert_eq!(out.trim(), "--help");
     }

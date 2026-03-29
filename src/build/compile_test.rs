@@ -152,6 +152,11 @@ fn test_type_checks() {
 }
 
 #[test]
+fn test_constraints() {
+    assert_build(include_str!("../../integration_tests/constraint_test.ucg"));
+}
+
+#[test]
 fn test_environment_variable_exists() {
     assert_build("assert { ok = env.FOO == \"bar\", desc = \"env var $FOO is bar\"};");
 }
@@ -635,4 +640,96 @@ fn test_invalid_call_selector() {
             Regex::new(r"line: 1 column: 26").unwrap(),
         ],
     )
+}
+
+// Constraint failure tests
+
+#[test]
+fn test_constraint_range_violation() {
+    assert_build_failure(
+        "let port :: in 1..1024 = 9999;",
+        vec![Regex::new(r"does not satisfy constraint").unwrap()],
+    )
+}
+
+#[test]
+fn test_constraint_range_below_minimum() {
+    assert_build_failure(
+        "let x :: in 10..100 = 5;",
+        vec![Regex::new(r"does not satisfy constraint").unwrap()],
+    )
+}
+
+#[test]
+fn test_constraint_range_above_maximum() {
+    assert_build_failure(
+        "let x :: in 10..100 = 101;",
+        vec![Regex::new(r"does not satisfy constraint").unwrap()],
+    )
+}
+
+#[test]
+fn test_constraint_open_end_below_minimum() {
+    assert_build_failure(
+        "let x :: in 0.. = 0 - 1;",
+        vec![Regex::new(r"does not satisfy constraint").unwrap()],
+    )
+}
+
+#[test]
+fn test_constraint_open_start_above_maximum() {
+    assert_build_failure(
+        "let x :: in ..100 = 101;",
+        vec![Regex::new(r"does not satisfy constraint").unwrap()],
+    )
+}
+
+#[test]
+fn test_constraint_alternation_violation() {
+    assert_build_failure(
+        r#"let status :: "active" | "inactive" = "unknown";"#,
+        vec![Regex::new(r"does not satisfy constraint").unwrap()],
+    )
+}
+
+#[test]
+fn test_constraint_combined_violation() {
+    assert_build_failure(
+        "let port :: in 1..1024 | 8080 | 8443 = 9999;",
+        vec![Regex::new(r"does not satisfy constraint").unwrap()],
+    )
+}
+
+#[test]
+fn test_constraint_float_range_violation() {
+    assert_build_failure(
+        "let ratio :: in 0.0..1.0 = 1.5;",
+        vec![Regex::new(r"does not satisfy constraint").unwrap()],
+    )
+}
+
+#[test]
+fn test_constraint_first_class_violation() {
+    assert_build_failure(
+        "constraint r = in 1..100; let x :: r = 200;",
+        vec![Regex::new(r"does not satisfy constraint").unwrap()],
+    )
+}
+
+// Constraint with function arguments — shape checking works at typecheck time.
+// NOTE: Runtime value checking (range/alternation) for func args is not yet
+// implemented. The constraint is parsed and type-checked but not enforced at
+// call time for value constraints. This is a known limitation.
+#[test]
+fn test_constraint_func_arg_range() {
+    assert_build(
+        "let add = func(a :: in 0..100, b :: in 0..100) => a + b; let result = add(10, 20);",
+    );
+}
+
+#[test]
+fn test_constraint_func_arg_alternation() {
+    assert_build(
+        r#"let greet = func(title :: "Mr" | "Ms" | "Dr") => "Hello " + title; let g = greet("Dr");"#,
+    );
 }

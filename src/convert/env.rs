@@ -77,6 +77,9 @@ impl EnvConverter {
                 // This is ignored
                 eprintln!("Skipping env...");
             }
+            &Val::Constraint(_) => {
+                eprintln!("Skipping constraint...");
+            }
         }
         Ok(())
     }
@@ -115,54 +118,45 @@ mod test {
 
     #[test]
     fn convert_tuple_string_field() {
-        let v = Val::Tuple(vec![
-            (Rc::from("DB_HOST"), Rc::new(Val::Str(Rc::from("localhost")))),
-        ]);
+        let v = Val::Tuple(vec![(
+            Rc::from("DB_HOST"),
+            Rc::new(Val::Str(Rc::from("localhost"))),
+        )]);
         let out = convert_to_string(v);
         assert_eq!(out, "DB_HOST='localhost'\n");
     }
 
     #[test]
     fn convert_tuple_int_field() {
-        let v = Val::Tuple(vec![
-            (Rc::from("PORT"), Rc::new(Val::Int(8080))),
-        ]);
+        let v = Val::Tuple(vec![(Rc::from("PORT"), Rc::new(Val::Int(8080)))]);
         let out = convert_to_string(v);
         assert_eq!(out, "PORT=8080\n");
     }
 
     #[test]
     fn convert_tuple_bool_field() {
-        let v = Val::Tuple(vec![
-            (Rc::from("DEBUG"), Rc::new(Val::Boolean(true))),
-        ]);
+        let v = Val::Tuple(vec![(Rc::from("DEBUG"), Rc::new(Val::Boolean(true)))]);
         let out = convert_to_string(v);
         assert_eq!(out, "DEBUG=true\n");
     }
 
     #[test]
     fn convert_tuple_float_field() {
-        let v = Val::Tuple(vec![
-            (Rc::from("RATE"), Rc::new(Val::Float(1.5))),
-        ]);
+        let v = Val::Tuple(vec![(Rc::from("RATE"), Rc::new(Val::Float(1.5)))]);
         let out = convert_to_string(v);
         assert_eq!(out, "RATE=1.5\n");
     }
 
     #[test]
     fn convert_empty_value_skips() {
-        let v = Val::Tuple(vec![
-            (Rc::from("SKIP"), Rc::new(Val::Empty)),
-        ]);
+        let v = Val::Tuple(vec![(Rc::from("SKIP"), Rc::new(Val::Empty))]);
         let out = convert_to_string(v);
         assert_eq!(out, "");
     }
 
     #[test]
     fn convert_nested_tuple_skips() {
-        let v = Val::Tuple(vec![
-            (Rc::from("nested"), Rc::new(Val::Tuple(vec![]))),
-        ]);
+        let v = Val::Tuple(vec![(Rc::from("nested"), Rc::new(Val::Tuple(vec![])))]);
         let out = convert_to_string(v);
         assert_eq!(out, "");
     }

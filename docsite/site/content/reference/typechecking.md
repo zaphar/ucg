@@ -156,6 +156,81 @@ let Endpoint = module {
 };
 ```
 
+Range Constraints
+-----------------
+
+Range constraints restrict a value to a numeric range using the `in` keyword
+and `..` syntax. They work for both integers and floats. The type is checked
+at compile time and the value is checked at runtime.
+
+```
+let port :: in 1..65535 = 8080;         // must be between 1 and 65535
+let ratio :: in 0.0..1.0 = 0.5;        // float range
+```
+
+Ranges can be open-ended — at least one bound must be specified:
+
+```
+let positive :: in 0.. = 42;            // >= 0, no upper bound
+let small :: in ..100 = 50;             // <= 100, no lower bound
+```
+
+If the value falls outside the range, you get a runtime error:
+
+```
+let port :: in 1..1024 = 9999;          // Error: does not satisfy constraint
+```
+
+Alternation Constraints
+-----------------------
+
+Alternation constraints restrict a value to one of several specific values
+using the `|` syntax. They work with any value type.
+
+```
+let status :: "active" | "inactive" | "pending" = "active";
+let code :: 200 | 404 | 500 = 200;
+```
+
+If the value doesn't match any alternative, you get a runtime error:
+
+```
+let status :: "active" | "inactive" = "unknown";  // Error
+```
+
+### Combining Ranges and Alternations
+
+Ranges and exact values can be combined with `|`:
+
+```
+let port :: in 1..1024 | 8080 | 8443 = 80;   // system ports or specific app ports
+let port2 :: in 1..10 | in 20..30 = 25;       // multiple ranges
+```
+
+Named Constraints
+-----------------
+
+The `constraint` statement defines a reusable named constraint. Named
+constraints are contracts — they describe what values are acceptable but are
+not configuration values themselves.
+
+```
+constraint port_range = in 1..65535;
+constraint log_level = "debug" | "info" | "warn" | "error";
+constraint valid_port = in 1..1024 | 8080 | 8443;
+```
+
+Use named constraints with `::` in let bindings:
+
+```
+let http_port :: port_range = 80;
+let level :: log_level = "info";
+let app_port :: valid_port = 8080;
+```
+
+Named constraints are especially useful when multiple bindings share the same
+contract, or when defining module parameter constraints.
+
 ### How Constraints Work
 
 Under the hood, shape constraints use the same type narrowing mechanism as the
@@ -164,8 +239,16 @@ narrowed against the value's type. If the types are incompatible (e.g.,
 constraining to integer but providing a string), the narrowing produces a type
 error.
 
+Range and alternation constraints add runtime value checking on top of
+compile-time type checking. The type checker verifies that the constraint and
+value are type-compatible (e.g., both are integers), and the VM verifies at
+runtime that the actual value falls within the specified range or matches one
+of the alternatives.
+
 This means constraints interact naturally with UCG's existing type inference:
 
 * NULL values are compatible with any constraint (they represent "any type")
 * Tuple constraints check field names and types structurally
 * Constraints propagate through copy expressions and module instantiation
+* Range constraints use `..` syntax (distinct from `:` list ranges)
+* The `|` operator joins constraint arms (distinct from `||` boolean OR)

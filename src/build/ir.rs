@@ -8,6 +8,50 @@ use std::string::ToString;
 
 use crate::error;
 
+/// Represents the bounds of a numeric range constraint.
+#[derive(PartialEq, Debug, Clone)]
+pub enum ConstraintBound {
+    Int(Option<i64>, Option<i64>),
+    Float(Option<f64>, Option<f64>),
+}
+
+/// A single arm of a constraint value.
+#[derive(PartialEq, Debug, Clone)]
+pub enum ConstraintValArm {
+    Range(ConstraintBound),
+    Exact(Rc<Val>),
+}
+
+/// A first-class constraint value that can check if a Val satisfies it.
+#[derive(PartialEq, Debug, Clone)]
+pub struct ConstraintVal {
+    pub arms: Vec<ConstraintValArm>,
+}
+
+impl ConstraintVal {
+    /// Check if a value satisfies this constraint.
+    /// Returns true if the value matches any arm.
+    pub fn check(&self, val: &Val) -> bool {
+        self.arms.iter().any(|arm| match arm {
+            ConstraintValArm::Range(ConstraintBound::Int(min, max)) => {
+                if let Val::Int(v) = val {
+                    min.map_or(true, |lo| *v >= lo) && max.map_or(true, |hi| *v <= hi)
+                } else {
+                    false
+                }
+            }
+            ConstraintValArm::Range(ConstraintBound::Float(min, max)) => {
+                if let Val::Float(v) = val {
+                    min.map_or(true, |lo| *v >= lo) && max.map_or(true, |hi| *v <= hi)
+                } else {
+                    false
+                }
+            }
+            ConstraintValArm::Exact(expected) => val.equal(expected).unwrap_or(false),
+        })
+    }
+}
+
 /// The Intermediate representation of a compiled UCG AST.
 #[derive(PartialEq, Debug, Clone)]
 pub enum Val {
@@ -19,6 +63,7 @@ pub enum Val {
     List(Vec<Rc<Val>>),
     Tuple(Vec<(Rc<str>, Rc<Val>)>),
     Env(Vec<(Rc<str>, Rc<str>)>),
+    Constraint(ConstraintVal),
 }
 
 impl Val {
@@ -33,6 +78,7 @@ impl Val {
             &Val::List(_) => "List".to_string(),
             &Val::Tuple(_) => "Tuple".to_string(),
             &Val::Env(_) => "Env".to_string(),
+            &Val::Constraint(_) => "Constraint".to_string(),
         }
     }
 
@@ -48,7 +94,8 @@ impl Val {
             &Val::Str(_),
             &Val::List(_),
             &Val::Tuple(_),
-            &Val::Env(_)
+            &Val::Env(_),
+            &Val::Constraint(_)
         )
     }
 
@@ -92,6 +139,7 @@ impl Val {
                     Ok(true)
                 }
             }
+            (&Val::Constraint(ref a), &Val::Constraint(ref b)) => Ok(a == b),
             // EMPTY is always comparable for equality.
             (&Val::Empty, _) => Ok(false),
             (_, &Val::Empty) => Ok(false),
@@ -203,6 +251,39 @@ impl Display for Val {
                     write!(f, "\t{}=\"{}\"\n", v.0, v.1)?;
                 }
                 write!(f, "}}")
+            }
+            &Val::Constraint(ref cv) => {
+                for (i, arm) in cv.arms.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, " | ")?;
+                    }
+                    match arm {
+                        ConstraintValArm::Range(ConstraintBound::Int(min, max)) => {
+                            write!(f, "in ")?;
+                            if let Some(lo) = min {
+                                write!(f, "{}", lo)?;
+                            }
+                            write!(f, "..")?;
+                            if let Some(hi) = max {
+                                write!(f, "{}", hi)?;
+                            }
+                        }
+                        ConstraintValArm::Range(ConstraintBound::Float(min, max)) => {
+                            write!(f, "in ")?;
+                            if let Some(lo) = min {
+                                write!(f, "{}", lo)?;
+                            }
+                            write!(f, "..")?;
+                            if let Some(hi) = max {
+                                write!(f, "{}", hi)?;
+                            }
+                        }
+                        ConstraintValArm::Exact(val) => {
+                            write!(f, "{}", val)?;
+                        }
+                    }
+                }
+                Ok(())
             }
         }
     }
@@ -438,5 +519,153 @@ mod test {
         let v: Val = s.into();
         assert!(v.is_str());
         assert!(v.equal(&str_val("test")).unwrap());
+    }
+
+    // ConstraintVal tests
+
+    #[test]
+    fn constraint_type_name() {
+        let cv = ConstraintVal {
+            arms: vec![ConstraintValArm::Range(ConstraintBound::Int(
+                Some(1),
+                Some(10),
+            ))],
+        };
+        assert_eq!(Val::Constraint(cv).type_name(), "Constraint");
+    }
+
+    #[test]
+    fn constraint_int_range_check() {
+        let cv = ConstraintVal {
+            arms: vec![ConstraintValArm::Range(ConstraintBound::Int(
+                Some(1),
+                Some(100),
+            ))],
+        };
+        assert!(cv.check(&int_val(1)));
+        assert!(cv.check(&int_val(50)));
+        assert!(cv.check(&int_val(100)));
+        assert!(!cv.check(&int_val(0)));
+        assert!(!cv.check(&int_val(101)));
+    }
+
+    #[test]
+    fn constraint_int_range_open_end() {
+        let cv = ConstraintVal {
+            arms: vec![ConstraintValArm::Range(ConstraintBound::Int(Some(0), None))],
+        };
+        assert!(cv.check(&int_val(0)));
+        assert!(cv.check(&int_val(999999)));
+        assert!(!cv.check(&int_val(-1)));
+    }
+
+    #[test]
+    fn constraint_int_range_open_start() {
+        let cv = ConstraintVal {
+            arms: vec![ConstraintValArm::Range(ConstraintBound::Int(
+                None,
+                Some(100),
+            ))],
+        };
+        assert!(cv.check(&int_val(100)));
+        assert!(cv.check(&int_val(-999)));
+        assert!(!cv.check(&int_val(101)));
+    }
+
+    #[test]
+    fn constraint_float_range_check() {
+        let cv = ConstraintVal {
+            arms: vec![ConstraintValArm::Range(ConstraintBound::Float(
+                Some(0.0),
+                Some(1.0),
+            ))],
+        };
+        assert!(cv.check(&Val::Float(0.0)));
+        assert!(cv.check(&Val::Float(0.5)));
+        assert!(cv.check(&Val::Float(1.0)));
+        assert!(!cv.check(&Val::Float(-0.1)));
+        assert!(!cv.check(&Val::Float(1.1)));
+    }
+
+    #[test]
+    fn constraint_range_rejects_wrong_type() {
+        let cv = ConstraintVal {
+            arms: vec![ConstraintValArm::Range(ConstraintBound::Int(
+                Some(1),
+                Some(10),
+            ))],
+        };
+        assert!(!cv.check(&str_val("hello")));
+        assert!(!cv.check(&Val::Boolean(true)));
+        assert!(!cv.check(&Val::Float(5.0)));
+    }
+
+    #[test]
+    fn constraint_exact_check() {
+        let cv = ConstraintVal {
+            arms: vec![
+                ConstraintValArm::Exact(Rc::new(str_val("active"))),
+                ConstraintValArm::Exact(Rc::new(str_val("inactive"))),
+            ],
+        };
+        assert!(cv.check(&str_val("active")));
+        assert!(cv.check(&str_val("inactive")));
+        assert!(!cv.check(&str_val("unknown")));
+    }
+
+    #[test]
+    fn constraint_combined_range_and_exact() {
+        let cv = ConstraintVal {
+            arms: vec![
+                ConstraintValArm::Range(ConstraintBound::Int(Some(1), Some(1024))),
+                ConstraintValArm::Exact(Rc::new(int_val(8080))),
+                ConstraintValArm::Exact(Rc::new(int_val(8443))),
+            ],
+        };
+        assert!(cv.check(&int_val(80)));
+        assert!(cv.check(&int_val(8080)));
+        assert!(cv.check(&int_val(8443)));
+        assert!(!cv.check(&int_val(2000)));
+        assert!(!cv.check(&int_val(9999)));
+    }
+
+    #[test]
+    fn constraint_equality() {
+        let cv1 = ConstraintVal {
+            arms: vec![ConstraintValArm::Range(ConstraintBound::Int(
+                Some(1),
+                Some(10),
+            ))],
+        };
+        let cv2 = ConstraintVal {
+            arms: vec![ConstraintValArm::Range(ConstraintBound::Int(
+                Some(1),
+                Some(10),
+            ))],
+        };
+        assert!(Val::Constraint(cv1.clone())
+            .equal(&Val::Constraint(cv2))
+            .unwrap());
+
+        let cv3 = ConstraintVal {
+            arms: vec![ConstraintValArm::Range(ConstraintBound::Int(
+                Some(1),
+                Some(20),
+            ))],
+        };
+        assert!(!Val::Constraint(cv1).equal(&Val::Constraint(cv3)).unwrap());
+    }
+
+    #[test]
+    fn constraint_display() {
+        let cv = ConstraintVal {
+            arms: vec![
+                ConstraintValArm::Range(ConstraintBound::Int(Some(1), Some(1024))),
+                ConstraintValArm::Exact(Rc::new(int_val(8080))),
+            ],
+        };
+        let s = format!("{}", Val::Constraint(cv));
+        assert!(s.contains("in 1..1024"));
+        assert!(s.contains("| 8080"));
     }
 }

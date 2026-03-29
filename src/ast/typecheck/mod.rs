@@ -59,7 +59,11 @@ impl DeriveShape for FuncDef {
         // 3. Finally determine what the return shape can be.
         // only include the closed over shapes.
         // Capture declaration order before collecting into BTreeMap (which sorts alphabetically).
-        let arg_order: Vec<Rc<str>> = self.argdefs.iter().map(|(sym, _)| sym.val.clone()).collect();
+        let arg_order: Vec<Rc<str>> = self
+            .argdefs
+            .iter()
+            .map(|(sym, _)| sym.val.clone())
+            .collect();
         let table = self
             .argdefs
             .iter()
@@ -127,10 +131,14 @@ impl DeriveShape for ModuleDef {
                 .map(|(k, v)| (PositionedItem::new(k.clone(), pos.clone()), v.clone()))
                 .collect();
             if tuple_fields.is_empty() {
-                Box::new(checker.pop_shape().unwrap_or(Shape::Narrowed(NarrowedShape {
-                    pos: self.pos.clone(),
-                    types: NarrowingShape::Any,
-                })))
+                Box::new(
+                    checker
+                        .pop_shape()
+                        .unwrap_or(Shape::Narrowed(NarrowedShape {
+                            pos: self.pos.clone(),
+                            types: NarrowingShape::Any,
+                        })),
+                )
             } else {
                 Box::new(Shape::Tuple(PositionedItem::new(tuple_fields, pos)))
             }
@@ -665,6 +673,43 @@ impl DeriveShape for Expression {
             Expression::Convert(def) => {
                 // Convert always produces a string
                 Shape::Str(def.pos.clone())
+            }
+            Expression::Constraint(def) => {
+                let mut shapes = Vec::new();
+                for arm in &def.arms {
+                    match arm {
+                        crate::ast::ConstraintArm::Range(rdef) => {
+                            // Derive shape from whichever bound is present
+                            let bound_shape = if let Some(ref start) = rdef.start {
+                                start.derive_shape(symbol_table)
+                            } else if let Some(ref end) = rdef.end {
+                                end.derive_shape(symbol_table)
+                            } else {
+                                return Shape::TypeErr(
+                                    rdef.pos.clone(),
+                                    "Range constraint must have at least one bound".to_string(),
+                                );
+                            };
+                            match &bound_shape {
+                                Shape::Int(_) | Shape::Float(_) => shapes.push(bound_shape),
+                                _ => {
+                                    return Shape::TypeErr(
+                                        rdef.pos.clone(),
+                                        "Range constraint bounds must be numeric".to_string(),
+                                    )
+                                }
+                            }
+                        }
+                        crate::ast::ConstraintArm::Shape(expr) => {
+                            shapes.push(expr.derive_shape(symbol_table));
+                        }
+                    }
+                }
+                if shapes.len() == 1 {
+                    shapes.pop().unwrap()
+                } else {
+                    Shape::Narrowed(NarrowedShape::new_with_pos(shapes, def.pos.clone()))
+                }
             }
         }
     }
@@ -1357,6 +1402,20 @@ impl Visitor for Checker {
                     }
                     shape = narrowed;
                 }
+                if let Shape::TypeErr(pos, msg) = &shape {
+                    self.err_stack.push(BuildError::with_pos(
+                        msg.clone(),
+                        ErrorType::TypeFail,
+                        pos.clone(),
+                    ));
+                } else {
+                    self.symbol_table.insert(name.clone(), shape.clone());
+                    self.shape_stack.push(shape);
+                }
+            }
+            Statement::Constraint(def) => {
+                let name = def.name.fragment.clone();
+                let shape = def.value.derive_shape(&mut self.symbol_table);
                 if let Shape::TypeErr(pos, msg) = &shape {
                     self.err_stack.push(BuildError::with_pos(
                         msg.clone(),

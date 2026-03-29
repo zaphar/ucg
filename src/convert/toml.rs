@@ -71,6 +71,10 @@ impl TomlConverter {
             &Val::Env(ref fs) => self.convert_env(fs)?,
             &Val::List(ref l) => self.convert_list(l)?,
             &Val::Tuple(ref t) => self.convert_tuple(t)?,
+            &Val::Constraint(_) => {
+                let err = SimpleError::new("Constraint values cannot be converted to TOML!");
+                return Err(Box::new(err));
+            }
         };
         Ok(toml_val)
     }

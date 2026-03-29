@@ -203,6 +203,10 @@ make_fn!(rparentok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, ")")
 );
 
+make_fn!(dotdottok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, "..")
+);
+
 make_fn!(dottok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, ".")
 );
@@ -299,6 +303,10 @@ make_fn!(ortok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::PUNCT, "||")
 );
 
+make_fn!(pipetok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::PUNCT, "|")
+);
+
 make_fn!(selecttok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "select", WS)
 );
@@ -349,6 +357,10 @@ make_fn!(asserttok<OffsetStrIter, Token>,
 
 make_fn!(outtok<OffsetStrIter, Token>,
        do_text_token_tok!(TokenType::BAREWORD, "out", WS)
+);
+
+make_fn!(constrainttok<OffsetStrIter, Token>,
+       do_text_token_tok!(TokenType::BAREWORD, "constraint", WS)
 );
 
 make_fn!(converttok<OffsetStrIter, Token>,
@@ -442,9 +454,11 @@ fn token<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Token> {
         lbracetok,
         lparentok,
         rparentok,
+        dotdottok, // Must come before dottok
         dottok,
         andtok,
         ortok,
+        pipetok, // Must come after ortok
         plustok,
         dashtok,
         startok,
@@ -473,6 +487,7 @@ fn token<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Token> {
         nottok,
         lettok,
         outtok,
+        constrainttok,
         converttok,
         selecttok,
         asserttok,

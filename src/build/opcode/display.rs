@@ -19,7 +19,7 @@ use super::Value;
 
 use Composite::{List, Tuple};
 use Primitive::{Bool, Empty, Float, Int, Str};
-use Value::{C, F, M, P, S, T};
+use Value::{C, F, K, M, P, S, T};
 
 impl fmt::Display for Value {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
@@ -43,6 +43,10 @@ impl fmt::Display for Value {
             M(_) => write!(w, "<Module>"),
             T(_) => write!(w, "<Expression>"),
             S(v) => write!(w, "{}", v),
+            K(cv) => {
+                use crate::build::ir::Val;
+                write!(w, "{}", Val::Constraint(cv.clone()))
+            }
         }
     }
 }

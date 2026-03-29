@@ -55,14 +55,16 @@ filter_keyword: "filter" ;
 module_keyword: "module" ;
 mod_keyword: "mod" ;
 out_keyword: "out" ;
+constraint_keyword: "constraint" ;
 convert_keyword: "convert" ;
 assert_keyword: "assert" ;
 fail_keyword: "fail" ;
 trace_keyword: "TRACE" ;
 null_keyword: "NULL" ;
 in_keyword: "in" ;
-is_keyword: "in" ;
-not_keyword: "module" ;
+is_keyword: "is" ;
+not_keyword: "not" ;
+dotdot: ".." ;
 escaped: "\", VISIBLE_CHAR ;
 str: quot, { escaped | UTF8_CHAR }, quot ;
 float: (DIGIT+, dot, { DIGIT }) | (dot, DIGIT+) ;
@@ -84,7 +86,10 @@ list: lbracket, [ list_elements ], rbracket ;
 ### Tuples
 
 ```
-shape_suffix: "::", non_operator_expr ;
+constraint_range: in_keyword, [simple_expr], dotdot, [simple_expr] ;
+constraint_arm: constraint_range | non_operator_expr ;
+constraint_expr: constraint_arm, { pipe, constraint_arm } ;
+shape_suffix: "::", constraint_expr ;
 field_pair: field, [shape_suffix], equal, expr ;
 field_list: field_pair, { comma, field_pair }, [comma]
 tuple: lbrace, [ field_list ], rbrace;
@@ -239,12 +244,14 @@ expr: binary_expr | non_operator_expr ;
 
 ```
 let_statement: let_keyword, bareword, [shape_suffix], equal, expr ;
+constraint_statement: constraint_keyword, bareword, equal, constraint_expr ;
 out_statement: out_keyword, bareword, str ;
 convert_statement: convert_keyword, bareword, str ;
 assert_statement: assert_keyword, pipe, { statement }, pipe ;
 simple_statement: expr ;
 
 statement: ( let_statement
+             | constraint_statement
              | out_statement
              | convert_statement
              | assert_statement

@@ -258,9 +258,8 @@ mod test {
     }
 
     fn xml_element(name: &str, children: Vec<Val>) -> Val {
-        let mut fields: Vec<(Rc<str>, Rc<Val>)> = vec![
-            (Rc::from("name"), Rc::new(Val::Str(Rc::from(name)))),
-        ];
+        let mut fields: Vec<(Rc<str>, Rc<Val>)> =
+            vec![(Rc::from("name"), Rc::new(Val::Str(Rc::from(name))))];
         if !children.is_empty() {
             fields.push((
                 Rc::from("children"),
@@ -271,9 +270,7 @@ mod test {
     }
 
     fn xml_text(s: &str) -> Val {
-        Val::Tuple(vec![
-            (Rc::from("text"), Rc::new(Val::Str(Rc::from(s)))),
-        ])
+        Val::Tuple(vec![(Rc::from("text"), Rc::new(Val::Str(Rc::from(s))))])
     }
 
     #[test]
@@ -338,9 +335,10 @@ mod test {
 
     #[test]
     fn convert_no_root_errors() {
-        let doc = Val::Tuple(vec![
-            (Rc::from("version"), Rc::new(Val::Str(Rc::from("1.0")))),
-        ]);
+        let doc = Val::Tuple(vec![(
+            Rc::from("version"),
+            Rc::new(Val::Str(Rc::from("1.0"))),
+        )]);
         let conv = XmlConverter {};
         let mut buf = Cursor::new(vec![]);
         let result = conv.convert(Rc::new(doc), &mut buf);
