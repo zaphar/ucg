@@ -52,3 +52,24 @@ assert {
     ok = 0:(start.val):6 == [0, 2, 4, 6],
     desc = "Range with grouped step: expected [0,2,4,6] but got @" % (0:(start.val):6),
 };
+
+// Range edge cases
+assert {
+    ok = 5:5 == [5],
+    desc = "Single element range 5:5 should produce [5]",
+};
+
+assert {
+    ok = 5:1 == [],
+    desc = "Reverse range 5:1 should produce empty list",
+};
+
+assert {
+    ok = 0:0 == [0],
+    desc = "Range 0:0 should produce [0]",
+};
+
+assert {
+    ok = 1:1:5 == [1, 2, 3, 4, 5],
+    desc = "Range with step 1 is same as no step",
+};

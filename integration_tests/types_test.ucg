@@ -112,6 +112,37 @@ assert t.ok{
     desc = "You can cast true into a string",
 };
 
+// float() cast
+
+assert t.ok{
+    test = float("3.14") == 3.14,
+    desc = "You can cast a string into a float",
+};
+
+assert t.ok{
+    test = float(1) == 1.0,
+    desc = "You can cast an int into a float",
+};
+
+assert t.ok{
+    test = float("1") == 1.0,
+    desc = "You can cast a string integer into a float",
+};
+
+// int from float
+
+assert t.ok{
+    test = int(3.14) == 3,
+    desc = "You can cast a float into an int (truncates)",
+};
+
+// str from float
+
+assert t.ok{
+    test = str(3.14) == "3.14",
+    desc = "You can cast a float into a string",
+};
+
 // Shapes and their specifiers
 
 let mystr::"" = "a string";
@@ -124,4 +155,39 @@ let func_shape = func(arg :: "", arg2 :: "") => arg + arg2;
 
 let module_shape = module{self={}} => (result :: {}) {
     let result :: {} = self;
+};
+
+// Constraint enforcement: valid values accepted
+
+assert t.ok{
+    test = mystr == "a string",
+    desc = "String constraint accepts valid string",
+};
+
+assert t.ok{
+    test = struct_shape.foo == "",
+    desc = "Tuple field with string constraint accepts valid value",
+};
+
+assert t.ok{
+    test = func_shape("hello", " world") == "hello world",
+    desc = "Func with constrained args works with valid types",
+};
+
+let myint :: 0 = 42;
+assert t.ok{
+    test = myint == 42,
+    desc = "Int constraint accepts valid int value",
+};
+
+let mybool :: false = true;
+assert t.ok{
+    test = mybool == true,
+    desc = "Bool constraint accepts valid bool value",
+};
+
+let mytuple :: {} = {x = 1, y = 2};
+assert t.ok{
+    test = mytuple.x == 1,
+    desc = "Tuple constraint accepts valid tuple value",
 };

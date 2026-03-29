@@ -19,7 +19,10 @@
       "Bash(cargo check:*)",
       "Bash(cargo tarpaulin:*)",
       "Bash(basenc --base64url)",
-      "Bash(git tag:*)"
+      "Bash(git tag:*)",
+      "Bash(grep:*)",
+      "Bash(/tmp/coverage_check.txt:*)",
+      "Read(//tmp/**)"
     ]
   }
 }
