@@ -289,22 +289,35 @@ fn collect_imports_in_expr(
 /// `let x = import "..."` binding found inside module or func bodies.
 fn collect_inner_import_paths(
     ast: &[Statement],
-    let_ranges: &[(usize, usize)],
+    binding_ranges: &[(usize, usize)],
     working_dir: Option<&Path>,
     tokens: &[Token],
     inner_import_map: &mut HashMap<(usize, usize), PathBuf>,
 ) {
-    let mut let_idx = 0usize;
+    let mut binding_idx = 0usize;
     for stmt in ast.iter() {
-        if let Statement::Let(def) = stmt {
-            collect_imports_in_expr(
-                &def.value,
-                working_dir,
-                tokens,
-                let_ranges[let_idx],
-                inner_import_map,
-            );
-            let_idx += 1;
+        match stmt {
+            Statement::Let(def) => {
+                collect_imports_in_expr(
+                    &def.value,
+                    working_dir,
+                    tokens,
+                    binding_ranges[binding_idx],
+                    inner_import_map,
+                );
+                binding_idx += 1;
+            }
+            Statement::Constraint(def) => {
+                collect_imports_in_expr(
+                    &def.value,
+                    working_dir,
+                    tokens,
+                    binding_ranges[binding_idx],
+                    inner_import_map,
+                );
+                binding_idx += 1;
+            }
+            _ => {}
         }
     }
 }
@@ -345,41 +358,40 @@ pub fn analyze(
         }
     };
 
-    // --- Build symbol table from Let bindings + collect type errors + track imports ---
-    // Compute per-let offset ranges so the scope collector can bound token scans.
-    // let_ranges[i] = (start_offset, end_offset) for the i-th top-level Let.
-    let let_stmts: Vec<&crate::ast::LetDef> = ast
+    // --- Build symbol table from Let/Constraint bindings + collect type errors + track imports ---
+    // Compute per-binding offset ranges so the scope collector can bound token scans.
+    // binding_ranges[i] = (start_offset, end_offset) for the i-th top-level Let or Constraint.
+    let binding_positions: Vec<usize> = ast
         .iter()
-        .filter_map(|s| {
-            if let Statement::Let(d) = s {
-                Some(d)
-            } else {
-                None
-            }
+        .filter_map(|s| match s {
+            Statement::Let(d) => Some(d.name.pos.offset),
+            Statement::Constraint(d) => Some(d.name.pos.offset),
+            _ => None,
         })
         .collect();
-    let let_ranges: Vec<(usize, usize)> = let_stmts
+    let binding_ranges: Vec<(usize, usize)> = binding_positions
         .iter()
         .enumerate()
-        .map(|(i, def)| {
-            let start = def.name.pos.offset;
-            let end = let_stmts
-                .get(i + 1)
-                .map(|next| next.name.pos.offset)
-                .unwrap_or(usize::MAX);
+        .map(|(i, &start)| {
+            let end = binding_positions.get(i + 1).copied().unwrap_or(usize::MAX);
             (start, end)
         })
         .collect();
 
     // Compute file-level doc comment using the 2-blank-line rule.
-    let first_code_line = let_stmts
-        .first()
-        .map(|def| def.name.pos.line)
+    let first_code_line = ast
+        .iter()
+        .filter_map(|s| match s {
+            Statement::Let(d) => Some(d.name.pos.line),
+            Statement::Constraint(d) => Some(d.name.pos.line),
+            _ => None,
+        })
+        .next()
         .unwrap_or(usize::MAX);
     result.file_doc = compute_file_doc(&result.comment_map, first_code_line);
 
     let mut sym_map: BTreeMap<Rc<str>, Shape> = BTreeMap::new();
-    let mut let_idx = 0usize;
+    let mut binding_idx = 0usize;
     for stmt in ast.iter() {
         match stmt {
             Statement::Expression(expr)
@@ -403,6 +415,28 @@ pub fn analyze(
                 );
             }
             _ => {}
+        }
+        if let Statement::Constraint(def) = stmt {
+            let shape = def.value.derive_shape(&mut sym_map);
+            let name: Rc<str> = def.name.fragment.clone();
+            collect_shape_errors(&shape, &mut result.diagnostics);
+            result
+                .symbol_table
+                .insert(name.clone(), (shape.clone(), def.name.pos.clone()));
+            sym_map.insert(name.clone(), shape);
+
+            let scope_range = binding_ranges[binding_idx];
+            binding_idx += 1;
+            collect_scoped_names(
+                &def.value,
+                &mut sym_map.clone(),
+                scope_range,
+                &result.tokens,
+                &mut result.token_types,
+                &mut result.path_map,
+                &mut result.def_positions,
+                def.name.fragment.as_ref(),
+            );
         }
         if let Statement::Let(def) = stmt {
             let shape = def.value.derive_shape(&mut sym_map);
@@ -457,8 +491,8 @@ pub fn analyze(
 
             // Collect scoped names (func/module args, inner lets, tuple fields) into
             // token_types and path_map, using the binding name as the path root.
-            let scope_range = let_ranges[let_idx];
-            let_idx += 1;
+            let scope_range = binding_ranges[binding_idx];
+            binding_idx += 1;
             collect_scoped_names(
                 &def.value,
                 &mut sym_map.clone(),
@@ -484,7 +518,7 @@ pub fn analyze(
     // Populate inner_import_map for imports inside module/func bodies.
     collect_inner_import_paths(
         &ast,
-        &let_ranges,
+        &binding_ranges,
         working_dir,
         &result.tokens,
         &mut result.inner_import_map,

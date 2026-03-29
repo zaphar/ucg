@@ -26,7 +26,7 @@
         craneLib = (crane.mkLib pkgs).overrideToolchain rust-bin;
         ucg = craneLib.buildPackage {
             pname = "ucg";
-            version = "0.8.1";
+            version = "0.8.2";
             src = ./.;
         };
     in
