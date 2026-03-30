@@ -84,7 +84,7 @@ impl FlagConverter {
                 write!(w, "{} ", i)?;
             }
             &Val::Str(ref s) => {
-                write!(w, "'{}' ", s)?;
+                write!(w, "'{}' ", super::shell_escape_single_quoted(s))?;
             }
             &Val::List(_) | &Val::Tuple(_) | &Val::Env(_) | &Val::Constraint(_) => {
                 // This is ignored

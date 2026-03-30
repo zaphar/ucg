@@ -770,6 +770,12 @@ impl Builtins {
         let mut pos_list = Vec::new();
         match (start.as_ref(), step.as_ref(), end.as_ref()) {
             (&P(Int(start)), &P(Int(step)), &P(Int(end))) => {
+                if step <= 0 {
+                    return Err(Error::new(
+                        format!("Range step must be a positive integer, got {}", step).into(),
+                        pos,
+                    ));
+                }
                 let mut num = start;
                 loop {
                     if num > end {

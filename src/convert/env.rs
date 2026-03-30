@@ -65,7 +65,7 @@ impl EnvConverter {
                 write!(w, "{}\n", i)?;
             }
             &Val::Str(ref s) => {
-                write!(w, "'{}'\n", s)?;
+                write!(w, "'{}'\n", super::shell_escape_single_quoted(s))?;
             }
             &Val::List(ref items) => {
                 self.convert_list(items, w)?;

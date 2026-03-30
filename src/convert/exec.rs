@@ -129,7 +129,7 @@ impl ExecConverter {
                 for &(ref name, ref v) in env_list.iter() {
                     // We only allow string fields in our env tuple.
                     if let &Val::Str(ref s) = v.as_ref() {
-                        write!(script, "{}=\"{}\"\n", name, s)?;
+                        write!(script, "{}=\"{}\"\n", name, convert::shell_escape_double_quoted(s))?;
                         continue;
                     }
                     return Err(BuildError::new(
@@ -142,13 +142,13 @@ impl ExecConverter {
             write!(script, "\n")?;
             let flag_converter = convert::flags::FlagConverter::new();
             // 4. Then construct our command line. (be sure to use exec)
-            write!(script, "exec {} ", command.unwrap())?;
+            write!(script, "exec '{}' ", convert::shell_escape_single_quoted(command.unwrap()))?;
             if let Some(arg_list) = args {
                 for v in arg_list.iter() {
                     // We only allow tuples or strings in our args list.
                     match v.as_ref() {
                         &Val::Str(ref s) => {
-                            write!(script, "{} ", s)?;
+                            write!(script, "'{}' ", convert::shell_escape_single_quoted(s))?;
                         }
                         &Val::Tuple(_) => flag_converter.convert(v.clone(), &mut script)?,
                         _ => {
@@ -220,7 +220,7 @@ mod exec_test {
         let mut expected = "#!/usr/bin/env bash\n".to_string();
         expected.push_str("# Turn on unofficial Bash-Strict-Mode\n");
         expected.push_str("set -euo pipefail\n\n");
-        expected.push_str("exec /bin/echo ");
+        expected.push_str("exec '/bin/echo' ");
         let mut buf = Cursor::new(vec![]);
         conv.convert(result, &mut buf).unwrap();
         assert_eq!(String::from_utf8_lossy(&buf.into_inner()), expected);
@@ -251,7 +251,7 @@ mod exec_test {
         expected.push_str("foo=\"bar\"\n");
         expected.push_str("quux=\"baz\"\n");
         expected.push_str("\n");
-        expected.push_str("exec /bin/echo ");
+        expected.push_str("exec '/bin/echo' ");
         let mut buf = Cursor::new(vec![]);
         conv.convert(result, &mut buf).unwrap();
         assert_eq!(String::from_utf8_lossy(&buf.into_inner()), expected);
@@ -286,7 +286,7 @@ mod exec_test {
         expected.push_str("foo=\"bar\"\n");
         expected.push_str("quux=\"baz\"\n");
         expected.push_str("\n");
-        expected.push_str("exec /bin/echo subcommand --flag1 1 ");
+        expected.push_str("exec '/bin/echo' 'subcommand' --flag1 1 ");
         let mut buf = Cursor::new(vec![]);
         conv.convert(result, &mut buf).unwrap();
         assert_eq!(String::from_utf8_lossy(&buf.into_inner()), expected);

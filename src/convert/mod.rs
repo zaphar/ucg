@@ -26,6 +26,23 @@ pub mod yamlmulti;
 
 use std::collections::HashMap;
 
+/// Escape a string for use inside single quotes in a shell context.
+/// Handles embedded single quotes using the `'\''` idiom (end quote, escaped
+/// literal quote, reopen quote).
+pub(crate) fn shell_escape_single_quoted(s: &str) -> String {
+    s.replace('\'', "'\\''")
+}
+
+/// Escape a string for use inside double quotes in a shell context.
+/// Handles characters that are special inside double quotes: backslash,
+/// double quote, dollar sign, and backtick.
+pub(crate) fn shell_escape_double_quoted(s: &str) -> String {
+    s.replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('$', "\\$")
+        .replace('`', "\\`")
+}
+
 /// ConverterRunner knows how to run a given converter on a Val.
 pub struct ConverterRegistry {
     converters: HashMap<String, Box<dyn traits::Converter>>,
