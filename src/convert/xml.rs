@@ -235,7 +235,6 @@ impl Converter for XmlConverter {
         String::from("Convert a ucg DSL into xml.")
     }
 
-    #[allow(unused_must_use)]
     fn help(&self) -> String {
         include_str!("xml_help.txt").to_string()
     }

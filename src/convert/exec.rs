@@ -185,7 +185,6 @@ impl Converter for ExecConverter {
         "Convert ucg Vals into an bash script with \nenvironment variables set and command line arguments sent..".to_string()
     }
 
-    #[allow(unused_must_use)]
     fn help(&self) -> String {
         include_str!("exec_help.txt").to_string()
     }

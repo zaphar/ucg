@@ -47,11 +47,11 @@ impl WorkspaceIndex {
     /// when it is analyzed.
     pub fn index_all(&mut self) {
         let files = self.discover_files();
-        let ordered = topo_sort_files(&files);
+        let (ordered, contents) = topo_sort_files(&files);
         for path in ordered {
-            if let Ok(content) = std::fs::read_to_string(&path) {
+            if let Some(content) = contents.get(&path) {
                 let working_dir = path.parent().map(Path::to_path_buf);
-                let result = analyze(&content, working_dir.as_deref(), &self.files);
+                let result = analyze(content, working_dir.as_deref(), &self.files);
                 self.files.insert(path, result);
             }
         }
@@ -148,11 +148,15 @@ pub fn scan_imports(content: &str, file_path: &Path) -> Vec<PathBuf> {
 /// Sort `files` in dependency order: if A imports B, B appears before A.
 /// Files not in the input set (e.g. stdlib) are ignored.
 /// Since circular imports are a language error, cycles won't arise in valid code.
-pub fn topo_sort_files(files: &[PathBuf]) -> Vec<PathBuf> {
+/// Returns the sorted order and a map of file contents read during scanning,
+/// so callers can reuse them without a second disk read.
+pub fn topo_sort_files(files: &[PathBuf]) -> (Vec<PathBuf>, HashMap<PathBuf, String>) {
     let file_set: HashSet<&PathBuf> = files.iter().collect();
 
     // Build adjacency list: file → [workspace deps it imports].
+    // Keep the file contents we read so callers can reuse them.
     let mut deps: HashMap<PathBuf, Vec<PathBuf>> = HashMap::new();
+    let mut contents: HashMap<PathBuf, String> = HashMap::new();
     for f in files {
         let content = std::fs::read_to_string(f).unwrap_or_default();
         let imports = scan_imports(&content, f)
@@ -160,6 +164,7 @@ pub fn topo_sort_files(files: &[PathBuf]) -> Vec<PathBuf> {
             .filter(|p| file_set.contains(p))
             .collect();
         deps.insert(f.clone(), imports);
+        contents.insert(f.clone(), content);
     }
 
     // Iterative post-order DFS topo sort.
@@ -193,7 +198,7 @@ pub fn topo_sort_files(files: &[PathBuf]) -> Vec<PathBuf> {
             }
         }
     }
-    result
+    (result, contents)
 }
 
 /// Returns true for `.ucg` files that are not test files (`*_test.ucg`).
@@ -246,7 +251,7 @@ mod test {
     fn test_topo_sort_independent_files_all_appear() {
         // Files with no imports among themselves: all must appear in output.
         let files = vec![PathBuf::from("/a.ucg"), PathBuf::from("/b.ucg")];
-        let sorted = topo_sort_files(&files);
+        let (sorted, _contents) = topo_sort_files(&files);
         assert_eq!(sorted.len(), 2);
     }
 }

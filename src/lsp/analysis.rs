@@ -25,18 +25,7 @@ use lsp_types::{Diagnostic, DiagnosticSeverity, Position as LspPosition, Range};
 /// (which may join `../../relative.ucg` onto a directory, producing `..`
 /// components).
 pub(crate) fn normalize_path(p: PathBuf) -> PathBuf {
-    use std::path::Component;
-    let mut out = PathBuf::new();
-    for c in p.components() {
-        match c {
-            Component::ParentDir => {
-                out.pop();
-            }
-            Component::CurDir => {}
-            other => out.push(other),
-        }
-    }
-    out
+    crate::path::normalize(p)
 }
 
 use crate::ast::typecheck::DeriveShape;
@@ -82,6 +71,9 @@ pub struct AnalysisResult {
     /// position.  Covers func args, module args, and inner let bindings.
     /// Keyed by `(line, column)` of each use or definition occurrence.
     pub def_positions: HashMap<(usize, usize), Position>,
+    /// Maps binding name → constraint display string for bindings with constraints.
+    /// Populated for `constraint` statements and `let` bindings with `::` constraints.
+    pub constraint_info: HashMap<Rc<str>, String>,
 }
 
 impl AnalysisResult {
@@ -96,6 +88,7 @@ impl AnalysisResult {
             path_map: HashMap::new(),
             comment_map: CommentMap::new(),
             file_doc: None,
+            constraint_info: HashMap::new(),
             inner_import_map: HashMap::new(),
             def_positions: HashMap::new(),
         }
@@ -131,6 +124,37 @@ pub fn ucg_pos_to_range(pos: &Position) -> Range {
             line,
             character: col + 1,
         },
+    }
+}
+
+/// Format a constraint expression for hover display.
+fn format_constraint_expr(expr: &Expression) -> String {
+    use crate::ast::{ConstraintArm, ConstraintDef};
+    match expr {
+        Expression::Constraint(ConstraintDef { arms, .. }) => {
+            let parts: Vec<String> = arms
+                .iter()
+                .map(|arm| match arm {
+                    ConstraintArm::Range(rdef) => {
+                        let start = rdef
+                            .start
+                            .as_ref()
+                            .map(|e| format!("{}", e))
+                            .unwrap_or_default();
+                        let end = rdef
+                            .end
+                            .as_ref()
+                            .map(|e| format!("{}", e))
+                            .unwrap_or_default();
+                        format!("in {}..{}", start, end)
+                    }
+                    ConstraintArm::Shape(e) => format!("{}", e),
+                })
+                .collect();
+            parts.join(" | ")
+        }
+        // For non-constraint expressions used as shape constraints (e.g., `:: 0`)
+        other => format!("{}", other),
     }
 }
 
@@ -424,6 +448,9 @@ pub fn analyze(
                 .symbol_table
                 .insert(name.clone(), (shape.clone(), def.name.pos.clone()));
             sym_map.insert(name.clone(), shape);
+            result
+                .constraint_info
+                .insert(name.clone(), format_constraint_expr(&def.value));
 
             let scope_range = binding_ranges[binding_idx];
             binding_idx += 1;
@@ -446,6 +473,13 @@ pub fn analyze(
                 .symbol_table
                 .insert(name.clone(), (shape.clone(), def.name.pos.clone()));
             sym_map.insert(name.clone(), shape.clone());
+
+            // Record constraint info if this let has a `::` constraint
+            if let Some(ref constraint_expr) = def.constraint {
+                result
+                    .constraint_info
+                    .insert(name.clone(), format_constraint_expr(constraint_expr));
+            }
 
             // Track import bindings for go-to-definition, and resolve the import
             // shape from the pre-analyzed cache when available.

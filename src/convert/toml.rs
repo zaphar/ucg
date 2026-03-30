@@ -124,7 +124,6 @@ impl Converter for TomlConverter {
         "Convert ucg Vals into valid ucg.".to_string()
     }
 
-    #[allow(unused_must_use)]
     fn help(&self) -> String {
         include_str!("toml_help.txt").to_string()
     }

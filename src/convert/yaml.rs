@@ -53,11 +53,21 @@ impl YamlConverter {
             &Val::Empty => serde_yaml::Value::Null,
             &Val::Float(f) => match serde_yaml::to_value(f) {
                 Ok(v) => v,
-                _ => panic!("Float is too large or not a Number {}", f),
+                _ => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        format!("Float is too large or not a Number {}", f),
+                    ));
+                }
             },
             &Val::Int(i) => match serde_yaml::to_value(i) {
                 Ok(v) => v,
-                _ => panic!("Int is too large or not a Number {}", i),
+                _ => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        format!("Int is too large or not a Number {}", i),
+                    ));
+                }
             },
             &Val::Str(ref s) => serde_yaml::Value::String(s.to_string()),
             &Val::Env(ref fs) => self.convert_env(fs)?,
@@ -168,7 +178,6 @@ impl Converter for YamlConverter {
         "Convert ucg Vals into valid yaml.".to_string()
     }
 
-    #[allow(unused_must_use)]
     fn help(&self) -> String {
         include_str!("yaml_help.txt").to_string()
     }

@@ -98,7 +98,6 @@ impl Converter for EnvConverter {
         "Convert ucg Vals into environment variables.".to_string()
     }
 
-    #[allow(unused_must_use)]
     fn help(&self) -> String {
         include_str!("env_help.txt").to_string()
     }

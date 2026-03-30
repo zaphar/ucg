@@ -58,16 +58,24 @@ impl JsonConverter {
             &Val::Float(f) => {
                 let n = match serde_json::Number::from_f64(f) {
                     Some(n) => n,
-                    // In theory this should never happen. But on the off chance that it does...
-                    None => panic!("Float is too large or Not a Number {}", f),
+                    None => {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            format!("Float is too large or Not a Number {}", f),
+                        ));
+                    }
                 };
                 serde_json::Value::Number(n)
             }
             &Val::Int(i) => {
                 let n = match serde_json::Number::from_f64(i as f64) {
                     Some(n) => n,
-                    // In theory this should never happen. But on the off chance that it does...
-                    None => panic!("Float is too large or Not a Number {}", i),
+                    None => {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            format!("Float is too large or Not a Number {}", i),
+                        ));
+                    }
                 };
                 serde_json::Value::Number(n)
             }
@@ -134,7 +142,6 @@ impl Converter for JsonConverter {
         "Convert ucg Vals into valid json.".to_string()
     }
 
-    #[allow(unused_must_use)]
     fn help(&self) -> String {
         include_str!("json_help.txt").to_string()
     }

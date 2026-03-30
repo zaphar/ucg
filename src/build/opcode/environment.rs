@@ -98,17 +98,20 @@ impl<Stdout: Write + Clone, Stderr: Write + Clone> Environment<Stdout, Stderr> {
         let shape_cache = self.shape_cache.clone();
         self.op_cache.entry(path.clone()).get_pointer_or_else(
             || {
-                // FIXME(jwall): We need to do proper error handling here.
                 let p = path.into();
-                let root = p.parent().unwrap();
+                let root = p.parent().ok_or_else(|| {
+                    Error::new(
+                        format!("No parent directory for path: {}", p.display()).into(),
+                        Position::new(0, 0, 0),
+                    )
+                })?;
                 // first we read in the file
                 let mut f = File::open(&p)?;
                 // then we parse it
                 let mut contents = String::new();
                 f.read_to_string(&mut contents)?;
                 let iter = OffsetStrIter::new(&contents).with_src_file(&p);
-                // FIXME(jwall): Unify BuildError and our other Error
-                let mut stmts = parse(iter, None).unwrap();
+                let mut stmts = parse(iter, None)?;
                 // type check the parsed AST
                 let mut checker = crate::ast::typecheck::Checker::new()
                     .with_working_dir(root)
@@ -139,10 +142,14 @@ impl<Stdout: Write + Clone, Stderr: Write + Clone> Environment<Stdout, Stderr> {
         self.op_cache.entry(path.clone()).get_pointer_or_else(
             || {
                 let p = path.into();
-                let root = p.parent().unwrap();
+                let root = p.parent().ok_or_else(|| {
+                    Error::new(
+                        format!("No parent directory for path: {}", p.display()).into(),
+                        Position::new(0, 0, 0),
+                    )
+                })?;
                 let iter = OffsetStrIter::new(contents).with_src_file(&p);
-                // FIXME(jwall): Unify BuildError and our other Error
-                let stmts = parse(iter, None).unwrap();
+                let stmts = parse(iter, None)?;
                 // then we create an ops from it
                 let ops = super::translate::AST::translate(stmts, &root);
                 Ok(ops)

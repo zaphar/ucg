@@ -53,7 +53,6 @@ impl Converter for MultiYamlConverter {
         "Convert ucg vals into valid multi document yaml.".to_owned()
     }
 
-    #[allow(unused_must_use)]
     fn help(&self) -> String {
         include_str!("yaml_help.txt").to_owned()
     }

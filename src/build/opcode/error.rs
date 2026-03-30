@@ -94,6 +94,16 @@ impl From<std::io::Error> for Error {
     }
 }
 
+impl From<crate::error::BuildError> for Error {
+    fn from(e: crate::error::BuildError) -> Self {
+        Error {
+            message: format!("{}: {}", e.err_type, e.msg).into(),
+            pos: e.pos,
+            call_stack: Vec::new(),
+        }
+    }
+}
+
 impl From<convert::Error> for Error {
     fn from(e: convert::Error) -> Self {
         Error {

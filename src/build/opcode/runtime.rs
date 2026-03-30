@@ -107,17 +107,20 @@ impl Builtins {
     {
         let path = stack.pop();
         if let Some((val, path_pos)) = path {
-            if let &Value::P(Str(ref path)) = val.as_ref() {
-                // TODO(jwall): A bit hacky we should probably change import stacks to be pathbufs.
-                // first we chack the cache
+            if let &Value::P(Str(ref raw_path)) = val.as_ref() {
+                // Normalize the import path so that equivalent paths (e.g.
+                // "./foo/../bar.ucg" and "./bar.ucg") resolve to the same
+                // cache key and are detected by cycle checking.
+                let normalized = crate::path::normalize(PathBuf::from(raw_path.as_ref()));
+                let path: Rc<str> = normalized.to_string_lossy().into();
+                // first we check the cache
                 if let Some(val) = env.borrow().get_cached_path_val(path.clone()) {
                     stack.push((val, path_pos));
                     return Ok(());
                 }
                 if import_stack
                     .iter()
-                    .find(|p| p.as_ref() == path.as_ref())
-                    .is_some()
+                    .any(|p| p.as_ref() == path.as_ref())
                 {
                     return Err(Error::new(
                         format!("Import cycle detected: {} in {:?}", path, import_stack).into(),
@@ -130,11 +133,15 @@ impl Builtins {
                         stack.push((v, path_pos));
                     }
                     None => {
-                        let path_buf = PathBuf::from(path.as_ref());
                         let op_pointer = decorate_error!(path_pos => env.borrow_mut().get_ops_for_path(path.as_ref()))?;
-                        // TODO(jwall): What if we don't have a base path?
+                        let base_path = normalized.parent().ok_or_else(|| {
+                            Error::new(
+                                format!("No parent directory for import path: {}", path).into(),
+                                pos.clone(),
+                            )
+                        })?;
                         let mut vm =
-                            VM::with_pointer(self.strict, op_pointer, path_buf.parent().unwrap())
+                            VM::with_pointer(self.strict, op_pointer, base_path)
                                 .with_import_stack(import_stack.clone());
                         vm.run(env)?;
                         let result = Rc::new(vm.symbols_to_tuple(true));
@@ -148,7 +155,7 @@ impl Builtins {
             }
             return Err(Error::new(format!("Invalid Path {:?}", val).into(), pos));
         }
-        unreachable!();
+        panic!("BUG: stack underflow in import - translator emitted wrong opcode sequence");
     }
 
     fn include<'a, O, E>(
@@ -173,7 +180,7 @@ impl Builtins {
                 ));
             }
         } else {
-            unreachable!();
+            panic!("BUG: stack underflow in include (path) - translator emitted wrong opcode sequence");
         };
         let typ = if let Some((val, typ_pos)) = typ {
             if let &Value::P(Str(ref typ)) = val.as_ref() {
@@ -185,7 +192,7 @@ impl Builtins {
                 ));
             }
         } else {
-            unreachable!();
+            panic!("BUG: stack underflow in include (type) - translator emitted wrong opcode sequence");
         };
         if typ.as_ref() == "str" {
             stack.push((
@@ -273,7 +280,7 @@ impl Builtins {
             );
             env.borrow_mut().record_assert_result(&msg, false);
         } else {
-            unreachable!();
+            panic!("BUG: stack underflow in assert - translator emitted wrong opcode sequence");
         }
         return Ok(());
     }
@@ -342,7 +349,7 @@ impl Builtins {
                 ));
             }
         }
-        unreachable!();
+        panic!("BUG: all branches should return in out - translator emitted wrong opcode sequence");
     }
 
     fn convert<'a, O, E>(
@@ -385,7 +392,7 @@ impl Builtins {
                 val_pos,
             ));
         }
-        unreachable!()
+        panic!("BUG: all branches should return in convert - translator emitted wrong opcode sequence");
     }
 
     fn map<'a, O, E>(
@@ -403,13 +410,13 @@ impl Builtins {
         let (list, list_pos) = if let Some(list) = stack.pop() {
             list
         } else {
-            unreachable!();
+            panic!("BUG: stack underflow in map (list) - translator emitted wrong opcode sequence");
         };
         // get the func ptr from the stack
         let (fptr, fptr_pos) = if let Some(ptr) = stack.pop() {
             ptr
         } else {
-            unreachable!();
+            panic!("BUG: stack underflow in map (func) - translator emitted wrong opcode sequence");
         };
 
         let f = if let &F(ref f) = fptr.as_ref() {
@@ -513,13 +520,13 @@ impl Builtins {
         let (list, list_pos) = if let Some(list) = stack.pop() {
             list
         } else {
-            unreachable!();
+            panic!("BUG: stack underflow in filter (list) - translator emitted wrong opcode sequence");
         };
         // get the func ptr from the stack
         let (fptr, fptr_pos) = if let Some(ptr) = stack.pop() {
             ptr
         } else {
-            unreachable!();
+            panic!("BUG: stack underflow in filter (func) - translator emitted wrong opcode sequence");
         };
 
         let f = if let &F(ref f) = fptr.as_ref() {
@@ -621,7 +628,7 @@ impl Builtins {
                 ));
             }
         } else {
-            unreachable!();
+            panic!("BUG: stack underflow in regex (left) - translator emitted wrong opcode sequence");
         };
 
         // 2. get right side (string)
@@ -635,7 +642,7 @@ impl Builtins {
                 ));
             }
         } else {
-            unreachable!();
+            panic!("BUG: stack underflow in regex (right) - translator emitted wrong opcode sequence");
         };
 
         // 3. compare via regex
@@ -659,19 +666,19 @@ impl Builtins {
         let (list, list_pos) = if let Some(list) = stack.pop() {
             list
         } else {
-            unreachable!();
+            panic!("BUG: stack underflow in reduce (list) - translator emitted wrong opcode sequence");
         };
         // Get the accumulator from the stack
         let (mut acc, mut acc_pos) = if let Some(acc) = stack.pop() {
             acc
         } else {
-            unreachable!();
+            panic!("BUG: stack underflow in reduce (accumulator) - translator emitted wrong opcode sequence");
         };
         // get the func ptr from the stack
         let (fptr, fptr_pos) = if let Some(ptr) = stack.pop() {
             ptr
         } else {
-            unreachable!();
+            panic!("BUG: stack underflow in reduce (func) - translator emitted wrong opcode sequence");
         };
 
         let f = if let &F(ref f) = fptr.as_ref() {
@@ -742,7 +749,7 @@ impl Builtins {
         let (start, _) = if let Some(start) = stack.pop() {
             start
         } else {
-            unreachable!();
+            panic!("BUG: stack underflow in range (start) - translator emitted wrong opcode sequence");
         };
         let (step, _) = if let Some((step, step_pos)) = stack.pop() {
             if let &P(Empty) = step.as_ref() {
@@ -751,12 +758,12 @@ impl Builtins {
                 (step, step_pos)
             }
         } else {
-            unreachable!();
+            panic!("BUG: stack underflow in range (step) - translator emitted wrong opcode sequence");
         };
         let (end, _) = if let Some(end) = stack.pop() {
             end
         } else {
-            unreachable!();
+            panic!("BUG: stack underflow in range (end) - translator emitted wrong opcode sequence");
         };
 
         let mut elems = Vec::new();
@@ -797,15 +804,15 @@ impl Builtins {
         let (val, val_pos) = if let Some(val) = stack.pop() {
             val
         } else {
-            unreachable!();
+            panic!("BUG: stack underflow in trace (value) - translator emitted wrong opcode sequence");
         };
         let expr = stack.pop();
         let expr_pretty = match expr {
             Some((ref expr, _)) => match expr.as_ref() {
                 &P(Str(ref expr)) => expr.clone(),
-                _ => unreachable!(),
+                _ => panic!("BUG: expected Str on stack in trace (expr) - translator emitted wrong opcode sequence"),
             },
-            _ => unreachable!(),
+            _ => panic!("BUG: stack underflow in trace (expr) - translator emitted wrong opcode sequence"),
         };
         let writable_val: Val = val.clone().into();
         if let Err(e) = writeln!(

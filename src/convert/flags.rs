@@ -137,7 +137,6 @@ impl Converter for FlagConverter {
         "Convert ucg Vals into command line flags.".to_string()
     }
 
-    #[allow(unused_must_use)]
     fn help(&self) -> String {
         include_str!("flags_help.txt").to_string()
     }

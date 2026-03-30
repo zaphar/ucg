@@ -42,6 +42,7 @@ pub mod io;
 pub mod iter;
 pub mod lsp;
 pub mod parse;
+pub mod path;
 
 pub use crate::ast::Expression;
 pub use crate::ast::Statement;

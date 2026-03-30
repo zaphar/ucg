@@ -25,6 +25,8 @@ use std::error::Error;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+use crate::ast::Token;
+
 use lsp_server::{
     Connection, Message, Notification as LspNotification, Request as LspRequest, RequestId,
     Response,
@@ -323,19 +325,27 @@ fn publish_diagnostics(
     Ok(())
 }
 
-/// Find the token at a (line, character) position (0-based LSP coords).
-/// Matches BAREWORD tokens whose text span covers the cursor.
-fn token_at(doc: &AnalysisResult, line: u32, character: u32) -> Option<Rc<str>> {
+/// Find the index of the token at a (line, character) position (0-based LSP coords).
+/// Matches tokens whose text span covers the cursor.
+fn token_index_at(doc: &AnalysisResult, line: u32, character: u32) -> Option<usize> {
     let target_line = (line + 1) as usize;
     let target_col = (character + 1) as usize;
-    doc.tokens
-        .iter()
-        .find(|tok| {
-            tok.pos.line == target_line
-                && tok.pos.column <= target_col
-                && target_col < tok.pos.column + tok.fragment.len()
-        })
-        .map(|tok| tok.fragment.clone())
+    doc.tokens.iter().position(|tok| {
+        tok.pos.line == target_line
+            && tok.pos.column <= target_col
+            && target_col < tok.pos.column + tok.fragment.len()
+    })
+}
+
+/// Find the token reference at a (line, character) position (0-based LSP coords).
+fn token_ref_at(doc: &AnalysisResult, line: u32, character: u32) -> Option<&Token> {
+    token_index_at(doc, line, character).map(|idx| &doc.tokens[idx])
+}
+
+/// Find the token at a (line, character) position (0-based LSP coords).
+/// Returns the token fragment name.
+fn token_at(doc: &AnalysisResult, line: u32, character: u32) -> Option<Rc<str>> {
+    token_ref_at(doc, line, character).map(|tok| tok.fragment.clone())
 }
 
 /// Find the token prefix being typed at (line, character): the longest BAREWORD
@@ -344,12 +354,13 @@ fn token_prefix_at(doc: &AnalysisResult, line: u32, character: u32) -> String {
     let target_line = (line + 1) as usize;
     let target_col = (character + 1) as usize;
     // Find the last token on this line that starts at or before the cursor.
+    // Note: this intentionally does NOT use token_ref_at because it wants the
+    // last token starting at-or-before the cursor, not the token spanning it.
     doc.tokens
         .iter()
         .filter(|tok| tok.pos.line == target_line && tok.pos.column <= target_col)
         .last()
         .map(|tok| {
-            // Trim the fragment to only the characters up to the cursor.
             let chars_before = target_col.saturating_sub(tok.pos.column);
             tok.fragment.chars().take(chars_before).collect::<String>()
         })
@@ -359,6 +370,8 @@ fn token_prefix_at(doc: &AnalysisResult, line: u32, character: u32) -> String {
 /// Check if the cursor is inside a QUOTED string token.
 fn cursor_in_string(doc: &AnalysisResult, line: u32, character: u32) -> Option<String> {
     use crate::ast::TokenType;
+    // cursor_in_string needs special span logic (+2 for quotes), so we can't
+    // directly reuse token_ref_at. But we still use the same coord conversion.
     let target_line = (line + 1) as usize;
     let target_col = (character + 1) as usize;
     doc.tokens
@@ -391,15 +404,8 @@ fn find_hover(
         return Some(hover);
     }
 
-    let target_line = (line + 1) as usize;
-    let target_col = (character + 1) as usize;
-
     // Find the exact token under the cursor.
-    let tok = doc.tokens.iter().find(|tok| {
-        tok.pos.line == target_line
-            && tok.pos.column <= target_col
-            && target_col < tok.pos.column + tok.fragment.len()
-    })?;
+    let tok = token_ref_at(doc, line, character)?;
     let tok_range = ucg_pos_to_range(&tok.pos);
     let name = tok.fragment.clone();
 
@@ -445,6 +451,10 @@ fn find_hover(
         });
     }
 
+    // 1b. Check if the scoped name has constraint info (e.g. func arg with ::)
+    // (constraint info for scoped names would need position-keyed storage;
+    // for now this is handled at the top-level symbol table path below.)
+
     // 2. Fall back to the top-level symbol table (name-keyed).
     let (shape, def_pos) = match doc.symbol_table.get(&name) {
         Some(entry) => entry,
@@ -469,9 +479,15 @@ fn find_hover(
     } else {
         analysis::doc_comment_for_binding(&doc.comment_map, def_pos.line)
     };
+    let constraint_line = doc
+        .constraint_info
+        .get(&name)
+        .map(|c| format!("\n\n**constraint**: `{}`", c))
+        .unwrap_or_default();
     let type_info = format!(
-        "**type**: {}\n\n**binding**: `{}`\n\n*defined at line {}, col {}*",
+        "**type**: {}{}\n\n**binding**: `{}`\n\n*defined at line {}, col {}*",
         hover_type_display(shape),
+        constraint_line,
         name,
         def_pos.line,
         def_pos.column
@@ -505,6 +521,27 @@ fn lookup_field_definition(shape: &crate::ast::Shape, field: &str) -> Option<cra
     }
 }
 
+/// Walk a chain of field names through a shape to resolve the final field's
+/// definition position. `fields` must be non-empty. Intermediate fields
+/// (all but the last) are traversed via `lookup_field_in_shape`; the last
+/// field is resolved via `lookup_field_definition` to get its source position.
+/// Returns a `Location` with the given `uri` if resolution succeeds.
+fn walk_fields_to_definition(
+    shape: &crate::ast::Shape,
+    fields: &[Rc<str>],
+    uri: Url,
+) -> Option<Location> {
+    let mut current = shape.clone();
+    for f in &fields[..fields.len() - 1] {
+        current = lookup_field_in_shape(&current, f)?;
+    }
+    let pos = lookup_field_definition(&current, &fields[fields.len() - 1])?;
+    Some(Location {
+        uri,
+        range: ucg_pos_to_range(&pos),
+    })
+}
+
 /// Walk backwards from the cursor token through `.`-separated BAREWORDs and
 /// return `(path, root_token_pos)` where `path` is the full dot chain from root
 /// to cursor (e.g. `["a","b","c"]` for cursor on `c` in `a.b.c`) and
@@ -516,13 +553,7 @@ fn collect_dot_path(
     character: u32,
 ) -> Option<(Vec<Rc<str>>, (usize, usize))> {
     use crate::ast::TokenType;
-    let target_line = (line + 1) as usize;
-    let target_col = (character + 1) as usize;
-    let idx = doc.tokens.iter().position(|tok| {
-        tok.pos.line == target_line
-            && tok.pos.column <= target_col
-            && target_col < tok.pos.column + tok.fragment.len()
-    })?;
+    let idx = token_index_at(doc, line, character)?;
     if doc.tokens[idx].typ != TokenType::BAREWORD {
         return None;
     }
@@ -626,13 +657,7 @@ fn find_hover_dot_expr(
     };
 
     // Find the cursor token for the hover range.
-    let target_line = (line + 1) as usize;
-    let target_col = (character + 1) as usize;
-    let tok = doc.tokens.iter().find(|tok| {
-        tok.pos.line == target_line
-            && tok.pos.column <= target_col
-            && target_col < tok.pos.column + tok.fragment.len()
-    })?;
+    let tok = token_ref_at(doc, line, character)?;
 
     let full_path = path
         .iter()
@@ -688,26 +713,10 @@ fn find_definition(
                                 range: ucg_pos_to_range(first_pos),
                             });
                         }
-                        // Multi-level: walk through intermediate fields then resolve last.
-                        let mut current = first_shape.clone();
-                        let mut ok = true;
-                        for f in &fields[1..fields.len() - 1] {
-                            if let Some(next) = lookup_field_in_shape(&current, f) {
-                                current = next;
-                            } else {
-                                ok = false;
-                                break;
-                            }
-                        }
-                        if ok {
-                            if let Some(pos) =
-                                lookup_field_definition(&current, &fields[fields.len() - 1])
-                            {
-                                return Some(Location {
-                                    uri: import_uri,
-                                    range: ucg_pos_to_range(&pos),
-                                });
-                            }
+                        if let Some(loc) =
+                            walk_fields_to_definition(first_shape, &fields[1..], import_uri)
+                        {
+                            return Some(loc);
                         }
                     }
                 }
@@ -719,7 +728,7 @@ fn find_definition(
                 .get(&root_pos)
                 .cloned()
                 .or_else(|| doc.symbol_table.get(root_name).map(|(s, _)| s.clone()));
-            if let Some(mut current) = root_shape {
+            if let Some(current) = root_shape {
                 use crate::ast::Shape;
                 // If the root shape is an import, inner_import_map missed root_pos but
                 // token_types still carries the resolved shape.  Find the imported file
@@ -739,26 +748,10 @@ fn find_definition(
                                             range: ucg_pos_to_range(first_pos),
                                         });
                                     }
-                                    // Multi-level: walk intermediate fields.
-                                    let mut cur = first_shape.clone();
-                                    let mut ok = true;
-                                    for f in &fields[1..fields.len() - 1] {
-                                        if let Some(next) = lookup_field_in_shape(&cur, f) {
-                                            cur = next;
-                                        } else {
-                                            ok = false;
-                                            break;
-                                        }
-                                    }
-                                    if ok {
-                                        if let Some(pos) =
-                                            lookup_field_definition(&cur, &fields[fields.len() - 1])
-                                        {
-                                            return Some(Location {
-                                                uri: imp_uri,
-                                                range: ucg_pos_to_range(&pos),
-                                            });
-                                        }
+                                    if let Some(loc) =
+                                        walk_fields_to_definition(first_shape, &fields[1..], imp_uri)
+                                    {
+                                        return Some(loc);
                                     }
                                 }
                                 break;
@@ -767,24 +760,10 @@ fn find_definition(
                     }
                     // If we couldn't resolve the import, fall through to standalone checks.
                 } else {
-                    let mut ok = true;
-                    for f in &fields[..fields.len() - 1] {
-                        if let Some(next) = lookup_field_in_shape(&current, f) {
-                            current = next;
-                        } else {
-                            ok = false;
-                            break;
-                        }
-                    }
-                    if ok {
-                        if let Some(pos) =
-                            lookup_field_definition(&current, &fields[fields.len() - 1])
-                        {
-                            return Some(Location {
-                                uri: current_uri.clone(),
-                                range: ucg_pos_to_range(&pos),
-                            });
-                        }
+                    if let Some(loc) =
+                        walk_fields_to_definition(&current, fields, current_uri.clone())
+                    {
+                        return Some(loc);
                     }
                 }
             }
@@ -792,16 +771,7 @@ fn find_definition(
     }
 
     // Find the token under the cursor (needed for inner_import_map lookup).
-    let target_line = (line + 1) as usize;
-    let target_col = (character + 1) as usize;
-    let tok_pos = doc
-        .tokens
-        .iter()
-        .find(|tok| {
-            tok.pos.line == target_line
-                && tok.pos.column <= target_col
-                && target_col < tok.pos.column + tok.fragment.len()
-        })
+    let tok_pos = token_ref_at(doc, line, character)
         .map(|tok| (tok.pos.line, tok.pos.column));
 
     let name = token_at(doc, line, character)?;
@@ -1194,10 +1164,6 @@ fn hover_type_display(shape: &crate::ast::Shape) -> String {
 }
 
 /// Convert a file-system path to an LSP `Url`, returning the original on failure.
-fn _path_to_uri(path: &std::path::Path) -> Option<Url> {
-    Url::from_file_path(path).ok()
-}
-
 /// Convert an LSP `Url` to a filesystem `PathBuf`.
 fn uri_to_path(uri: &Url) -> Option<PathBuf> {
     uri.to_file_path().ok()
@@ -3004,6 +2970,77 @@ mod test {
             assert!(
                 mc.value.contains("**type**"),
                 "should show type info for binding, got: {}",
+                mc.value
+            );
+        }
+    }
+
+    // --- constraint hover ---
+
+    #[test]
+    fn test_hover_constraint_binding_shows_constraint() {
+        let doc = analyze("constraint port_range = in 1..65535;", None);
+        let hover = find_hover(&doc, 0, "constraint ".len() as u32);
+        assert!(hover.is_some());
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
+            assert!(
+                mc.value.contains("**constraint**"),
+                "should show constraint info, got: {}",
+                mc.value
+            );
+            assert!(
+                mc.value.contains("1..65535"),
+                "should show range bounds, got: {}",
+                mc.value
+            );
+        }
+    }
+
+    #[test]
+    fn test_hover_let_with_constraint_shows_constraint() {
+        let doc = analyze("let port :: in 1..1024 = 80;", None);
+        let hover = find_hover(&doc, 0, "let ".len() as u32);
+        assert!(hover.is_some());
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
+            assert!(
+                mc.value.contains("**constraint**"),
+                "should show constraint info, got: {}",
+                mc.value
+            );
+            assert!(
+                mc.value.contains("1..1024"),
+                "should show range bounds, got: {}",
+                mc.value
+            );
+        }
+    }
+
+    #[test]
+    fn test_hover_alternation_constraint_shows_values() {
+        let doc = analyze(r#"let status :: "active" | "inactive" = "active";"#, None);
+        let hover = find_hover(&doc, 0, "let ".len() as u32);
+        assert!(hover.is_some());
+        if let Some(Hover {
+            contents: HoverContents::Markup(mc),
+            ..
+        }) = hover
+        {
+            assert!(
+                mc.value.contains("**constraint**"),
+                "should show constraint info, got: {}",
+                mc.value
+            );
+            assert!(
+                mc.value.contains("active"),
+                "should show alternation values, got: {}",
                 mc.value
             );
         }

@@ -31,15 +31,15 @@ use super::Value::{C, F, K, M, P, S, T};
 use super::{Error, Op, Primitive, Value};
 use super::{Func, Module};
 
-fn construct_reserved_word_set() -> BTreeSet<&'static str> {
-    let mut words = BTreeSet::new();
-    for word in vec![
-        "let", "module", "func", "out", "assert", "self", "import", "include", "as", "map",
-        "filter", "convert", "fail", "NULL", "in", "is", "TRACE",
-    ] {
-        words.insert(word);
-    }
-    words
+fn reserved_words() -> &'static BTreeSet<&'static str> {
+    use std::sync::LazyLock;
+    static WORDS: LazyLock<BTreeSet<&'static str>> = LazyLock::new(|| {
+        BTreeSet::from([
+            "let", "module", "func", "out", "assert", "self", "import", "include", "as", "map",
+            "filter", "convert", "fail", "NULL", "in", "is", "TRACE",
+        ])
+    });
+    &WORDS
 }
 
 pub struct VM {
@@ -51,7 +51,7 @@ pub struct VM {
     ops: OpPointer,
     pub last: Option<(Rc<Value>, Position)>,
     self_stack: Vec<(Rc<Value>, Position)>,
-    reserved_words: BTreeSet<&'static str>,
+    reserved_words: &'static BTreeSet<&'static str>,
 }
 
 impl VM {
@@ -69,7 +69,7 @@ impl VM {
             ops: ops,
             last: None,
             self_stack: Vec::new(),
-            reserved_words: construct_reserved_word_set(),
+            reserved_words: reserved_words(),
         }
     }
 
@@ -101,7 +101,7 @@ impl VM {
             ops: self.ops.clone(),
             last: None,
             self_stack: self.self_stack.clone(),
-            reserved_words: self.reserved_words.clone(),
+            reserved_words: self.reserved_words,
         }
     }
 

@@ -456,10 +456,11 @@ fn do_repl(
         );
         // introduce a scope so the file will get automatically closed after
         {
-            let base_dir = config_home.parent().unwrap();
-            if !base_dir.exists() {
-                if let Err(e) = std::fs::create_dir_all(base_dir) {
-                    eprintln!("{}", e);
+            if let Some(base_dir) = config_home.parent() {
+                if !base_dir.exists() {
+                    if let Err(e) = std::fs::create_dir_all(base_dir) {
+                        eprintln!("{}", e);
+                    }
                 }
             }
             if let Err(e) = std::fs::File::create(&config_home) {
