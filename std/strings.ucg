@@ -15,7 +15,7 @@
 //   - `start` field is the index at which the substr starts (defaults to 0)
 //   -  `end` field is the index at which the substr ends (defaults to end of string)
 let ops = module {
-    str="",
+    str :: "" = "",
 } => ({len=len,
        str=str,
        chars=chars,
@@ -30,10 +30,10 @@ let ops = module {
     let chars = reduce(func(acc, char) => acc + [char], [], mod.str);
 
     let split_on = module{
-        on=" ",
+        on :: "" = " ",
         buf = "",
         out = [],
-        str=mod.str,
+        str :: "" = mod.str,
     } => (result) {
         let recurse = module {
             buf = "",
@@ -124,9 +124,9 @@ let ops = module {
     let parse_int_func = func() => parse_int{chars=chars}.do(func(s) => int(s));
 
     let substr = module{
-        str = mod.str,
-        start = 0,
-        end = len,
+        str :: "" = mod.str,
+        start :: 0 = 0,
+        end :: 0 = len,
     } => (result) {
         let pkg = mod.pkg();
         let reducer = func(acc, char) => acc{
@@ -140,4 +140,4 @@ let ops = module {
     };
 };
 
-let wrap = func(str) => ops{str=str};
+let wrap = func(str :: "") => ops{str=str};

@@ -15,15 +15,15 @@ let ns = func(prefix, uri) => select (uri != NULL) => {
 };
 
 let tag = module{
-    name = NULL,
-    attrs = {},
-    children = [],
+    name :: "" = "",
+    attrs :: {} = {},
+    children :: [] = [],
     ns = NULL,
 } => (result) {
     let schema = import "std/schema.ucg";
     let pkg = mod.pkg();
 
-    (mod.name != NULL) || fail "XML Tag names must have a name";
+    (mod.name != "") || fail "XML Tag names must have a name";
     let base = {
         name = mod.name,
         attrs = mod.attrs,

@@ -3,9 +3,9 @@ let todo_desc = "TODO description";
 // Test that a value is true.
 let ok = module{
     // test value expected to be true for success.
-    test=false,
+    test :: false = false,
     // descriptive message to use in output.
-    desc=todo_desc,
+    desc :: "" = todo_desc,
 } => ({ok=ok, desc=desc}) {
     (mod.desc != NULL) || fail "description can't be null";
 
@@ -16,9 +16,9 @@ let ok = module{
 // Test that a value is not true.
 let not_ok = module{
     // Test value expected to to be false for success.
-    test=true,
+    test :: false = true,
     // descriptive message to use in output.
-    desc=todo_desc,
+    desc :: "" = todo_desc,
 } => ({ok=ok, desc=desc}) {
     (mod.desc != NULL) || fail "description can't be null";
 
@@ -33,7 +33,7 @@ let equal = module{
     left=NULL,
     // right value for deep equal comparison.
     right=NULL,
-    desc="",
+    desc :: "" = "",
 } => ({ok=ok, desc=desc}) {
     (mod.desc != NULL) || fail "description can't be null";
 
@@ -49,7 +49,7 @@ let not_equal = module{
     left=NULL,
     // right value for deep equal comparison.
     right=NULL,
-    desc="",
+    desc :: "" = "",
 } => ({ok=ok, desc=desc}) {
     (mod.desc != NULL) || fail "description can't be null";
 

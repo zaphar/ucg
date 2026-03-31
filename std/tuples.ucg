@@ -1,38 +1,26 @@
 // Assert that a value is a tuple. Generate a compile failure if it is not.
-let assert_tuple = func (tpl) => select (tpl is "tuple", NULL) => {
+let assert_tuple = func (tpl :: {}) => select (tpl is "tuple", NULL) => {
     false = fail "@ is not a tuple" % (tpl),
 };
 
 // Return a list of the fields in a tuple.
 let fields = module{
-    tpl = NULL,
+    tpl :: {} = {},
 } => (result) {
-    let assert_tuple = import "std/tuples.ucg".assert_tuple;
-    // First we check that mod.tpl is a tuple.
-    assert_tuple(mod.tpl);
-    
     let result = reduce(func (acc, field, value) =>  acc + [field], [], (mod.tpl));
 };
 
 // Return a list of the values in a tuple.
 let values = module{
-    tpl = NULL,
+    tpl :: {} = {},
 } => (result) {
-    let assert_tuple = import "std/tuples.ucg".assert_tuple;
-    // First we check that mod.tpl is a tuple.
-    assert_tuple(mod.tpl);
-    
     let result = reduce(func (acc, field, value) =>  acc + [value], [], (mod.tpl));
 };
 
 // Return a list of the key value pairs in the tuple.
 let iter = module{
-    tpl = NULL,
+    tpl :: {} = {},
 } => (result) {
-    let assert_tuple = import "std/tuples.ucg".assert_tuple;
-    // First we check that mod.tpl is a tuple.
-    assert_tuple(mod.tpl);
-    
     let result = reduce(func (acc, field, value) =>  acc + [[field, value]], [], (mod.tpl));
 };
 
@@ -44,10 +32,8 @@ let iter = module{
 //
 // * iter - function returns a list of pairs of [field, value].
 let ops = module{
-    tpl = NULL,
+    tpl :: {} = {},
 } => ({fields=fields, values=values, iter=iter}) {
-    (mod.tpl != NULL) || fail "tpl must not be null";
-    
     let pkg = mod.pkg();
     
     let fields = func() => pkg.fields{tpl=mod.tpl};
@@ -57,23 +43,17 @@ let ops = module{
 
 // Strip all the null fields from a tuple.
 let strip_nulls = module{
-    tpl = NULL,
+    tpl :: {} = {},
 } => (result) {
-    let assert_tuple = import "std/tuples.ucg".assert_tuple;
-    // First we check that mod.tpl is a tuple.
-    assert_tuple(mod.tpl);
-    
     let result = filter(func (name, value) =>  value != NULL, (mod.tpl));
 };
 
 // Check if a tuple has all the fields in a given list.
 let has_fields = module{
-    tpl = NULL,
-    fields = [],
+    tpl :: {} = {},
+    fields :: [] = [],
 } => (result) {
     let pkg = mod.pkg();
-    // First we check that mod.tpl is a tuple.
-    pkg.assert_tuple(mod.tpl);
 
     let fs = pkg.fields{tpl=mod.tpl};
 
@@ -82,23 +62,11 @@ let has_fields = module{
 
 // Check if a field in a tuple is a given type.
 let field_type = module{
-    tpl = NULL,
-    field = NULL,
-    type = NULL,
+    tpl :: {} = {},
+    field :: "" = "",
+    type :: "" = "",
 } => (result) {
     let pkg = mod.pkg();
-    // First we check that mod.tpl is a tuple.
-    pkg.assert_tuple(mod.tpl);
-
-    // Next we assert that mod.field is a string.
-    select (mod.field is "str", NULL) => {
-        false = fail "@ is not a string" % (mod.field),
-    };
-
-    // and finally that mod.type is a string
-    select (mod.type is "str", NULL) => {
-        false = fail "@ is not a string" % (mod.type),
-    };
 
     // Get the list of field value pairs.
     let it = pkg.iter{tpl=mod.tpl};

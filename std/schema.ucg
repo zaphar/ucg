@@ -19,7 +19,7 @@ let base_type_of = func (val) => reduce(func (acc, f) => select ((acc.val is f),
 
 // Turns any schema check module into a compile failure.
 // The module must export the computed value as the result field.
-let must = func (m, msg) => select (m, fail msg) => {
+let must = func (m :: false, msg :: "") => select (m, fail msg) => {
     true = m,
 };
 
@@ -32,7 +32,7 @@ let all = module {
     // The source value to check.
     val=NULL,
     // The set of allowed type shapes it can be.
-    types=[],
+    types :: [] = [],
 } => (result) {
     let schema = mod.pkg();
 
@@ -53,9 +53,9 @@ let any = module {
     // The source value to check.
     val=NULL,
     // The set of allowed type shapes it can be.
-    types=[],
+    types :: [] = [],
     // Whether to do partial matches for the shapes
-    partial=false
+    partial :: false = false,
 } => (result) {
     let schema = mod.pkg();
 
@@ -81,15 +81,15 @@ let any = module {
 let shaped = module {
     // The source value to validate
     val = NULL,
-    
+
     // The shape to validate it against.
     shape = NULL,
-    
+
     // Whether partial matches are accepted.
     // When set to true then the source value can have
     // fields in tuples that are not present in the
     // shape it is compared with.
-    partial = true,
+    partial :: false = true,
 } => (result) {
     let schema = mod.pkg();
     let this = mod.this;
