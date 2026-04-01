@@ -231,6 +231,63 @@ let app_port :: valid_port = 8080;
 Named constraints are especially useful when multiple bindings share the same
 contract, or when defining module parameter constraints.
 
+### Recursive Constraints
+
+Named constraints can reference themselves, enabling recursive type
+definitions for tree-like data structures. A self-reference must appear
+inside a list or as one arm of an alternation with a non-recursive base
+case — otherwise the type would be impossible to construct.
+
+```
+// An XML-like tree node: either a text string or a tag with children
+constraint xml_node = "" | {name="", attrs={}, children=[xml_node]};
+
+// Base case: a text node
+let leaf :: xml_node = "hello";
+
+// One level deep
+let tag :: xml_node = {
+    name = "div",
+    attrs = {},
+    children = ["text", {name = "span", attrs = {}, children = []}],
+};
+
+// Arbitrarily deep nesting is valid
+let tree :: xml_node = {
+    name = "html",
+    attrs = {},
+    children = [
+        {name = "body", attrs = {}, children = [
+            {name = "p", attrs = {}, children = ["paragraph"]},
+        ]},
+    ],
+};
+```
+
+The type checker validates the shape at all nesting depths statically.
+Wrong types at any depth produce a compile error:
+
+```
+// Error: 42 is not a valid xml_node (not a string or matching tuple)
+let bad :: xml_node = {
+    name = "div",
+    attrs = {},
+    children = [42],
+};
+```
+
+Self-references must have a base case. The following is rejected because
+there is no way to construct a value that satisfies it:
+
+```
+// Error: unconstructible — no base case
+constraint bad = {child = bad};
+```
+
+Valid positions for self-references:
+* Inside a list: `[my_constraint]` — the list can be empty, providing the base case
+* As one arm of an alternation: `"" | {next = my_constraint}` — the other arm is the base case
+
 ### How Constraints Work
 
 Under the hood, shape constraints use the same type narrowing mechanism as the

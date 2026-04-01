@@ -35,7 +35,6 @@ including a decimal point. Any number with a decimal point is a float.
 ```
 1.0;
 .0;
-1.;
 ```
 
 ### String

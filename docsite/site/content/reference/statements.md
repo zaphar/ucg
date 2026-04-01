@@ -72,8 +72,17 @@ let port :: port_range = 8080;
 let level :: log_level = "info";
 ```
 
+Named constraints can also be recursive — they can reference themselves to
+define tree-like types:
+
+```
+constraint xml_node = "" | {name="", children=[xml_node]};
+let tree :: xml_node = {name = "div", children = ["text"]};
+```
+
 See <a href="/reference/typechecking">Type Checking & Shape Constraints</a>
-for full details on range constraints and alternations.
+for full details on range constraints, alternations, and recursive
+constraints.
 
 Output Statements
 -----------
@@ -83,15 +92,15 @@ configuration or the results of test assertions.
 
 ### Assert Statements
 
-The assert statement defines an expression that must evaluate to tuple with an
-ok field that is either true or false and a desc field that is a string. Assert
-statements are noops except when executing `ucg test`. They give you a way to
-assert certains properties about your data and can be used as a form of unit
-testing for your configurations. It starts with the `assert` keyword followed
-by a valid ucg expression that resolves to a tuple with an `ok` field and a
-`desc` field. The `ok` field must contain a boolean value. The `desc` field
-must contain a description for this assertion. The `ok` field is `true` the
-assert test succeeds. When it is `false` the assert test fails.
+The assert statement defines an expression that must evaluate to a tuple with
+shape `{ok = false, desc = ""}` — an `ok` field that is a boolean and a `desc`
+field that is a string. This shape is enforced at compile time by the type
+checker. Assert statements are noops except when executing `ucg test`. They
+give you a way to assert certain properties about your data and can be used as
+a form of unit testing for your configurations. It starts with the `assert`
+keyword followed by a valid ucg expression that resolves to a tuple with an
+`ok` field and a `desc` field. When `ok` is `true` the assert test succeeds.
+When it is `false` the assert test fails.
 
 ```
 assert {
