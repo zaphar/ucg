@@ -358,6 +358,7 @@ pub enum Shape {
     Hole(PositionedItem<Rc<str>>), // A type hole We don't know what this type is yet.
     Narrowed(NarrowedShape),       // A narrowed type. We know *some* of the possible options.
     Import(ImportShape),           // A type hole We don't know what this type is yet.
+    ConstraintRef(PositionedItem<Rc<str>>), // A reference to a named constraint (for recursive types).
     TypeErr(Position, String),     // A type hole We don't know what this type is yet.
 }
 
@@ -369,6 +370,7 @@ impl Shape {
             | (Shape::Int(_), Shape::Int(_))
             | (Shape::Hole(_), Shape::Hole(_))
             | (Shape::Float(_), Shape::Float(_)) => true,
+            (Shape::ConstraintRef(left), Shape::ConstraintRef(right)) => left.val == right.val,
             (
                 Shape::List(NarrowedShape {
                     pos: _,
@@ -525,6 +527,30 @@ impl Shape {
             // Propagate TypeErr
             (Shape::TypeErr(_, _), _) => self.clone(),
             (_, Shape::TypeErr(_, _)) => right.clone(),
+            // ConstraintRef: same name is trivially compatible
+            (Shape::ConstraintRef(left_ref), Shape::ConstraintRef(right_ref))
+                if left_ref.val == right_ref.val =>
+            {
+                self.clone()
+            }
+            // ConstraintRef: expand and re-narrow
+            (Shape::ConstraintRef(cref), other) | (other, Shape::ConstraintRef(cref)) => {
+                if let Some(expanded) = symbol_table.get(&cref.val).cloned() {
+                    // If expansion is still a ConstraintRef with the same name,
+                    // we've hit a cycle — treat as compatible.
+                    if let Shape::ConstraintRef(inner) = &expanded {
+                        if inner.val == cref.val {
+                            return other.clone();
+                        }
+                    }
+                    other.narrow(&expanded, symbol_table)
+                } else {
+                    Shape::TypeErr(
+                        cref.pos.clone(),
+                        format!("Unknown constraint '{}'", cref.val),
+                    )
+                }
+            }
             // Same-type narrowing
             (Shape::Str(_), Shape::Str(_))
             | (Shape::Boolean(_), Shape::Boolean(_))
@@ -771,6 +797,7 @@ impl Shape {
             Shape::Narrowed(_) => "narrowed",
             Shape::Import(_) => "import",
             Shape::Hole(_) => "type-hole",
+            Shape::ConstraintRef(_) => "constraint-ref",
             Shape::TypeErr(_, _) => "type-error",
         }
     }
@@ -787,6 +814,7 @@ impl Shape {
             Shape::Module(def) => def.ret.pos(),
             Shape::Narrowed(pi) => &pi.pos,
             Shape::Hole(pi) => &pi.pos,
+            Shape::ConstraintRef(pi) => &pi.pos,
             Shape::TypeErr(pos, _) => pos,
             Shape::Import(ImportShape::Resolved(p, _)) => p,
             Shape::Import(ImportShape::Unresolved(pi)) => &pi.pos,
@@ -814,6 +842,7 @@ impl Shape {
             Shape::Func(_) | Shape::Module(_) => self.clone(),
             Shape::Narrowed(narrowed_shape) => Shape::Narrowed(narrowed_shape.with_pos(pos)),
             Shape::Hole(pi) => Shape::Hole(pi.with_pos(pos)),
+            Shape::ConstraintRef(pi) => Shape::ConstraintRef(pi.with_pos(pos)),
             Shape::Import(ImportShape::Resolved(_, s)) => {
                 Shape::Import(ImportShape::Resolved(pos, s))
             }

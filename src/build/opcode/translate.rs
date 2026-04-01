@@ -103,9 +103,17 @@ impl AST {
             }
             Statement::Constraint(def) => {
                 let binding = def.name.fragment;
+                // Pre-bind with an empty constraint so self-references
+                // in the RHS resolve (enabling recursive constraints).
+                // An empty ConstraintVal (no arms) acts as "match anything"
+                // since the static typechecker has already validated the shape.
+                ops.push(Op::Sym(binding.clone()), def.name.pos.clone());
+                ops.push(Op::BuildConstraint(vec![]), def.pos.clone());
+                ops.push(Op::Bind, def.pos.clone());
+                // Now evaluate the real expression and overwrite the binding.
                 ops.push(Op::Sym(binding), def.name.pos);
                 Self::translate_expr(def.value, &mut ops, root);
-                ops.push(Op::Bind, def.pos);
+                ops.push(Op::BindOver, def.pos);
             }
             Statement::Output(pos, tok, expr) => {
                 ops.push(Op::Val(Primitive::Str(tok.fragment)), tok.pos);

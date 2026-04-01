@@ -1317,3 +1317,156 @@ fn test_module_copy_no_constraints_wrong_type() {
     // Module without explicit constraints — default value's type is still enforced.
     assert_type_err!("let m = module { x = 0, } => (mod.x) {};\nlet n = m { x = \"wrong\" };");
 }
+
+// --- recursive constraint tests ---
+
+#[test]
+fn test_recursive_constraint_basic_base_case() {
+    // A recursive constraint should accept values matching the base case.
+    assert_type_ok!(
+        "constraint node = \"\" | {name=\"\", children=[]};\nlet x :: node = \"leaf\";"
+    );
+}
+
+#[test]
+fn test_recursive_constraint_one_level_deep() {
+    // A recursive constraint should accept a one-level-deep structure.
+    assert_type_ok!(
+        "constraint node = \"\" | {name=\"\", children=[node]};\nlet x :: node = {name=\"root\", children=[\"leaf\"]};"
+    );
+}
+
+#[test]
+fn test_recursive_constraint_two_levels_deep() {
+    // A recursive constraint should accept a two-level-deep structure.
+    assert_type_ok!(
+        "constraint node = \"\" | {name=\"\", children=[node]};\nlet x :: node = {name=\"root\", children=[{name=\"child\", children=[\"leaf\"]}]};"
+    );
+}
+
+#[test]
+fn test_recursive_constraint_three_levels_deep() {
+    // Three levels of nesting should work.
+    assert_type_ok!(
+        "constraint node = \"\" | {name=\"\", children=[node]};\nlet x :: node = {name=\"a\", children=[{name=\"b\", children=[{name=\"c\", children=[]}]}]};"
+    );
+}
+
+#[test]
+fn test_recursive_constraint_mismatch_at_top() {
+    // Wrong type at the top level should fail.
+    assert_type_err!(
+        "constraint node = \"\" | {name=\"\", children=[node]};\nlet x :: node = 42;"
+    );
+}
+
+#[test]
+fn test_recursive_constraint_mismatch_nested() {
+    // Wrong type nested inside should fail.
+    assert_type_err!(
+        "constraint node = \"\" | {name=\"\", children=[node]};\nlet x :: node = {name=\"root\", children=[42]};"
+    );
+}
+
+#[test]
+fn test_recursive_constraint_mismatch_deep_nested() {
+    // Wrong type two levels deep should fail.
+    assert_type_err!(
+        "constraint node = \"\" | {name=\"\", children=[node]};\nlet x :: node = {name=\"root\", children=[{name=\"child\", children=[42]}]};"
+    );
+}
+
+#[test]
+fn test_recursive_constraint_empty_list() {
+    // Empty list should satisfy a recursive list constraint.
+    assert_type_ok!(
+        "constraint node = \"\" | {name=\"\", children=[node]};\nlet x :: node = {name=\"leaf\", children=[]};"
+    );
+}
+
+#[test]
+fn test_recursive_constraint_in_module_param() {
+    // Recursive constraint used as a module parameter constraint.
+    assert_type_ok!(
+        "constraint node = \"\" | {name=\"\", children=[node]};\nlet m = module { root :: node = {name=\"default\", children=[]}, } => (mod.root) {};"
+    );
+}
+
+#[test]
+fn test_recursive_constraint_in_func_arg() {
+    // Recursive constraint used as a function argument constraint.
+    assert_type_ok!(
+        "constraint node = \"\" | {name=\"\", children=[node]};\nlet f = func(n :: node) => n;"
+    );
+}
+
+#[test]
+fn test_recursive_constraint_two_compatible() {
+    // Two recursive constraints with the same structure should be compatible.
+    assert_type_ok!(
+        "constraint a = \"\" | {name=\"\", children=[a]};\nconstraint b = \"\" | {name=\"\", children=[b]};\nlet x :: a = \"leaf\";\nlet y :: b = x;"
+    );
+}
+
+#[test]
+fn test_recursive_constraint_two_incompatible() {
+    // Two recursive constraints with different base types should not be compatible.
+    assert_type_err!(
+        "constraint a = \"\" | {name=\"\", children=[a]};\nconstraint b = 0 | {label=\"\", items=[b]};\nlet x :: a = \"leaf\";\nlet y :: b = x;"
+    );
+}
+
+#[test]
+fn test_non_recursive_constraint_still_works() {
+    // A named constraint that doesn't self-reference should still work as before.
+    assert_type_ok!(
+        "constraint port = in 1..65535;\nlet p :: port = 8080;"
+    );
+}
+
+#[test]
+fn test_non_recursive_constraint_rejects_bad_value() {
+    assert_type_err!(
+        "constraint level = \"debug\" | \"info\" | \"warn\";\nlet x :: level = 42;"
+    );
+}
+
+#[test]
+fn test_recursive_constraint_unconstructible_direct_field() {
+    // constraint a = {foo = a} is unconstructible — no base case.
+    assert_type_err!(
+        "constraint a = {foo = a};"
+    );
+}
+
+#[test]
+fn test_recursive_constraint_unconstructible_nested_field() {
+    // Self-reference in a nested tuple field with no list/alternation guard.
+    assert_type_err!(
+        "constraint a = {outer = {inner = a}};"
+    );
+}
+
+#[test]
+fn test_recursive_constraint_valid_in_list() {
+    // Self-reference inside a list is valid (list can be empty).
+    assert_type_ok!(
+        "constraint a = {children = [a]};"
+    );
+}
+
+#[test]
+fn test_recursive_constraint_valid_in_alternation() {
+    // Self-reference as one arm of alternation with a base case is valid.
+    assert_type_ok!(
+        "constraint a = \"\" | {next = a};"
+    );
+}
+
+#[test]
+fn test_recursive_constraint_unconstructible_all_arms_recursive() {
+    // All arms of the alternation reference self — no base case.
+    assert_type_err!(
+        "constraint a = {foo = a} | {bar = a};"
+    );
+}

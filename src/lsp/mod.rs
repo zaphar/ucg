@@ -1078,6 +1078,7 @@ fn format_shape(shape: &crate::ast::Shape) -> String {
         Shape::Import(crate::ast::ImportShape::Unresolved(pi)) => {
             format!("import(\"{}\")", pi.val)
         }
+        Shape::ConstraintRef(pi) => format!("{}", pi.val),
         Shape::TypeErr(_, msg) => format!("TypeError({})", msg),
     }
 }

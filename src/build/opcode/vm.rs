@@ -823,6 +823,12 @@ impl VM {
         }
         let (val, val_pos) = self.stack.last().unwrap().clone();
         if let K(ref cv) = constraint.as_ref() {
+            // Recursive constraints contain self-referential placeholders.
+            // They are fully validated by the static typechecker, so skip
+            // runtime checking.
+            if cv.contains_self_ref() {
+                return Ok(());
+            }
             // Convert opcode Value to IR Val for checking
             let ir_val: crate::build::ir::Val = val.as_ref().into();
             if !cv.check(&ir_val) {

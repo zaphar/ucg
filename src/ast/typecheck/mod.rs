@@ -246,7 +246,8 @@ fn derive_copy_shape(def: &CopyDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>)
         | Shape::Float(_)
         | Shape::Str(_)
         | Shape::List(_)
-        | Shape::Func(_) => Shape::TypeErr(
+        | Shape::Func(_)
+        | Shape::ConstraintRef(_) => Shape::TypeErr(
             def.pos.clone(),
             format!("Not a Copyable type {}", base_shape.type_name()),
         ),
@@ -1202,6 +1203,87 @@ impl Checker {
         self.shape_stack.pop()
     }
 
+    /// Check that a recursive constraint is constructible.
+    /// A ConstraintRef to `name` is valid only inside a list or as one arm of
+    /// an alternation that has at least one non-self-referential arm.
+    /// Returns Some(Position) of the offending ref if invalid, None if ok.
+    fn validate_recursive_constraint(name: &Rc<str>, shape: &Shape) -> Option<Position> {
+        Self::check_constraint_ref(name, shape, false)
+    }
+
+    /// Recursively walk a shape checking ConstraintRef positions.
+    /// `guarded` is true when we're inside a list or alternation with alternatives.
+    fn check_constraint_ref(name: &Rc<str>, shape: &Shape, guarded: bool) -> Option<Position> {
+        match shape {
+            Shape::ConstraintRef(pi) if pi.val == *name => {
+                if guarded {
+                    None // Valid: inside a list or alternation
+                } else {
+                    Some(pi.pos.clone()) // Invalid: no base case
+                }
+            }
+            Shape::ConstraintRef(_) => None, // Different constraint, not our concern
+            Shape::Tuple(pi) => {
+                // Check each field — fields are NOT guarded by the tuple
+                for (_field_name, field_shape) in pi.val.iter() {
+                    if let Some(pos) = Self::check_constraint_ref(name, field_shape, guarded) {
+                        return Some(pos);
+                    }
+                }
+                None
+            }
+            Shape::List(ns) => {
+                // List elements are guarded — a list can be empty
+                match &ns.types {
+                    NarrowingShape::Narrowed(types) => {
+                        for t in types {
+                            if let Some(pos) = Self::check_constraint_ref(name, t, true) {
+                                return Some(pos);
+                            }
+                        }
+                    }
+                    NarrowingShape::Any => {}
+                }
+                None
+            }
+            Shape::Narrowed(ns) => {
+                // An alternation guards its arms IF there's at least one
+                // arm that doesn't reference the constraint (a base case).
+                match &ns.types {
+                    NarrowingShape::Narrowed(types) => {
+                        let has_base_case = types.iter().any(|t| !Self::shape_contains_ref(name, t));
+                        for t in types {
+                            if let Some(pos) = Self::check_constraint_ref(name, t, guarded || has_base_case) {
+                                return Some(pos);
+                            }
+                        }
+                    }
+                    NarrowingShape::Any => {}
+                }
+                None
+            }
+            // Primitive shapes and others — no recursion concerns
+            _ => None,
+        }
+    }
+
+    /// Returns true if a shape contains any ConstraintRef to `name`.
+    fn shape_contains_ref(name: &Rc<str>, shape: &Shape) -> bool {
+        match shape {
+            Shape::ConstraintRef(pi) => pi.val == *name,
+            Shape::Tuple(pi) => pi.val.iter().any(|(_, s)| Self::shape_contains_ref(name, s)),
+            Shape::List(ns) => match &ns.types {
+                NarrowingShape::Narrowed(types) => types.iter().any(|t| Self::shape_contains_ref(name, t)),
+                NarrowingShape::Any => false,
+            },
+            Shape::Narrowed(ns) => match &ns.types {
+                NarrowingShape::Narrowed(types) => types.iter().any(|t| Self::shape_contains_ref(name, t)),
+                NarrowingShape::Any => false,
+            },
+            _ => false,
+        }
+    }
+
     fn push_shape_or_err(&mut self, shape: Shape) {
         if let Shape::TypeErr(pos, msg) = &shape {
             self.err_stack.push(BuildError::with_pos(
@@ -1415,12 +1497,27 @@ impl Visitor for Checker {
             }
             Statement::Constraint(def) => {
                 let name = def.name.fragment.clone();
+                // Pre-seed symbol table with a ConstraintRef so self-references
+                // in the RHS resolve (enabling recursive constraints).
+                self.symbol_table.insert(
+                    name.clone(),
+                    Shape::ConstraintRef(PositionedItem::new(name.clone(), def.name.pos.clone())),
+                );
                 let shape = def.value.derive_shape(&mut self.symbol_table);
                 if let Shape::TypeErr(pos, msg) = &shape {
                     self.err_stack.push(BuildError::with_pos(
                         msg.clone(),
                         ErrorType::TypeFail,
                         pos.clone(),
+                    ));
+                } else if let Some(pos) = Self::validate_recursive_constraint(&name, &shape) {
+                    self.err_stack.push(BuildError::with_pos(
+                        format!(
+                            "Recursive constraint '{}' is unconstructible: self-reference must appear inside a list or alternation with a base case",
+                            name
+                        ),
+                        ErrorType::TypeFail,
+                        pos,
                     ));
                 } else {
                     self.symbol_table.insert(name.clone(), shape.clone());

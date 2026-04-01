@@ -31,7 +31,22 @@ pub struct ConstraintVal {
 impl ConstraintVal {
     /// Check if a value satisfies this constraint.
     /// Returns true if the value matches any arm.
+    /// Returns true if this constraint contains a self-referential placeholder
+    /// (an embedded empty ConstraintVal). Such constraints are validated
+    /// statically by the typechecker and should be skipped at runtime.
+    pub fn contains_self_ref(&self) -> bool {
+        self.arms.iter().any(|arm| match arm {
+            ConstraintValArm::Exact(val) => val.contains_empty_constraint(),
+            _ => false,
+        })
+    }
+
     pub fn check(&self, val: &Val) -> bool {
+        // An empty constraint (e.g., a self-referential placeholder) matches
+        // anything — the static typechecker has already validated the shape.
+        if self.arms.is_empty() {
+            return true;
+        }
         self.arms.iter().any(|arm| match arm {
             ConstraintValArm::Range(ConstraintBound::Int(min, max)) => {
                 if let Val::Int(v) = val {
@@ -79,6 +94,17 @@ impl Val {
             &Val::Tuple(_) => "Tuple".to_string(),
             &Val::Env(_) => "Env".to_string(),
             &Val::Constraint(_) => "Constraint".to_string(),
+        }
+    }
+
+    /// Returns true if this value contains an empty ConstraintVal anywhere
+    /// in its structure (indicating a self-referential constraint placeholder).
+    pub fn contains_empty_constraint(&self) -> bool {
+        match self {
+            Val::Constraint(cv) => cv.arms.is_empty(),
+            Val::List(items) => items.iter().any(|v| v.contains_empty_constraint()),
+            Val::Tuple(fields) => fields.iter().any(|(_, v)| v.contains_empty_constraint()),
+            _ => false,
         }
     }
 
