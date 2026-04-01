@@ -35,10 +35,8 @@ assert t.ok{
     test = nested_tag.name == "div",
     desc = "recursive constraint accepts two-level nesting",
 };
-// Use intermediate let to avoid chained numeric.field access (pre-existing parser limitation)
-let nested_child = nested_tag.children.1;
 assert t.ok{
-    test = nested_child.name == "span",
+    test = nested_tag.children.1.name == "span",
     desc = "recursive constraint nested child is accessible",
 };
 
@@ -52,10 +50,8 @@ let deep_tree :: xml_node = {
         ]},
     ],
 };
-let body = deep_tree.children.0;
-let para = body.children.0;
 assert t.ok{
-    test = para.name == "p",
+    test = deep_tree.children.0.children.0.name == "p",
     desc = "recursive constraint three levels deep",
 };
 
@@ -77,9 +73,8 @@ let mixed :: xml_node = {
         {name = "i", attrs = {}, children = []},
     ],
 };
-let bold_child = mixed.children.1;
 assert t.ok{
-    test = bold_child.name == "b",
+    test = mixed.children.1.name == "b",
     desc = "recursive constraint with mixed node types",
 };
 
@@ -95,8 +90,7 @@ let menu :: [item] = [
         {label = "Copy", subitems = []},
     ]},
 ];
-let first_menu = menu.0;
 assert t.ok{
-    test = first_menu.label == "File",
+    test = menu.0.label == "File",
     desc = "recursive constraint used in list constraint",
 };

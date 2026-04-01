@@ -283,6 +283,33 @@ fn test_assert_bare_non_tuple_compile_failures() {
 }
 
 #[test]
+fn test_chained_numeric_index_then_field_access() {
+    assert_build(
+        "let l = [{name=\"a\"}, {name=\"b\"}];
+         let x = l.0.name;
+         assert {ok = x == \"a\", desc = \"chained numeric index then field\"};",
+    );
+}
+
+#[test]
+fn test_chained_numeric_index_then_field_access_second_element() {
+    assert_build(
+        "let l = [{name=\"a\"}, {name=\"b\"}];
+         let x = l.1.name;
+         assert {ok = x == \"b\", desc = \"chained index 1 then field\"};",
+    );
+}
+
+#[test]
+fn test_chained_field_then_numeric_index_then_field() {
+    assert_build(
+        "let t = {items = [{label=\"x\"}]};
+         let x = t.items.0.label;
+         assert {ok = x == \"x\", desc = \"field then index then field\"};",
+    );
+}
+
+#[test]
 fn test_import_missing_path_compile_failure() {
     assert_build_failure(
         "import ;",

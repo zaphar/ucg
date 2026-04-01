@@ -1470,3 +1470,19 @@ fn test_recursive_constraint_unconstructible_all_arms_recursive() {
         "constraint a = {foo = a} | {bar = a};"
     );
 }
+
+// --- chained numeric index then field access ---
+
+#[test]
+fn test_chained_numeric_index_then_field() {
+    assert_type_ok!(
+        "let l = [{name=\"a\"}, {name=\"b\"}];\nlet x = l.0.name;"
+    );
+}
+
+#[test]
+fn test_chained_field_numeric_field() {
+    assert_type_ok!(
+        "let t = {items = [{label=\"x\"}]};\nlet x = t.items.0.label;"
+    );
+}

@@ -164,13 +164,6 @@ fn number(input: SliceIter<Token>) -> Result<SliceIter<Token>, Value> {
              )),
              complete!(
                   "Not a float",
-                  do_each!( // 1.
-                      prefix => match_type!(DIGIT),
-                      has_dot => punct!("."),
-                      (Some(prefix.clone()), Some(has_dot.clone()), None)
-             )),
-             complete!(
-                  "Not a float",
                   do_each!( // .1
                       has_dot => punct!("."),
                       suffix => match_type!(DIGIT),
