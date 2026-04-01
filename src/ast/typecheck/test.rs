@@ -795,8 +795,8 @@ fn test_func_narrowing() {
 
 #[test]
 fn test_assert_type_check() {
-    // Assert with boolean should succeed
-    assert_type_success!("assert 1 == 1;", Shape::Boolean(Position::new(1, 8, 7)));
+    // Assert with bare boolean should fail - assert requires {ok=<bool>, desc=<str>}
+    assert_type_err!("assert 1 == 1;");
 }
 
 #[test]
@@ -1206,7 +1206,8 @@ fn test_convert_statement() {
 
 #[test]
 fn test_assert_statement_bool() {
-    assert_type_ok!("assert true;");
+    // Bare boolean is not a valid assert shape - must be {ok=<bool>, desc=<str>}
+    assert_type_err!("assert true;");
 }
 
 #[test]

@@ -273,6 +273,16 @@ fn test_assert_partial_tuple_bad_desc_compile_failures() {
 }
 
 #[test]
+fn test_assert_bare_non_tuple_compile_failures() {
+    assert_build_failure(
+        "assert true;",
+        vec![
+            Regex::new(r"TYPE FAIL - Expected tuple with ok and desc fields got true").unwrap(),
+        ],
+    );
+}
+
+#[test]
 fn test_import_missing_path_compile_failure() {
     assert_build_failure(
         "import ;",

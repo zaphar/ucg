@@ -1429,9 +1429,22 @@ impl Visitor for Checker {
             }
             Statement::Assert(_pos, ref expr) => {
                 let shape = expr.derive_shape(&mut self.symbol_table);
-                // UCG asserts accept either a boolean or a tuple with an `ok` field
-                // e.g., `assert { ok = expr, desc = "..." };`
-                self.push_shape_or_err(shape);
+                // Assert statements require a tuple with shape {ok=<bool>, desc=<str>}
+                let expected = Shape::Tuple(PositionedItem::new(
+                    vec![
+                        (
+                            PositionedItem::new(Rc::from("ok"), _pos.clone()),
+                            Shape::Boolean(_pos.clone()),
+                        ),
+                        (
+                            PositionedItem::new(Rc::from("desc"), _pos.clone()),
+                            Shape::Str(_pos.clone()),
+                        ),
+                    ],
+                    _pos.clone(),
+                ));
+                let narrowed = shape.narrow(&expected, &mut self.symbol_table);
+                self.push_shape_or_err(narrowed);
             }
             Statement::Output(_pos, _tok, ref expr) => {
                 let shape = expr.derive_shape(&mut self.symbol_table);
