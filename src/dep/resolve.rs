@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use semver::{Version, VersionReq};
 
 use super::error::DepError;
-use super::manifest::{DepEntry, Manifest};
+use super::manifest::Manifest;
 use super::registry::TagSource;
 use super::url::normalize_url;
 
