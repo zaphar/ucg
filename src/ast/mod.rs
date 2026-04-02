@@ -359,7 +359,7 @@ pub enum Shape {
     Narrowed(NarrowedShape),       // A narrowed type. We know *some* of the possible options.
     Import(ImportShape),           // A type hole We don't know what this type is yet.
     ConstraintRef(PositionedItem<Rc<str>>), // A reference to a named constraint (for recursive types).
-    TypeErr(Position, String),     // A type hole We don't know what this type is yet.
+    TypeErr(Position, String),              // A type hole We don't know what this type is yet.
 }
 
 impl Shape {

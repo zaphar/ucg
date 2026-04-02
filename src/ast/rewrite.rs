@@ -56,7 +56,9 @@ impl Rewriter {
                 } else {
                     &path_str["vendor/".len()..]
                 };
-                return root.join(&self.vendor_dir).join(rest.replace("/", &main_separator));
+                return root
+                    .join(&self.vendor_dir)
+                    .join(rest.replace("/", &main_separator));
             }
             // No package root: fall through to relative resolution
         }

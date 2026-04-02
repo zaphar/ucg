@@ -500,12 +500,7 @@ fn dep_init(matches: &clap::ArgMatches) -> Result<(), Box<dyn Error>> {
     let manifest_path = cwd.join(dep::MANIFEST_FILE);
 
     if manifest_path.exists() {
-        return Err(format!(
-            "{} already exists in {}",
-            dep::MANIFEST_FILE,
-            cwd.display()
-        )
-        .into());
+        return Err(format!("{} already exists in {}", dep::MANIFEST_FILE, cwd.display()).into());
     }
 
     let vendor = matches.value_of("vendor").unwrap_or("vendor");
@@ -553,11 +548,7 @@ fn dep_add(matches: &clap::ArgMatches) -> Result<(), Box<dyn Error>> {
         let tag_source = dep::registry::RemoteTagSource;
         let versions = tag_source.list_semver_tags(url, repo_type)?;
         if versions.is_empty() {
-            return Err(format!(
-                "dependency {} has no semver tags (v*.*.*)",
-                normalized
-            )
-            .into());
+            return Err(format!("dependency {} has no semver tags (v*.*.*)", normalized).into());
         }
         let mut sorted = versions;
         sorted.sort();
@@ -567,7 +558,9 @@ fn dep_add(matches: &clap::ArgMatches) -> Result<(), Box<dyn Error>> {
 
     // Check if already exists (update case)
     let deps = manifest.deps();
-    let existing_key = deps.keys().find(|k| dep::url::normalize_url(k) == normalized);
+    let existing_key = deps
+        .keys()
+        .find(|k| dep::url::normalize_url(k) == normalized);
     if let Some(existing) = existing_key {
         let old_version = &deps[existing].version;
         println!(
@@ -615,10 +608,9 @@ fn dep_add(matches: &clap::ArgMatches) -> Result<(), Box<dyn Error>> {
 
     // Vendor
     let vendor_dir = cwd.join(manifest.vendor_dir());
-    if let Some(warning) = dep::vendor::check_vendor_dir_warning(
-        &vendor_dir,
-        cwd.join(dep::LOCK_FILE).exists(),
-    ) {
+    if let Some(warning) =
+        dep::vendor::check_vendor_dir_warning(&vendor_dir, cwd.join(dep::LOCK_FILE).exists())
+    {
         eprintln!("Warning: {}", warning);
     }
 
@@ -678,7 +670,12 @@ fn dep_remove(matches: &clap::ArgMatches) -> Result<(), Box<dyn Error>> {
         .cloned();
 
     if key_to_remove.is_none() {
-        return Err(format!("dependency {} not found in {}", normalized, dep::MANIFEST_FILE).into());
+        return Err(format!(
+            "dependency {} not found in {}",
+            normalized,
+            dep::MANIFEST_FILE
+        )
+        .into());
     }
     new_deps.remove(&key_to_remove.unwrap());
     manifest.deps = Some(new_deps);
@@ -821,11 +818,7 @@ fn dep_vendor() -> Result<(), Box<dyn Error>> {
         .into());
     }
     if !lock_path.exists() {
-        return Err(format!(
-            "{} not found. Run `ucg dep lock` first.",
-            dep::LOCK_FILE
-        )
-        .into());
+        return Err(format!("{} not found. Run `ucg dep lock` first.", dep::LOCK_FILE).into());
     }
 
     let manifest_content = std::fs::read_to_string(&manifest_path)?;
@@ -851,7 +844,11 @@ fn dep_vendor() -> Result<(), Box<dyn Error>> {
     dep::vendor::vendor_from_lockfile(&lockfile, &manifest, &vendor_dir, &temp_dir)?;
 
     let _ = std::fs::remove_dir_all(&temp_dir);
-    println!("Vendored {} dependencies to {}", lockfile.package.len(), vendor_dir.display());
+    println!(
+        "Vendored {} dependencies to {}",
+        lockfile.package.len(),
+        vendor_dir.display()
+    );
     Ok(())
 }
 
@@ -864,11 +861,7 @@ fn dep_nix(matches: &clap::ArgMatches) -> Result<(), Box<dyn Error>> {
     let cwd = std::env::current_dir()?;
     let lock_path = cwd.join(dep::LOCK_FILE);
     if !lock_path.exists() {
-        return Err(format!(
-            "{} not found. Run `ucg dep lock` first.",
-            dep::LOCK_FILE
-        )
-        .into());
+        return Err(format!("{} not found. Run `ucg dep lock` first.", dep::LOCK_FILE).into());
     }
 
     let lock_content = std::fs::read_to_string(&lock_path)?;
@@ -932,7 +925,10 @@ impl dep::resolve::ManifestSource for VendorManifestSource {
         normalized_url: &str,
         _version: &semver::Version,
     ) -> Result<Option<dep::manifest::Manifest>, dep::error::DepError> {
-        let manifest_path = self.vendor_dir.join(normalized_url).join(dep::MANIFEST_FILE);
+        let manifest_path = self
+            .vendor_dir
+            .join(normalized_url)
+            .join(dep::MANIFEST_FILE);
         if !manifest_path.exists() {
             return Ok(None);
         }
@@ -1015,11 +1011,8 @@ fn main() {
     for (var, val) in std::env::vars() {
         env_vars.insert(var.into(), val.into());
     }
-    let mut environment = Environment::new_with_vars(
-        StdoutWrapper::new(),
-        StderrWrapper::new(),
-        env_vars,
-    );
+    let mut environment =
+        Environment::new_with_vars(StdoutWrapper::new(), StderrWrapper::new(), env_vars);
     // Detect package root and configure vendor dir
     let cwd = std::env::current_dir().unwrap_or_default();
     if let Some(pkg_root) = dep::find_package_root(&cwd) {

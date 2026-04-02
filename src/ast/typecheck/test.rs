@@ -1355,9 +1355,7 @@ fn test_recursive_constraint_three_levels_deep() {
 #[test]
 fn test_recursive_constraint_mismatch_at_top() {
     // Wrong type at the top level should fail.
-    assert_type_err!(
-        "constraint node = \"\" | {name=\"\", children=[node]};\nlet x :: node = 42;"
-    );
+    assert_type_err!("constraint node = \"\" | {name=\"\", children=[node]};\nlet x :: node = 42;");
 }
 
 #[test]
@@ -1419,70 +1417,52 @@ fn test_recursive_constraint_two_incompatible() {
 #[test]
 fn test_non_recursive_constraint_still_works() {
     // A named constraint that doesn't self-reference should still work as before.
-    assert_type_ok!(
-        "constraint port = in 1..65535;\nlet p :: port = 8080;"
-    );
+    assert_type_ok!("constraint port = in 1..65535;\nlet p :: port = 8080;");
 }
 
 #[test]
 fn test_non_recursive_constraint_rejects_bad_value() {
-    assert_type_err!(
-        "constraint level = \"debug\" | \"info\" | \"warn\";\nlet x :: level = 42;"
-    );
+    assert_type_err!("constraint level = \"debug\" | \"info\" | \"warn\";\nlet x :: level = 42;");
 }
 
 #[test]
 fn test_recursive_constraint_unconstructible_direct_field() {
     // constraint a = {foo = a} is unconstructible — no base case.
-    assert_type_err!(
-        "constraint a = {foo = a};"
-    );
+    assert_type_err!("constraint a = {foo = a};");
 }
 
 #[test]
 fn test_recursive_constraint_unconstructible_nested_field() {
     // Self-reference in a nested tuple field with no list/alternation guard.
-    assert_type_err!(
-        "constraint a = {outer = {inner = a}};"
-    );
+    assert_type_err!("constraint a = {outer = {inner = a}};");
 }
 
 #[test]
 fn test_recursive_constraint_valid_in_list() {
     // Self-reference inside a list is valid (list can be empty).
-    assert_type_ok!(
-        "constraint a = {children = [a]};"
-    );
+    assert_type_ok!("constraint a = {children = [a]};");
 }
 
 #[test]
 fn test_recursive_constraint_valid_in_alternation() {
     // Self-reference as one arm of alternation with a base case is valid.
-    assert_type_ok!(
-        "constraint a = \"\" | {next = a};"
-    );
+    assert_type_ok!("constraint a = \"\" | {next = a};");
 }
 
 #[test]
 fn test_recursive_constraint_unconstructible_all_arms_recursive() {
     // All arms of the alternation reference self — no base case.
-    assert_type_err!(
-        "constraint a = {foo = a} | {bar = a};"
-    );
+    assert_type_err!("constraint a = {foo = a} | {bar = a};");
 }
 
 // --- chained numeric index then field access ---
 
 #[test]
 fn test_chained_numeric_index_then_field() {
-    assert_type_ok!(
-        "let l = [{name=\"a\"}, {name=\"b\"}];\nlet x = l.0.name;"
-    );
+    assert_type_ok!("let l = [{name=\"a\"}, {name=\"b\"}];\nlet x = l.0.name;");
 }
 
 #[test]
 fn test_chained_field_numeric_field() {
-    assert_type_ok!(
-        "let t = {items = [{label=\"x\"}]};\nlet x = t.items.0.label;"
-    );
+    assert_type_ok!("let t = {items = [{label=\"x\"}]};\nlet x = t.items.0.label;");
 }

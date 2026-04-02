@@ -749,9 +749,11 @@ fn find_definition(
                                             range: ucg_pos_to_range(first_pos),
                                         });
                                     }
-                                    if let Some(loc) =
-                                        walk_fields_to_definition(first_shape, &fields[1..], imp_uri)
-                                    {
+                                    if let Some(loc) = walk_fields_to_definition(
+                                        first_shape,
+                                        &fields[1..],
+                                        imp_uri,
+                                    ) {
                                         return Some(loc);
                                     }
                                 }
@@ -772,8 +774,7 @@ fn find_definition(
     }
 
     // Find the token under the cursor (needed for inner_import_map lookup).
-    let tok_pos = token_ref_at(doc, line, character)
-        .map(|tok| (tok.pos.line, tok.pos.column));
+    let tok_pos = token_ref_at(doc, line, character).map(|tok| (tok.pos.line, tok.pos.column));
 
     let name = token_at(doc, line, character)?;
 
