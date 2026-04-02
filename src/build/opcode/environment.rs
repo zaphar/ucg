@@ -47,6 +47,8 @@ where
     pub stderr: Stderr,
     pub env_vars: BTreeMap<Rc<str>, Rc<str>>, // Environment Variables
     pub out_lock: BTreeSet<PathBuf>,
+    pub package_root: Option<PathBuf>,
+    pub vendor_dir: String,
 }
 
 impl<Stdout: Write + Clone, Stderr: Write + Clone> Environment<Stdout, Stderr> {
@@ -67,9 +69,16 @@ impl<Stdout: Write + Clone, Stderr: Write + Clone> Environment<Stdout, Stderr> {
             stdout: out,
             stderr: err,
             out_lock: BTreeSet::new(),
+            package_root: None,
+            vendor_dir: "vendor".to_string(),
         };
         me.populate_stdlib();
         me
+    }
+
+    pub fn set_package_root(&mut self, root: Option<PathBuf>, vendor_dir: &str) {
+        self.package_root = root;
+        self.vendor_dir = vendor_dir.to_string();
     }
 
     pub fn get_env_vars_tuple(&self) -> Value {
@@ -96,6 +105,8 @@ impl<Stdout: Write + Clone, Stderr: Write + Clone> Environment<Stdout, Stderr> {
     {
         let path_copy = path.clone();
         let shape_cache = self.shape_cache.clone();
+        let pkg_root = self.package_root.clone();
+        let vendor_dir = self.vendor_dir.clone();
         self.op_cache.entry(path.clone()).get_pointer_or_else(
             || {
                 let p = path.into();
@@ -127,7 +138,12 @@ impl<Stdout: Write + Clone, Stderr: Write + Clone> Environment<Stdout, Stderr> {
                     ));
                 }
                 // then we create an ops from it
-                let ops = super::translate::AST::translate(stmts, &root);
+                let ops = super::translate::AST::translate_with_pkg_root(
+                    stmts,
+                    &root,
+                    pkg_root,
+                    &vendor_dir,
+                );
                 Ok(ops)
             },
             path_copy,

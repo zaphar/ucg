@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use crate::ast::rewrite::Rewriter;
@@ -81,8 +81,18 @@ impl OpsMap {
 }
 
 impl AST {
-    pub fn translate<P: AsRef<Path>>(mut stmts: Vec<Statement>, root: &P) -> OpsMap {
-        let mut rewriter = Rewriter::new(root.as_ref());
+    pub fn translate<P: AsRef<Path>>(stmts: Vec<Statement>, root: &P) -> OpsMap {
+        Self::translate_with_pkg_root(stmts, root, None, "vendor")
+    }
+
+    pub fn translate_with_pkg_root<P: AsRef<Path>>(
+        mut stmts: Vec<Statement>,
+        root: &P,
+        package_root: Option<PathBuf>,
+        vendor_dir: &str,
+    ) -> OpsMap {
+        let mut rewriter =
+            Rewriter::new(root.as_ref()).with_package_root(package_root, vendor_dir);
         let mut_stmts = stmts.iter_mut().collect();
         rewriter.walk_statement_list(mut_stmts);
         let mut ops = OpsMap::new();

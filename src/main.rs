@@ -233,6 +233,17 @@ fn visit_ucg_files(
     let our_path = String::from(path.to_string_lossy());
     let mut result = true;
     let mut summary = String::new();
+
+    // Determine vendor dir to skip during recursion
+    let vendor_dir_name = {
+        let env_ref = env.borrow();
+        if env_ref.package_root.is_some() {
+            env_ref.vendor_dir.clone()
+        } else {
+            String::new()
+        }
+    };
+
     if path.is_dir() {
         let mut dir_iter = std::fs::read_dir(path)?.peekable();
         loop {
@@ -246,6 +257,14 @@ fn visit_ucg_files(
             let next_path = next_item.path();
             let path_as_string = String::from(next_path.to_string_lossy());
             if next_path.is_dir() && recurse {
+                // Skip vendor directory during recursive traversal
+                if !vendor_dir_name.is_empty() {
+                    if let Some(dir_name) = next_path.file_name() {
+                        if dir_name == vendor_dir_name.as_str() {
+                            continue;
+                        }
+                    }
+                }
                 if let Err(e) =
                     visit_ucg_files(&next_path, recurse, validate, strict, import_paths, env)
                 {
@@ -996,11 +1015,31 @@ fn main() {
     for (var, val) in std::env::vars() {
         env_vars.insert(var.into(), val.into());
     }
-    let env = RefCell::new(Environment::new_with_vars(
+    let mut environment = Environment::new_with_vars(
         StdoutWrapper::new(),
         StderrWrapper::new(),
         env_vars,
-    ));
+    );
+    // Detect package root and configure vendor dir
+    let cwd = std::env::current_dir().unwrap_or_default();
+    if let Some(pkg_root) = dep::find_package_root(&cwd) {
+        let manifest_path = pkg_root.join(dep::MANIFEST_FILE);
+        let vendor_dir = if manifest_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(&manifest_path) {
+                if let Ok(manifest) = dep::manifest::Manifest::from_toml(&content) {
+                    manifest.vendor_dir().to_string()
+                } else {
+                    "vendor".to_string()
+                }
+            } else {
+                "vendor".to_string()
+            }
+        } else {
+            "vendor".to_string()
+        };
+        environment.set_package_root(Some(pkg_root), &vendor_dir);
+    }
+    let env = RefCell::new(environment);
     if let Some(mut p) = dirs::home_dir() {
         p.push(".ucg");
         // Attempt to create directory if it doesn't exist.
