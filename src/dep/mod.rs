@@ -1,6 +1,7 @@
 pub mod error;
 pub mod lockfile;
 pub mod manifest;
+pub mod registry;
 pub mod resolve;
 pub mod url;
 

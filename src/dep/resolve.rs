@@ -1,6 +1,309 @@
+use std::collections::BTreeMap;
+
 use semver::{Version, VersionReq};
 
 use super::error::DepError;
+use super::manifest::{DepEntry, Manifest};
+use super::registry::TagSource;
+use super::url::normalize_url;
+
+/// A resolved dependency with all resolution information.
+#[derive(Debug, Clone)]
+pub struct ResolvedDep {
+    pub normalized_url: String,
+    pub fetch_url: String,
+    pub repo_type: String,
+    pub version: Version,
+}
+
+/// A constraint on a dependency, with provenance.
+#[derive(Debug, Clone)]
+struct Constraint {
+    req: VersionReq,
+    from_package: String,
+    repo_type: String,
+    fetch_url: String,
+}
+
+/// Trait for reading transitive manifests at a specific version.
+/// In real usage this fetches/reads repos; in tests it returns mock manifests.
+pub trait ManifestSource {
+    fn get_manifest(
+        &self,
+        normalized_url: &str,
+        version: &Version,
+    ) -> Result<Option<Manifest>, DepError>;
+}
+
+/// Resolve the full dependency graph using Minimum Version Selection.
+///
+/// Returns a list of resolved dependencies sorted by normalized URL.
+pub fn resolve_mvs(
+    root_manifest: &Manifest,
+    tag_source: &dyn TagSource,
+    manifest_source: &dyn ManifestSource,
+) -> Result<Vec<ResolvedDep>, DepError> {
+    let root_deps = root_manifest.deps();
+    if root_deps.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // Collect all constraints, keyed by normalized URL.
+    // Each entry has a list of (VersionReq, source_package) pairs.
+    let mut all_constraints: BTreeMap<String, Vec<Constraint>> = BTreeMap::new();
+
+    // Seed with root constraints
+    for (url, entry) in &root_deps {
+        let normalized = normalize_url(url);
+        let req = parse_version_constraint(&entry.version)?;
+        all_constraints
+            .entry(normalized.clone())
+            .or_default()
+            .push(Constraint {
+                req,
+                from_package: "root".to_string(),
+                repo_type: entry.repo_type.clone(),
+                fetch_url: url.clone(),
+            });
+    }
+
+    // Fixed-point iteration
+    let mut resolved: BTreeMap<String, ResolvedDep> = BTreeMap::new();
+    let max_iterations = 100;
+
+    for _ in 0..max_iterations {
+        let prev_resolved = resolved.clone();
+
+        // Resolve each dependency
+        for (normalized_url, constraints) in &all_constraints {
+            // Check for conflicting repo types
+            check_repo_type_conflicts(normalized_url, constraints)?;
+
+            // Check for major version conflicts
+            check_major_version_conflicts(normalized_url, constraints)?;
+
+            // Intersect all constraints
+            let combined = intersect_constraints(constraints)?;
+
+            // Get available versions
+            let repo_type = &constraints[0].repo_type;
+            let fetch_url = select_fetch_url(constraints);
+            let versions = tag_source.list_semver_tags(&fetch_url, repo_type)?;
+
+            if versions.is_empty() {
+                return Err(DepError::ParseError(format!(
+                    "dependency {} has no semver tags (v*.*.*) -- the package must have at least one semver version tag to be used as a dependency",
+                    normalized_url
+                )));
+            }
+
+            // MVS: pick minimum satisfying version
+            let version = find_minimum_satisfying(&combined, &versions).ok_or_else(|| {
+                let constraint_desc: Vec<String> = constraints
+                    .iter()
+                    .map(|c| format!("{} from {}", c.req, c.from_package))
+                    .collect();
+                DepError::ParseError(format!(
+                    "dependency {}: no version satisfies all constraints ({})",
+                    normalized_url,
+                    constraint_desc.join("; ")
+                ))
+            })?;
+
+            resolved.insert(
+                normalized_url.clone(),
+                ResolvedDep {
+                    normalized_url: normalized_url.clone(),
+                    fetch_url: fetch_url.clone(),
+                    repo_type: repo_type.clone(),
+                    version,
+                },
+            );
+        }
+
+        // Collect transitive dependencies
+        let mut new_constraints: BTreeMap<String, Vec<Constraint>> = all_constraints.clone();
+
+        for (normalized_url, dep) in &resolved {
+            collect_transitive(
+                normalized_url,
+                dep,
+                manifest_source,
+                &mut new_constraints,
+                &mut vec![], // ancestor chain for cycle detection
+            )?;
+        }
+
+        // Check if we've reached a fixed point
+        if new_constraints == all_constraints && resolved == prev_resolved {
+            break;
+        }
+        all_constraints = new_constraints;
+    }
+
+    let mut result: Vec<ResolvedDep> = resolved.into_values().collect();
+    result.sort_by(|a, b| a.normalized_url.cmp(&b.normalized_url));
+    Ok(result)
+}
+
+fn collect_transitive(
+    normalized_url: &str,
+    dep: &ResolvedDep,
+    manifest_source: &dyn ManifestSource,
+    constraints: &mut BTreeMap<String, Vec<Constraint>>,
+    ancestors: &mut Vec<String>,
+) -> Result<(), DepError> {
+    // Circular dependency check: if this URL is already in our ancestor chain
+    if ancestors.contains(&normalized_url.to_string()) {
+        ancestors.push(normalized_url.to_string());
+        return Err(DepError::ParseError(format!(
+            "circular dependency detected: {}",
+            ancestors.join(" -> ")
+        )));
+    }
+
+    let manifest = manifest_source.get_manifest(normalized_url, &dep.version)?;
+    let manifest = match manifest {
+        Some(m) => m,
+        None => return Ok(()), // Leaf node
+    };
+
+    ancestors.push(normalized_url.to_string());
+
+    for (url, entry) in manifest.deps() {
+        let trans_normalized = normalize_url(&url);
+        let req = parse_version_constraint(&entry.version)?;
+
+        // Add constraint if not already present from this source
+        let entry_constraints = constraints.entry(trans_normalized.clone()).or_default();
+        let already_has = entry_constraints
+            .iter()
+            .any(|c| c.from_package == normalized_url && c.req.to_string() == req.to_string());
+
+        if !already_has {
+            entry_constraints.push(Constraint {
+                req,
+                from_package: normalized_url.to_string(),
+                repo_type: entry.repo_type.clone(),
+                fetch_url: url.clone(),
+            });
+        }
+
+        // Recursively collect transitive deps
+        // We need a placeholder ResolvedDep to recurse; version doesn't matter
+        // for manifest lookup in mock, and real resolution will re-resolve anyway
+        let placeholder = ResolvedDep {
+            normalized_url: trans_normalized.clone(),
+            fetch_url: url.clone(),
+            repo_type: entry.repo_type.clone(),
+            version: semver::Version::new(0, 0, 0), // placeholder
+        };
+        collect_transitive(
+            &trans_normalized,
+            &placeholder,
+            manifest_source,
+            constraints,
+            ancestors,
+        )?;
+    }
+
+    ancestors.pop();
+    Ok(())
+}
+
+fn check_repo_type_conflicts(
+    normalized_url: &str,
+    constraints: &[Constraint],
+) -> Result<(), DepError> {
+    let first_type = &constraints[0].repo_type;
+    for c in &constraints[1..] {
+        if c.repo_type != *first_type {
+            return Err(DepError::ConflictingRepoTypes {
+                url: normalized_url.to_string(),
+                type1: format!("{} from {}", first_type, constraints[0].from_package),
+                type2: format!("{} from {}", c.repo_type, c.from_package),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn check_major_version_conflicts(
+    normalized_url: &str,
+    constraints: &[Constraint],
+) -> Result<(), DepError> {
+    let mut major_versions: Vec<(u64, &str)> = Vec::new();
+    for c in constraints {
+        if let Some(major) = extract_major_version(&c.req) {
+            if let Some((existing_major, _)) = major_versions.first() {
+                if major != *existing_major {
+                    return Err(DepError::MajorVersionConflict {
+                        url: normalized_url.to_string(),
+                        major1: *existing_major,
+                        major2: major,
+                    });
+                }
+            }
+            major_versions.push((major, &c.from_package));
+        }
+    }
+    Ok(())
+}
+
+fn intersect_constraints(constraints: &[Constraint]) -> Result<VersionReq, DepError> {
+    // Build a combined VersionReq by joining all constraint strings with commas
+    let combined_str: Vec<String> = constraints.iter().map(|c| c.req.to_string()).collect();
+    let joined = combined_str.join(", ");
+    parse_version_constraint(&joined)
+}
+
+/// Select the best fetch URL from constraints.
+/// Prefers SSH URLs, then root package's URL.
+fn select_fetch_url(constraints: &[Constraint]) -> String {
+    use super::url::is_ssh_url;
+
+    // Prefer SSH from root
+    for c in constraints {
+        if c.from_package == "root" && is_ssh_url(&c.fetch_url) {
+            return c.fetch_url.clone();
+        }
+    }
+    // Then any SSH
+    for c in constraints {
+        if is_ssh_url(&c.fetch_url) {
+            return c.fetch_url.clone();
+        }
+    }
+    // Then root's URL
+    for c in constraints {
+        if c.from_package == "root" {
+            return c.fetch_url.clone();
+        }
+    }
+    // Fallback to first
+    constraints[0].fetch_url.clone()
+}
+
+impl PartialEq for Constraint {
+    fn eq(&self, other: &Self) -> bool {
+        self.req.to_string() == other.req.to_string()
+            && self.from_package == other.from_package
+            && self.repo_type == other.repo_type
+            && self.fetch_url == other.fetch_url
+    }
+}
+
+impl Eq for Constraint {}
+
+impl PartialEq for ResolvedDep {
+    fn eq(&self, other: &Self) -> bool {
+        self.normalized_url == other.normalized_url
+            && self.version == other.version
+            && self.repo_type == other.repo_type
+    }
+}
+
+impl Eq for ResolvedDep {}
 
 /// Parse a version constraint string into a semver VersionReq.
 pub fn parse_version_constraint(s: &str) -> Result<VersionReq, DepError> {
@@ -59,6 +362,236 @@ pub fn filter_semver_tags(tags: &[String]) -> Vec<Version> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::registry::MockTagSource;
+
+    struct MockManifestSource {
+        manifests: std::collections::HashMap<String, Manifest>,
+    }
+
+    impl MockManifestSource {
+        fn new() -> Self {
+            Self {
+                manifests: std::collections::HashMap::new(),
+            }
+        }
+
+        fn add_manifest(&mut self, normalized_url: &str, manifest: Manifest) {
+            self.manifests.insert(normalized_url.to_string(), manifest);
+        }
+    }
+
+    impl ManifestSource for MockManifestSource {
+        fn get_manifest(
+            &self,
+            normalized_url: &str,
+            _version: &Version,
+        ) -> Result<Option<Manifest>, DepError> {
+            Ok(self.manifests.get(normalized_url).cloned())
+        }
+    }
+
+    impl Clone for Manifest {
+        fn clone(&self) -> Self {
+            let toml = self.to_toml().unwrap();
+            Manifest::from_toml(&toml).unwrap()
+        }
+    }
+
+    fn make_manifest(deps: &[(&str, &str, &str)]) -> Manifest {
+        let mut toml = String::from("[deps]\n");
+        for (url, version, repo_type) in deps {
+            toml.push_str(&format!(
+                "\"{}\" = {{ version = \"{}\", type = \"{}\" }}\n",
+                url, version, repo_type
+            ));
+        }
+        Manifest::from_toml(&toml).unwrap()
+    }
+
+    #[test]
+    fn resolve_single_dep() {
+        let root = make_manifest(&[("https://github.com/org/lib", ">= 1.0.0", "git")]);
+        let mut tags = MockTagSource::new();
+        tags.add_tags(
+            "github.com/org/lib",
+            vec![Version::new(1, 0, 0), Version::new(1, 1, 0), Version::new(2, 0, 0)],
+        );
+        let manifests = MockManifestSource::new();
+
+        let resolved = resolve_mvs(&root, &tags, &manifests).unwrap();
+        assert_eq!(resolved.len(), 1);
+        assert_eq!(resolved[0].version, Version::new(1, 0, 0));
+    }
+
+    #[test]
+    fn resolve_diamond_dependency() {
+        // Root -> B (>= 1.0.0), C (>= 1.0.0)
+        // B -> D (>= 1.1.0)
+        // C -> D (>= 1.2.0)
+        // Should resolve D to 1.2.0 (minimum satisfying both)
+        let root = make_manifest(&[
+            ("https://github.com/org/b", ">= 1.0.0", "git"),
+            ("https://github.com/org/c", ">= 1.0.0", "git"),
+        ]);
+
+        let b_manifest = make_manifest(&[("https://github.com/org/d", ">= 1.1.0", "git")]);
+        let c_manifest = make_manifest(&[("https://github.com/org/d", ">= 1.2.0", "git")]);
+
+        let mut tags = MockTagSource::new();
+        tags.add_tags("github.com/org/b", vec![Version::new(1, 0, 0)]);
+        tags.add_tags("github.com/org/c", vec![Version::new(1, 0, 0)]);
+        tags.add_tags(
+            "github.com/org/d",
+            vec![Version::new(1, 0, 0), Version::new(1, 1, 0), Version::new(1, 2, 0), Version::new(1, 3, 0)],
+        );
+
+        let mut manifests = MockManifestSource::new();
+        manifests.add_manifest("github.com/org/b", b_manifest);
+        manifests.add_manifest("github.com/org/c", c_manifest);
+
+        let resolved = resolve_mvs(&root, &tags, &manifests).unwrap();
+        assert_eq!(resolved.len(), 3); // b, c, d
+        let d = resolved.iter().find(|r| r.normalized_url == "github.com/org/d").unwrap();
+        assert_eq!(d.version, Version::new(1, 2, 0));
+    }
+
+    #[test]
+    fn resolve_no_tags_error() {
+        let root = make_manifest(&[("https://github.com/org/lib", ">= 1.0.0", "git")]);
+        let tags = MockTagSource::new(); // No tags
+        let manifests = MockManifestSource::new();
+
+        let err = resolve_mvs(&root, &tags, &manifests).unwrap_err();
+        assert!(err.to_string().contains("no semver tags"));
+    }
+
+    #[test]
+    fn resolve_conflict_error() {
+        // Root requires >= 2.0.0, but only 1.x available
+        let root = make_manifest(&[("https://github.com/org/lib", ">= 2.0.0", "git")]);
+        let mut tags = MockTagSource::new();
+        tags.add_tags("github.com/org/lib", vec![Version::new(1, 0, 0), Version::new(1, 5, 0)]);
+        let manifests = MockManifestSource::new();
+
+        let err = resolve_mvs(&root, &tags, &manifests).unwrap_err();
+        assert!(err.to_string().contains("no version satisfies"));
+    }
+
+    #[test]
+    fn resolve_major_version_conflict() {
+        // Root -> lib >= 1.0.0
+        // Transitive dep -> lib >= 2.0.0
+        let root = make_manifest(&[
+            ("https://github.com/org/lib", ">= 1.0.0", "git"),
+            ("https://github.com/org/other", ">= 1.0.0", "git"),
+        ]);
+
+        let other_manifest = make_manifest(&[("https://github.com/org/lib", ">= 2.0.0", "git")]);
+
+        let mut tags = MockTagSource::new();
+        tags.add_tags(
+            "github.com/org/lib",
+            vec![Version::new(1, 0, 0), Version::new(2, 0, 0)],
+        );
+        tags.add_tags("github.com/org/other", vec![Version::new(1, 0, 0)]);
+
+        let mut manifests = MockManifestSource::new();
+        manifests.add_manifest("github.com/org/other", other_manifest);
+
+        let err = resolve_mvs(&root, &tags, &manifests).unwrap_err();
+        assert!(err.to_string().contains("major version conflict") || err.to_string().contains("major version"));
+    }
+
+    #[test]
+    fn resolve_circular_dependency_error() {
+        // A -> B -> A (cycle)
+        let root = make_manifest(&[("https://github.com/org/a", ">= 1.0.0", "git")]);
+        let a_manifest = make_manifest(&[("https://github.com/org/b", ">= 1.0.0", "git")]);
+        let b_manifest = make_manifest(&[("https://github.com/org/a", ">= 1.0.0", "git")]);
+
+        let mut tags = MockTagSource::new();
+        tags.add_tags("github.com/org/a", vec![Version::new(1, 0, 0)]);
+        tags.add_tags("github.com/org/b", vec![Version::new(1, 0, 0)]);
+
+        let mut manifests = MockManifestSource::new();
+        manifests.add_manifest("github.com/org/a", a_manifest);
+        manifests.add_manifest("github.com/org/b", b_manifest);
+
+        let err = resolve_mvs(&root, &tags, &manifests).unwrap_err();
+        assert!(err.to_string().contains("circular dependency"));
+    }
+
+    #[test]
+    fn resolve_leaf_node_no_manifest() {
+        let root = make_manifest(&[("https://github.com/org/leaf", ">= 1.0.0", "git")]);
+        let mut tags = MockTagSource::new();
+        tags.add_tags("github.com/org/leaf", vec![Version::new(1, 0, 0)]);
+        let manifests = MockManifestSource::new(); // No manifest = leaf
+
+        let resolved = resolve_mvs(&root, &tags, &manifests).unwrap();
+        assert_eq!(resolved.len(), 1);
+        assert_eq!(resolved[0].version, Version::new(1, 0, 0));
+    }
+
+    #[test]
+    fn resolve_same_dep_different_url_forms() {
+        // Two deps via different URL forms that normalize to the same thing
+        let root = make_manifest(&[
+            ("https://github.com/org/lib.git", ">= 1.0.0", "git"),
+            ("https://github.com/org/other", ">= 1.0.0", "git"),
+        ]);
+
+        let other_manifest = make_manifest(&[
+            ("git@github.com:org/lib.git", ">= 1.1.0", "git"),
+        ]);
+
+        let mut tags = MockTagSource::new();
+        tags.add_tags(
+            "github.com/org/lib",
+            vec![Version::new(1, 0, 0), Version::new(1, 1, 0), Version::new(1, 2, 0)],
+        );
+        tags.add_tags("github.com/org/other", vec![Version::new(1, 0, 0)]);
+
+        let mut manifests = MockManifestSource::new();
+        manifests.add_manifest("github.com/org/other", other_manifest);
+
+        let resolved = resolve_mvs(&root, &tags, &manifests).unwrap();
+        let lib = resolved.iter().find(|r| r.normalized_url == "github.com/org/lib").unwrap();
+        // Should pick 1.1.0 (minimum satisfying both >= 1.0.0 and >= 1.1.0)
+        assert_eq!(lib.version, Version::new(1, 1, 0));
+    }
+
+    #[test]
+    fn resolve_conflicting_repo_types() {
+        let root = make_manifest(&[
+            ("https://github.com/org/lib", ">= 1.0.0", "git"),
+            ("https://github.com/org/other", ">= 1.0.0", "git"),
+        ]);
+
+        let other_manifest = make_manifest(&[
+            ("https://github.com/org/lib", ">= 1.0.0", "hg"),
+        ]);
+
+        let mut tags = MockTagSource::new();
+        tags.add_tags("github.com/org/lib", vec![Version::new(1, 0, 0)]);
+        tags.add_tags("github.com/org/other", vec![Version::new(1, 0, 0)]);
+
+        let mut manifests = MockManifestSource::new();
+        manifests.add_manifest("github.com/org/other", other_manifest);
+
+        let err = resolve_mvs(&root, &tags, &manifests).unwrap_err();
+        assert!(err.to_string().contains("conflicting") || err.to_string().contains("Conflicting"));
+    }
+
+    #[test]
+    fn resolve_empty_deps() {
+        let root = make_manifest(&[]);
+        let tags = MockTagSource::new();
+        let manifests = MockManifestSource::new();
+
+        let resolved = resolve_mvs(&root, &tags, &manifests).unwrap();
+        assert!(resolved.is_empty());
+    }
 
     #[test]
     fn parse_gte_constraint() {
