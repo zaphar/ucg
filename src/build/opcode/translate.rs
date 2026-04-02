@@ -91,8 +91,7 @@ impl AST {
         package_root: Option<PathBuf>,
         vendor_dir: &str,
     ) -> OpsMap {
-        let mut rewriter =
-            Rewriter::new(root.as_ref()).with_package_root(package_root, vendor_dir);
+        let mut rewriter = Rewriter::new(root.as_ref()).with_package_root(package_root, vendor_dir);
         let mut_stmts = stmts.iter_mut().collect();
         rewriter.walk_statement_list(mut_stmts);
         let mut ops = OpsMap::new();

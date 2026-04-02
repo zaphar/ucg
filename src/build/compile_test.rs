@@ -276,9 +276,7 @@ fn test_assert_partial_tuple_bad_desc_compile_failures() {
 fn test_assert_bare_non_tuple_compile_failures() {
     assert_build_failure(
         "assert true;",
-        vec![
-            Regex::new(r"TYPE FAIL - Expected tuple with ok and desc fields got true").unwrap(),
-        ],
+        vec![Regex::new(r"TYPE FAIL - Expected tuple with ok and desc fields got true").unwrap()],
     );
 }
 

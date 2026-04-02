@@ -35,10 +35,7 @@ pub fn nar_hash(dir: &Path) -> Result<String, DepError> {
 ///
 /// The vendor_dir is used to compute NAR hashes if nix is available.
 /// If nix is not available, falls back to the lockfile's sha256 hashes.
-pub fn generate_nix_expression(
-    lockfile: &Lockfile,
-    vendor_dir: &Path,
-) -> Result<String, DepError> {
+pub fn generate_nix_expression(lockfile: &Lockfile, vendor_dir: &Path) -> Result<String, DepError> {
     let mut packages: Vec<NixPackage> = Vec::new();
 
     for pkg in &lockfile.package {

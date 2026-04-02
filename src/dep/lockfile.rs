@@ -47,7 +47,10 @@ impl Lockfile {
         // Check each manifest dep has a matching lockfile entry
         for (url, entry) in &deps {
             let normalized = normalize_url(url);
-            let locked = self.package.iter().find(|p| normalize_url(p.url()) == normalized);
+            let locked = self
+                .package
+                .iter()
+                .find(|p| normalize_url(p.url()) == normalized);
 
             match locked {
                 None => {
@@ -82,10 +85,7 @@ impl Lockfile {
 impl LockedPackage {
     /// Returns the URL for this locked package.
     pub fn url(&self) -> &str {
-        self.git
-            .as_deref()
-            .or(self.hg.as_deref())
-            .unwrap_or("")
+        self.git.as_deref().or(self.hg.as_deref()).unwrap_or("")
     }
 
     /// Returns the repository type ("git" or "hg").
@@ -157,9 +157,7 @@ sha256 = "sha256-def456"
 
     #[test]
     fn staleness_missing_dep() {
-        let lockfile = Lockfile {
-            package: vec![],
-        };
+        let lockfile = Lockfile { package: vec![] };
         let manifest_toml = r#"
 [deps]
 "https://github.com/org/lib" = { version = ">= 1.0.0", type = "git" }

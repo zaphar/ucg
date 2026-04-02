@@ -1254,9 +1254,12 @@ impl Checker {
                 // arm that doesn't reference the constraint (a base case).
                 match &ns.types {
                     NarrowingShape::Narrowed(types) => {
-                        let has_base_case = types.iter().any(|t| !Self::shape_contains_ref(name, t));
+                        let has_base_case =
+                            types.iter().any(|t| !Self::shape_contains_ref(name, t));
                         for t in types {
-                            if let Some(pos) = Self::check_constraint_ref(name, t, guarded || has_base_case) {
+                            if let Some(pos) =
+                                Self::check_constraint_ref(name, t, guarded || has_base_case)
+                            {
                                 return Some(pos);
                             }
                         }
@@ -1274,13 +1277,20 @@ impl Checker {
     fn shape_contains_ref(name: &Rc<str>, shape: &Shape) -> bool {
         match shape {
             Shape::ConstraintRef(pi) => pi.val == *name,
-            Shape::Tuple(pi) => pi.val.iter().any(|(_, s)| Self::shape_contains_ref(name, s)),
+            Shape::Tuple(pi) => pi
+                .val
+                .iter()
+                .any(|(_, s)| Self::shape_contains_ref(name, s)),
             Shape::List(ns) => match &ns.types {
-                NarrowingShape::Narrowed(types) => types.iter().any(|t| Self::shape_contains_ref(name, t)),
+                NarrowingShape::Narrowed(types) => {
+                    types.iter().any(|t| Self::shape_contains_ref(name, t))
+                }
                 NarrowingShape::Any => false,
             },
             Shape::Narrowed(ns) => match &ns.types {
-                NarrowingShape::Narrowed(types) => types.iter().any(|t| Self::shape_contains_ref(name, t)),
+                NarrowingShape::Narrowed(types) => {
+                    types.iter().any(|t| Self::shape_contains_ref(name, t))
+                }
                 NarrowingShape::Any => false,
             },
             _ => false,

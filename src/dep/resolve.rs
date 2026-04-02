@@ -329,7 +329,9 @@ pub fn extract_major_version(req: &VersionReq) -> Option<u64> {
     // We find the first digit sequence that represents a version.
     let s = req.to_string();
     for part in s.split(',') {
-        let trimmed = part.trim().trim_start_matches(|c: char| !c.is_ascii_digit());
+        let trimmed = part
+            .trim()
+            .trim_start_matches(|c: char| !c.is_ascii_digit());
         if let Some(dot_pos) = trimmed.find('.') {
             if let Ok(major) = trimmed[..dot_pos].parse::<u64>() {
                 return Some(major);
@@ -361,8 +363,8 @@ pub fn filter_semver_tags(tags: &[String]) -> Vec<Version> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::registry::MockTagSource;
+    use super::*;
 
     struct MockManifestSource {
         manifests: std::collections::HashMap<String, Manifest>,
@@ -414,7 +416,11 @@ mod tests {
         let mut tags = MockTagSource::new();
         tags.add_tags(
             "github.com/org/lib",
-            vec![Version::new(1, 0, 0), Version::new(1, 1, 0), Version::new(2, 0, 0)],
+            vec![
+                Version::new(1, 0, 0),
+                Version::new(1, 1, 0),
+                Version::new(2, 0, 0),
+            ],
         );
         let manifests = MockManifestSource::new();
 
@@ -442,7 +448,12 @@ mod tests {
         tags.add_tags("github.com/org/c", vec![Version::new(1, 0, 0)]);
         tags.add_tags(
             "github.com/org/d",
-            vec![Version::new(1, 0, 0), Version::new(1, 1, 0), Version::new(1, 2, 0), Version::new(1, 3, 0)],
+            vec![
+                Version::new(1, 0, 0),
+                Version::new(1, 1, 0),
+                Version::new(1, 2, 0),
+                Version::new(1, 3, 0),
+            ],
         );
 
         let mut manifests = MockManifestSource::new();
@@ -451,7 +462,10 @@ mod tests {
 
         let resolved = resolve_mvs(&root, &tags, &manifests).unwrap();
         assert_eq!(resolved.len(), 3); // b, c, d
-        let d = resolved.iter().find(|r| r.normalized_url == "github.com/org/d").unwrap();
+        let d = resolved
+            .iter()
+            .find(|r| r.normalized_url == "github.com/org/d")
+            .unwrap();
         assert_eq!(d.version, Version::new(1, 2, 0));
     }
 
@@ -470,7 +484,10 @@ mod tests {
         // Root requires >= 2.0.0, but only 1.x available
         let root = make_manifest(&[("https://github.com/org/lib", ">= 2.0.0", "git")]);
         let mut tags = MockTagSource::new();
-        tags.add_tags("github.com/org/lib", vec![Version::new(1, 0, 0), Version::new(1, 5, 0)]);
+        tags.add_tags(
+            "github.com/org/lib",
+            vec![Version::new(1, 0, 0), Version::new(1, 5, 0)],
+        );
         let manifests = MockManifestSource::new();
 
         let err = resolve_mvs(&root, &tags, &manifests).unwrap_err();
@@ -499,7 +516,10 @@ mod tests {
         manifests.add_manifest("github.com/org/other", other_manifest);
 
         let err = resolve_mvs(&root, &tags, &manifests).unwrap_err();
-        assert!(err.to_string().contains("major version conflict") || err.to_string().contains("major version"));
+        assert!(
+            err.to_string().contains("major version conflict")
+                || err.to_string().contains("major version")
+        );
     }
 
     #[test]
@@ -541,14 +561,16 @@ mod tests {
             ("https://github.com/org/other", ">= 1.0.0", "git"),
         ]);
 
-        let other_manifest = make_manifest(&[
-            ("git@github.com:org/lib.git", ">= 1.1.0", "git"),
-        ]);
+        let other_manifest = make_manifest(&[("git@github.com:org/lib.git", ">= 1.1.0", "git")]);
 
         let mut tags = MockTagSource::new();
         tags.add_tags(
             "github.com/org/lib",
-            vec![Version::new(1, 0, 0), Version::new(1, 1, 0), Version::new(1, 2, 0)],
+            vec![
+                Version::new(1, 0, 0),
+                Version::new(1, 1, 0),
+                Version::new(1, 2, 0),
+            ],
         );
         tags.add_tags("github.com/org/other", vec![Version::new(1, 0, 0)]);
 
@@ -556,7 +578,10 @@ mod tests {
         manifests.add_manifest("github.com/org/other", other_manifest);
 
         let resolved = resolve_mvs(&root, &tags, &manifests).unwrap();
-        let lib = resolved.iter().find(|r| r.normalized_url == "github.com/org/lib").unwrap();
+        let lib = resolved
+            .iter()
+            .find(|r| r.normalized_url == "github.com/org/lib")
+            .unwrap();
         // Should pick 1.1.0 (minimum satisfying both >= 1.0.0 and >= 1.1.0)
         assert_eq!(lib.version, Version::new(1, 1, 0));
     }
@@ -568,9 +593,7 @@ mod tests {
             ("https://github.com/org/other", ">= 1.0.0", "git"),
         ]);
 
-        let other_manifest = make_manifest(&[
-            ("https://github.com/org/lib", ">= 1.0.0", "hg"),
-        ]);
+        let other_manifest = make_manifest(&[("https://github.com/org/lib", ">= 1.0.0", "hg")]);
 
         let mut tags = MockTagSource::new();
         tags.add_tags("github.com/org/lib", vec![Version::new(1, 0, 0)]);

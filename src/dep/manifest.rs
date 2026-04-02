@@ -84,10 +84,7 @@ impl Manifest {
     }
 
     pub fn nix_enabled(&self) -> bool {
-        self.package
-            .as_ref()
-            .and_then(|p| p.nix)
-            .unwrap_or(false)
+        self.package.as_ref().and_then(|p| p.nix).unwrap_or(false)
     }
 
     pub fn deps(&self) -> BTreeMap<String, DepEntry> {

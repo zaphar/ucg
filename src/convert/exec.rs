@@ -136,6 +136,8 @@ impl ExecConverter {
                     // We only allow string fields in our env tuple.
                     if let Val::Str(s) = v.as_ref() {
                         writeln!(script, "{}=\"{}\"", name, convert::shell_escape_double_quoted(s))?;
+                    if let &Val::Str(ref s) = v.as_ref() {
+                        write!(script, "{}=\"{}\"\n", name, convert::shell_escape_double_quoted(s))?;
                         continue;
                     }
                     return Err(BuildError::new(
@@ -148,7 +150,11 @@ impl ExecConverter {
             writeln!(script)?;
             let flag_converter = convert::flags::FlagConverter::new();
             // 4. Then construct our command line. (be sure to use exec)
-            write!(script, "exec '{}' ", convert::shell_escape_single_quoted(command.unwrap()))?;
+            write!(
+                script,
+                "exec '{}' ",
+                convert::shell_escape_single_quoted(command.unwrap())
+            )?;
             if let Some(arg_list) = args {
                 for v in arg_list.iter() {
                     // We only allow tuples or strings in our args list.

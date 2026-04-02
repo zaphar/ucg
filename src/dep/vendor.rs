@@ -572,11 +572,7 @@ mod tests {
         fs::create_dir_all(dir.join("deps/some/dep")).unwrap();
         fs::write(dir.join("deps/some/dep/file.ucg"), "content").unwrap();
         fs::write(dir.join("lib.ucg"), "main content").unwrap();
-        fs::write(
-            dir.join("ucg-deps"),
-            "[package]\nvendor = \"deps\"\n",
-        )
-        .unwrap();
+        fs::write(dir.join("ucg-deps"), "[package]\nvendor = \"deps\"\n").unwrap();
 
         strip_dep_vendor_dir(&dir).unwrap();
 

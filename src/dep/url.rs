@@ -224,16 +224,16 @@ mod tests {
         ];
         let normalized: Vec<String> = urls.iter().map(|u| normalize_url(u)).collect();
         for n in &normalized {
-            assert_eq!(n, &normalized[0], "all forms should normalize to the same value");
+            assert_eq!(
+                n, &normalized[0],
+                "all forms should normalize to the same value"
+            );
         }
     }
 
     #[test]
     fn nix_identifier_derivation() {
-        assert_eq!(
-            nix_identifier("github.com/org/lib"),
-            "github_com_org_lib"
-        );
+        assert_eq!(nix_identifier("github.com/org/lib"), "github_com_org_lib");
     }
 
     #[test]
