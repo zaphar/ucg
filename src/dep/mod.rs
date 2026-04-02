@@ -4,6 +4,7 @@ pub mod manifest;
 pub mod registry;
 pub mod resolve;
 pub mod url;
+pub mod vendor;
 
 use std::path::{Path, PathBuf};
 
