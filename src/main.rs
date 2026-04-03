@@ -507,9 +507,7 @@ fn dep_init(matches: &clap::ArgMatches) -> Result<(), Box<dyn Error>> {
     let nix = matches.is_present("nix");
 
     let mut content = String::from("[package]\n");
-    if vendor != "vendor" {
-        content.push_str(&format!("vendor = \"{}\"\n", vendor));
-    }
+    content.push_str(&format!("vendor = \"{}\"\n", vendor));
     if nix {
         content.push_str("nix = true\n");
     }
