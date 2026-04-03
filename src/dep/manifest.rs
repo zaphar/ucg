@@ -4,15 +4,15 @@ use serde::{Deserialize, Serialize};
 
 use super::error::DepError;
 use super::resolve::parse_version_constraint;
-use super::url::normalize_url;
+use super::url::{normalize_url, validate_remote_url};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Manifest {
     pub package: Option<PackageInfo>,
     pub deps: Option<BTreeMap<String, DepEntry>>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PackageInfo {
     pub vendor: Option<String>,
     pub nix: Option<bool>,
@@ -53,6 +53,9 @@ impl Manifest {
             let mut seen_normalized: BTreeMap<String, String> = BTreeMap::new();
 
             for (url, entry) in deps {
+                // Validate URL is remote
+                validate_remote_url(url)?;
+
                 // Validate repo type
                 if entry.repo_type != "git" && entry.repo_type != "hg" {
                     return Err(DepError::InvalidRepoType(entry.repo_type.clone()));
@@ -218,5 +221,27 @@ vendor = "deps"
     fn valid_manifest_passes_validation() {
         let manifest = Manifest::from_toml(VALID_MANIFEST).unwrap();
         manifest.validate().unwrap();
+    }
+
+    #[test]
+    fn local_path_rejected() {
+        let toml = r#"
+[deps]
+"/home/user/my-lib" = { version = ">= 1.0.0", type = "git" }
+"#;
+        let manifest = Manifest::from_toml(toml).unwrap();
+        let err = manifest.validate().unwrap_err();
+        assert!(err.to_string().contains("local filesystem"));
+    }
+
+    #[test]
+    fn file_url_rejected() {
+        let toml = r#"
+[deps]
+"file:///home/user/my-lib" = { version = ">= 1.0.0", type = "git" }
+"#;
+        let manifest = Manifest::from_toml(toml).unwrap();
+        let err = manifest.validate().unwrap_err();
+        assert!(err.to_string().contains("local file URL"));
     }
 }

@@ -392,13 +392,6 @@ mod tests {
         }
     }
 
-    impl Clone for Manifest {
-        fn clone(&self) -> Self {
-            let toml = self.to_toml().unwrap();
-            Manifest::from_toml(&toml).unwrap()
-        }
-    }
-
     fn make_manifest(deps: &[(&str, &str, &str)]) -> Manifest {
         let mut toml = String::from("[deps]\n");
         for (url, version, repo_type) in deps {

@@ -121,6 +121,51 @@ pub fn nix_identifier(normalized: &str) -> String {
         .collect()
 }
 
+/// Validate that a URL is a remote repository URL, not a local path.
+///
+/// Returns Ok(()) for valid remote URLs (https://, http://, ssh://, git@host:path).
+/// Returns Err for local paths (file://, absolute paths, relative paths).
+pub fn validate_remote_url(raw: &str) -> Result<(), super::error::DepError> {
+    // Reject file:// scheme
+    if raw.starts_with("file://") {
+        return Err(super::error::DepError::ParseError(format!(
+            "local file URLs are not supported as dependencies: '{}'. \
+             Use relative imports for local files.",
+            raw
+        )));
+    }
+
+    // Reject absolute paths
+    if raw.starts_with('/') || (raw.len() >= 2 && raw.as_bytes()[1] == b':') {
+        return Err(super::error::DepError::ParseError(format!(
+            "local filesystem paths are not supported as dependencies: '{}'. \
+             Use relative imports for local files.",
+            raw
+        )));
+    }
+
+    // Reject relative paths (no scheme, no @, contains only path-like chars)
+    if !raw.contains("://") && !raw.contains('@') && !raw.contains('.') {
+        return Err(super::error::DepError::ParseError(format!(
+            "dependency URL '{}' does not look like a remote repository URL. \
+             URLs must use https://, ssh://, or git@ syntax.",
+            raw
+        )));
+    }
+
+    // Must contain a dot in the host portion (e.g., github.com)
+    // This catches paths like "../foo" or "./bar"
+    if raw.starts_with('.') {
+        return Err(super::error::DepError::ParseError(format!(
+            "local filesystem paths are not supported as dependencies: '{}'. \
+             Use relative imports for local files.",
+            raw
+        )));
+    }
+
+    Ok(())
+}
+
 /// Check if the original (non-normalized) URL uses SSH syntax.
 ///
 /// Returns true for:
@@ -270,5 +315,44 @@ mod tests {
             vendor_path("github.com/org/lib"),
             PathBuf::from("github.com/org/lib")
         );
+    }
+
+    #[test]
+    fn validate_remote_url_https() {
+        assert!(validate_remote_url("https://github.com/org/lib").is_ok());
+    }
+
+    #[test]
+    fn validate_remote_url_ssh_colon() {
+        assert!(validate_remote_url("git@github.com:org/lib.git").is_ok());
+    }
+
+    #[test]
+    fn validate_remote_url_ssh_scheme() {
+        assert!(validate_remote_url("ssh://git@github.com/org/lib").is_ok());
+    }
+
+    #[test]
+    fn validate_remote_url_rejects_file_scheme() {
+        let err = validate_remote_url("file:///home/user/repo").unwrap_err();
+        assert!(err.to_string().contains("local file URLs"));
+    }
+
+    #[test]
+    fn validate_remote_url_rejects_absolute_path() {
+        let err = validate_remote_url("/home/user/repo").unwrap_err();
+        assert!(err.to_string().contains("local filesystem paths"));
+    }
+
+    #[test]
+    fn validate_remote_url_rejects_relative_path() {
+        let err = validate_remote_url("../repos/my-lib").unwrap_err();
+        assert!(err.to_string().contains("local filesystem paths"));
+    }
+
+    #[test]
+    fn validate_remote_url_rejects_dot_relative() {
+        let err = validate_remote_url("./local-lib").unwrap_err();
+        assert!(err.to_string().contains("local filesystem paths"));
     }
 }

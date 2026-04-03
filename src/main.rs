@@ -30,7 +30,7 @@ use ucglib::build;
 use ucglib::build::opcode::Environment;
 use ucglib::convert::{ConverterRegistry, ImporterRegistry};
 use ucglib::dep;
-use ucglib::dep::registry::TagSource;
+use ucglib::dep::registry::{RemoteFetcher, RepoFetcher, TagSource};
 use ucglib::iter::OffsetStrIter;
 use ucglib::parse::parse;
 
@@ -611,7 +611,9 @@ fn dep_add(matches: &clap::ArgMatches) -> Result<(), Box<dyn Error>> {
         eprintln!("Warning: {}", warning);
     }
 
-    let locked_packages = dep::vendor::vendor_resolved(&resolved, &vendor_dir, &temp_dir)?;
+    let fetcher = RemoteFetcher;
+    let locked_packages =
+        dep::vendor::vendor_resolved(&resolved, &vendor_dir, &temp_dir, &fetcher)?;
 
     // Write lockfile
     let mut lockfile = dep::lockfile::Lockfile {
@@ -700,7 +702,9 @@ fn dep_remove(matches: &clap::ArgMatches) -> Result<(), Box<dyn Error>> {
     std::fs::create_dir_all(&temp_dir)?;
 
     let vendor_dir = cwd.join(manifest.vendor_dir());
-    let locked_packages = dep::vendor::vendor_resolved(&resolved, &vendor_dir, &temp_dir)?;
+    let fetcher = RemoteFetcher;
+    let locked_packages =
+        dep::vendor::vendor_resolved(&resolved, &vendor_dir, &temp_dir, &fetcher)?;
 
     // Write lockfile
     let mut lockfile = dep::lockfile::Lockfile {
@@ -751,6 +755,7 @@ fn dep_lock() -> Result<(), Box<dyn Error>> {
     }
     std::fs::create_dir_all(&temp_dir)?;
 
+    let fetcher = RemoteFetcher;
     let mut locked_packages = Vec::new();
     for dep_entry in &resolved {
         let tag = format!("v{}", dep_entry.version);
@@ -760,8 +765,7 @@ fn dep_lock() -> Result<(), Box<dyn Error>> {
         }
         std::fs::create_dir_all(dep_temp.parent().unwrap_or(&temp_dir))?;
 
-        let commit =
-            dep::vendor::fetch_repo(&dep_entry.fetch_url, &dep_entry.repo_type, &tag, &dep_temp)?;
+        let commit = fetcher.fetch(&dep_entry.fetch_url, &dep_entry.repo_type, &tag, &dep_temp)?;
         dep::vendor::strip_dep_vendor_dir(&dep_temp)?;
         let sha256 = dep::vendor::hash_directory(&dep_temp)?;
 
@@ -838,7 +842,8 @@ fn dep_vendor() -> Result<(), Box<dyn Error>> {
     }
     std::fs::create_dir_all(&temp_dir)?;
 
-    dep::vendor::vendor_from_lockfile(&lockfile, &manifest, &vendor_dir, &temp_dir)?;
+    let fetcher = RemoteFetcher;
+    dep::vendor::vendor_from_lockfile(&lockfile, &manifest, &vendor_dir, &temp_dir, &fetcher)?;
 
     let _ = std::fs::remove_dir_all(&temp_dir);
     println!(

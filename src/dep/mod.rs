@@ -188,3 +188,336 @@ mod tests {
         assert_eq!(result, PathBuf::from("/project/src/utils.ucg"));
     }
 }
+
+/// Integration tests using mock fetcher and tag source.
+/// These test the full pipeline without network access.
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+    use crate::dep::lockfile::Lockfile;
+    use crate::dep::manifest::Manifest;
+    use crate::dep::registry::{MockFetcher, MockTagSource};
+    use crate::dep::resolve::{resolve_mvs, ManifestSource, ResolvedDep};
+    use crate::dep::vendor;
+    use semver::Version;
+    use std::fs;
+
+    struct MockManifestSource {
+        manifests: std::collections::HashMap<String, Manifest>,
+    }
+
+    impl MockManifestSource {
+        fn new() -> Self {
+            Self {
+                manifests: std::collections::HashMap::new(),
+            }
+        }
+
+        fn add_manifest(&mut self, normalized_url: &str, manifest: Manifest) {
+            self.manifests.insert(normalized_url.to_string(), manifest);
+        }
+    }
+
+    impl ManifestSource for MockManifestSource {
+        fn get_manifest(
+            &self,
+            normalized_url: &str,
+            _version: &Version,
+        ) -> Result<Option<Manifest>, error::DepError> {
+            Ok(self.manifests.get(normalized_url).cloned())
+        }
+    }
+
+    fn make_manifest(deps: &[(&str, &str, &str)]) -> Manifest {
+        let mut toml = String::from("[deps]\n");
+        for (url, version, repo_type) in deps {
+            toml.push_str(&format!(
+                "\"{}\" = {{ version = \"{}\", type = \"{}\" }}\n",
+                url, version, repo_type
+            ));
+        }
+        Manifest::from_toml(&toml).unwrap()
+    }
+
+    /// Helper: set up a full project directory, resolve, vendor, and return
+    /// the project root path and lockfile.
+    fn full_pipeline(
+        test_name: &str,
+        manifest: &Manifest,
+        tags: &MockTagSource,
+        manifests: &MockManifestSource,
+        fetcher: &MockFetcher,
+    ) -> (PathBuf, Lockfile) {
+        let root = std::env::temp_dir().join(format!("ucg_integ_{}", test_name));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+
+        // Write manifest
+        fs::write(root.join(MANIFEST_FILE), manifest.to_toml().unwrap()).unwrap();
+
+        let vendor_dir = root.join(manifest.vendor_dir());
+        let temp_dir = root.join(".ucg_tmp");
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        let resolved = resolve_mvs(manifest, tags, manifests).unwrap();
+        let locked_packages =
+            vendor::vendor_resolved(&resolved, &vendor_dir, &temp_dir, fetcher).unwrap();
+
+        let mut lockfile = Lockfile {
+            package: locked_packages,
+        };
+        lockfile.sort();
+        fs::write(root.join(LOCK_FILE), lockfile.to_toml().unwrap()).unwrap();
+
+        let _ = fs::remove_dir_all(&temp_dir);
+        (root, lockfile)
+    }
+
+    #[test]
+    fn pipeline_single_dep() {
+        let manifest = make_manifest(&[("https://github.com/org/lib", ">= 1.0.0", "git")]);
+
+        let mut tags = MockTagSource::new();
+        tags.add_tags("github.com/org/lib", vec![Version::new(1, 0, 0)]);
+
+        let manifests = MockManifestSource::new();
+
+        let mut fetcher = MockFetcher::new();
+        fetcher.add_repo(
+            "github.com/org/lib",
+            "abc123",
+            vec![("lib.ucg", "let x = 1;")],
+        );
+
+        let (root, lockfile) = full_pipeline("single_dep", &manifest, &tags, &manifests, &fetcher);
+
+        // Verify vendor directory
+        assert!(root.join("vendor/github.com/org/lib/lib.ucg").exists());
+        assert_eq!(
+            fs::read_to_string(root.join("vendor/github.com/org/lib/lib.ucg")).unwrap(),
+            "let x = 1;"
+        );
+
+        // Verify lockfile
+        assert_eq!(lockfile.package.len(), 1);
+        assert_eq!(lockfile.package[0].version, "1.0.0");
+        assert_eq!(lockfile.package[0].commit, "abc123");
+        assert!(lockfile.package[0].sha256.starts_with("sha256-"));
+
+        // Verify lockfile on disk
+        let lock_content = fs::read_to_string(root.join(LOCK_FILE)).unwrap();
+        let parsed_lock = Lockfile::from_toml(&lock_content).unwrap();
+        assert_eq!(parsed_lock.package.len(), 1);
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn pipeline_transitive_deps() {
+        // root -> A (>= 1.0.0), A -> B (>= 1.0.0)
+        let manifest = make_manifest(&[("https://github.com/org/a", ">= 1.0.0", "git")]);
+
+        let a_manifest = make_manifest(&[("https://github.com/org/b", ">= 1.0.0", "git")]);
+
+        let mut tags = MockTagSource::new();
+        tags.add_tags("github.com/org/a", vec![Version::new(1, 0, 0)]);
+        tags.add_tags("github.com/org/b", vec![Version::new(1, 0, 0)]);
+
+        let mut manifests = MockManifestSource::new();
+        manifests.add_manifest("github.com/org/a", a_manifest);
+
+        let mut fetcher = MockFetcher::new();
+        fetcher.add_repo("github.com/org/a", "aaa111", vec![("a.ucg", "let a = 1;")]);
+        fetcher.add_repo("github.com/org/b", "bbb222", vec![("b.ucg", "let b = 2;")]);
+
+        let (root, lockfile) = full_pipeline("transitive", &manifest, &tags, &manifests, &fetcher);
+
+        // Both deps should be vendored
+        assert!(root.join("vendor/github.com/org/a/a.ucg").exists());
+        assert!(root.join("vendor/github.com/org/b/b.ucg").exists());
+        assert_eq!(lockfile.package.len(), 2);
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn pipeline_lockfile_staleness_detected() {
+        let manifest = make_manifest(&[("https://github.com/org/lib", ">= 1.0.0", "git")]);
+
+        let mut tags = MockTagSource::new();
+        tags.add_tags("github.com/org/lib", vec![Version::new(1, 0, 0)]);
+
+        let manifests = MockManifestSource::new();
+
+        let mut fetcher = MockFetcher::new();
+        fetcher.add_repo(
+            "github.com/org/lib",
+            "abc123",
+            vec![("lib.ucg", "let x = 1;")],
+        );
+
+        let (root, lockfile) = full_pipeline("staleness", &manifest, &tags, &manifests, &fetcher);
+
+        // Now change the manifest to require a different dep
+        let new_manifest = make_manifest(&[("https://github.com/org/other", ">= 1.0.0", "git")]);
+
+        // Lockfile should be stale
+        let err = lockfile.is_stale(&new_manifest).unwrap_err();
+        assert!(err.to_string().contains("not found"));
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn pipeline_vendor_directory_structure() {
+        let manifest = make_manifest(&[
+            ("https://github.com/org/lib", ">= 1.0.0", "git"),
+            ("https://github.com/other/tool", ">= 2.0.0", "git"),
+        ]);
+
+        let mut tags = MockTagSource::new();
+        tags.add_tags("github.com/org/lib", vec![Version::new(1, 0, 0)]);
+        tags.add_tags("github.com/other/tool", vec![Version::new(2, 0, 0)]);
+
+        let manifests = MockManifestSource::new();
+
+        let mut fetcher = MockFetcher::new();
+        fetcher.add_repo(
+            "github.com/org/lib",
+            "aaa",
+            vec![("lib.ucg", "let x = 1;"), ("sub/helper.ucg", "let h = 2;")],
+        );
+        fetcher.add_repo(
+            "github.com/other/tool",
+            "bbb",
+            vec![("tool.ucg", "let t = 3;")],
+        );
+
+        let (root, _) = full_pipeline("vendor_structure", &manifest, &tags, &manifests, &fetcher);
+
+        // Verify normalized URL becomes vendor directory path
+        assert!(root.join("vendor/github.com/org/lib/lib.ucg").exists());
+        assert!(root
+            .join("vendor/github.com/org/lib/sub/helper.ucg")
+            .exists());
+        assert!(root.join("vendor/github.com/other/tool/tool.ucg").exists());
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn pipeline_hash_consistency() {
+        let manifest = make_manifest(&[("https://github.com/org/lib", ">= 1.0.0", "git")]);
+
+        let mut tags = MockTagSource::new();
+        tags.add_tags("github.com/org/lib", vec![Version::new(1, 0, 0)]);
+
+        let manifests = MockManifestSource::new();
+
+        let mut fetcher = MockFetcher::new();
+        fetcher.add_repo(
+            "github.com/org/lib",
+            "abc123",
+            vec![("lib.ucg", "let x = 1;")],
+        );
+
+        let (root, lockfile) =
+            full_pipeline("hash_consistency", &manifest, &tags, &manifests, &fetcher);
+
+        // Hash of vendored directory should match lockfile
+        let vendor_path = root.join("vendor/github.com/org/lib");
+        let actual_hash = vendor::hash_directory(&vendor_path).unwrap();
+        assert_eq!(actual_hash, lockfile.package[0].sha256);
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn pipeline_dep_vendor_dir_stripped() {
+        let manifest = make_manifest(&[("https://github.com/org/lib", ">= 1.0.0", "git")]);
+
+        let mut tags = MockTagSource::new();
+        tags.add_tags("github.com/org/lib", vec![Version::new(1, 0, 0)]);
+
+        let manifests = MockManifestSource::new();
+
+        let mut fetcher = MockFetcher::new();
+        fetcher.add_repo(
+            "github.com/org/lib",
+            "abc123",
+            vec![
+                ("lib.ucg", "let x = 1;"),
+                ("ucg-deps", "[package]\nvendor = \"vendor\"\n"),
+                ("vendor/some/dep/file.ucg", "let y = 2;"),
+            ],
+        );
+
+        let (root, _) = full_pipeline("strip_vendor", &manifest, &tags, &manifests, &fetcher);
+
+        // The dep's own vendor directory should have been stripped
+        assert!(root.join("vendor/github.com/org/lib/lib.ucg").exists());
+        assert!(root.join("vendor/github.com/org/lib/ucg-deps").exists());
+        assert!(!root.join("vendor/github.com/org/lib/vendor").exists());
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn pipeline_empty_deps() {
+        let manifest = make_manifest(&[]);
+        let tags = MockTagSource::new();
+        let manifests = MockManifestSource::new();
+        let fetcher = MockFetcher::new();
+
+        let (root, lockfile) = full_pipeline("empty_deps", &manifest, &tags, &manifests, &fetcher);
+
+        assert!(lockfile.package.is_empty());
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn pipeline_mvs_picks_minimum() {
+        // Root requires >= 1.0.0, versions 1.0.0 and 1.5.0 available
+        // MVS should pick 1.0.0
+        let manifest = make_manifest(&[("https://github.com/org/lib", ">= 1.0.0", "git")]);
+
+        let mut tags = MockTagSource::new();
+        tags.add_tags(
+            "github.com/org/lib",
+            vec![Version::new(1, 0, 0), Version::new(1, 5, 0)],
+        );
+
+        let manifests = MockManifestSource::new();
+
+        let mut fetcher = MockFetcher::new();
+        fetcher.add_repo("github.com/org/lib", "abc", vec![("lib.ucg", "let x = 1;")]);
+
+        let (root, lockfile) = full_pipeline("mvs_minimum", &manifest, &tags, &manifests, &fetcher);
+
+        assert_eq!(lockfile.package[0].version, "1.0.0");
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn pipeline_url_normalization_flows_to_vendor_path() {
+        // Use SSH URL - should normalize to github.com/org/lib for vendor path
+        let manifest = make_manifest(&[("git@github.com:org/lib.git", ">= 1.0.0", "git")]);
+
+        let mut tags = MockTagSource::new();
+        tags.add_tags("github.com/org/lib", vec![Version::new(1, 0, 0)]);
+
+        let manifests = MockManifestSource::new();
+
+        let mut fetcher = MockFetcher::new();
+        fetcher.add_repo("github.com/org/lib", "abc", vec![("lib.ucg", "let x = 1;")]);
+
+        let (root, _) = full_pipeline("url_normalization", &manifest, &tags, &manifests, &fetcher);
+
+        // Vendor path should use normalized URL, not original SSH URL
+        assert!(root.join("vendor/github.com/org/lib/lib.ucg").exists());
+
+        let _ = fs::remove_dir_all(&root);
+    }
+}
