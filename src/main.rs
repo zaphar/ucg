@@ -511,7 +511,6 @@ fn dep_init(matches: &clap::ArgMatches) -> Result<(), Box<dyn Error>> {
     if nix {
         content.push_str("nix = true\n");
     }
-    content.push_str("\n[deps]\n");
 
     std::fs::write(&manifest_path, &content)?;
     println!("Created {}", manifest_path.display());
