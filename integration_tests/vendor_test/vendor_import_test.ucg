@@ -1,0 +1,22 @@
+// Test that vendor/ prefix imports resolve correctly against the package root.
+let lib = import "vendor/example.com/org/lib/lib.ucg";
+
+assert {
+    ok = lib.name == "shared-lib",
+    desc = "vendor import resolves name field",
+};
+
+assert {
+    ok = lib.version == 1,
+    desc = "vendor import resolves version field",
+};
+
+assert {
+    ok = lib.config.host == "localhost",
+    desc = "vendor import resolves nested tuple field",
+};
+
+assert {
+    ok = lib.config.port == 8080,
+    desc = "vendor import resolves nested tuple port field",
+};

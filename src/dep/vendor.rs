@@ -1,6 +1,5 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
@@ -8,95 +7,9 @@ use walkdir::WalkDir;
 use super::error::DepError;
 use super::lockfile::{LockedPackage, Lockfile};
 use super::manifest::Manifest;
+use super::registry::RepoFetcher;
 use super::resolve::ResolvedDep;
 use super::url::normalize_url;
-
-/// Fetch a repository at a specific tag into a temp directory.
-///
-/// Returns the path to the temp directory and the commit hash.
-pub fn fetch_repo(
-    fetch_url: &str,
-    repo_type: &str,
-    tag: &str,
-    temp_dir: &Path,
-) -> Result<String, DepError> {
-    match repo_type {
-        "git" => fetch_git(fetch_url, tag, temp_dir),
-        "hg" => fetch_hg(fetch_url, tag, temp_dir),
-        _ => Err(DepError::InvalidRepoType(repo_type.to_string())),
-    }
-}
-
-fn fetch_git(url: &str, tag: &str, dest: &Path) -> Result<String, DepError> {
-    // Shallow clone at the specific tag
-    let output = Command::new("git")
-        .args([
-            "clone",
-            "--depth",
-            "1",
-            "--branch",
-            tag,
-            url,
-            &dest.to_string_lossy(),
-        ])
-        .output()
-        .map_err(|e| DepError::IoError(e))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(DepError::ParseError(format!(
-            "git clone failed for '{}' at tag '{}': {}",
-            url, tag, stderr
-        )));
-    }
-
-    // Get the commit hash
-    let output = Command::new("git")
-        .args(["-C", &dest.to_string_lossy(), "rev-parse", "HEAD"])
-        .output()
-        .map_err(|e| DepError::IoError(e))?;
-
-    let commit = String::from_utf8_lossy(&output.stdout).trim().to_string();
-
-    // Remove .git directory
-    let git_dir = dest.join(".git");
-    if git_dir.exists() {
-        fs::remove_dir_all(&git_dir)?;
-    }
-
-    Ok(commit)
-}
-
-fn fetch_hg(url: &str, tag: &str, dest: &Path) -> Result<String, DepError> {
-    let output = Command::new("hg")
-        .args(["clone", "-r", tag, url, &dest.to_string_lossy()])
-        .output()
-        .map_err(|e| DepError::IoError(e))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(DepError::ParseError(format!(
-            "hg clone failed for '{}' at tag '{}': {}",
-            url, tag, stderr
-        )));
-    }
-
-    // Get the commit hash
-    let output = Command::new("hg")
-        .args(["-R", &dest.to_string_lossy(), "id", "-i", "--debug"])
-        .output()
-        .map_err(|e| DepError::IoError(e))?;
-
-    let commit = String::from_utf8_lossy(&output.stdout).trim().to_string();
-
-    // Remove .hg directory
-    let hg_dir = dest.join(".hg");
-    if hg_dir.exists() {
-        fs::remove_dir_all(&hg_dir)?;
-    }
-
-    Ok(commit)
-}
 
 /// Strip the dependency's own vendor directory from a fetched tree.
 ///
@@ -193,6 +106,7 @@ pub fn vendor_resolved(
     resolved: &[ResolvedDep],
     vendor_dir: &Path,
     temp_base: &Path,
+    fetcher: &dyn RepoFetcher,
 ) -> Result<Vec<LockedPackage>, DepError> {
     let mut locked_packages: Vec<LockedPackage> = Vec::new();
     let mut staged: Vec<(PathBuf, PathBuf)> = Vec::new(); // (temp_dir, final_dir)
@@ -206,7 +120,7 @@ pub fn vendor_resolved(
         }
         fs::create_dir_all(temp_dir.parent().unwrap_or(temp_base))?;
 
-        let commit = fetch_repo(&dep.fetch_url, &dep.repo_type, &tag, &temp_dir)?;
+        let commit = fetcher.fetch(&dep.fetch_url, &dep.repo_type, &tag, &temp_dir)?;
 
         // Strip the dep's own vendor directory
         strip_dep_vendor_dir(&temp_dir)?;
@@ -259,6 +173,7 @@ pub fn vendor_from_lockfile(
     manifest: &Manifest,
     vendor_dir: &Path,
     temp_base: &Path,
+    fetcher: &dyn RepoFetcher,
 ) -> Result<(), DepError> {
     let mut staged: Vec<(PathBuf, PathBuf)> = Vec::new();
 
@@ -282,7 +197,7 @@ pub fn vendor_from_lockfile(
         }
         fs::create_dir_all(temp_dir.parent().unwrap_or(temp_base))?;
 
-        let commit = fetch_repo(pkg.url(), pkg.repo_type(), &tag, &temp_dir)?;
+        let commit = fetcher.fetch(pkg.url(), pkg.repo_type(), &tag, &temp_dir)?;
 
         // Strip dep's own vendor dir
         strip_dep_vendor_dir(&temp_dir)?;
