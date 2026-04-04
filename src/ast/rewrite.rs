@@ -30,13 +30,13 @@ impl Visitor for Rewriter {
     fn visit_expression(&mut self, expr: &mut Expression) {
         // Rewrite all paths except for stdlib paths to absolute.
         let main_separator = format!("{}", std::path::MAIN_SEPARATOR);
-        if let Expression::Include(ref mut def) = expr {
+        if let Expression::Include(def) = expr {
             let path = PathBuf::from(def.path.fragment.as_ref());
             if path.is_relative() {
                 def.path.fragment = self.base.join(path).to_string_lossy().to_string().into();
             }
         }
-        if let Expression::Import(ref mut def) = expr {
+        if let Expression::Import(def) = expr {
             let path = PathBuf::from(
                 &def.path
                     .fragment

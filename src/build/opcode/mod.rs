@@ -215,9 +215,9 @@ impl PartialEq for Value {
                 if left.len() != right.len() {
                     return false;
                 }
-                for (ref lk, ref lv) in left.iter() {
+                for (lk, lv) in left.iter() {
                     let mut found = false;
-                    for (ref rk, ref rv) in right.iter() {
+                    for (rk, rv) in right.iter() {
                         if lk == rk {
                             found = true;
                             if lv != rv {

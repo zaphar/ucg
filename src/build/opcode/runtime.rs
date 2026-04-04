@@ -324,7 +324,7 @@ impl Builtins {
             if let Some((c_type_val, c_type_pos)) = c_type {
                 if let &Value::P(Primitive::Str(ref c_type)) = c_type_val.as_ref() {
                     let stdout = env.borrow().stdout();
-                    if let Some(c) = env.borrow().converter_registry.get_converter(c_type) {
+                    match env.borrow().converter_registry.get_converter(c_type) { Some(c) => {
                         let mut writer: Box<dyn std::io::Write> = match write_path {
                             Some(p) => {
                                 let p = p.with_extension(c.file_ext());
@@ -336,12 +336,12 @@ impl Builtins {
                             return Err(Error::new(format!("{}", e).into(), pos.clone()));
                         }
                         return Ok(());
-                    } else {
+                    } _ => {
                         return Err(Error::new(
                             format!("No such conversion type {:?}", c_type).into(),
                             c_type_pos,
                         ));
-                    }
+                    }}
                 }
                 return Err(Error::new(
                     format!("Not a conversion type {:?}", c_type_val).into(),
@@ -447,7 +447,7 @@ impl Builtins {
                 let mut new_fields = Vec::new();
                 let mut new_flds_pos_list = Vec::new();
                 let mut counter = 0;
-                for (ref name, ref val) in flds {
+                for (name, val) in flds {
                     let name_pos = flds_pos_list[counter].0.clone();
                     let val_pos = flds_pos_list[counter].1.clone();
                     stack.push((Rc::new(P(Str(name.clone()))), name_pos));
@@ -566,7 +566,7 @@ impl Builtins {
                 let mut new_fields = Vec::new();
                 let mut new_flds_pos_list = Vec::new();
                 let mut counter = 0;
-                for (ref name, ref val) in flds {
+                for (name, val) in flds {
                     let name_pos = pos_list[counter].0.clone();
                     let val_pos = pos_list[counter].1.clone();
                     stack.push((Rc::new(P(Str(name.clone()))), name_pos.clone()));
@@ -705,7 +705,7 @@ impl Builtins {
             }
             &C(Tuple(ref _flds, ref flds_pos_list)) => {
                 let mut counter = 0;
-                for (ref name, ref val) in _flds.iter() {
+                for (name, val) in _flds.iter() {
                     let name_pos = flds_pos_list[counter].0.clone();
                     let val_pos = flds_pos_list[counter].1.clone();
                     // push function arguments on the stack.

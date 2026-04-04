@@ -29,14 +29,14 @@ impl fmt::Debug for Value {
             P(Float(v)) => write!(w, "Float({})", v),
             P(Str(v)) => write!(w, "String({})", v),
             P(Empty) => write!(w, "NULL"),
-            C(List(ref els, _)) => {
+            C(List(els, _)) => {
                 write!(w, "List[")?;
                 for e in els {
                     write!(w, "{:?},", e)?;
                 }
                 write!(w, "]")
             }
-            C(Tuple(ref flds, _)) => {
+            C(Tuple(flds, _)) => {
                 write!(w, "Tuple(")?;
                 for (k, v) in flds {
                     write!(w, "\"{}\"={:?},", k, v)?;

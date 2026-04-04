@@ -167,7 +167,7 @@ where
         if has_fields {
             write!(self.w, "\n")?;
         }
-        for (ref t, ref constraint, ref expr) in def.iter() {
+        for (t, constraint, expr) in def.iter() {
             let field_line = t.pos.line;
             let expr_line = expr.pos().line;
             self.render_comment_if_needed(field_line)?;
@@ -356,7 +356,7 @@ where
             Expression::Func(_def) => {
                 self.w.write("func (".as_bytes())?;
                 if _def.argdefs.len() == 1 {
-                    let (ref arg, ref constraint) = _def.argdefs.first().unwrap();
+                    let (arg, constraint) = _def.argdefs.first().unwrap();
                     write!(self.w, "{}", arg)?;
                     if let Some(c) = constraint {
                         write!(self.w, " :: ")?;
@@ -364,7 +364,7 @@ where
                     }
                 } else {
                     let mut prefix = "";
-                    for (ref n, ref constraint) in _def.argdefs.iter() {
+                    for (n, constraint) in _def.argdefs.iter() {
                         write!(self.w, "{}{}", prefix, n.val)?;
                         if let Some(c) = constraint {
                             write!(self.w, " :: ")?;
@@ -452,7 +452,7 @@ where
                     write!(self.w, ")")?;
                 }
             },
-            Expression::Grouped(ref expr, _) => {
+            Expression::Grouped(expr, _) => {
                 write!(self.w, "(")?;
                 if self.has_comment(expr.pos().line) {
                     self.curr_indent += self.indent_size;
@@ -554,16 +554,16 @@ where
                 write!(self.w, ") => ")?;
                 self.render_tuple_def(&_def.tuple)?;
             }
-            Expression::Simple(ref _def) => {
+            Expression::Simple(_def) => {
                 self.render_value(_def)?;
             }
-            Expression::Constraint(ref def) => {
+            Expression::Constraint(def) => {
                 for (i, arm) in def.arms.iter().enumerate() {
                     if i > 0 {
                         write!(self.w, " | ")?;
                     }
                     match arm {
-                        crate::ast::ConstraintArm::Range(ref rdef) => {
+                        crate::ast::ConstraintArm::Range(rdef) => {
                             write!(self.w, "in ")?;
                             if let Some(ref start) = rdef.start {
                                 self.render_expr(start)?;
@@ -573,7 +573,7 @@ where
                                 self.render_expr(end)?;
                             }
                         }
-                        crate::ast::ConstraintArm::Shape(ref expr) => {
+                        crate::ast::ConstraintArm::Shape(expr) => {
                             self.render_expr(expr)?;
                         }
                     }

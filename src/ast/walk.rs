@@ -60,19 +60,19 @@ pub trait Walker: Visitor {
     fn walk_statement(&mut self, stmt: &mut Statement) {
         self.visit_statement(stmt);
         match stmt {
-            Statement::Let(ref mut def) => {
+            Statement::Let(def) => {
                 self.walk_expression(&mut def.value);
             }
-            Statement::Constraint(ref mut def) => {
+            Statement::Constraint(def) => {
                 self.walk_expression(&mut def.value);
             }
-            Statement::Expression(ref mut expr) => {
+            Statement::Expression(expr) => {
                 self.walk_expression(expr);
             }
-            Statement::Assert(_, ref mut expr) => {
+            Statement::Assert(_, expr) => {
                 self.walk_expression(expr);
             }
-            Statement::Output(_, _, ref mut expr) => {
+            Statement::Output(_, _, expr) => {
                 self.walk_expression(expr);
             }
         }
@@ -80,7 +80,7 @@ pub trait Walker: Visitor {
     }
 
     fn walk_fieldset(&mut self, fs: &mut FieldList) {
-        for (_, _constraint, ref mut expr) in fs.iter_mut() {
+        for (_, _constraint, expr) in fs.iter_mut() {
             self.walk_expression(expr);
         }
     }
@@ -88,18 +88,18 @@ pub trait Walker: Visitor {
     fn walk_expression(&mut self, expr: &mut Expression) {
         self.visit_expression(expr);
         match expr {
-            Expression::Call(ref mut def) => {
+            Expression::Call(def) => {
                 for expr in def.arglist.iter_mut() {
                     self.walk_expression(expr);
                 }
             }
-            Expression::Cast(ref mut def) => {
+            Expression::Cast(def) => {
                 self.walk_expression(&mut def.target);
             }
-            Expression::Copy(ref mut def) => {
+            Expression::Copy(def) => {
                 self.walk_fieldset(&mut def.fields);
             }
-            Expression::Format(ref mut def) => match def.args {
+            Expression::Format(def) => match def.args {
                 FormatArgs::List(ref mut args) => {
                     for expr in args.iter_mut() {
                         self.walk_expression(expr);
@@ -109,40 +109,40 @@ pub trait Walker: Visitor {
                     self.walk_expression(expr);
                 }
             },
-            Expression::FuncOp(ref mut def) => match def {
-                FuncOpDef::Reduce(ref mut def) => {
+            Expression::FuncOp(def) => match def {
+                FuncOpDef::Reduce(def) => {
                     self.walk_expression(def.target.as_mut());
                     self.walk_expression(def.acc.as_mut())
                 }
-                FuncOpDef::Map(ref mut def) => {
+                FuncOpDef::Map(def) => {
                     self.walk_expression(def.target.as_mut());
                 }
-                FuncOpDef::Filter(ref mut def) => {
+                FuncOpDef::Filter(def) => {
                     self.walk_expression(def.target.as_mut());
                 }
             },
-            Expression::Binary(ref mut def) => {
+            Expression::Binary(def) => {
                 self.walk_expression(def.left.as_mut());
                 self.walk_expression(def.right.as_mut());
             }
-            Expression::Grouped(ref mut expr, _) => {
+            Expression::Grouped(expr, _) => {
                 self.walk_expression(expr);
             }
-            Expression::Func(ref mut def) => self.walk_expression(def.fields.as_mut()),
-            Expression::Module(ref mut def) => {
+            Expression::Func(def) => self.walk_expression(def.fields.as_mut()),
+            Expression::Module(def) => {
                 self.walk_fieldset(&mut def.arg_set);
                 for stmt in def.statements.iter_mut() {
                     self.walk_statement(stmt);
                 }
             }
-            Expression::Range(ref mut def) => {
+            Expression::Range(def) => {
                 self.walk_expression(def.start.as_mut());
                 self.walk_expression(def.end.as_mut());
                 if let Some(ref mut expr) = def.step {
                     self.walk_expression(expr.as_mut());
                 }
             }
-            Expression::Select(ref mut def) => {
+            Expression::Select(def) => {
                 match def.default {
                     Some(ref mut e) => {
                         self.walk_expression(e.as_mut());
@@ -154,7 +154,7 @@ pub trait Walker: Visitor {
                 self.walk_expression(def.val.as_mut());
                 self.walk_fieldset(&mut def.tuple);
             }
-            Expression::Simple(ref mut val) => {
+            Expression::Simple(val) => {
                 self.walk_value(val);
             }
 
@@ -170,19 +170,19 @@ pub trait Walker: Visitor {
                 self.visit_fail(f);
                 self.leave_fail();
             }
-            Expression::Not(ref mut def) => {
+            Expression::Not(def) => {
                 self.walk_expression(def.expr.as_mut());
             }
-            Expression::Debug(ref mut def) => {
+            Expression::Debug(def) => {
                 self.walk_expression(&mut def.expr);
             }
-            Expression::Convert(ref mut def) => {
+            Expression::Convert(def) => {
                 self.walk_expression(&mut def.target);
             }
-            Expression::Constraint(ref mut def) => {
+            Expression::Constraint(def) => {
                 for arm in def.arms.iter_mut() {
                     match arm {
-                        ConstraintArm::Range(ref mut rdef) => {
+                        ConstraintArm::Range(rdef) => {
                             if let Some(ref mut start) = rdef.start {
                                 self.walk_expression(start);
                             }
@@ -190,7 +190,7 @@ pub trait Walker: Visitor {
                                 self.walk_expression(end);
                             }
                         }
-                        ConstraintArm::Shape(ref mut expr) => {
+                        ConstraintArm::Shape(expr) => {
                             self.walk_expression(expr);
                         }
                     }

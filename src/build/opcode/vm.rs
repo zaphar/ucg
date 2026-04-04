@@ -206,7 +206,7 @@ impl VM {
     }
 
     fn do_cast(&mut self, t: CastType, val: &Value, pos: Position) -> Result<(), Error> {
-        if let Value::P(ref p) = val {
+        if let Value::P(p) = val {
             self.push(
                 Rc::new(match t {
                     CastType::Str => Value::P(Primitive::Str(format!("{}", p).into())),
@@ -473,9 +473,9 @@ impl VM {
         E: std::io::Write + Clone,
     {
         let Func {
-            ref ptr,
-            ref bindings,
-            ref snapshot,
+            ptr,
+            bindings,
+            snapshot,
         } = f;
         // use the captured scope snapshot for the function.
         let mut vm = Self::with_pointer(strict, ptr.clone(), std::env::current_dir()?)
@@ -822,7 +822,7 @@ impl VM {
             ));
         }
         let (val, val_pos) = self.stack.last().unwrap().clone();
-        if let K(ref cv) = constraint.as_ref() {
+        if let K(cv) = constraint.as_ref() {
             // Recursive constraints contain self-referential placeholders.
             // They are fully validated by the static typechecker, so skip
             // runtime checking.
@@ -966,7 +966,7 @@ impl VM {
         match left.as_ref() {
             &C(Tuple(ref flds, _)) => {
                 if let &P(Str(ref name)) = right.as_ref() {
-                    for (ref nm, _) in flds {
+                    for (nm, _) in flds {
                         if nm == name {
                             self.push(Rc::new(P(Bool(true))), pos)?;
                             return Ok(());
@@ -1303,8 +1303,8 @@ impl VM {
                 P(Str(ns.into()))
             }
             (
-                C(List(ref left_list, ref left_pos_list)),
-                C(List(ref right_list, ref right_pos_list)),
+                C(List(left_list, left_pos_list)),
+                C(List(right_list, right_pos_list)),
             ) => {
                 let cap = left_list.len() + right_list.len();
                 let mut new_list = Vec::with_capacity(cap);

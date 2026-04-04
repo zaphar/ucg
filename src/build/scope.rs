@@ -141,7 +141,7 @@ impl Scope {
         }
         if self.search_curr_val && self.curr_val.is_some() {
             match self.curr_val.as_ref().unwrap().as_ref() {
-                Val::Env(ref fs) => {
+                Val::Env(fs) => {
                     for (name, val) in fs.iter() {
                         if name == &sym.val {
                             return Some(Rc::new(Val::Str(val.clone())));
@@ -151,13 +151,13 @@ impl Scope {
                         return Some(Rc::new(Val::Empty));
                     }
                 }
-                Val::Tuple(ref fs) => match Self::lookup_in_tuple(&sym.pos, &sym.val, fs) {
+                Val::Tuple(fs) => match Self::lookup_in_tuple(&sym.pos, &sym.val, fs) {
                     Ok(v) => return Some(v),
                     Err(_) => {
                         // noop
                     }
                 },
-                Val::List(ref fs) => {
+                Val::List(fs) => {
                     match Self::lookup_in_list(&sym.pos, &Val::Str(sym.val.clone()), fs) {
                         Ok(v) => return Some(v),
                         Err(_) => {

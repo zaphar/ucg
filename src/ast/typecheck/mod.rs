@@ -1122,7 +1122,7 @@ fn derive_field_list_shape(
     symbol_table: &mut BTreeMap<Rc<str>, Shape>,
 ) -> Shape {
     let mut field_shapes = Vec::new();
-    for (ref tok, ref constraint, ref expr) in flds {
+    for (tok, constraint, expr) in flds {
         let value_shape = expr.derive_shape(symbol_table);
         let shape = if let Some(c) = constraint {
             let constraint_shape = c.derive_shape(symbol_table);
@@ -1524,7 +1524,7 @@ impl Visitor for Checker {
                     self.shape_stack.push(shape);
                 }
             }
-            Statement::Assert(_pos, ref expr) => {
+            &mut Statement::Assert(ref mut _pos, ref expr) => {
                 let shape = expr.derive_shape(&mut self.symbol_table);
                 // Assert statements require a tuple with shape {ok=<bool>, desc=<str>}
                 let expected = Shape::Tuple(PositionedItem::new(
@@ -1543,11 +1543,11 @@ impl Visitor for Checker {
                 let narrowed = shape.narrow(&expected, &mut self.symbol_table);
                 self.push_shape_or_err(narrowed);
             }
-            Statement::Output(_pos, _tok, ref expr) => {
+            &mut Statement::Output(ref mut _pos, ref mut _tok, ref expr) => {
                 let shape = expr.derive_shape(&mut self.symbol_table);
                 self.push_shape_or_err(shape);
             }
-            Statement::Expression(ref expr) => {
+            &mut Statement::Expression(ref expr) => {
                 let shape = expr.derive_shape(&mut self.symbol_table);
                 self.push_shape_or_err(shape);
             }

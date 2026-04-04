@@ -40,7 +40,7 @@ const ENABLE_TRACE: bool = false;
 type ConvertResult<'a, O> = std::result::Result<O, abortable_parser::Error<SliceIter<'a, Token>>>;
 
 macro_rules! trace_parse {
-    ($i:expr, $rule:ident!( $($args:tt)* )) => {
+    ($i:expr_2021, $rule:ident!( $($args:tt)* )) => {
         {
             use crate::parse::ENABLE_TRACE;
             if ENABLE_TRACE {
@@ -54,7 +54,7 @@ macro_rules! trace_parse {
         }
     };
 
-    ($i:expr, $rule:ident) => {
+    ($i:expr_2021, $rule:ident) => {
         {
             use crate::parse::ENABLE_TRACE;
             if ENABLE_TRACE {
@@ -904,7 +904,7 @@ make_fn!(
 
 /// Verify binding is not a reserved word.
 macro_rules! match_binding_name {
-    ($i:expr,) => {{
+    ($i:expr_2021,) => {{
         use abortable_parser::{Error, Result};
         let mut _i = $i.clone();
         match match_type!(_i, BAREWORD) {

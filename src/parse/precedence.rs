@@ -21,7 +21,7 @@ use super::{non_op_expression, ParseResult};
 use crate::ast::*;
 
 macro_rules! abort_on_end {
-    ($i:expr) => {{
+    ($i:expr_2021) => {{
         if eoi($i.clone()).is_complete() {
             return Result::Fail(Error::new(
                 format!("Expected Expression found End Of Input"),
@@ -326,7 +326,7 @@ make_fn!(
 );
 
 macro_rules! try_parse {
-    ($r:expr) => {
+    ($r:expr_2021) => {
         match $r {
             Result::Abort(e) => return Result::Abort(e),
             Result::Fail(e) => return Result::Fail(e),

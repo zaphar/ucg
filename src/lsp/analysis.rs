@@ -234,7 +234,7 @@ pub fn doc_comment_for_binding(comment_map: &CommentMap, def_line: usize) -> Opt
 fn compute_file_doc(comment_map: &CommentMap, first_code_line: usize) -> Option<String> {
     let groups: Vec<String> = comment_map
         .iter()
-        .filter(|(&last_line, _)| last_line + 3 <= first_code_line)
+        .filter(|&(&last_line, _)| last_line + 3 <= first_code_line)
         .map(|(_, g)| format_comment_group(g))
         .collect();
     if groups.is_empty() {

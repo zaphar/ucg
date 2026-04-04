@@ -1,6 +1,6 @@
 # Universal Configuration Grammar.
 
-[![Build Status](https://travis-ci.org/zaphar/ucg.svg?branch=master)](https://travis-ci.org/zaphar/ucg)
+[![CI](https://github.com/zaphar/ucg/actions/workflows/ci.yml/badge.svg)](https://github.com/zaphar/ucg/actions/workflows/ci.yml)
 
 This is an experiment in configuration management. The approach is **not**
 to create a "parsable" config file format.  We have plenty of

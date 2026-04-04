@@ -47,7 +47,7 @@ impl Error {
 }
 
 macro_rules! decorate_error {
-    ($pos:expr => $result:expr) => {
+    ($pos:expr_2021 => $result:expr_2021) => {
         match $result {
             Ok(v) => Ok(v),
             Err(e) => Err(e.with_pos($pos.clone())),
@@ -56,7 +56,7 @@ macro_rules! decorate_error {
 }
 
 macro_rules! decorate_call {
-    ($pos:expr => $result:expr) => {
+    ($pos:expr_2021 => $result:expr_2021) => {
         match $result {
             Ok(v) => Ok(v),
             Err(mut e) => {

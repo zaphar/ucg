@@ -45,7 +45,7 @@ pub enum TemplatePart {
 }
 
 macro_rules! enum_type_equality {
-    ( $slf:ident, $r:expr, $( $l:pat ),* ) => {
+    ( $slf:ident, $r:expr_2021, $( $l:pat ),* ) => {
         match $slf {
         $(
             $l => {
@@ -168,7 +168,7 @@ impl Borrow<str> for Token {
 
 /// Helper macro for making a Positioned Value.
 macro_rules! value_node {
-    ($v:expr, $p:expr) => {
+    ($v:expr_2021, $p:expr_2021) => {
         PositionedItem::new_with_pos($v, $p)
     };
 }
@@ -176,31 +176,31 @@ macro_rules! value_node {
 /// Helper macro for making a Token.
 #[allow(unused_macros)]
 macro_rules! make_tok {
-    (EOF => $i:expr) => {
+    (EOF => $i:expr_2021) => {
         Token::new("", TokenType::END, &$i)
     };
 
-    (WS => $i:expr) => {
+    (WS => $i:expr_2021) => {
         Token::new("", TokenType::WS, &$i)
     };
 
-    (CMT => $e:expr, $i:expr) => {
+    (CMT => $e:expr_2021, $i:expr_2021) => {
         Token::new($e, TokenType::COMMENT, &$i)
     };
 
-    (QUOT => $e:expr, $i:expr) => {
+    (QUOT => $e:expr_2021, $i:expr_2021) => {
         Token::new($e, TokenType::QUOTED, &$i)
     };
 
-    (PUNCT => $e:expr, $i:expr) => {
+    (PUNCT => $e:expr_2021, $i:expr_2021) => {
         Token::new($e, TokenType::PUNCT, &$i)
     };
 
-    (DIGIT => $e:expr, $i:expr) => {
+    (DIGIT => $e:expr_2021, $i:expr_2021) => {
         Token::new($e, TokenType::DIGIT, &$i)
     };
 
-    ($e:expr, $i:expr) => {
+    ($e:expr_2021, $i:expr_2021) => {
         Token::new($e, TokenType::BAREWORD, &$i)
     };
 }
@@ -208,14 +208,14 @@ macro_rules! make_tok {
 /// Helper macro for making expressions.
 #[allow(unused_macros)]
 macro_rules! make_expr {
-    ($e:expr, $i:expr) => {
+    ($e:expr_2021, $i:expr_2021) => {
         Expression::Simple(Value::Symbol(PositionedItem::new_with_pos(
             $e.to_string(),
             $i,
         )))
     };
 
-    ($e:expr => int, $i:expr) => {
+    ($e:expr_2021 => int, $i:expr_2021) => {
         Expression::Simple(Value::Int(PositionedItem::new_with_pos($e, $i)))
     };
 }
@@ -328,7 +328,7 @@ impl NarrowedShape {
 
     pub fn merge_in_shape(&mut self, shape: Shape, symbol_table: &mut BTreeMap<Rc<str>, Shape>) {
         match &mut self.types {
-            NarrowingShape::Narrowed(ref mut types) => {
+            NarrowingShape::Narrowed(types) => {
                 for s in types.iter() {
                     if s.equivalent(&shape, symbol_table) {
                         return;
@@ -764,8 +764,8 @@ impl Shape {
     ) -> Shape {
         match (&left_slist.types, &right_slist.types) {
             (
-                NarrowingShape::Narrowed(ref left_types),
-                NarrowingShape::Narrowed(ref right_types),
+                NarrowingShape::Narrowed(left_types),
+                NarrowingShape::Narrowed(right_types),
             ) => {
                 let left_iter = left_types.iter();
                 let right_iter = right_types.iter();
@@ -889,7 +889,7 @@ fn is_list_subset(
 ) -> bool {
     let left_slist = match &left_slist.types {
         NarrowingShape::Any => return true,
-        NarrowingShape::Narrowed(ref list) => list,
+        NarrowingShape::Narrowed(list) => list,
     };
     let right_subset = loop {
         let mut matches = false;
@@ -1537,11 +1537,11 @@ pub enum Statement {
 impl Statement {
     fn pos(&self) -> &Position {
         match self {
-            Statement::Expression(ref e) => e.pos(),
-            Statement::Let(ref def) => &def.pos,
-            Statement::Constraint(ref def) => &def.pos,
-            Statement::Assert(ref pos, _) => pos,
-            Statement::Output(ref pos, _, _) => pos,
+            Statement::Expression(e) => e.pos(),
+            Statement::Let(def) => &def.pos,
+            Statement::Constraint(def) => &def.pos,
+            Statement::Assert(pos, _) => pos,
+            Statement::Output(pos, _, _) => pos,
         }
     }
 }

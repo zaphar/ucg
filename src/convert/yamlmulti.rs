@@ -37,7 +37,7 @@ impl MultiYamlConverter {
 
 impl Converter for MultiYamlConverter {
     fn convert(&self, v: Rc<Val>, mut w: &mut dyn Write) -> ConvertResult {
-        if let Val::List(ref vals) = v.as_ref() {
+        if let Val::List(vals) = v.as_ref() {
             self.convert_list(vals, &mut w)
         } else {
             let list = vec![v];

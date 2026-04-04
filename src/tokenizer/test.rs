@@ -82,7 +82,7 @@ fn test_tokenize_bareword_with_dash() {
 }
 
 macro_rules! assert_token {
-    ($input:expr, $typ:expr, $msg:expr) => {
+    ($input:expr_2021, $typ:expr_2021, $msg:expr_2021) => {
         let result = token(OffsetStrIter::new($input));
         assert!(
             result.is_complete(),

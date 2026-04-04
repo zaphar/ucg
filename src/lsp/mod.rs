@@ -2383,7 +2383,7 @@ mod test {
     /// Run analysis + semantic tokens + hover on every integration test file to
     /// catch panics.
     macro_rules! lsp_no_panic_test {
-        ($name:ident, $path:expr) => {
+        ($name:ident, $path:expr_2021) => {
             #[test]
             fn $name() {
                 let src = include_str!($path);

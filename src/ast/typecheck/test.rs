@@ -11,7 +11,7 @@ use crate::tokenizer::tokenize;
 use super::*;
 
 macro_rules! assert_type_fail {
-    ($e:expr, $msg:expr, $pos:expr) => {{
+    ($e:expr_2021, $msg:expr_2021, $pos:expr_2021) => {{
         let mut checker = Checker::new();
         let mut expr = parse($e.into(), None).unwrap();
         checker.walk_statement_list(expr.iter_mut().collect());
@@ -24,7 +24,7 @@ macro_rules! assert_type_fail {
 }
 
 macro_rules! assert_type_ok {
-    ($e:expr) => {{
+    ($e:expr_2021) => {{
         let mut checker = Checker::new();
         let mut stmts = parse($e.into(), None).unwrap();
         checker.walk_statement_list(stmts.iter_mut().collect());
@@ -38,7 +38,7 @@ macro_rules! assert_type_ok {
 }
 
 macro_rules! assert_type_err {
-    ($e:expr) => {{
+    ($e:expr_2021) => {{
         let mut checker = Checker::new();
         let mut stmts = parse($e.into(), None).unwrap();
         checker.walk_statement_list(stmts.iter_mut().collect());
@@ -48,10 +48,10 @@ macro_rules! assert_type_err {
 }
 
 macro_rules! assert_type_success {
-    ($e:expr, $shape:expr) => {{
+    ($e:expr_2021, $shape:expr_2021) => {{
         assert_type_success!($e, $shape, BTreeMap::new());
     }};
-    ($e:expr, $shape:expr, $sym_table:expr) => {{
+    ($e:expr_2021, $shape:expr_2021, $sym_table:expr_2021) => {{
         let mut checker = Checker::new().with_symbol_table($sym_table);
         let mut expr = parse($e.into(), None).unwrap();
         checker.walk_statement_list(expr.iter_mut().collect());
@@ -65,7 +65,7 @@ macro_rules! assert_type_success {
         assert!(maybe_shape.is_some(), "We got a shape out of it");
         assert_eq!(maybe_shape.unwrap(), $shape);
     }};
-    ($e:expr, $shape:expr, $sym_table:expr, $expected_sym:expr) => {{
+    ($e:expr_2021, $shape:expr_2021, $sym_table:expr_2021, $expected_sym:expr_2021) => {{
         let mut checker = Checker::new().with_symbol_table($sym_table);
         let mut expr = parse($e.into(), None).unwrap();
         checker.walk_statement_list(expr.iter_mut().collect());
@@ -176,7 +176,7 @@ fn multiple_binary_typefail() {
 }
 
 macro_rules! infer_symbol_test {
-    ($e:expr, $sym_list:expr, $sym_init_list:expr) => {{
+    ($e:expr_2021, $sym_list:expr_2021, $sym_init_list:expr_2021) => {{
         let expr = $e.into();
         let mut symbol_table = BTreeMap::new();
         for (idx, shape) in $sym_init_list.iter().enumerate() {

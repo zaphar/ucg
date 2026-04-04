@@ -10,7 +10,7 @@ fn generate_rust_module() -> String {
     // NOTE(jwall): Since the generated file will be included using the include! macro
     // This has to be an expression or item. This means we need to enclose it with
     // braces to force it to be a single expression instead of multiple.
-    rust_lib.push_str("{");
+    rust_lib.push('{');
     for entry in WalkDir::new("std").into_iter().filter_map(|e| e.ok()) {
         // Okay we want to add these as include bytes in a simulated
         // filesystem for our binary to use.
@@ -39,10 +39,10 @@ fn generate_rust_module() -> String {
                 path_str
             );
             rust_lib.push_str(&include);
-            rust_lib.push_str("\n");
+            rust_lib.push('\n');
         }
     }
-    rust_lib.push_str("}");
+    rust_lib.push('}');
     println!("Finished Adding lib files");
     rust_lib
 }

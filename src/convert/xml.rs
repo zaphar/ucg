@@ -31,7 +31,7 @@ pub struct XmlConverter {}
 
 impl XmlConverter {
     fn get_str_val(v: &Val) -> std::result::Result<&str, Box<dyn Error>> {
-        if let Val::Str(ref s) = v {
+        if let Val::Str(s) = v {
             Ok(s)
         } else {
             Err(BuildError::new("Not a String value", ErrorType::TypeFail).to_boxed())
@@ -39,7 +39,7 @@ impl XmlConverter {
     }
 
     fn get_tuple_val(v: &Val) -> std::result::Result<&Vec<(Rc<str>, Rc<Val>)>, Box<dyn Error>> {
-        if let Val::Tuple(ref fs) = v {
+        if let Val::Tuple(fs) = v {
             Ok(fs)
         } else {
             Err(BuildError::new("Not a tuple value", ErrorType::TypeFail).to_boxed())
@@ -47,7 +47,7 @@ impl XmlConverter {
     }
 
     fn get_list_val(v: &Val) -> std::result::Result<&Vec<Rc<Val>>, Box<dyn Error>> {
-        if let Val::List(ref fs) = v {
+        if let Val::List(fs) = v {
             Ok(fs)
         } else {
             Err(BuildError::new("Not a List value", ErrorType::TypeFail).to_boxed())
@@ -56,21 +56,21 @@ impl XmlConverter {
 
     fn write_node<W: std::io::Write>(&self, v: &Val, w: &mut EventWriter<W>) -> ConvertResult {
         // First we determine if this is a tag or text node
-        if let Val::Tuple(ref fs) = v {
+        if let Val::Tuple(fs) = v {
             let mut name: Option<&str> = None;
             let mut attrs: Option<&Vec<(Rc<str>, Rc<Val>)>> = None;
             let mut children: Option<&Vec<Rc<Val>>> = None;
             let mut text: Option<&str> = None;
             let mut ns: Option<(&str, &str)> = None;
-            for (ref field, ref val) in fs.iter() {
+            for (field, val) in fs.iter() {
                 if field.as_ref() == "name" {
                     name = Some(Self::get_str_val(val.as_ref())?);
                 }
                 if field.as_ref() == "ns" {
-                    if let Val::Tuple(ref fs) = val.as_ref() {
+                    if let Val::Tuple(fs) = val.as_ref() {
                         let mut prefix = "";
                         let mut uri = "";
-                        for (ref name, ref val) in fs.iter() {
+                        for (name, val) in fs.iter() {
                             if val.is_empty() {
                                 continue;
                             }
@@ -84,7 +84,7 @@ impl XmlConverter {
                         if uri != "" && prefix != "" {
                             ns = Some((prefix, uri));
                         }
-                    } else if let Val::Str(ref s) = val.as_ref() {
+                    } else if let Val::Str(s) = val.as_ref() {
                         ns = Some(("", s));
                     }
                 }
@@ -116,7 +116,7 @@ impl XmlConverter {
             if name.is_some() {
                 let mut start = XmlEvent::start_element(name.unwrap());
                 if attrs.is_some() {
-                    for (ref name, ref val) in attrs.unwrap().iter() {
+                    for (name, val) in attrs.unwrap().iter() {
                         if val.is_empty() {
                             continue;
                         }
@@ -141,7 +141,7 @@ impl XmlConverter {
             if text.is_some() {
                 w.write(XmlEvent::characters(text.unwrap()))?;
             }
-        } else if let Val::Str(ref s) = v {
+        } else if let Val::Str(s) = v {
             w.write(XmlEvent::characters(s.as_ref()))?;
         } else {
             return Err(BuildError::new(
@@ -154,7 +154,7 @@ impl XmlConverter {
     }
 
     fn write(&self, v: &Val, w: &mut dyn Write) -> ConvertResult {
-        if let Val::Tuple(ref fs) = v {
+        if let Val::Tuple(fs) = v {
             let mut version: Option<&str> = None;
             let mut encoding: Option<&str> = None;
             let mut standalone: Option<bool> = None;

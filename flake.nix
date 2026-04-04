@@ -21,7 +21,7 @@
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays; };
         rust-bin = pkgs.rust-bin.stable.latest.default.override {
-            extensions = [ "rust-src" ];
+            extensions = [ "rust-src" "clippy" ];
         };
         rust-nightly = pkgs.rust-bin.nightly.latest.default.override {
             extensions = [ "rust-src" ];

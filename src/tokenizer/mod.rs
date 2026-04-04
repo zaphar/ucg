@@ -153,7 +153,7 @@ make_fn!(booleantok<OffsetStrIter, Token>,
 /// do_text_token_tok! is a helper macro to make building a simple text_token token
 /// less code.
 macro_rules! do_text_token_tok {
-    ($i:expr, $type:expr, $text_token:expr, WS) => {
+    ($i:expr_2021, $type:expr_2021, $text_token:expr_2021, WS) => {
         do_each!($i,
            span => input!(),
            frag => text_token!($text_token),
@@ -166,7 +166,7 @@ macro_rules! do_text_token_tok {
            )
     };
 
-    ($i:expr, $type:expr, $text_token:expr) => {
+    ($i:expr_2021, $type:expr_2021, $text_token:expr_2021) => {
         do_each!($i,
             span => input!(),
             frag => text_token!($text_token),
@@ -589,63 +589,63 @@ pub fn token_clone<'a>(t: &Token) -> std::result::Result<Token, Error<SliceIter<
 /// nom macro that matches a Token by type and uses an optional conversion handler
 /// for the matched Token.
 macro_rules! match_type {
-    ($i:expr,BOOLEAN => $h:expr) => {
+    ($i:expr_2021,BOOLEAN => $h:expr_2021) => {
         match_type!($i, TokenType::BOOLEAN, "Not a Boolean", $h)
     };
 
-    ($i:expr,BOOLEAN) => {
+    ($i:expr_2021,BOOLEAN) => {
         match_type!($i, BOOLEAN => token_clone)
     };
 
-    ($i:expr,COMMENT => $h:expr) => {
+    ($i:expr_2021,COMMENT => $h:expr_2021) => {
         match_type!($i, TokenType::COMMENT, "Not a Comment", $h)
     };
 
-    ($i:expr,COMMENT) => {
+    ($i:expr_2021,COMMENT) => {
         match_type!($i, COMMENT => token_clone)
     };
 
-    ($i:expr,BAREWORD => $h:expr) => {
+    ($i:expr_2021,BAREWORD => $h:expr_2021) => {
         match_type!($i, TokenType::BAREWORD, "Not a Bareword", $h)
     };
 
-    ($i:expr,BAREWORD) => {
+    ($i:expr_2021,BAREWORD) => {
         match_type!($i, BAREWORD => token_clone)
     };
 
-    ($i:expr,EMPTY => $h:expr) => {
+    ($i:expr_2021,EMPTY => $h:expr_2021) => {
         match_type!($i, TokenType::EMPTY, "Not NULL", $h)
     };
 
-    ($i:expr,EMPTY) => {
+    ($i:expr_2021,EMPTY) => {
         match_type!($i, EMPTY => token_clone)
     };
 
-    ($i:expr,STR => $h:expr) => {
+    ($i:expr_2021,STR => $h:expr_2021) => {
         match_type!($i, TokenType::QUOTED, "Not a String", $h)
     };
 
-    ($i:expr,STR) => {
+    ($i:expr_2021,STR) => {
         match_type!($i, STR => token_clone)
     };
 
-    ($i:expr,DIGIT => $h:expr) => {
+    ($i:expr_2021,DIGIT => $h:expr_2021) => {
         match_type!($i, TokenType::DIGIT, "Not a DIGIT", $h)
     };
 
-    ($i:expr,DIGIT) => {
+    ($i:expr_2021,DIGIT) => {
         match_type!($i, DIGIT => token_clone)
     };
 
-    ($i:expr,PUNCT => $h:expr) => {
+    ($i:expr_2021,PUNCT => $h:expr_2021) => {
         match_type!($i, TokenType::PUNCT, "Not PUNCTUATION", $h)
     };
 
-    ($i:expr,PUNCT) => {
+    ($i:expr_2021,PUNCT) => {
         match_type!($i, PUNCT => token_clone)
     };
 
-    ($i:expr, $t:expr, $msg:expr, $h:expr) => {{
+    ($i:expr_2021, $t:expr_2021, $msg:expr_2021, $h:expr_2021) => {{
         use abortable_parser::combinators::eoi;
         use abortable_parser::{Error, Result};
         use std;
@@ -676,21 +676,21 @@ macro_rules! match_type {
 /// nom style macro that matches various Tokens by type and value and allows optional
 /// conversion handlers for the matched Token.
 macro_rules! match_token {
-    ($i:expr,PUNCT => $f:expr) => {{
+    ($i:expr_2021,PUNCT => $f:expr_2021) => {{
         use crate::tokenizer::token_clone;
         match_token!($i, PUNCT => $f, token_clone)
     }};
 
-    ($i:expr,PUNCT => $f:expr, $h:expr) => {
+    ($i:expr_2021,PUNCT => $f:expr_2021, $h:expr_2021) => {
         match_token!($i, TokenType::PUNCT, $f, format!("({})", $f), $h)
     };
 
-    ($i:expr,BAREWORD => $f:expr) => {{
+    ($i:expr_2021,BAREWORD => $f:expr_2021) => {{
         use crate::tokenizer::token_clone;
         match_token!($i, BAREWORD => $f, token_clone)
     }};
 
-    ($i:expr,BAREWORD => $f:expr, $h:expr) => {
+    ($i:expr_2021,BAREWORD => $f:expr_2021, $h:expr_2021) => {
         match_token!(
             $i,
             TokenType::BAREWORD,
@@ -700,7 +700,7 @@ macro_rules! match_token {
         )
     };
 
-    ($i:expr, $t:expr, $f:expr, $msg:expr, $h:expr) => {{
+    ($i:expr_2021, $t:expr_2021, $f:expr_2021, $msg:expr_2021, $h:expr_2021) => {{
         use abortable_parser::Result;
         use std;
         use std::rc::Rc;
@@ -729,14 +729,14 @@ macro_rules! match_token {
 
 /// nom style macro that matches punctuation Tokens.
 macro_rules! punct {
-    ($i:expr, $c:expr) => {
+    ($i:expr_2021, $c:expr_2021) => {
         match_token!($i, PUNCT => $c)
     };
 }
 
 /// nom style macro that matches any bareword Token.
 macro_rules! word {
-    ($i:expr, $w:expr) => {
+    ($i:expr_2021, $w:expr_2021) => {
         match_token!($i, BAREWORD => $w)
     };
 }

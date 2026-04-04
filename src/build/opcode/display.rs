@@ -25,14 +25,14 @@ impl fmt::Display for Value {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
         match self {
             P(p) => write!(w, "{}", p),
-            C(List(ref els, _)) => {
+            C(List(els, _)) => {
                 write!(w, "[")?;
                 for e in els {
                     write!(w, "{},", e)?;
                 }
                 write!(w, "]")
             }
-            C(Tuple(ref flds, _)) => {
+            C(Tuple(flds, _)) => {
                 write!(w, "{{")?;
                 for (k, v) in flds {
                     write!(w, "\"{}\"={},\n", k, v)?;
