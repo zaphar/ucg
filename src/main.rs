@@ -94,13 +94,16 @@ fn do_flags<'a, 'b>() -> clap::App<'a, 'b> {
              )
              (@subcommand lock =>
               (about: "Re-resolve all dependencies and rewrite ucg.lock.")
+              (@arg dry_run: --("dry-run") "Show what would change without writing")
              )
              (@subcommand vendor =>
-              (about: "Fetch all locked dependencies into the vendor directory.")
+              (about: "Re-resolve, rewrite ucg.lock, and fetch dependencies into the vendor directory.")
+              (@arg dry_run: --("dry-run") "Show what would change without writing")
              )
              (@subcommand nix =>
-              (about: "Regenerate ucg-deps.nix from ucg.lock.")
+              (about: "Re-resolve, rewrite ucg.lock, and regenerate ucg-deps.nix.")
               (@arg stdout: --stdout "Write to stdout instead of ucg-deps.nix")
+              (@arg dry_run: --("dry-run") "Show what would change without writing")
              )
             )
     )
@@ -483,16 +486,195 @@ fn do_dep_command(matches: &clap::ArgMatches) -> Result<(), Box<dyn Error>> {
         dep_add(matches)
     } else if let Some(matches) = matches.subcommand_matches("remove") {
         dep_remove(matches)
-    } else if let Some(_) = matches.subcommand_matches("lock") {
-        dep_lock()
-    } else if let Some(_) = matches.subcommand_matches("vendor") {
-        dep_vendor()
+    } else if let Some(matches) = matches.subcommand_matches("lock") {
+        dep_lock(matches)
+    } else if let Some(matches) = matches.subcommand_matches("vendor") {
+        dep_vendor(matches)
     } else if let Some(matches) = matches.subcommand_matches("nix") {
         dep_nix(matches)
     } else {
         eprintln!("No dep subcommand specified. Use --help for usage.");
         process::exit(1);
     }
+}
+
+/// Result of resolving and locking dependencies.
+struct ResolveResult {
+    resolved: Vec<dep::resolve::ResolvedDep>,
+    lockfile: dep::lockfile::Lockfile,
+    vendor_dir: PathBuf,
+}
+
+/// Shared resolve-and-lock logic used by lock, vendor, and nix commands.
+///
+/// Reads the manifest, resolves dependencies via MVS, fetches to compute
+/// commit hashes and sha256, builds a new lockfile, and writes it.
+/// If `dry_run` is true, prints what would change without writing.
+/// Returns the resolve result for the caller to do command-specific work.
+fn resolve_and_lock(dry_run: bool) -> Result<ResolveResult, Box<dyn Error>> {
+    let cwd = std::env::current_dir()?;
+    let manifest_path = cwd.join(dep::MANIFEST_FILE);
+
+    if !manifest_path.exists() {
+        return Err(format!(
+            "{} not found. Run `ucg dep init` first.",
+            dep::MANIFEST_FILE
+        )
+        .into());
+    }
+
+    let content = std::fs::read_to_string(&manifest_path)?;
+    let manifest = dep::manifest::Manifest::from_toml(&content)?;
+    manifest.validate()?;
+
+    let tag_source = dep::registry::RemoteTagSource;
+    let manifest_source = VendorManifestSource {
+        vendor_dir: cwd.join(manifest.vendor_dir()),
+    };
+    let resolved = dep::resolve::resolve_mvs(&manifest, &tag_source, &manifest_source)?;
+
+    // Read existing lockfile for diff
+    let lock_path = cwd.join(dep::LOCK_FILE);
+    let old_lockfile = if lock_path.exists() {
+        let content = std::fs::read_to_string(&lock_path)?;
+        Some(dep::lockfile::Lockfile::from_toml(&content)?)
+    } else {
+        None
+    };
+
+    // Fetch to temp dir to get commit hashes and sha256
+    let temp_dir = std::env::temp_dir().join("ucg_dep_resolve");
+    if temp_dir.exists() {
+        std::fs::remove_dir_all(&temp_dir)?;
+    }
+    std::fs::create_dir_all(&temp_dir)?;
+
+    let fetcher = RemoteFetcher;
+    let mut locked_packages = Vec::new();
+    for dep_entry in &resolved {
+        let tag = format!("v{}", dep_entry.version);
+        let dep_temp = temp_dir.join(&dep_entry.normalized_url);
+        if dep_temp.exists() {
+            std::fs::remove_dir_all(&dep_temp)?;
+        }
+        std::fs::create_dir_all(dep_temp.parent().unwrap_or(&temp_dir))?;
+
+        let commit =
+            fetcher.fetch(&dep_entry.fetch_url, &dep_entry.repo_type, &tag, &dep_temp)?;
+        dep::vendor::strip_dep_vendor_dir(&dep_temp)?;
+        let sha256 = dep::vendor::hash_directory(&dep_temp)?;
+
+        locked_packages.push(dep::lockfile::LockedPackage {
+            git: if dep_entry.repo_type == "git" {
+                Some(dep_entry.fetch_url.clone())
+            } else {
+                None
+            },
+            hg: if dep_entry.repo_type == "hg" {
+                Some(dep_entry.fetch_url.clone())
+            } else {
+                None
+            },
+            version: dep_entry.version.to_string(),
+            commit,
+            sha256,
+        });
+    }
+
+    let mut lockfile = dep::lockfile::Lockfile {
+        package: locked_packages,
+    };
+    lockfile.sort();
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+
+    // Compute and display diff
+    let diff = lockfile_diff(&old_lockfile, &lockfile);
+    if !diff.is_empty() {
+        if dry_run {
+            println!("Would resolve:");
+        }
+        for line in &diff {
+            println!("  {}", line);
+        }
+    } else if dry_run {
+        println!("No changes.");
+    }
+
+    let vendor_dir = cwd.join(manifest.vendor_dir());
+
+    if dry_run {
+        return Ok(ResolveResult {
+            resolved,
+            lockfile,
+            vendor_dir,
+        });
+    }
+
+    // Write lockfile
+    std::fs::write(cwd.join(dep::LOCK_FILE), lockfile.to_toml()?)?;
+
+    // Nix generation if enabled
+    if manifest.nix_enabled() {
+        emit_nix_warning_or_generate(&cwd, &lockfile, &vendor_dir)?;
+    }
+
+    Ok(ResolveResult {
+        resolved,
+        lockfile,
+        vendor_dir,
+    })
+}
+
+/// Compute a human-readable diff between old and new lockfiles.
+fn lockfile_diff(
+    old: &Option<dep::lockfile::Lockfile>,
+    new: &dep::lockfile::Lockfile,
+) -> Vec<String> {
+    use std::collections::BTreeMap;
+    let mut lines = Vec::new();
+
+    let old_map: BTreeMap<String, &dep::lockfile::LockedPackage> = old
+        .as_ref()
+        .map(|l| {
+            l.package
+                .iter()
+                .map(|p| (dep::url::normalize_url(p.url()), p))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let new_map: BTreeMap<String, &dep::lockfile::LockedPackage> = new
+        .package
+        .iter()
+        .map(|p| (dep::url::normalize_url(p.url()), p))
+        .collect();
+
+    // Added or changed
+    for (url, new_pkg) in &new_map {
+        match old_map.get(url) {
+            None => {
+                lines.push(format!("+ {} v{}  (added)", url, new_pkg.version));
+            }
+            Some(old_pkg) => {
+                if old_pkg.version != new_pkg.version {
+                    lines.push(format!(
+                        "~ {} v{} -> v{}  (changed)",
+                        url, old_pkg.version, new_pkg.version
+                    ));
+                }
+            }
+        }
+    }
+
+    // Removed
+    for (url, old_pkg) in &old_map {
+        if !new_map.contains_key(url) {
+            lines.push(format!("- {} v{}  (removed)", url, old_pkg.version));
+        }
+    }
+
+    lines
 }
 
 fn dep_init(matches: &clap::ArgMatches) -> Result<(), Box<dyn Error>> {
@@ -726,113 +908,32 @@ fn dep_remove(matches: &clap::ArgMatches) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn dep_lock() -> Result<(), Box<dyn Error>> {
-    let cwd = std::env::current_dir()?;
-    let manifest_path = cwd.join(dep::MANIFEST_FILE);
+fn dep_lock(matches: &clap::ArgMatches) -> Result<(), Box<dyn Error>> {
+    let dry_run = matches.is_present("dry_run");
+    let result = resolve_and_lock(dry_run)?;
 
-    if !manifest_path.exists() {
-        return Err(format!(
-            "{} not found. Run `ucg dep init` first.",
-            dep::MANIFEST_FILE
-        )
-        .into());
-    }
-
-    let content = std::fs::read_to_string(&manifest_path)?;
-    let manifest = dep::manifest::Manifest::from_toml(&content)?;
-    manifest.validate()?;
-
-    let tag_source = dep::registry::RemoteTagSource;
-    let manifest_source = VendorManifestSource {
-        vendor_dir: cwd.join(manifest.vendor_dir()),
-    };
-    let resolved = dep::resolve::resolve_mvs(&manifest, &tag_source, &manifest_source)?;
-
-    // For lock-only, we need to fetch to get commit hashes and sha256
-    let temp_dir = std::env::temp_dir().join("ucg_dep_lock");
-    if temp_dir.exists() {
-        std::fs::remove_dir_all(&temp_dir)?;
-    }
-    std::fs::create_dir_all(&temp_dir)?;
-
-    let fetcher = RemoteFetcher;
-    let mut locked_packages = Vec::new();
-    for dep_entry in &resolved {
-        let tag = format!("v{}", dep_entry.version);
-        let dep_temp = temp_dir.join(&dep_entry.normalized_url);
-        if dep_temp.exists() {
-            std::fs::remove_dir_all(&dep_temp)?;
+    if !dry_run {
+        println!("Wrote {}", dep::LOCK_FILE);
+        for dep_entry in &result.resolved {
+            println!("  {} v{}", dep_entry.normalized_url, dep_entry.version);
         }
-        std::fs::create_dir_all(dep_temp.parent().unwrap_or(&temp_dir))?;
-
-        let commit = fetcher.fetch(&dep_entry.fetch_url, &dep_entry.repo_type, &tag, &dep_temp)?;
-        dep::vendor::strip_dep_vendor_dir(&dep_temp)?;
-        let sha256 = dep::vendor::hash_directory(&dep_temp)?;
-
-        locked_packages.push(dep::lockfile::LockedPackage {
-            git: if dep_entry.repo_type == "git" {
-                Some(dep_entry.fetch_url.clone())
-            } else {
-                None
-            },
-            hg: if dep_entry.repo_type == "hg" {
-                Some(dep_entry.fetch_url.clone())
-            } else {
-                None
-            },
-            version: dep_entry.version.to_string(),
-            commit,
-            sha256,
-        });
-    }
-
-    let mut lockfile = dep::lockfile::Lockfile {
-        package: locked_packages,
-    };
-    lockfile.sort();
-    std::fs::write(cwd.join(dep::LOCK_FILE), lockfile.to_toml()?)?;
-
-    // Nix
-    if manifest.nix_enabled() {
-        let vendor_dir = cwd.join(manifest.vendor_dir());
-        emit_nix_warning_or_generate(&cwd, &lockfile, &vendor_dir)?;
-    }
-
-    let _ = std::fs::remove_dir_all(&temp_dir);
-    println!("Wrote {}", dep::LOCK_FILE);
-    for dep_entry in &resolved {
-        println!("  {} v{}", dep_entry.normalized_url, dep_entry.version);
     }
     Ok(())
 }
 
-fn dep_vendor() -> Result<(), Box<dyn Error>> {
+fn dep_vendor(matches: &clap::ArgMatches) -> Result<(), Box<dyn Error>> {
+    let dry_run = matches.is_present("dry_run");
+    let result = resolve_and_lock(dry_run)?;
+
+    if dry_run {
+        return Ok(());
+    }
+
+    // Vendor the resolved deps
     let cwd = std::env::current_dir()?;
-    let manifest_path = cwd.join(dep::MANIFEST_FILE);
-    let lock_path = cwd.join(dep::LOCK_FILE);
-
-    if !manifest_path.exists() {
-        return Err(format!(
-            "{} not found. Run `ucg dep init` first.",
-            dep::MANIFEST_FILE
-        )
-        .into());
-    }
-    if !lock_path.exists() {
-        return Err(format!("{} not found. Run `ucg dep lock` first.", dep::LOCK_FILE).into());
-    }
-
-    let manifest_content = std::fs::read_to_string(&manifest_path)?;
-    let manifest = dep::manifest::Manifest::from_toml(&manifest_content)?;
-
-    let lock_content = std::fs::read_to_string(&lock_path)?;
-    let lockfile = dep::lockfile::Lockfile::from_toml(&lock_content)?;
-
-    // Check staleness
-    lockfile.is_stale(&manifest)?;
-
-    let vendor_dir = cwd.join(manifest.vendor_dir());
-    if let Some(warning) = dep::vendor::check_vendor_dir_warning(&vendor_dir, true) {
+    if let Some(warning) =
+        dep::vendor::check_vendor_dir_warning(&result.vendor_dir, cwd.join(dep::LOCK_FILE).exists())
+    {
         eprintln!("Warning: {}", warning);
     }
 
@@ -843,13 +944,13 @@ fn dep_vendor() -> Result<(), Box<dyn Error>> {
     std::fs::create_dir_all(&temp_dir)?;
 
     let fetcher = RemoteFetcher;
-    dep::vendor::vendor_from_lockfile(&lockfile, &manifest, &vendor_dir, &temp_dir, &fetcher)?;
+    dep::vendor::vendor_resolved(&result.resolved, &result.vendor_dir, &temp_dir, &fetcher)?;
 
     let _ = std::fs::remove_dir_all(&temp_dir);
     println!(
         "Vendored {} dependencies to {}",
-        lockfile.package.len(),
-        vendor_dir.display()
+        result.lockfile.package.len(),
+        result.vendor_dir.display()
     );
     Ok(())
 }
@@ -860,25 +961,16 @@ fn dep_nix(matches: &clap::ArgMatches) -> Result<(), Box<dyn Error>> {
         return Err("nix is not available on PATH. Install nix to generate ucg-deps.nix.".into());
     }
 
-    let cwd = std::env::current_dir()?;
-    let lock_path = cwd.join(dep::LOCK_FILE);
-    if !lock_path.exists() {
-        return Err(format!("{} not found. Run `ucg dep lock` first.", dep::LOCK_FILE).into());
+    let dry_run = matches.is_present("dry_run");
+    let result = resolve_and_lock(dry_run)?;
+
+    if dry_run {
+        return Ok(());
     }
 
-    let lock_content = std::fs::read_to_string(&lock_path)?;
-    let lockfile = dep::lockfile::Lockfile::from_toml(&lock_content)?;
-
-    let manifest_path = cwd.join(dep::MANIFEST_FILE);
-    let vendor_dir = if manifest_path.exists() {
-        let mc = std::fs::read_to_string(&manifest_path)?;
-        let m = dep::manifest::Manifest::from_toml(&mc)?;
-        cwd.join(m.vendor_dir())
-    } else {
-        cwd.join("vendor")
-    };
-
-    let nix_content = dep::nix::generate_nix_expression(&lockfile, &vendor_dir)?;
+    let cwd = std::env::current_dir()?;
+    let nix_content =
+        dep::nix::generate_nix_expression(&result.lockfile, &result.vendor_dir)?;
 
     if matches.is_present("stdout") {
         print!("{}", nix_content);

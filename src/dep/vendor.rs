@@ -5,11 +5,10 @@ use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 
 use super::error::DepError;
-use super::lockfile::{LockedPackage, Lockfile};
+use super::lockfile::LockedPackage;
 use super::manifest::Manifest;
 use super::registry::RepoFetcher;
 use super::resolve::ResolvedDep;
-use super::url::normalize_url;
 
 /// Strip the dependency's own vendor directory from a fetched tree.
 ///
@@ -165,84 +164,6 @@ pub fn vendor_resolved(
     clean_stale_deps(vendor_dir, resolved)?;
 
     Ok(locked_packages)
-}
-
-/// Vendor from an existing lockfile (no resolution needed).
-pub fn vendor_from_lockfile(
-    lockfile: &Lockfile,
-    manifest: &Manifest,
-    vendor_dir: &Path,
-    temp_base: &Path,
-    fetcher: &dyn RepoFetcher,
-) -> Result<(), DepError> {
-    let mut staged: Vec<(PathBuf, PathBuf)> = Vec::new();
-
-    for pkg in &lockfile.package {
-        let normalized = normalize_url(pkg.url());
-        let final_dir = vendor_dir.join(&normalized);
-
-        // Skip if already vendored and hash matches
-        if final_dir.exists() {
-            if let Ok(existing_hash) = hash_directory(&final_dir) {
-                if existing_hash == pkg.sha256 {
-                    continue;
-                }
-            }
-        }
-
-        let tag = format!("v{}", pkg.version);
-        let temp_dir = temp_base.join(&normalized);
-        if temp_dir.exists() {
-            fs::remove_dir_all(&temp_dir)?;
-        }
-        fs::create_dir_all(temp_dir.parent().unwrap_or(temp_base))?;
-
-        let commit = fetcher.fetch(pkg.url(), pkg.repo_type(), &tag, &temp_dir)?;
-
-        // Strip dep's own vendor dir
-        strip_dep_vendor_dir(&temp_dir)?;
-
-        // Verify hash
-        let hash = hash_directory(&temp_dir)?;
-        if hash != pkg.sha256 {
-            return Err(DepError::ParseError(format!(
-                "hash mismatch for {} at v{}: expected {}, got {}. The tag may have been force-pushed. Run `ucg dep lock` to re-resolve.",
-                normalized, pkg.version, pkg.sha256, hash
-            )));
-        }
-
-        // Verify commit
-        if commit != pkg.commit {
-            return Err(DepError::ParseError(format!(
-                "commit mismatch for {} at v{}: expected {}, got {}. The tag may have been force-pushed. Run `ucg dep lock` to re-resolve.",
-                normalized, pkg.version, pkg.commit, commit
-            )));
-        }
-
-        staged.push((temp_dir, final_dir));
-    }
-
-    // Write staged
-    for (temp_dir, final_dir) in &staged {
-        if final_dir.exists() {
-            fs::remove_dir_all(final_dir)?;
-        }
-        if let Some(parent) = final_dir.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        copy_dir_skip_symlinks(temp_dir, final_dir)?;
-    }
-
-    // Clean stale deps
-    let normalized_urls: Vec<String> = lockfile
-        .package
-        .iter()
-        .map(|p| normalize_url(p.url()))
-        .collect();
-    clean_stale_deps_by_urls(vendor_dir, &normalized_urls)?;
-
-    let _ = manifest; // used for future extensions
-    Ok(())
 }
 
 /// Copy a directory tree, skipping symlinks.
