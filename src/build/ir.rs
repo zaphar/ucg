@@ -67,6 +67,9 @@ impl ConstraintVal {
     }
 }
 
+/// A tuple's runtime field list: name-value pairs.
+pub type TupleFields = Vec<(Rc<str>, Rc<Val>)>;
+
 /// The Intermediate representation of a compiled UCG AST.
 #[derive(PartialEq, Debug, Clone)]
 pub enum Val {

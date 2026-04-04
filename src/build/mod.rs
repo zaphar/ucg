@@ -41,7 +41,7 @@ pub mod scope;
 
 pub mod stdlib;
 
-pub use self::ir::Val;
+pub use self::ir::{TupleFields, Val};
 
 /// The result of a build.
 type BuildResult = Result<(), Box<dyn Error>>;

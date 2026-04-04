@@ -18,7 +18,7 @@ use std::io::Write;
 use std::rc::Rc;
 
 use super::traits::{ConvertResult, Converter};
-use crate::build::Val;
+use crate::build::{TupleFields, Val};
 use crate::error::BuildError;
 use crate::error::ErrorType;
 
@@ -38,7 +38,7 @@ impl XmlConverter {
         }
     }
 
-    fn get_tuple_val(v: &Val) -> std::result::Result<&Vec<(Rc<str>, Rc<Val>)>, Box<dyn Error>> {
+    fn get_tuple_val(v: &Val) -> std::result::Result<&TupleFields, Box<dyn Error>> {
         if let Val::Tuple(fs) = v {
             Ok(fs)
         } else {

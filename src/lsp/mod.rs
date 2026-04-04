@@ -27,6 +27,9 @@ use std::rc::Rc;
 
 use crate::ast::Token;
 
+/// A dot-separated symbol path with the (line, col) position of the root token.
+type DotPath = (Vec<Rc<str>>, (usize, usize));
+
 use lsp_server::{
     Connection, Message, Notification as LspNotification, Request as LspRequest, RequestId,
     Response,
@@ -549,7 +552,7 @@ fn collect_dot_path(
     doc: &AnalysisResult,
     line: u32,
     character: u32,
-) -> Option<(Vec<Rc<str>>, (usize, usize))> {
+) -> Option<DotPath> {
     use crate::ast::TokenType;
     let idx = token_index_at(doc, line, character)?;
     if doc.tokens[idx].typ != TokenType::BAREWORD {

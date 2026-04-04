@@ -739,8 +739,8 @@ impl Shape {
 
     fn narrow_tuple_shapes(
         &self,
-        left_slist: &PositionedItem<Vec<(PositionedItem<Rc<str>>, Shape)>>,
-        right_slist: &PositionedItem<Vec<(PositionedItem<Rc<str>>, Shape)>>,
+        left_slist: &PositionedItem<TupleShape>,
+        right_slist: &PositionedItem<TupleShape>,
         right: &Shape,
         symbol_table: &mut BTreeMap<Rc<str>, Shape>,
     ) -> Shape {
@@ -856,7 +856,7 @@ impl Shape {
 
 fn is_tuple_subset(
     mut left_iter: std::slice::Iter<(PositionedItem<Rc<str>>, Shape)>,
-    right_slist: &PositionedItem<Vec<(PositionedItem<Rc<str>>, Shape)>>,
+    right_slist: &PositionedItem<TupleShape>,
     symbol_table: &mut BTreeMap<Rc<str>, Shape>,
 ) -> bool {
     loop {
