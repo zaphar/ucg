@@ -1,8 +1,6 @@
 use serde::{Deserialize, Serialize};
 
 use super::error::DepError;
-use super::manifest::Manifest;
-use super::resolve::parse_version_constraint;
 use super::url::normalize_url;
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -37,49 +35,6 @@ impl Lockfile {
         });
     }
 
-    /// Check if this lockfile is stale relative to the given manifest.
-    ///
-    /// Returns Ok(()) if the lockfile is up-to-date.
-    /// Returns Err with a description of what's stale.
-    pub fn is_stale(&self, manifest: &Manifest) -> Result<(), DepError> {
-        let deps = manifest.deps();
-
-        // Check each manifest dep has a matching lockfile entry
-        for (url, entry) in &deps {
-            let normalized = normalize_url(url);
-            let locked = self
-                .package
-                .iter()
-                .find(|p| normalize_url(p.url()) == normalized);
-
-            match locked {
-                None => {
-                    return Err(DepError::ParseError(format!(
-                        "dependency '{}' not found in lockfile",
-                        url
-                    )));
-                }
-                Some(locked) => {
-                    // Check that the locked version still satisfies the constraint
-                    let req = parse_version_constraint(&entry.version)?;
-                    let locked_version = semver::Version::parse(&locked.version).map_err(|e| {
-                        DepError::ParseError(format!(
-                            "invalid version '{}' in lockfile: {}",
-                            locked.version, e
-                        ))
-                    })?;
-                    if !req.matches(&locked_version) {
-                        return Err(DepError::ParseError(format!(
-                            "locked version {} for '{}' no longer satisfies constraint '{}'",
-                            locked.version, url, entry.version
-                        )));
-                    }
-                }
-            }
-        }
-
-        Ok(())
-    }
 }
 
 impl LockedPackage {
@@ -153,57 +108,6 @@ sha256 = "sha256-def456"
         lockfile.sort();
         assert!(lockfile.package[0].url().contains("aaa"));
         assert!(lockfile.package[1].url().contains("zzz"));
-    }
-
-    #[test]
-    fn staleness_missing_dep() {
-        let lockfile = Lockfile { package: vec![] };
-        let manifest_toml = r#"
-[deps]
-"https://github.com/org/lib" = { version = ">= 1.0.0", type = "git" }
-"#;
-        let manifest = Manifest::from_toml(manifest_toml).unwrap();
-        let err = lockfile.is_stale(&manifest).unwrap_err();
-        assert!(err.to_string().contains("not found"));
-    }
-
-    #[test]
-    fn staleness_constraint_no_longer_satisfied() {
-        let lockfile = Lockfile {
-            package: vec![LockedPackage {
-                git: Some("https://github.com/org/lib".into()),
-                hg: None,
-                version: "1.0.0".into(),
-                commit: "abc".into(),
-                sha256: "sha256-1".into(),
-            }],
-        };
-        let manifest_toml = r#"
-[deps]
-"https://github.com/org/lib" = { version = ">= 2.0.0", type = "git" }
-"#;
-        let manifest = Manifest::from_toml(manifest_toml).unwrap();
-        let err = lockfile.is_stale(&manifest).unwrap_err();
-        assert!(err.to_string().contains("no longer satisfies"));
-    }
-
-    #[test]
-    fn staleness_clean_lockfile() {
-        let lockfile = Lockfile {
-            package: vec![LockedPackage {
-                git: Some("https://github.com/org/lib".into()),
-                hg: None,
-                version: "1.2.3".into(),
-                commit: "abc".into(),
-                sha256: "sha256-1".into(),
-            }],
-        };
-        let manifest_toml = r#"
-[deps]
-"https://github.com/org/lib" = { version = ">= 1.0.0", type = "git" }
-"#;
-        let manifest = Manifest::from_toml(manifest_toml).unwrap();
-        lockfile.is_stale(&manifest).unwrap();
     }
 
     #[test]

@@ -197,7 +197,7 @@ mod integration_tests {
     use crate::dep::lockfile::Lockfile;
     use crate::dep::manifest::Manifest;
     use crate::dep::registry::{MockFetcher, MockTagSource};
-    use crate::dep::resolve::{resolve_mvs, ManifestSource, ResolvedDep};
+    use crate::dep::resolve::{resolve_mvs, ManifestSource};
     use crate::dep::vendor;
     use semver::Version;
     use std::fs;
@@ -336,34 +336,6 @@ mod integration_tests {
         assert!(root.join("vendor/github.com/org/a/a.ucg").exists());
         assert!(root.join("vendor/github.com/org/b/b.ucg").exists());
         assert_eq!(lockfile.package.len(), 2);
-
-        let _ = fs::remove_dir_all(&root);
-    }
-
-    #[test]
-    fn pipeline_lockfile_staleness_detected() {
-        let manifest = make_manifest(&[("https://github.com/org/lib", ">= 1.0.0", "git")]);
-
-        let mut tags = MockTagSource::new();
-        tags.add_tags("github.com/org/lib", vec![Version::new(1, 0, 0)]);
-
-        let manifests = MockManifestSource::new();
-
-        let mut fetcher = MockFetcher::new();
-        fetcher.add_repo(
-            "github.com/org/lib",
-            "abc123",
-            vec![("lib.ucg", "let x = 1;")],
-        );
-
-        let (root, lockfile) = full_pipeline("staleness", &manifest, &tags, &manifests, &fetcher);
-
-        // Now change the manifest to require a different dep
-        let new_manifest = make_manifest(&[("https://github.com/org/other", ">= 1.0.0", "git")]);
-
-        // Lockfile should be stale
-        let err = lockfile.is_stale(&new_manifest).unwrap_err();
-        assert!(err.to_string().contains("not found"));
 
         let _ = fs::remove_dir_all(&root);
     }
