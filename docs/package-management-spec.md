@@ -15,9 +15,9 @@ optionally generates Nix expressions for fully reproducible builds.
    the resolver picks the lowest version that satisfies all of them. This is
    deterministic without a lockfile and produces the most conservative upgrade behavior.
 3. **Strict semver** -- all dependency versions must be semver tags of the form
-   `vMAJOR.MINOR.PATCH` in the source repository. Repositories without semver tags
-   cannot be used as dependencies. Pre-release tags (e.g. `v1.2.3-beta.1`) are
-   invisible to the resolver and cannot be opted into.
+   `vMAJOR.MINOR.PATCH` in the source repository. Version constraints must include
+   a `>=` lower bound, and the resolved version is derived directly from those bounds
+   (no remote tag listing is performed during resolution).
 4. **Nix-friendly vendoring** -- the lockfile contains sha256 hashes of fetched
    dependency trees, and a Nix expression can be auto-generated to reproduce the
    vendor directory using `fetchgit`/`fetchhg` fixed-output derivations.
@@ -92,13 +92,15 @@ Version constraints use standard semver operators, parsed by the `semver` crate:
 - **Combined**: `">= 1.2.3, < 2.0.0"` -- comma-separated constraints are
   intersected
 
-The resolver lists tags matching `v*.*.*` from the repository (the `v` prefix is
-required) and selects the minimum version satisfying all constraints across the full
-transitive dependency graph.
+The resolver extracts the minimum version directly from constraint lower bounds
+(the `>=` bound). It does not query remote repositories for available tags during
+resolution. The version specified in the `>=` constraint must exist as a `v`-prefixed
+tag in the repository (e.g. `>= 1.2.3` expects tag `v1.2.3` to exist). If the tag
+does not exist, the fetch step will fail with an error.
 
-Pre-release tags (e.g. `v1.2.3-beta.1`) are excluded from resolution. There is no
-syntax to opt into pre-release versions. If a repository has only pre-release tags, it
-is treated as having no semver tags (error).
+When multiple constraints apply to the same dependency, the highest lower bound is
+selected (e.g. `>= 1.0.0` and `>= 1.2.0` resolves to `1.2.0`). The selected version
+must also satisfy any upper bounds (`<` constraints).
 
 ### `ucg.lock` (Lock File)
 
@@ -454,10 +456,11 @@ UCG uses **Minimum Version Selection** (MVS), as described by Russ Cox for Go mo
 
 ### Tag Requirements
 
-- Tags must match the pattern `vMAJOR.MINOR.PATCH` (the `v` prefix is required)
-- Tags without the `v` prefix (e.g. `1.2.3`) are ignored
-- Pre-release tags (e.g. `v1.2.3-beta.1`) are ignored
-- Build metadata tags (e.g. `v1.2.3+build`) are ignored
+- Resolved versions are fetched as tags of the form `vMAJOR.MINOR.PATCH` (the `v`
+  prefix is required). For example, version `1.2.3` is fetched as tag `v1.2.3`.
+- All version constraints must have a `>=` lower bound (e.g. `">= 1.0.0"`). The
+  resolver does not query remote repositories for available tags; it derives the
+  version directly from the constraint bounds.
 
 ### Algorithm
 
@@ -468,12 +471,13 @@ UCG uses **Minimum Version Selection** (MVS), as described by Russ Cox for Go mo
       version. If they differ, report an error -- major version mismatches are never
       resolved, even if the constraint ranges technically overlap. This prevents a
       dependency written against v1 from silently being used with v2.
-   b. List all valid semver tags from the repository.
-   c. Collect all constraints on this dependency from every package that requires it.
-   d. Compute the intersection of all constraints.
-   e. Select the **minimum** version within that intersection.
-3. If the intersection is empty for any dependency, report an error listing the
-   conflicting constraints and which packages introduced them.
+   b. Collect all constraints on this dependency from every package that requires it.
+   c. Compute the intersection of all constraints.
+   d. Extract the **minimum** version: the highest `>=` lower bound across all
+      constraints. Verify it satisfies any upper bounds (`<` constraints).
+3. If the minimum version violates an upper bound, or constraints lack a `>=` lower
+   bound, report an error listing the conflicting constraints and which packages
+   introduced them.
 
 ### Transitive Resolution
 
@@ -510,17 +514,15 @@ transitive dependency of github.com/org/b)".
 
 ### Error Cases
 
-- **No semver tags**: "dependency github.com/org/foo has no semver tags (v*.*.*) --
-  the package must have at least one semver version tag to be used as a dependency"
-- **Unresolvable conflict**: "dependency github.com/org/foo: no version satisfies all
-  constraints (>= 1.2.0, < 2.0.0 from root; >= 2.1.0 from github.com/org/bar)"
+- **Missing lower bound**: "dependency github.com/org/foo: constraint '< 2.0.0'
+  (from root) must have a '>=' lower bound"
+- **Unsatisfiable constraints**: "dependency github.com/org/foo: minimum version
+  v2.0.0 does not satisfy all constraints (>= 1.0.0, < 2.0.0 from root;
+  >= 2.0.0 from github.com/org/bar)"
 - **Dependency cycle**: "circular dependency detected: github.com/org/a ->
   github.com/org/b -> github.com/org/a"
-- **Hash mismatch during vendor**: "hash mismatch for github.com/org/lib at v1.2.3:
-  expected sha256-abc..., got sha256-def.... The tag may have been force-pushed.
-  Run `ucg dep lock` to re-resolve."
-- **Stale lockfile**: "ucg-deps has changed since ucg.lock was generated.
-  Run `ucg dep lock` to update."
+- **Tag not found during fetch**: git clone or hg clone will fail if the resolved
+  version tag does not exist in the remote repository
 - **Major version mismatch**: "dependency github.com/org/lib has conflicting major
   versions: v1 required by root (>= 1.2.0), v2 required by github.com/org/bar
   (>= 2.0.0)"
@@ -553,7 +555,7 @@ updated. An informational message is printed: "updating constraint for
 github.com/org/lib from '>= 1.0.0' to '>= 2.0.0'".
 
 Options:
-- `--version "<constraint>"` -- version constraint (default: `">= <latest>"`)
+- `--version "<constraint>"` -- version constraint (**required**, e.g. `">= 1.0.0"`)
 - `--type "git"|"hg"` -- repository type (default: `"git"`)
 
 Behavior:
@@ -567,8 +569,6 @@ Behavior:
 
 All network operations and resolution happen before any files are written. If any step
 fails, no files are modified.
-
-Errors if the repository has no semver tags.
 
 ### `ucg dep remove <url>`
 
@@ -588,7 +588,7 @@ Behavior:
 If the removed dependency is still required transitively, it remains in the lockfile
 and vendor directory. An informational message is printed.
 
-### `ucg dep lock`
+### `ucg dep lock [--dry-run]`
 
 Re-resolve all dependencies and rewrite `ucg.lock`.
 
@@ -596,37 +596,37 @@ Behavior:
 1. Error if `ucg-deps` does not exist
 2. Parse `ucg-deps`
 3. Resolve the full transitive dependency graph via MVS
-4. Write `ucg.lock`
+4. Write `ucg.lock` (removing any stale entries)
 5. If `nix = true` and `nix` available, write `ucg-deps.nix`
+
+With `--dry-run`, shows what would change (added/removed/changed deps) without writing.
 
 Does not vendor (use `ucg dep vendor` after).
 
-### `ucg dep vendor`
+### `ucg dep vendor [--dry-run]`
 
-Fetch all locked dependencies into the vendor directory.
+Re-resolve, rewrite `ucg.lock`, and fetch all dependencies into the vendor directory.
 
 Behavior:
 1. Error if `ucg-deps` does not exist
-2. Error if `ucg.lock` does not exist
-3. Error if `ucg.lock` is stale (does not match `ucg-deps`)
-4. Warn if vendor directory exists but `ucg.lock` does not (pre-existing directory)
-5. For each dependency in `ucg.lock`, fetch the specified commit
-6. Verify the sha256 hash matches the lockfile
-7. Write to `<vendor>/<normalized-url-path>/`
+2. Resolve the full transitive dependency graph via MVS
+3. Write `ucg.lock` (removing any stale entries)
+4. If `nix = true` and `nix` available, write `ucg-deps.nix`
+5. Warn if vendor directory exists but `ucg.lock` does not (pre-existing directory)
+6. Fetch and vendor all resolved dependencies
 
-Staleness is detected by checking that every dependency URL in `ucg-deps` has a
-corresponding entry in `ucg.lock` and that locked versions still satisfy the
-constraints in `ucg-deps`.
+With `--dry-run`, shows what would change without writing or fetching.
 
 ### `ucg dep nix [options]`
 
-Regenerate `ucg-deps.nix` from the current `ucg.lock`.
+Re-resolve, rewrite `ucg.lock`, and regenerate `ucg-deps.nix`.
 
 Errors if `nix` is not available on PATH -- this command exists for users who have
 nix but whose project collaborators may not.
 
 Options:
 - `--stdout` -- write to stdout instead of `ucg-deps.nix`
+- `--dry-run` -- show what would change without writing
 
 ## Interaction with Existing Features
 

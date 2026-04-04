@@ -39,7 +39,8 @@ pub fn generate_nix_expression(lockfile: &Lockfile, vendor_dir: &Path) -> Result
     let mut packages: Vec<NixPackage> = Vec::new();
 
     for pkg in &lockfile.package {
-        let normalized = normalize_url(pkg.url());
+        let url = pkg.url()?;
+        let normalized = normalize_url(url);
         let nix_id = super::url::nix_identifier(&normalized);
         let vendor_path = vendor_dir.join(&normalized);
 
@@ -59,7 +60,7 @@ pub fn generate_nix_expression(lockfile: &Lockfile, vendor_dir: &Path) -> Result
             nix_id,
             normalized_url: normalized,
             fetch_fn: fetch_fn.to_string(),
-            fetch_url: pkg.url().to_string(),
+            fetch_url: url.to_string(),
             commit: pkg.commit.clone(),
             hash,
         });

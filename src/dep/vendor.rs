@@ -38,40 +38,26 @@ pub fn hash_directory(dir: &Path) -> Result<String, DepError> {
     let mut hasher = Sha256::new();
     let mut entries: Vec<(String, PathBuf)> = Vec::new();
 
-    for entry in WalkDir::new(dir).follow_links(false).into_iter() {
+    let walker = WalkDir::new(dir).follow_links(false).into_iter();
+    // filter_entry prunes the walk: .git/.hg directories are never descended into
+    for entry in walker.filter_entry(|e| {
+        let name = e.file_name().to_string_lossy();
+        name != ".git" && name != ".hg"
+    }) {
         let entry = entry.map_err(|e| DepError::IoError(e.into()))?;
-        let path = entry.path();
 
-        // Skip symlinks
-        if entry.path_is_symlink() {
+        // Skip symlinks and directories (we only hash files)
+        if entry.path_is_symlink() || entry.file_type().is_dir() {
             continue;
         }
 
-        // Skip directories (we only hash files)
-        if entry.file_type().is_dir() {
-            // Skip .git and .hg directories
-            let name = entry.file_name().to_string_lossy();
-            if name == ".git" || name == ".hg" {
-                continue;
-            }
-            continue;
-        }
-
-        let rel_path = path
+        let rel_path = entry
+            .path()
             .strip_prefix(dir)
             .map_err(|e| DepError::ParseError(e.to_string()))?;
         let rel_str = rel_path.to_string_lossy().to_string();
 
-        // Skip files inside .git or .hg directories
-        if rel_str.starts_with(".git/")
-            || rel_str.starts_with(".hg/")
-            || rel_str == ".git"
-            || rel_str == ".hg"
-        {
-            continue;
-        }
-
-        entries.push((rel_str, path.to_path_buf()));
+        entries.push((rel_str, entry.path().to_path_buf()));
     }
 
     // Sort by relative path for determinism

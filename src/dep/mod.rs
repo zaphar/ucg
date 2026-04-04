@@ -189,14 +189,14 @@ mod tests {
     }
 }
 
-/// Integration tests using mock fetcher and tag source.
+/// Integration tests using mock fetcher.
 /// These test the full pipeline without network access.
 #[cfg(test)]
 mod integration_tests {
     use super::*;
     use crate::dep::lockfile::Lockfile;
     use crate::dep::manifest::Manifest;
-    use crate::dep::registry::{MockFetcher, MockTagSource};
+    use crate::dep::registry::MockFetcher;
     use crate::dep::resolve::{resolve_mvs, ManifestSource};
     use crate::dep::vendor;
     use semver::Version;
@@ -244,7 +244,6 @@ mod integration_tests {
     fn full_pipeline(
         test_name: &str,
         manifest: &Manifest,
-        tags: &MockTagSource,
         manifests: &MockManifestSource,
         fetcher: &MockFetcher,
     ) -> (PathBuf, Lockfile) {
@@ -259,7 +258,7 @@ mod integration_tests {
         let temp_dir = root.join(".ucg_tmp");
         fs::create_dir_all(&temp_dir).unwrap();
 
-        let resolved = resolve_mvs(manifest, tags, manifests).unwrap();
+        let resolved = resolve_mvs(manifest, manifests).unwrap();
         let locked_packages =
             vendor::vendor_resolved(&resolved, &vendor_dir, &temp_dir, fetcher).unwrap();
 
@@ -276,10 +275,6 @@ mod integration_tests {
     #[test]
     fn pipeline_single_dep() {
         let manifest = make_manifest(&[("https://github.com/org/lib", ">= 1.0.0", "git")]);
-
-        let mut tags = MockTagSource::new();
-        tags.add_tags("github.com/org/lib", vec![Version::new(1, 0, 0)]);
-
         let manifests = MockManifestSource::new();
 
         let mut fetcher = MockFetcher::new();
@@ -289,7 +284,7 @@ mod integration_tests {
             vec![("lib.ucg", "let x = 1;")],
         );
 
-        let (root, lockfile) = full_pipeline("single_dep", &manifest, &tags, &manifests, &fetcher);
+        let (root, lockfile) = full_pipeline("single_dep", &manifest, &manifests, &fetcher);
 
         // Verify vendor directory
         assert!(root.join("vendor/github.com/org/lib/lib.ucg").exists());
@@ -316,12 +311,7 @@ mod integration_tests {
     fn pipeline_transitive_deps() {
         // root -> A (>= 1.0.0), A -> B (>= 1.0.0)
         let manifest = make_manifest(&[("https://github.com/org/a", ">= 1.0.0", "git")]);
-
         let a_manifest = make_manifest(&[("https://github.com/org/b", ">= 1.0.0", "git")]);
-
-        let mut tags = MockTagSource::new();
-        tags.add_tags("github.com/org/a", vec![Version::new(1, 0, 0)]);
-        tags.add_tags("github.com/org/b", vec![Version::new(1, 0, 0)]);
 
         let mut manifests = MockManifestSource::new();
         manifests.add_manifest("github.com/org/a", a_manifest);
@@ -330,7 +320,7 @@ mod integration_tests {
         fetcher.add_repo("github.com/org/a", "aaa111", vec![("a.ucg", "let a = 1;")]);
         fetcher.add_repo("github.com/org/b", "bbb222", vec![("b.ucg", "let b = 2;")]);
 
-        let (root, lockfile) = full_pipeline("transitive", &manifest, &tags, &manifests, &fetcher);
+        let (root, lockfile) = full_pipeline("transitive", &manifest, &manifests, &fetcher);
 
         // Both deps should be vendored
         assert!(root.join("vendor/github.com/org/a/a.ucg").exists());
@@ -346,11 +336,6 @@ mod integration_tests {
             ("https://github.com/org/lib", ">= 1.0.0", "git"),
             ("https://github.com/other/tool", ">= 2.0.0", "git"),
         ]);
-
-        let mut tags = MockTagSource::new();
-        tags.add_tags("github.com/org/lib", vec![Version::new(1, 0, 0)]);
-        tags.add_tags("github.com/other/tool", vec![Version::new(2, 0, 0)]);
-
         let manifests = MockManifestSource::new();
 
         let mut fetcher = MockFetcher::new();
@@ -365,7 +350,7 @@ mod integration_tests {
             vec![("tool.ucg", "let t = 3;")],
         );
 
-        let (root, _) = full_pipeline("vendor_structure", &manifest, &tags, &manifests, &fetcher);
+        let (root, _) = full_pipeline("vendor_structure", &manifest, &manifests, &fetcher);
 
         // Verify normalized URL becomes vendor directory path
         assert!(root.join("vendor/github.com/org/lib/lib.ucg").exists());
@@ -380,10 +365,6 @@ mod integration_tests {
     #[test]
     fn pipeline_hash_consistency() {
         let manifest = make_manifest(&[("https://github.com/org/lib", ">= 1.0.0", "git")]);
-
-        let mut tags = MockTagSource::new();
-        tags.add_tags("github.com/org/lib", vec![Version::new(1, 0, 0)]);
-
         let manifests = MockManifestSource::new();
 
         let mut fetcher = MockFetcher::new();
@@ -394,7 +375,7 @@ mod integration_tests {
         );
 
         let (root, lockfile) =
-            full_pipeline("hash_consistency", &manifest, &tags, &manifests, &fetcher);
+            full_pipeline("hash_consistency", &manifest, &manifests, &fetcher);
 
         // Hash of vendored directory should match lockfile
         let vendor_path = root.join("vendor/github.com/org/lib");
@@ -407,10 +388,6 @@ mod integration_tests {
     #[test]
     fn pipeline_dep_vendor_dir_stripped() {
         let manifest = make_manifest(&[("https://github.com/org/lib", ">= 1.0.0", "git")]);
-
-        let mut tags = MockTagSource::new();
-        tags.add_tags("github.com/org/lib", vec![Version::new(1, 0, 0)]);
-
         let manifests = MockManifestSource::new();
 
         let mut fetcher = MockFetcher::new();
@@ -424,7 +401,7 @@ mod integration_tests {
             ],
         );
 
-        let (root, _) = full_pipeline("strip_vendor", &manifest, &tags, &manifests, &fetcher);
+        let (root, _) = full_pipeline("strip_vendor", &manifest, &manifests, &fetcher);
 
         // The dep's own vendor directory should have been stripped
         assert!(root.join("vendor/github.com/org/lib/lib.ucg").exists());
@@ -437,11 +414,10 @@ mod integration_tests {
     #[test]
     fn pipeline_empty_deps() {
         let manifest = make_manifest(&[]);
-        let tags = MockTagSource::new();
         let manifests = MockManifestSource::new();
         let fetcher = MockFetcher::new();
 
-        let (root, lockfile) = full_pipeline("empty_deps", &manifest, &tags, &manifests, &fetcher);
+        let (root, lockfile) = full_pipeline("empty_deps", &manifest, &manifests, &fetcher);
 
         assert!(lockfile.package.is_empty());
 
@@ -450,22 +426,14 @@ mod integration_tests {
 
     #[test]
     fn pipeline_mvs_picks_minimum() {
-        // Root requires >= 1.0.0, versions 1.0.0 and 1.5.0 available
-        // MVS should pick 1.0.0
+        // Root requires >= 1.0.0 — MVS picks 1.0.0 (the lower bound)
         let manifest = make_manifest(&[("https://github.com/org/lib", ">= 1.0.0", "git")]);
-
-        let mut tags = MockTagSource::new();
-        tags.add_tags(
-            "github.com/org/lib",
-            vec![Version::new(1, 0, 0), Version::new(1, 5, 0)],
-        );
-
         let manifests = MockManifestSource::new();
 
         let mut fetcher = MockFetcher::new();
         fetcher.add_repo("github.com/org/lib", "abc", vec![("lib.ucg", "let x = 1;")]);
 
-        let (root, lockfile) = full_pipeline("mvs_minimum", &manifest, &tags, &manifests, &fetcher);
+        let (root, lockfile) = full_pipeline("mvs_minimum", &manifest, &manifests, &fetcher);
 
         assert_eq!(lockfile.package[0].version, "1.0.0");
 
@@ -476,16 +444,12 @@ mod integration_tests {
     fn pipeline_url_normalization_flows_to_vendor_path() {
         // Use SSH URL - should normalize to github.com/org/lib for vendor path
         let manifest = make_manifest(&[("git@github.com:org/lib.git", ">= 1.0.0", "git")]);
-
-        let mut tags = MockTagSource::new();
-        tags.add_tags("github.com/org/lib", vec![Version::new(1, 0, 0)]);
-
         let manifests = MockManifestSource::new();
 
         let mut fetcher = MockFetcher::new();
         fetcher.add_repo("github.com/org/lib", "abc", vec![("lib.ucg", "let x = 1;")]);
 
-        let (root, _) = full_pipeline("url_normalization", &manifest, &tags, &manifests, &fetcher);
+        let (root, _) = full_pipeline("url_normalization", &manifest, &manifests, &fetcher);
 
         // Vendor path should use normalized URL, not original SSH URL
         assert!(root.join("vendor/github.com/org/lib/lib.ucg").exists());

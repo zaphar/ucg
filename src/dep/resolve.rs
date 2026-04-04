@@ -4,7 +4,6 @@ use semver::{Version, VersionReq};
 
 use super::error::DepError;
 use super::manifest::Manifest;
-use super::registry::TagSource;
 use super::url::normalize_url;
 
 /// A resolved dependency with all resolution information.
@@ -40,7 +39,6 @@ pub trait ManifestSource {
 /// Returns a list of resolved dependencies sorted by normalized URL.
 pub fn resolve_mvs(
     root_manifest: &Manifest,
-    tag_source: &dyn TagSource,
     manifest_source: &dyn ManifestSource,
 ) -> Result<Vec<ResolvedDep>, DepError> {
     let root_deps = root_manifest.deps();
@@ -70,7 +68,7 @@ pub fn resolve_mvs(
     // Fixed-point iteration: MVS guarantees convergence because constraints
     // only grow and versions only increase (the minimum satisfying version
     // rises monotonically as constraints tighten). Unsatisfiable constraints
-    // are caught immediately by find_minimum_satisfying, and cycles are
+    // are caught immediately by extract_minimum_version, and cycles are
     // caught by check_for_cycles.
     let mut resolved: BTreeMap<String, ResolvedDep> = BTreeMap::new();
 
@@ -88,30 +86,12 @@ pub fn resolve_mvs(
             // Intersect all constraints
             let combined = intersect_constraints(constraints)?;
 
-            // Get available versions
             let repo_type = &constraints[0].repo_type;
             let fetch_url = select_fetch_url(constraints);
-            let versions = tag_source.list_semver_tags(&fetch_url, repo_type)?;
 
-            if versions.is_empty() {
-                return Err(DepError::ParseError(format!(
-                    "dependency {} has no semver tags (v*.*.*) -- the package must have at least one semver version tag to be used as a dependency",
-                    normalized_url
-                )));
-            }
-
-            // MVS: pick minimum satisfying version
-            let version = find_minimum_satisfying(&combined, &versions).ok_or_else(|| {
-                let constraint_desc: Vec<String> = constraints
-                    .iter()
-                    .map(|c| format!("{} from {}", c.req, c.from_package))
-                    .collect();
-                DepError::ParseError(format!(
-                    "dependency {}: no version satisfies all constraints ({})",
-                    normalized_url,
-                    constraint_desc.join("; ")
-                ))
-            })?;
+            // MVS: extract minimum version directly from constraint lower bounds
+            let version =
+                extract_minimum_version(normalized_url, constraints, &combined)?;
 
             resolved.insert(
                 normalized_url.clone(),
@@ -357,13 +337,68 @@ pub fn parse_version_constraint(s: &str) -> Result<VersionReq, DepError> {
     VersionReq::parse(s).map_err(|e| DepError::InvalidVersionConstraint(format!("{}: {}", s, e)))
 }
 
-/// Find the minimum version that satisfies the given requirement (MVS).
+/// Extract the minimum version that satisfies a set of constraints (MVS).
 ///
-/// Sorts the versions and returns the first (lowest) that matches.
-pub fn find_minimum_satisfying(req: &VersionReq, versions: &[Version]) -> Option<Version> {
-    let mut sorted = versions.to_vec();
-    sorted.sort();
-    sorted.into_iter().find(|v| req.matches(v))
+/// Each constraint must have a `>=` lower bound. The minimum satisfying
+/// version is the highest lower bound (since it must satisfy all `>=`
+/// constraints). Returns an error if any constraint lacks a `>=` bound
+/// or if the highest lower bound violates an upper bound (`<`).
+fn extract_minimum_version(
+    normalized_url: &str,
+    constraints: &[Constraint],
+    combined: &VersionReq,
+) -> Result<Version, DepError> {
+    let mut lower_bounds: Vec<Version> = Vec::new();
+
+    for c in constraints {
+        let s = c.req.to_string();
+        // Extract version from ">=" comparators
+        // The string form is like ">=1.2.3" or ">=1.2.3, <2.0.0"
+        let mut found_lower = false;
+        for part in s.split(',') {
+            let trimmed = part.trim();
+            if let Some(version_str) = trimmed.strip_prefix(">=") {
+                let version_str = version_str.trim();
+                let version = Version::parse(version_str).map_err(|e| {
+                    DepError::ParseError(format!(
+                        "invalid version in constraint '{}': {}",
+                        trimmed, e
+                    ))
+                })?;
+                lower_bounds.push(version);
+                found_lower = true;
+            }
+        }
+        if !found_lower {
+            return Err(DepError::ParseError(format!(
+                "dependency {}: constraint '{}' (from {}) must have a '>=' lower bound",
+                normalized_url, c.req, c.from_package
+            )));
+        }
+    }
+
+    // MVS: pick the highest lower bound
+    lower_bounds.sort();
+    let candidate = lower_bounds
+        .last()
+        .expect("constraints is non-empty")
+        .clone();
+
+    // Verify it satisfies the combined requirement (including upper bounds)
+    if !combined.matches(&candidate) {
+        let constraint_desc: Vec<String> = constraints
+            .iter()
+            .map(|c| format!("{} from {}", c.req, c.from_package))
+            .collect();
+        return Err(DepError::ParseError(format!(
+            "dependency {}: minimum version v{} does not satisfy all constraints ({})",
+            normalized_url,
+            candidate,
+            constraint_desc.join("; ")
+        )));
+    }
+
+    Ok(candidate)
 }
 
 /// Extract the major version from the first comparator in a VersionReq.
@@ -390,27 +425,9 @@ pub fn extract_major_version(req: &VersionReq) -> Option<u64> {
     None
 }
 
-/// Filter a list of tag names to valid semver versions.
-///
-/// Tags must have a `v` prefix (e.g., `v1.2.3`).
-/// Pre-release versions are excluded.
-pub fn filter_semver_tags(tags: &[String]) -> Vec<Version> {
-    tags.iter()
-        .filter_map(|tag| {
-            let stripped = tag.strip_prefix('v')?;
-            let version = Version::parse(stripped).ok()?;
-            if version.pre.is_empty() {
-                Some(version)
-            } else {
-                None
-            }
-        })
-        .collect()
-}
 
 #[cfg(test)]
 mod tests {
-    use super::super::registry::MockTagSource;
     use super::*;
 
     struct MockManifestSource {
@@ -453,18 +470,9 @@ mod tests {
     #[test]
     fn resolve_single_dep() {
         let root = make_manifest(&[("https://github.com/org/lib", ">= 1.0.0", "git")]);
-        let mut tags = MockTagSource::new();
-        tags.add_tags(
-            "github.com/org/lib",
-            vec![
-                Version::new(1, 0, 0),
-                Version::new(1, 1, 0),
-                Version::new(2, 0, 0),
-            ],
-        );
         let manifests = MockManifestSource::new();
 
-        let resolved = resolve_mvs(&root, &tags, &manifests).unwrap();
+        let resolved = resolve_mvs(&root, &manifests).unwrap();
         assert_eq!(resolved.len(), 1);
         assert_eq!(resolved[0].version, Version::new(1, 0, 0));
     }
@@ -474,7 +482,7 @@ mod tests {
         // Root -> B (>= 1.0.0), C (>= 1.0.0)
         // B -> D (>= 1.1.0)
         // C -> D (>= 1.2.0)
-        // Should resolve D to 1.2.0 (minimum satisfying both)
+        // Should resolve D to 1.2.0 (highest lower bound)
         let root = make_manifest(&[
             ("https://github.com/org/b", ">= 1.0.0", "git"),
             ("https://github.com/org/c", ">= 1.0.0", "git"),
@@ -483,24 +491,11 @@ mod tests {
         let b_manifest = make_manifest(&[("https://github.com/org/d", ">= 1.1.0", "git")]);
         let c_manifest = make_manifest(&[("https://github.com/org/d", ">= 1.2.0", "git")]);
 
-        let mut tags = MockTagSource::new();
-        tags.add_tags("github.com/org/b", vec![Version::new(1, 0, 0)]);
-        tags.add_tags("github.com/org/c", vec![Version::new(1, 0, 0)]);
-        tags.add_tags(
-            "github.com/org/d",
-            vec![
-                Version::new(1, 0, 0),
-                Version::new(1, 1, 0),
-                Version::new(1, 2, 0),
-                Version::new(1, 3, 0),
-            ],
-        );
-
         let mut manifests = MockManifestSource::new();
         manifests.add_manifest("github.com/org/b", b_manifest);
         manifests.add_manifest("github.com/org/c", c_manifest);
 
-        let resolved = resolve_mvs(&root, &tags, &manifests).unwrap();
+        let resolved = resolve_mvs(&root, &manifests).unwrap();
         assert_eq!(resolved.len(), 3); // b, c, d
         let d = resolved
             .iter()
@@ -510,28 +505,22 @@ mod tests {
     }
 
     #[test]
-    fn resolve_no_tags_error() {
-        let root = make_manifest(&[("https://github.com/org/lib", ">= 1.0.0", "git")]);
-        let tags = MockTagSource::new(); // No tags
-        let manifests = MockManifestSource::new();
+    fn resolve_unsatisfiable_upper_bound() {
+        // Root -> lib >= 1.0.0, < 2.0.0
+        // Transitive -> lib >= 2.0.0
+        // The highest lower bound is 2.0.0 but that violates < 2.0.0
+        let root = make_manifest(&[
+            ("https://github.com/org/lib", ">= 1.0.0, < 2.0.0", "git"),
+            ("https://github.com/org/other", ">= 1.0.0", "git"),
+        ]);
 
-        let err = resolve_mvs(&root, &tags, &manifests).unwrap_err();
-        assert!(err.to_string().contains("no semver tags"));
-    }
+        let other_manifest = make_manifest(&[("https://github.com/org/lib", ">= 2.0.0", "git")]);
 
-    #[test]
-    fn resolve_conflict_error() {
-        // Root requires >= 2.0.0, but only 1.x available
-        let root = make_manifest(&[("https://github.com/org/lib", ">= 2.0.0", "git")]);
-        let mut tags = MockTagSource::new();
-        tags.add_tags(
-            "github.com/org/lib",
-            vec![Version::new(1, 0, 0), Version::new(1, 5, 0)],
-        );
-        let manifests = MockManifestSource::new();
+        let mut manifests = MockManifestSource::new();
+        manifests.add_manifest("github.com/org/other", other_manifest);
 
-        let err = resolve_mvs(&root, &tags, &manifests).unwrap_err();
-        assert!(err.to_string().contains("no version satisfies"));
+        let err = resolve_mvs(&root, &manifests).unwrap_err();
+        assert!(err.to_string().contains("does not satisfy") || err.to_string().contains("major version"));
     }
 
     #[test]
@@ -545,17 +534,10 @@ mod tests {
 
         let other_manifest = make_manifest(&[("https://github.com/org/lib", ">= 2.0.0", "git")]);
 
-        let mut tags = MockTagSource::new();
-        tags.add_tags(
-            "github.com/org/lib",
-            vec![Version::new(1, 0, 0), Version::new(2, 0, 0)],
-        );
-        tags.add_tags("github.com/org/other", vec![Version::new(1, 0, 0)]);
-
         let mut manifests = MockManifestSource::new();
         manifests.add_manifest("github.com/org/other", other_manifest);
 
-        let err = resolve_mvs(&root, &tags, &manifests).unwrap_err();
+        let err = resolve_mvs(&root, &manifests).unwrap_err();
         assert!(
             err.to_string().contains("major version conflict")
                 || err.to_string().contains("major version")
@@ -569,26 +551,20 @@ mod tests {
         let a_manifest = make_manifest(&[("https://github.com/org/b", ">= 1.0.0", "git")]);
         let b_manifest = make_manifest(&[("https://github.com/org/a", ">= 1.0.0", "git")]);
 
-        let mut tags = MockTagSource::new();
-        tags.add_tags("github.com/org/a", vec![Version::new(1, 0, 0)]);
-        tags.add_tags("github.com/org/b", vec![Version::new(1, 0, 0)]);
-
         let mut manifests = MockManifestSource::new();
         manifests.add_manifest("github.com/org/a", a_manifest);
         manifests.add_manifest("github.com/org/b", b_manifest);
 
-        let err = resolve_mvs(&root, &tags, &manifests).unwrap_err();
+        let err = resolve_mvs(&root, &manifests).unwrap_err();
         assert!(err.to_string().contains("circular dependency"));
     }
 
     #[test]
     fn resolve_leaf_node_no_manifest() {
         let root = make_manifest(&[("https://github.com/org/leaf", ">= 1.0.0", "git")]);
-        let mut tags = MockTagSource::new();
-        tags.add_tags("github.com/org/leaf", vec![Version::new(1, 0, 0)]);
         let manifests = MockManifestSource::new(); // No manifest = leaf
 
-        let resolved = resolve_mvs(&root, &tags, &manifests).unwrap();
+        let resolved = resolve_mvs(&root, &manifests).unwrap();
         assert_eq!(resolved.len(), 1);
         assert_eq!(resolved[0].version, Version::new(1, 0, 0));
     }
@@ -603,26 +579,15 @@ mod tests {
 
         let other_manifest = make_manifest(&[("git@github.com:org/lib.git", ">= 1.1.0", "git")]);
 
-        let mut tags = MockTagSource::new();
-        tags.add_tags(
-            "github.com/org/lib",
-            vec![
-                Version::new(1, 0, 0),
-                Version::new(1, 1, 0),
-                Version::new(1, 2, 0),
-            ],
-        );
-        tags.add_tags("github.com/org/other", vec![Version::new(1, 0, 0)]);
-
         let mut manifests = MockManifestSource::new();
         manifests.add_manifest("github.com/org/other", other_manifest);
 
-        let resolved = resolve_mvs(&root, &tags, &manifests).unwrap();
+        let resolved = resolve_mvs(&root, &manifests).unwrap();
         let lib = resolved
             .iter()
             .find(|r| r.normalized_url == "github.com/org/lib")
             .unwrap();
-        // Should pick 1.1.0 (minimum satisfying both >= 1.0.0 and >= 1.1.0)
+        // Should pick 1.1.0 (highest lower bound from >= 1.0.0 and >= 1.1.0)
         assert_eq!(lib.version, Version::new(1, 1, 0));
     }
 
@@ -635,24 +600,19 @@ mod tests {
 
         let other_manifest = make_manifest(&[("https://github.com/org/lib", ">= 1.0.0", "hg")]);
 
-        let mut tags = MockTagSource::new();
-        tags.add_tags("github.com/org/lib", vec![Version::new(1, 0, 0)]);
-        tags.add_tags("github.com/org/other", vec![Version::new(1, 0, 0)]);
-
         let mut manifests = MockManifestSource::new();
         manifests.add_manifest("github.com/org/other", other_manifest);
 
-        let err = resolve_mvs(&root, &tags, &manifests).unwrap_err();
+        let err = resolve_mvs(&root, &manifests).unwrap_err();
         assert!(err.to_string().contains("conflicting") || err.to_string().contains("Conflicting"));
     }
 
     #[test]
     fn resolve_empty_deps() {
         let root = make_manifest(&[]);
-        let tags = MockTagSource::new();
         let manifests = MockManifestSource::new();
 
-        let resolved = resolve_mvs(&root, &tags, &manifests).unwrap();
+        let resolved = resolve_mvs(&root, &manifests).unwrap();
         assert!(resolved.is_empty());
     }
 
@@ -694,64 +654,6 @@ mod tests {
     }
 
     #[test]
-    fn find_minimum_picks_lowest_match() {
-        let req = parse_version_constraint(">= 1.2.0").unwrap();
-        let versions = vec![
-            Version::new(1, 0, 0),
-            Version::new(1, 2, 0),
-            Version::new(1, 3, 0),
-            Version::new(2, 0, 0),
-        ];
-        assert_eq!(
-            find_minimum_satisfying(&req, &versions),
-            Some(Version::new(1, 2, 0))
-        );
-    }
-
-    #[test]
-    fn find_minimum_none_when_no_match() {
-        let req = parse_version_constraint(">= 3.0.0").unwrap();
-        let versions = vec![Version::new(1, 0, 0), Version::new(2, 0, 0)];
-        assert_eq!(find_minimum_satisfying(&req, &versions), None);
-    }
-
-    #[test]
-    fn find_minimum_unordered_input() {
-        let req = parse_version_constraint(">= 1.0.0").unwrap();
-        let versions = vec![
-            Version::new(2, 0, 0),
-            Version::new(1, 0, 0),
-            Version::new(1, 5, 0),
-        ];
-        assert_eq!(
-            find_minimum_satisfying(&req, &versions),
-            Some(Version::new(1, 0, 0))
-        );
-    }
-
-    #[test]
-    fn filter_semver_tags_basic() {
-        let tags: Vec<String> = vec![
-            "v1.0.0".into(),
-            "v2.1.3".into(),
-            "v0.1.0-beta.1".into(),
-            "not-a-version".into(),
-            "1.0.0".into(), // no v prefix
-            "v3.0.0".into(),
-        ];
-        let mut versions = filter_semver_tags(&tags);
-        versions.sort();
-        assert_eq!(
-            versions,
-            vec![
-                Version::new(1, 0, 0),
-                Version::new(2, 1, 3),
-                Version::new(3, 0, 0),
-            ]
-        );
-    }
-
-    #[test]
     fn extract_major_version_from_gte() {
         let req = parse_version_constraint(">= 1.2.3").unwrap();
         assert_eq!(extract_major_version(&req), Some(1));
@@ -767,5 +669,14 @@ mod tests {
     fn extract_major_version_from_range() {
         let req = parse_version_constraint(">= 3.1.0, < 4.0.0").unwrap();
         assert_eq!(extract_major_version(&req), Some(3));
+    }
+
+    #[test]
+    fn constraint_without_gte_lower_bound_errors() {
+        let root = make_manifest(&[("https://github.com/org/lib", "< 2.0.0", "git")]);
+        let manifests = MockManifestSource::new();
+
+        let err = resolve_mvs(&root, &manifests).unwrap_err();
+        assert!(err.to_string().contains("'>=' lower bound"));
     }
 }

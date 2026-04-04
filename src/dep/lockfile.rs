@@ -26,11 +26,38 @@ impl Lockfile {
         toml::to_string(self).map_err(|e| DepError::ParseError(e.to_string()))
     }
 
+    /// Validate all packages in the lockfile.
+    ///
+    /// Checks every package and collects all errors so the user sees
+    /// every problem at once rather than fixing them one at a time.
+    pub fn validate(&self) -> Result<(), DepError> {
+        let errors: Vec<String> = self
+            .package
+            .iter()
+            .enumerate()
+            .filter_map(|(i, pkg)| match pkg.url() {
+                Ok(_) => None,
+                Err(e) => Some(format!("  package[{}]: {}", i, e)),
+            })
+            .collect();
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(DepError::ParseError(format!(
+                "invalid lockfile entries:\n{}",
+                errors.join("\n")
+            )))
+        }
+    }
+
     /// Sort packages by normalized URL for deterministic output.
+    ///
+    /// Packages with invalid URLs (no git or hg) sort last.
     pub fn sort(&mut self) {
         self.package.sort_by(|a, b| {
-            let a_norm = normalize_url(a.url());
-            let b_norm = normalize_url(b.url());
+            let a_norm = a.url().map(|u| normalize_url(u)).unwrap_or_default();
+            let b_norm = b.url().map(|u| normalize_url(u)).unwrap_or_default();
             a_norm.cmp(&b_norm)
         });
     }
@@ -39,8 +66,18 @@ impl Lockfile {
 
 impl LockedPackage {
     /// Returns the URL for this locked package.
-    pub fn url(&self) -> &str {
-        self.git.as_deref().or(self.hg.as_deref()).unwrap_or("")
+    ///
+    /// Returns an error if neither `git` nor `hg` is set.
+    pub fn url(&self) -> Result<&str, DepError> {
+        self.git
+            .as_deref()
+            .or(self.hg.as_deref())
+            .ok_or_else(|| {
+                DepError::ParseError(format!(
+                    "lockfile entry for version {} has neither git nor hg URL",
+                    self.version
+                ))
+            })
     }
 
     /// Returns the repository type ("git" or "hg").
@@ -106,8 +143,8 @@ sha256 = "sha256-def456"
             ],
         };
         lockfile.sort();
-        assert!(lockfile.package[0].url().contains("aaa"));
-        assert!(lockfile.package[1].url().contains("zzz"));
+        assert!(lockfile.package[0].url().unwrap().contains("aaa"));
+        assert!(lockfile.package[1].url().unwrap().contains("zzz"));
     }
 
     #[test]
@@ -119,7 +156,7 @@ sha256 = "sha256-def456"
             commit: "abc".into(),
             sha256: "sha256-1".into(),
         };
-        assert_eq!(pkg.url(), "https://github.com/org/lib");
+        assert_eq!(pkg.url().unwrap(), "https://github.com/org/lib");
         assert_eq!(pkg.repo_type(), "git");
     }
 
@@ -132,7 +169,60 @@ sha256 = "sha256-def456"
             commit: "abc".into(),
             sha256: "sha256-1".into(),
         };
-        assert_eq!(pkg.url(), "https://hg.example.com/repo");
+        assert_eq!(pkg.url().unwrap(), "https://hg.example.com/repo");
         assert_eq!(pkg.repo_type(), "hg");
+    }
+
+    #[test]
+    fn locked_package_url_missing_returns_error() {
+        let pkg = LockedPackage {
+            git: None,
+            hg: None,
+            version: "1.0.0".into(),
+            commit: "abc".into(),
+            sha256: "sha256-1".into(),
+        };
+        let err = pkg.url().unwrap_err();
+        assert!(err.to_string().contains("neither git nor hg"));
+    }
+
+    #[test]
+    fn validate_catches_all_invalid_entries() {
+        let lockfile = Lockfile {
+            package: vec![
+                LockedPackage {
+                    git: Some("https://github.com/org/lib".into()),
+                    hg: None,
+                    version: "1.0.0".into(),
+                    commit: "abc".into(),
+                    sha256: "sha256-1".into(),
+                },
+                LockedPackage {
+                    git: None,
+                    hg: None,
+                    version: "2.0.0".into(),
+                    commit: "def".into(),
+                    sha256: "sha256-2".into(),
+                },
+                LockedPackage {
+                    git: None,
+                    hg: None,
+                    version: "3.0.0".into(),
+                    commit: "ghi".into(),
+                    sha256: "sha256-3".into(),
+                },
+            ],
+        };
+        let err = lockfile.validate().unwrap_err();
+        let msg = err.to_string();
+        // Both invalid entries should be reported
+        assert!(msg.contains("2.0.0"), "should mention version 2.0.0");
+        assert!(msg.contains("3.0.0"), "should mention version 3.0.0");
+    }
+
+    #[test]
+    fn validate_passes_for_valid_lockfile() {
+        let lockfile = Lockfile::from_toml(VALID_LOCKFILE).unwrap();
+        lockfile.validate().unwrap();
     }
 }
