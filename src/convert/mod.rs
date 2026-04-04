@@ -82,8 +82,8 @@ impl ConverterRegistry {
         self.converters.get(typ).map(|c| c.as_ref())
     }
 
-    pub fn get_converter_list(&self) -> Vec<(&String, &Box<dyn traits::Converter>)> {
-        self.converters.iter().collect()
+    pub fn get_converter_list(&self) -> Vec<(&String, &dyn traits::Converter)> {
+        self.converters.iter().map(|(k, v)| (k, v.as_ref())).collect()
     }
 }
 
@@ -123,7 +123,7 @@ impl ImporterRegistry {
         self.importers.get(typ).map(|c| c.as_ref())
     }
 
-    pub fn get_importer_list(&self) -> Vec<(&String, &Box<dyn traits::Importer>)> {
-        self.importers.iter().collect()
+    pub fn get_importer_list(&self) -> Vec<(&String, &dyn traits::Importer)> {
+        self.importers.iter().map(|(k, v)| (k, v.as_ref())).collect()
     }
 }

@@ -34,7 +34,7 @@ impl EnvConverter {
         EnvConverter {}
     }
 
-    fn convert_tuple(&self, flds: &Vec<(Rc<str>, Rc<Val>)>, w: &mut dyn IOWrite) -> ConvertResult {
+    fn convert_tuple(&self, flds: &[(Rc<str>, Rc<Val>)], w: &mut dyn IOWrite) -> ConvertResult {
         for (name, val) in flds.iter() {
             if val.is_tuple() {
                 eprintln!("Skipping embedded tuple...");

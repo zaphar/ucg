@@ -23,7 +23,7 @@ impl YamlConverter {
         YamlConverter {}
     }
 
-    fn convert_list(&self, items: &Vec<Rc<Val>>) -> std::io::Result<serde_yaml::Value> {
+    fn convert_list(&self, items: &[Rc<Val>]) -> std::io::Result<serde_yaml::Value> {
         let mut v = Vec::new();
         for val in items.iter() {
             v.push(self.convert_value(val)?);
@@ -31,7 +31,7 @@ impl YamlConverter {
         Ok(serde_yaml::Value::Sequence(v))
     }
 
-    fn convert_env(&self, items: &Vec<(Rc<str>, Rc<str>)>) -> std::io::Result<serde_yaml::Value> {
+    fn convert_env(&self, items: &[(Rc<str>, Rc<str>)]) -> std::io::Result<serde_yaml::Value> {
         let mut mp = serde_yaml::Mapping::new();
         for (k, v) in items.iter() {
             mp.insert(
@@ -42,7 +42,7 @@ impl YamlConverter {
         Ok(serde_yaml::Value::Mapping(mp))
     }
 
-    fn convert_tuple(&self, items: &Vec<(Rc<str>, Rc<Val>)>) -> std::io::Result<serde_yaml::Value> {
+    fn convert_tuple(&self, items: &[(Rc<str>, Rc<Val>)]) -> std::io::Result<serde_yaml::Value> {
         let mut mapping = serde_yaml::Mapping::new();
         for (k, v) in items.iter() {
             mapping.insert(

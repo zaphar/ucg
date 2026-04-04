@@ -81,14 +81,14 @@ impl WorkspaceIndex {
 
     /// Re-analyze a file from its in-memory content (for open documents).
     /// Uses the existing workspace cache to resolve import shapes.
-    pub fn update_from_content(&mut self, path: &PathBuf, content: &str) {
+    pub fn update_from_content(&mut self, path: &Path, content: &str) {
         let working_dir = path.parent().map(Path::to_path_buf);
         let result = analyze(content, working_dir.as_deref(), &self.files);
-        self.files.insert(path.clone(), result);
+        self.files.insert(path.to_path_buf(), result);
     }
 
     /// Re-analyze a file by reading it from disk.
-    pub fn update_from_disk(&mut self, path: &PathBuf) {
+    pub fn update_from_disk(&mut self, path: &Path) {
         if let Ok(content) = std::fs::read_to_string(path) {
             self.update_from_content(path, &content);
         }

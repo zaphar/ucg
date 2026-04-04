@@ -462,7 +462,7 @@ impl VM {
         strict: bool,
         stack: &mut Vec<(Rc<Value>, Position)>,
         env: &RefCell<Environment<O, E>>,
-        import_stack: &Vec<Rc<str>>,
+        import_stack: &[Rc<str>],
     ) -> Result<(Rc<Value>, Position), Error>
     where
         O: std::io::Write + Clone,
@@ -476,7 +476,7 @@ impl VM {
         // use the captured scope snapshot for the function.
         let mut vm = Self::with_pointer(strict, ptr.clone(), std::env::current_dir()?)
             .to_scoped(snapshot.clone())
-            .with_import_stack(import_stack.clone());
+            .with_import_stack(import_stack.to_vec());
         for nm in bindings.iter() {
             // now put each argument on our scope stack as a binding.
             // TODO(jwall): This should do a better error if there is

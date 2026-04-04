@@ -96,9 +96,9 @@ impl Scope {
         self.import_stack.push(path.into());
     }
 
-    pub fn prepend_import_stack(&mut self, imports: &Vec<String>) {
+    pub fn prepend_import_stack(&mut self, imports: &[String]) {
         let mut new_stack = self.import_stack.clone();
-        new_stack.append(imports.clone().as_mut());
+        new_stack.extend_from_slice(imports);
         self.import_stack = new_stack;
     }
 
@@ -201,7 +201,7 @@ impl Scope {
     fn lookup_in_list(
         pos: &Position,
         field: &Val,
-        elems: &Vec<Rc<Val>>,
+        elems: &[Rc<Val>],
     ) -> Result<Rc<Val>, Box<dyn Error>> {
         let idx = match field {
             &Val::Int(i) => i as usize,

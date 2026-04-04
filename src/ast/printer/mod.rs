@@ -153,7 +153,7 @@ where
 
     fn render_tuple_def(
         &mut self,
-        def: &Vec<(Token, Option<Expression>, Expression)>,
+        def: &[(Token, Option<Expression>, Expression)],
     ) -> std::io::Result<()> {
         self.w.write_all(b"{")?;
         // If the field list is just 1 we might be able to collapse the tuple.

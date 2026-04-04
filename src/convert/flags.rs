@@ -55,7 +55,7 @@ impl FlagConverter {
         &self,
         pfx: &str,
         name: &str,
-        def: &Vec<Rc<Val>>,
+        def: &[Rc<Val>],
         w: &mut dyn Write,
     ) -> ConvertResult {
         // first of all we need to make sure that each &Val is only a primitive type.
@@ -100,7 +100,7 @@ impl FlagConverter {
         Ok(())
     }
 
-    fn write(&self, pfx: &str, flds: &Vec<(Rc<str>, Rc<Val>)>, w: &mut dyn Write) -> ConvertResult {
+    fn write(&self, pfx: &str, flds: &[(Rc<str>, Rc<Val>)], w: &mut dyn Write) -> ConvertResult {
         for (name, val) in flds.iter() {
             if let &Val::Empty = val.as_ref() {
                 self.write_flag_name(pfx, name, w)?;

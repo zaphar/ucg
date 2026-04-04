@@ -940,7 +940,7 @@ impl Value {
         buf
     }
 
-    fn elems_to_string(v: &Vec<Expression>) -> String {
+    fn elems_to_string(v: &[Expression]) -> String {
         format!("{}", v.len())
     }
 

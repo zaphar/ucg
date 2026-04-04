@@ -39,7 +39,7 @@ impl TomlConverter {
         TomlConverter {}
     }
 
-    fn convert_list(&self, items: &Vec<Rc<Val>>) -> Result {
+    fn convert_list(&self, items: &[Rc<Val>]) -> Result {
         let mut v = Vec::new();
         for val in items.iter() {
             v.push(self.convert_value(val)?);
@@ -47,7 +47,7 @@ impl TomlConverter {
         Ok(toml::Value::Array(v))
     }
 
-    fn convert_tuple(&self, items: &Vec<(Rc<str>, Rc<Val>)>) -> Result {
+    fn convert_tuple(&self, items: &[(Rc<str>, Rc<Val>)]) -> Result {
         let mut mp = toml::value::Table::new();
         for (k, v) in items.iter() {
             mp.entry(k.to_string()).or_insert(self.convert_value(v)?);
@@ -55,7 +55,7 @@ impl TomlConverter {
         Ok(toml::Value::Table(mp))
     }
 
-    fn convert_env(&self, items: &Vec<(Rc<str>, Rc<str>)>) -> Result {
+    fn convert_env(&self, items: &[(Rc<str>, Rc<str>)]) -> Result {
         let mut mp = toml::value::Table::new();
         for (k, v) in items.iter() {
             mp.entry(k.to_string())

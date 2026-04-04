@@ -32,7 +32,7 @@ impl JsonConverter {
         JsonConverter {}
     }
 
-    fn convert_list(&self, items: &Vec<Rc<Val>>) -> std::io::Result<serde_json::Value> {
+    fn convert_list(&self, items: &[Rc<Val>]) -> std::io::Result<serde_json::Value> {
         let mut v = Vec::new();
         for val in items.iter() {
             v.push(self.convert_value(val)?);
@@ -40,7 +40,7 @@ impl JsonConverter {
         Ok(serde_json::Value::Array(v))
     }
 
-    fn convert_tuple(&self, items: &Vec<(Rc<str>, Rc<Val>)>) -> std::io::Result<serde_json::Value> {
+    fn convert_tuple(&self, items: &[(Rc<str>, Rc<Val>)]) -> std::io::Result<serde_json::Value> {
         let mut mp = serde_json::Map::new();
         for (k, v) in items.iter() {
             mp.entry(k.as_ref()).or_insert(self.convert_value(v)?);
@@ -48,7 +48,7 @@ impl JsonConverter {
         Ok(serde_json::Value::Object(mp))
     }
 
-    fn convert_env(&self, items: &Vec<(Rc<str>, Rc<str>)>) -> std::io::Result<serde_json::Value> {
+    fn convert_env(&self, items: &[(Rc<str>, Rc<str>)]) -> std::io::Result<serde_json::Value> {
         let mut mp = serde_json::Map::new();
         for (k, v) in items.iter() {
             mp.entry(k.as_ref())
