@@ -26,3 +26,8 @@ doc = false
 name = "parse"
 path = "fuzz_targets/parse.rs"
 doc = false
+
+[[bin]]
+name = "compile"
+path = "fuzz_targets/compile.rs"
+doc = false

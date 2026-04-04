@@ -109,6 +109,17 @@ is the highest-value target since the parser has complex state: precedence
 climbing, recursive expression parsing, and many interacting grammar rules. It
 also implicitly tests the tokenizer.
 
+### compile
+
+Parses the input, then runs it through the full compilation pipeline: AST to
+opcode translation and VM execution. Inputs that fail to parse are skipped so
+the fuzzer concentrates on syntactically valid programs that exercise the
+compiler. The environment is sandboxed -- stdout/stderr go to a sink, no import
+paths are configured, and no filesystem access occurs. This target is slower
+than the others (it does the most work per input) but finds the deepest bugs:
+panics in the VM, stack overflows from deeply nested expressions, infinite
+loops, and out-of-memory conditions from unbounded allocation.
+
 ## Corpus
 
 Seed corpus files live in `fuzz/corpus/<target>/`. These were initially

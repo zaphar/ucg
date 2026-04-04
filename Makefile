@@ -60,4 +60,4 @@ build-fuzz:
 fuzz-%:
 	$(FUZZ_SHELL) cargo fuzz run $* -- -max_len=$(FUZZ_MAX_LEN) -max_total_time=$(FUZZ_DURATION) -jobs=$(FUZZ_JOBS)
 
-all-fuzz: fuzz-tokenize fuzz-parse
+all-fuzz: fuzz-tokenize fuzz-parse fuzz-compile
