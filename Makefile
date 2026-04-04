@@ -49,7 +49,7 @@ clean:
 	cargo clean
 
 # Fuzzing targets — run inside the nix fuzz shell with nightly toolchain
-FUZZ_SHELL = nix develop .#fuzz -c
+FUZZ_SHELL = nix develop .\#fuzz -c
 FUZZ_MAX_LEN ?= 4096
 FUZZ_DURATION ?= 0
 FUZZ_JOBS ?= 1
