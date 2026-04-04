@@ -20,8 +20,7 @@ use std::path::PathBuf;
 use std::process;
 use std::rc::Rc;
 
-use atty;
-use atty::Stream;
+use std::io::IsTerminal;
 use rustyline;
 use rustyline::error::ReadlineError;
 use simple_error;
@@ -221,7 +220,7 @@ where
     pub fn repl(&mut self, mut editor: rustyline::Editor<()>, config_home: PathBuf) -> BuildResult {
         // loop
         let mut lines = crate::io::StatementAccumulator::new();
-        if atty::is(Stream::Stdin) {
+        if std::io::stdin().is_terminal() {
             println!("Welcome to the UCG repl. Ctrl-D to exit, Ctrl-C to abort expression.");
             println!("Type '#help' for help.");
             println!("");

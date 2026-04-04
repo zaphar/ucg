@@ -32,7 +32,6 @@ regex = "1"
 dirs = "4.0.0"
 unicode-segmentation = "1.2.1"
 rustyline = "10.1.0"
-atty = "0.2"
 lsp-server = "0.7"
 lsp-types = "0.95"
 
