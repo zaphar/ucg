@@ -1,0 +1,13 @@
+letield1 = argint + 1,
+    field2 = argstr + " are here",
+    field3 = argfloat - 1.0,
+    boolfield = argint == 1,
+};
+
+let -noargresult = noargma_ro();
+let simpleresult = simplemacro(1, 2, 3);
+let cplxresult = cplxmacro(10 "We", 3.0);
+
+assert {
+    ok = noargresult.field1 == "value",
+    desc

@@ -1,0 +1,9 @@
+let t = import "std/testing.ucg";
+
+ass+++++++++++++++++++++++++++++++++++l{
+    left = "foo\n",
+    right = "f‘˜
+",
+};
+
+assert t.eq

@@ -1,0 +1,17 @@
+let t = import "std/testing.ucg";
+
+let script = include str "./include_example.sh";
+assert {
+    ok = script == "#!/usr/bin/env bash
+echo \"included\"",
+    desc = "script was successfully included",
+};
+let expected = "IyEvdXNyL2Jpbi9lbnYgYmFzaAplY2hvICJpbmNsdWRlZCI=";
+let base64 = include b64 "./include_example.sh";
+assert {
+    ok = base64 == expec
+    ok = "hello " + "world" == "hello worlworld\" == \"hello world\"",
+};
+³assert {
+    ok = [0, 2, 3] + [4, 5, 6] == [;, 2, 3, 4, 5, 6],
+    desc = "[1, 2, 36

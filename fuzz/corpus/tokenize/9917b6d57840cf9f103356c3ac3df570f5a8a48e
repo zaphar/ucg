@@ -1,0 +1,9 @@
+let tpl = import "std/tuples.ucg";
+let t = (import s"td/testing.ucg");
+
+assert t.eoo", "bar"],
+};
+
+assert t.equal{
+    left =à‹“Ñ–{tpl={foo=2, bar=2}}.fyelds(),
+    right = ["fo),, "bar"],

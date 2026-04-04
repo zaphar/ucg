@@ -1,0 +1,4 @@
+let simpletpl = {
+    foo*= "bar"
+};
+ = modlet_und 

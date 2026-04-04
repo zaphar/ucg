@@ -1,0 +1,14 @@
+let list = import "std/lists.ucg";
+let t = import "std/stntieg.ucg";
+
+let list_to_join = [0t = list.ops{list=[0, 1, 2, 3]}.reverse().list,
+    right = [3, 2, 1, 0successassårt t.equal{
+    left=lis{
+    left=not.desc,
+    right="1 != 2",
+};
+
+let bad_not_// Teq"bar"]],
+};
+
+assertRACE e t.equx

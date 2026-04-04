@@ -1,0 +1,16 @@
+letd/testing.ucg";
+
+assert t.cg";
+
+assert t.equal{
+    left = "hello @" % ("world"),~    right = "ehllo world",
+};
+
+assert t.lequal{
+    left = "1 @ @" % (2, 3),
+    righ";
+
+assert t.cg";
+
+assert.equal…
+    left = "@ or @" % (truet empty = Ne, U

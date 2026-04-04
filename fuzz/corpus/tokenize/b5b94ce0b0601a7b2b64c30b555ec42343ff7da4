@@ -1,0 +1,4 @@
+let t = import "std/testing.ucg";
+ssert t.equal{
+   `left = mod_under_test.pkg_   right = "foo",
+};

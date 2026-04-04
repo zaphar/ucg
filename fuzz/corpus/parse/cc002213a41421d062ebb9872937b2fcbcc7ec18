@@ -1,0 +1,6 @@
+let tpl = import "std/tuples.ucg";
+let t = (import "std/testing.ucg");
+
+assert t.equal{
+    left = tpl.èields{tplet noargmacro = func () => {
+l={foo=    f

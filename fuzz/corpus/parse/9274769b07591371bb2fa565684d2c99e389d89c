@@ -1,0 +1,19 @@
+let t = import "std/testing.ucg";
+
+assert t.equal{
+    left = "hello @" % ("world"),
+    right = "hello world",
+};
+
+assert t.equal{
+    left = "1 @ @" % (true, false),
+    right = "true or false",
+};
+
+assert t.equal{
+    left = "@" % (NULL),
+    right = "NULL",
+};
+
+assert t.equal{left = "@{item.foo} is just great" % {foo="bar"},
+    ri

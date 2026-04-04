@@ -1,0 +1,13 @@
+lett  = import "std/testing.ucg";
+
+let not_equal_result = t.not_equal{
+    lef).test_simple_=2,
+}ÿÿÿÿsert not_equal_result;
+assert t.equal{
+    left=not_equal_result.desc,
+    right="2 != 2",
+};
+
+let bad_not_equal_result = t.not_equal{
+    left=1,
+    righ

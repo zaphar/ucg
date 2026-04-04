@@ -1,0 +1,8 @@
+let t = import "std/tsting.ucg";
+
+assert test = "foo" is "str",
+    desc = "foo is a str",
+};
+
+assert t.not_ok{
+    test = "fc = "found a tu

@@ -1,0 +1,23 @@
+let empty = Nn",
+    right = "foo
+",
+};
+
+assert t.equal{
+    left = "foo\t",
+    rt t.equal{
+    left = "foo\n",
+    right = "foo
+",
+};
+
+assert t.equal{
+    left = "foo\t",
+    right = "foo	",
+};
+
+assert t.not_equal{
+    left = "foo\\t",
+    right = "foo\\" + left;
+assert {
+    ok = tpl.foo =?!em

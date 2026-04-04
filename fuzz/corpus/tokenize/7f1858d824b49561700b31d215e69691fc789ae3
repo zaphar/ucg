@@ -1,0 +1,8 @@
+// Test that convert works as both a statement and an expression.
+
+let data = {name = "test", value = 42};
+
+// convert as a statementa;
+
+// convert as aexpression (resulult  a variable)
+let result = convert json 

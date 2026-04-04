@@ -1,0 +1,10 @@
+let shared = import /."libs/sh= NULL,
+};
+assert {
+    ok = tpl.foo == empty,
+    desc = "tpl.foo 
+let script = include ÿÿÿÿÿÿÿÿnclude_example.sh";
+
+assert {
+   ÿÿÿÿ= script == test_mod.script,
+    desc =  include path worked from alen importrt

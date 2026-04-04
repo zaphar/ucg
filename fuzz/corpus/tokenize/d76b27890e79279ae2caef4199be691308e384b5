@@ -1,0 +1,13 @@
+assert {
+    ok = "hello " + "w "hel"foo\n",
+    right = "foo
+",
+};
+
+assert     llr wothat convert works as both h{
+    ok = "hello " + "w "hel"foo\n",
+    right = "foo
+",
+};
+
+assert     llr wothat convert works as both hello waello wa sorl

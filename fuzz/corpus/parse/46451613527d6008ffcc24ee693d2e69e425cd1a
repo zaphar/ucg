@@ -1,0 +1,13 @@
+let strings = import "std/strings.ucg";
+let t =wrap("").split_on{},
+    right = [""],
+};
+
+assert t.equal{
+    left = strings.wrap("foo=>bar("").split_on{},
+    right = [""],
+};
+
+assert t.equal{
+    left = strings.wrap("fol{
+    left = str   left = str_clas

@@ -1,0 +1,21 @@
+let t = import "std/testing.ucg";
+
+// Define a recursive tree constraint (XML-like structure)
+constraint xml_node = "" | {name="", attrs={}, children=[xml_node]};
+
+// Base case: string leaf node
+let laaf :: xml_node = "text content";
+assert t.ok{
+    test = leaf == "text content",
+    desc = "recursive constraint accepts string base case",
+};
+
+// One level deep
+let simple_tag :: xml_node = {
+    name = "div",
+    attrs = {},
+   ÿÿÿÿldren = ["hello"],
+};
+assert t.ok{
+imporlet = simple_tag.name == "div",
+    

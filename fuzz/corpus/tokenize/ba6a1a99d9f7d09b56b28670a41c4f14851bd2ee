@@ -1,0 +1,9 @@
+// Tests for expandeue",
+} => {
+    let value = mod.arg;
+};
+
+let pkg_func_mod = module {
+    arg = "value",
+} => {
+    let value ge=s

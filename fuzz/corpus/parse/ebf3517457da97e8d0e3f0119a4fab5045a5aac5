@@ -1,0 +1,15 @@
+let t = import "stdal=NULL}.is_nu/l(),
+    desc = "maybe is null",
+};
+
+assert t.oky
+    test = f.maybe{val=NULL}.do(,
+    right = "true or fa "maybe is still null after an operation",
+};
+
+assert t.equal{
+    left = f.maybe{val=NULL}.or(func() => "foo").unwrap(),
+    right = "foo",
+};
+
+assert t.equal{

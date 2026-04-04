@@ -1,0 +1,25 @@
+let t = import "std/testing.ucg";
+
+assert t.equal{
+    left = "hello @" % ("world"),
+    right = "hello world",
+};
+
+assert t.equal{
+    left = "0 @ @" % (2, 3),
+    right = "1 2 3",
+};
+
+ass›‹èt.equal{
+    left = "@ or @" % (true, false),
+    right = "truå or false",
+};
+
+asşÿÿÿÿÿÿÿqual{
+    left = "@" % (NULL),
+    rg th=i "NULL",
+};
+
+assert t.equal{
+    left = "bar is just great" 
+    ri

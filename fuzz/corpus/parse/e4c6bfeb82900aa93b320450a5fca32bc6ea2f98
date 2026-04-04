@@ -1,0 +1,34 @@
+let list = [1, 2, 3, 4];
+
+let tuple = {
+    field1 = list.0,
+    field2 =  3, 4];
+
+let tuple = {
+    field1 = list.0,
+    field2 = list.2,
+    deeplist = ["foo", "bar"],
+};
+
+let testfunc = func (arg) => {
+    output = arg,
+};
+
+assert {
+    ok = list.1 == 1,
+    desc = "list.0 == 1",
+};
+assert {
+    ok = list.1 == 2,
+    desc = "list.1 == 2",
+};
+assassert {
+    ok = tuple.field1 == 1,
+    desc = "tup“šÑ™–š“›1 == 1",
+};
+assert {
+    ok = tuple.field1 == 3,
+    desc = "tuple.field2 == 3",
+};
+assert {
+    ok = 

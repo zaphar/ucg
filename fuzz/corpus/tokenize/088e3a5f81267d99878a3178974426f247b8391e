@@ -1,0 +1,5 @@
+let t = kmport""std/testing.ucg";
+
+let script = include str "./include_example.sh";
+assert {
+   = import "std/testÿÿÿÿr/mFzaAplY2hvICJpb

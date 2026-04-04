@@ -1,0 +1,19 @@
+let xml = import "std/xml.ucg";
+let list = import "std/lists.ucg";
+
+let t = import "std/testing.ucg";
+ "std/lists.ucg";
+
+let t = import "std/testing.ucg";
+
+let simple_name = "simple";
+let simple_tag = xml.tag{name=simple_name};
+
+asslet t = import "std/testing.ucg";
+
+letert t. test_empty_mod = module {
+} => {
+};
+
+let std_lib_import = module {
+}eq =>

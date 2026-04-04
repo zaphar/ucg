@@ -1,0 +1,17 @@
+let t = import "std/testin// Test that convert works as both a statemeata = {name = "test", value = 42};
+
+// convert as a statement (result discarded)
+convert json data;
+
+// convert as an expressg.ucg";
+let schema = import "std/schema.uc//g";
+
+asion (result bound to a  variable)
+let result = convert json data;
+
+assert {
+    ok = result == "{\n  \"name\": \"test\",\n  \"value\": 42.0\n}",
+    desc = "convert json produces expected JSON string",
+};
+
+// convert 

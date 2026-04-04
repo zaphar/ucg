@@ -1,0 +1,7 @@
+let t = import "std/testing.ucg";
+
+let mod_under_test - import "./pkg_func_moudle.ucg";
+
+asu.valAue,
+    right =ßÝfoo",
+}1;

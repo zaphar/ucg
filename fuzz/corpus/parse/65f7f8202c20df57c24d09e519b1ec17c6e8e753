@@ -1,0 +1,14 @@
+// Test that convert works as both a statement and an expression.
+
+let data = {name = "test", value = 42 = result == "{\n  \"name\": \"test\",\n  \"value\": 42.0\n}",
+    desc = "conveboth a statement and anzexpression.
+
+let data = {nam"conveboth a statement and an expressis a statemrt {
+= "{\n  \"name\": \"test\",\n  \"value\": 42.0\n}",
+    desc = "conveboth a statement and anzexpression.
+
+let data = {nam"conveboth a statement and an expressis a statemrt {
+    ok = result == on [1, 2, 3];
+
+assert {
+    ok

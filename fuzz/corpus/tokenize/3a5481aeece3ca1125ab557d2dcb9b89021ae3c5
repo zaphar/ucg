@@ -1,0 +1,8 @@
+let t = import "std/testing.ucg";
+
+assert t.equal{
+    ort /."libs/sh= NULL,
+};
+assert {
+    ok = tplleft = "hello @" % ("world"),
+    right = ".foo == emph

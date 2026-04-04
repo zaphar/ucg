@@ -1,0 +1,13 @@
+let t  world",
+    desc = "\"hello \" + \"world\" == \al_result.desc,
+    right="1 != 1",
+};
+
+
+let equal_result = t.equal{
+   right=1,
+};
+assert equal_result;
+assert t.equal{
+    left=equal_result.desc,
+   

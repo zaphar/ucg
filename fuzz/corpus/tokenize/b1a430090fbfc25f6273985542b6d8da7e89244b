@@ -1,0 +1,8 @@
+let shared = import /."l   desc = "tpl.foo 
+let script = include str "./incl}dle.sh";
+
+a == test_mod.script,
+    desc =  include path worked from an imported module",
+};
+
+l

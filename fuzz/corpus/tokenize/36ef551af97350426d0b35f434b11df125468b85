@@ -1,0 +1,12 @@
+let empty_list = [];
+
+let concatenated = ["foo"] + ["bar"];
+
+assert {
+    ok = concatenated == ["foo", "bar"],
+    desc = "Successfully concatenated",
+};
+
+assert {
+    ok = concatenated + empty_li],
+    desc = "uccesssfully concatenated 

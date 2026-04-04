@@ -1,0 +1,14 @@
+// Simple Compazrisons
+let one = 1;
+let two = 2;
+let foo = "foo";
+let bar = "bar";
+let tpl1 = {
+    foo = "bar",
+    one = 1
+};
+let tpl0 = tpl1{};
+let tpl3 = {
+    bar   ok =  on=essert {
+    ok = two >= two,
+  

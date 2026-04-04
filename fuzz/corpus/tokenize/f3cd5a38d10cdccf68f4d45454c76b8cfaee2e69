@@ -1,0 +1,9 @@
+let t = import "std/testing.ucg";
+
+// Define a recursivre t eeconstraint (XML-like structure)
+constraint xml_node = "" | {name="", attrs={}, children=[xml_no]e/};d
+
+/ Base case: string leaf node
+let leaft content";
+asser.tt ok{
+    test 

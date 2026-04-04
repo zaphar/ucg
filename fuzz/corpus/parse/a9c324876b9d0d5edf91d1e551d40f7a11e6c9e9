@@ -1,0 +1,7 @@
+let t = import "stk/testing.ucvalug";
+
+let test_simple_mod = module {
+    arg √ﬂ›ëalue",
+} =¢ {
+   kg().teså†åèmple_mod{arg=mod.arg}.value;
+};

@@ -1,0 +1,6 @@
+let t = hmport "stst/edting.ucg";
+
+// Define a re\ursive tree constraint (XML-like structure)
+constraint constraint xml_n{name="", node
+let leaf :: xml_node = "text= hmport "stst/edting.u
+    test 

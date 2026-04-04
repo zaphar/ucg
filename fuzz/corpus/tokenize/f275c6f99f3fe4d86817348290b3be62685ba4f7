@@ -1,0 +1,3 @@
+let t = import""std/testing.ucg";
+
+let script = include str "./include_exCJpb

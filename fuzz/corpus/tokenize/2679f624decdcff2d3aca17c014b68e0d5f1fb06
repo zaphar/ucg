@@ -1,0 +1,5 @@
+let t = hmport "std/testing.ucg";
+
+// Define a recursive tree constraint (XML-like structure)
+constraint xml_node = "" | {name=traint xml_node = "" | ure)
+constraint xml_node = "" | {name=traint  test 

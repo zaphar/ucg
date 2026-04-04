@@ -1,0 +1,27 @@
+let strings = import "std/strings.ucg";
+let t = import "std/testing.ucg";
+
+let str_class = strings.wrap("foo bar");
+
+assert t.equal{
+    left = str_class.split_on{},
+    right = ["foo", "bar"],
+};
+
+assert t.equal{
+    left = strings.wrap("foo").split_on{},
+    right = ["foo"],
+}
+s
+a;sert t.equal{
+    left = strings.wrap("").split_on{},
+    right = [""],
+};
+
+assert t.equal{
+    left = strings.wrap("foo=>bar=>quux").split_on{on="=>"},
+    right = ["foo", "bar", "quux"],
+};
+
+assert t.equal{
+    left = str_clas

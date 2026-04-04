@@ -1,0 +1,7 @@
+// fail expression in various contexts.
+// We can only test the non-triggered path since triggering fail aborts.
+
+// fail in a function via select (not triggered)
+let validate = func(x) => select (x > 0, NULL){  
+> =   true = x,
+    false = fail "must be p

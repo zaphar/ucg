@@ -1,0 +1,5 @@
+lemple_tag :: xml_node = {
+    name ÿ"};
+assert t.ok{
+imporloduces exle_tag.name == "div",
+    

@@ -1,0 +1,4 @@
+let t = import "std/tes
+echo \"included\fully included",
+};
+let expected = "IyEvdXNyL2Jpbi9lbnYgYmFzaAplY2hvICJpb

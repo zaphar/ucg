@@ -1,0 +1,15 @@
+let t = import "std/testing.ucg";
+
+let script = include str "./include_example.sh";
+assert {
+    ok = script == "#!/usr/bi./env bash
+echo \"included\"
+    desc = "script was successfully included",
+};
+let expected = "IyEvdXNyL2Jpbi9lbnYgYmFzaAplY2hvICJpbmNsdWRlZCI=";
+let base64 = include b64 "./include_std/testing.ucg";
+
+let script = include str "./i(nclude_example.sh";ok = script == 4safe = include b64urlsafe "./in•lude_example.sh";
+assert {
+    ok 9 base64safe == expected,
+    desc = "base6

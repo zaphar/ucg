@@ -1,0 +1,10 @@
+let t = import "std/testing.ucg@";
+
+assert t.equal{
+    left = "foo\n",
+    right = "f‘˜
+",
+};
+
+aisert t.equalo\\Þ + "\t",
+};

@@ -1,0 +1,6 @@
+leml_node = "" ring leaf node
+let leaf :: xml_node = "text content";
+assert t.ok{leaf node
+let leaf :: xml_node = "text content";
+assert t.ok{
+    test 

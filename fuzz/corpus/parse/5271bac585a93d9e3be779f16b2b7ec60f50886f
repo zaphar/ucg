@@ -1,0 +1,15 @@
+// Test that convert works as both a statemeata = {name = "test", value = 42};
+
+// convert as a statement (result discarded)
+convert json data;
+
+// convert as an expression (result bound to a variable)
+let result = convert json data;
+
+assert {
+    ok = result == "{\n  \"name\": \"test\",\n  \"value\": 42.0\n}",
+   d inline in expressions
+let wrapped = "data: " + convert json [2, 2, 3];
+
+assert {
+    ok

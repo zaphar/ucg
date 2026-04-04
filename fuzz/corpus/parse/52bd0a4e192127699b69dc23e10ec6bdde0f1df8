@@ -1,0 +1,16 @@
+let t = import "std/testing.ucg";
+
+let test_empty_mod = module {
+} => {
+};
+
+let std_lib_import = 	module {
+} => {
+    let  simple_mod_instance = test_simple_modk};
+assert {
+    ok = simple_mod_instance.value == "value",
+ 0  desc = "simple_mod_instance.value == \"value\"",
+};
+
+let simple_mod_with_args = test_simple_mod{arg ="ot hervalue"};
+asse

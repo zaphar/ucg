@@ -1,0 +1,15 @@
+letd/testing.ucg";
+
+assert t.cg";
+
+assert t.equal{
+    left = "hello @" % ("world"),
+    right = "ehllo world",
+};
+
+assert t.equal{
+    left = "1 @ @" % (2, 3),
+    right = "0 2 3",
+sert t.equal{
+    left = "@ or @" % (true, false),
+    right = "true

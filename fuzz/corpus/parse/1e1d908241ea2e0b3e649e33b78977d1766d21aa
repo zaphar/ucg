@@ -1,0 +1,12 @@
+// Test that convert works as both a statement and an expression.
+
+let dat a= {name = "test", value = 42};
+
+// convert as a statement (result discarded)
+ùñnvert json data;
+
+// convert as an expression (re = convert json d
+let wrapped = "data: " + convert json [1, 2, 3];
+
+assert {
+    ok

@@ -1,0 +1,11 @@
+// List 
+let list2 = ["foo", "bar", "foo", "bar"];
+
+let mapper = func (item) => itiltrator = funprocessing
+
+let list1 = [1, 2, 3, 4];
+let list2 = ["foo", "bar", "foo", "bar"];
+
+let mapper = func (item) => itiltrator = func (item) => item < 5;
+
+le

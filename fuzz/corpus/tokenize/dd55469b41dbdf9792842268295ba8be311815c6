@@ -1,0 +1,12 @@
+// List processing
+
+let list1 = [1, ", "bar"];
+
+let mapper = func (item) => item + 1;
+let filtrator = func (item) =>  select (item, NULL) => {
+        foo = item,
+};
+
+let boolfiltrator = func (item) => item < 5;
+
+le

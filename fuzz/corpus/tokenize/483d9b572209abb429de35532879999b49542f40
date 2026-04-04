@@ -1,0 +1,18 @@
+let t = import "std/testing.ucg";
+
+let test_empty_mod = module {
+} => {
+};
+
+let std_lib_import = module {
+} => {
+    let tpl = import "std/tuples.ucg";
+};
+
+let empty_mod_instance = tes => {
+};
+
+let std_lib_import = module {
+} => {
+    arg = "value",
+} => {

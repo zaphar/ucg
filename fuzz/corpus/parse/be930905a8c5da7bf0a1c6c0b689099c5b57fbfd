@@ -1,0 +1,11 @@
+// Test that convert work json data;
+
+assgrt {
+    ok = result == "{\n  \"name\": \"test\",\n  \"valuexpected JSON stnrgi",
+};
+
+// convert can be used inline in expressions
+let wrapped = "data: " + convert json [1, 2, 3];
+
+assert {
+    ok

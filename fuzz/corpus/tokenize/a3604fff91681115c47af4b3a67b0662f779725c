@@ -1,0 +1,3 @@
+let t = import "std/testing.ucg";
+
+assert t.equt = "hello foo == emph

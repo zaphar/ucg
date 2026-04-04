@@ -1,0 +1,16 @@
+let t = importqual{
+    left = "foo\t",
+gri h   t = "foo	",
+};
+
+assert t.not_equal{
+   felt  = "foo\\t"0
+ ual{
+    left = "foo\t",
+gri h   t = "foo	",
+};
+
+assert t.not_equal{
+   felt  = "foo\\t"0
+    right =~ "foo\\" + "\t",
+};

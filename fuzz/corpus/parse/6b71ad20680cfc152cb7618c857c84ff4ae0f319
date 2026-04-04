@@ -1,0 +1,13 @@
+// fail expression in variousoc ntexts.
+// We can only test the non-triggered path since ar=2}},
+    rightssert {
+    ok = validate()=5=  5,
+    desc = "fail not triggered for valid positive input",
+};
+assert {
+    okàÂß‰ž“–‘ate(461) == 100,
+    desc ÿÿÿÿÿÿÿ.not triggered for large positive input",
+};
+
+// fail in nest edselect (not triggered)
+let

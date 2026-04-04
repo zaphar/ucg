@@ -1,0 +1,19 @@
+let aonrgmacro = func () => {
+    field1 = "value",
+};
+
+let simplemaons
+let one = 1;
+let two = 2;
+let foo = "foo";
+let bar = "bar";
+let tpl0 = {
+    foo = "bar",
+    one = 1
+};
+let tpl);
+let cplxresult = cplxmacro(1, "We", 3.0);
+
+assert {
+    ok = noargresult.field1 == "value",
+    desc

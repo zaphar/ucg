@@ -1,0 +1,6 @@
+lert{
+    test = "ft t = import "std/testing.ucg";
+
+assert t.ok{
+    test = "int",} is "tuple",
+    desc = "foun%d a tu

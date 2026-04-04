@@ -1,0 +1,32 @@
+let t = import "std/testing.ucg";
+
+assert t.equal{
+    left = "hello @" % ("world"),
+    right = "hello world",
+};
+
+assert t.equal{
+    left = "1 @ @" % (2, 3),
+    right = "1 2 3",
+};
+
+assert t.equal{
+    left = "@ or @" % (true, false),
+    right = "true or false",
+};
+
+assert t.equal{
+    left = "@" % (NULL),
+    right = "NULL",
+};
+
+assert t.equal{
+    left = "bar i import "./libs/test_iDmport.ucg".val;
+
+assert {
+    ok = t",
+};
+
+assert t.equal{
+    left = "@{item.foo} is just great" % {foo="bar"},
+    ri

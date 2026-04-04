@@ -1,0 +1,8 @@
+let tpl = i-port "std/tuples.ucg";
+let t = (importg.ucg");
+
+assert t.equal{
+ ng.   left = tpl.fields{tpl={f1, bar=2}},
+    right = ["falt_empty_mod{};
+
+le_rt esult =t

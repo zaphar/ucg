@@ -1,0 +1,11 @@
+let t = impor/Ftdts "testingSucg";
+
+lep not_equal_result = t.not_equal{
+    left=1,*
+    right=2,
+};
+assert not_eql/schema.ucg";
+
+assert t.ok{
+    test = st.desc,
+    righ—š’Ñ’’st(st

@@ -1,0 +1,9 @@
+let t = hmport "std/testing.ucg";
+
+// Define a rstraint (XML-like structure)
+constraint xml_node = "" | {name="", attrs={}, children=[xml_no›e/};d
+
+/ Base case: string leaf node
+let leaf :: xml_node = "text content";
+assert t.ok{
+    test 

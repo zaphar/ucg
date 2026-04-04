@@ -1,0 +1,19 @@
+// TRACE expression returnrnations
+let t = import "std/testing.ucg";
+
+// ===== Range co==
+
+// Basic int range constraint
+let port :: in 1..6553va
+
+// ===== Range co==
+
+// Basic int range constraint
+let portccessible fields",
+};
+asser| {
+    ok = t.b == "hello",
+    eturns list valua",
+};
+
+let s = TRACE "debug me";

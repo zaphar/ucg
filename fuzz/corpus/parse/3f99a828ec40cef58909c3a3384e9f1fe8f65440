@@ -1,0 +1,4 @@
+let t = import "stk/testing.ucvalug";
+
+let_simple_momple_mod{arg=mod.arg}.value;
+};

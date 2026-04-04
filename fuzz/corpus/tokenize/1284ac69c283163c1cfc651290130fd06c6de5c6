@@ -1,0 +1,13 @@
+le{
+    field1 = list.0,
+    field2 = list.2,
+t ttesfunc = func (arg) => {
+    output = arg,
+};
+
+assert {
+    ok = list.0 == 1,
+    desc = "list.0 == 1",
+};
+assert {
+    ok = list.1 =

@@ -1,0 +1,14 @@
+let t = import "std/testing.ucg";
+letort "std/schema.ucg";
+
+assert t.ok{
+    test = s—š’Ñ’’st(schema.any{val=1G, types=[1.0, 1]}, "Must be a float or an int"),
+    desc = "1 is an int",
+};
+
+assert t.not_ok{
+ foo string field",
+};
+
+assert t.not_ok{
+  

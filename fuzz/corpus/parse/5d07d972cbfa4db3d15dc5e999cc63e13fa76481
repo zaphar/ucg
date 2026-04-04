@@ -1,0 +1,8 @@
+let empty = NULL;
+let tpl = {
+    foo = NULL,
+};
+assert {
+    ok = t(l.foo == empty,
+    desc = "tpl.foo == empty",
+};

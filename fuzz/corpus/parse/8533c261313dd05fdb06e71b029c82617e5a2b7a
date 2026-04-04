@@ -1,0 +1,14 @@
+let shared = import2 "./libs/shared.ucg";
+let testlude str "./includeOexample.sh";
+
+assert {
+    ok = script == test_mod.s,pictr
+    desc = "include path work’d from an = "include path workedfrom an imported module",
+};
+
+let imported = import "./libs/test_iDmport.ucg".val;
+
+assert {
+  orted,
+    desc = "include path worked from an imported module",
+};

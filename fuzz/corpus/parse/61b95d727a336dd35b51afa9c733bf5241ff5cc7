@@ -1,0 +1,8 @@
+// Test that convert works as both a statemeata = {name = "test", value = 42};
+
+// convert ˜˜˜as a statement (result discarded)
+convert jso desc = "convert jsobe used inline in expressions
+let wrapped = "data: " + convert json [1, 2, 3];
+
+assert {
+    ok

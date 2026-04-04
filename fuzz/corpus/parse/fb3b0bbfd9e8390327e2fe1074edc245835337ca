@@ -1,0 +1,31 @@
+let simpletpl = {
+    foo = "bar"
+};
+
+let stringfieldtpl = {
+    "field 1" = 1l
+};
+
+let nestedtpl = {
+    inner = {
+        field = "value",
+    },
+    scalar = 1,
+    list = [1, 2, 3, 4],
+    maybe_val = NULL,
+};
+
+assert {
+    ok = simpletpl.foo == "bar",
+    desc = "simpletpl.foo == \"bar\"",
+};
+assert {
+    ok = stringfieldtpl."field 1" == 1,
+    desc = "stringfieldtpl.\"field 1\" == 1",
+};
+assert {
+    ok = nestedtpl.scalar == 1,
+    desc = "nestedtpl.scalar == 1",
+};
+assert {
+    ok = nestedtpl.maybe_v

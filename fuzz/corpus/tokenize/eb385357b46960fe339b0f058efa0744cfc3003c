@@ -1,0 +1,3 @@
+// fail expression in various contexts.
+// We can only test the non-triggered path since triggering fail ab  true = x,
+    false = fail "must be p

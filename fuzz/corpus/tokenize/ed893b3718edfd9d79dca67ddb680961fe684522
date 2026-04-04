@@ -1,0 +1,4 @@
+assert {
+ sc = "\"hello \" + \"w" + \"world\" == \"heqlo world\"",
+, 3©",
+};

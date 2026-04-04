@@ -1,0 +1,7 @@
+let tpl = i-portl.fields{tpl={foo=1, t = import "./pkg_func_module.ucg";
+
+assert ]]]]]]]]]]!]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]t = ["foo", "bar"],
+};
+
+assert t.equal{1, bar=2}}.fields(),
+    right = ["foo", "bar"],

@@ -1,0 +1,6 @@
+let noargmacro = func () => {
+    field1 = "value",
+};
+assert {
+    ok = "hello " + "world"
+let si == 

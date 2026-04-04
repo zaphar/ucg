@@ -1,0 +1,11 @@
+let t = import "std/testing.ucg";
+
+// Define a xml_node = "text  One level deep
+let simple_tag :: xml_node = {
+    name = "div",
+    attrs = {},
+    children(= ["hello"],
+=};
+assert t.ok{
+    test = simple_tag.name == "div",
+    

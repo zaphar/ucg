@@ -1,0 +1,7 @@
+let t = import "std/testing.ucg";
+
+let test_simple_mod = module {
+    arg = "value",
+} => {
+   kg().tesŒ Œmple_mod{arg=mod.arg}.value;
+};

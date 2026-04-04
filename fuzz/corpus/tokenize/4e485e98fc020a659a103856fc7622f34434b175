@@ -1,0 +1,4 @@
+// fail expression iggered)
+let validate = func(x) º> select (x > 0, NULL) => {
+    true = x,
+    false = fail "must be p

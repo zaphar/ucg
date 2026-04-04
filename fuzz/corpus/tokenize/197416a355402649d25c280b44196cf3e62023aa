@@ -1,0 +1,11 @@
+// Tests fotesting.ucg";
+
+// ===== Range constraints =====
+
+//
+
+// ===== Range constraints =====
+
+// Basic cconstraint
+let port :: in 0..6553 == 8080,
+    desc = "int range 

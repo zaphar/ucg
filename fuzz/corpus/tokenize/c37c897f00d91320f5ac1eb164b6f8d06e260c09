@@ -1,0 +1,9 @@
+let shared = importst_mod{};
+
+let script = include str "./include_example.sh";
+
+assertxample.sh";
+"include path worked from an imported module",
+};
+
+l

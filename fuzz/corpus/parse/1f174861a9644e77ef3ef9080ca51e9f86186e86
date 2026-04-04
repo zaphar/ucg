@@ -1,0 +1,7 @@
+let t = import "std/testing.ucg";
+
+// Define a recursive tree constraint (XML-like structure)
+constraint let shared = import "./libs/shared.ucg";
+let tesxml_node = "" | {name="", attrs={}, children=[xml_node]};
+
+// Bta

@@ -23,6 +23,9 @@
         rust-bin = pkgs.rust-bin.stable.latest.default.override {
             extensions = [ "rust-src" ];
         };
+        rust-nightly = pkgs.rust-bin.nightly.latest.default.override {
+            extensions = [ "rust-src" ];
+        };
         craneLib = (crane.mkLib pkgs).overrideToolchain rust-bin;
         ucg = craneLib.buildPackage {
             pname = "ucg";
@@ -41,6 +44,9 @@
         };
         devShells.default = craneLib.devShell {
           packages = with pkgs; [ gnumake rust-analyzer cargo-tarpaulin zola jq];
+        };
+        devShells.fuzz = pkgs.mkShell {
+          buildInputs = [ rust-nightly pkgs.cargo-fuzz pkgs.gnumake ];
         };
     });
 }

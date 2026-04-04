@@ -1,0 +1,9 @@
+let tpl = i-port "std/tuples.ucg";
+let t = (import "std/testing.ucg");
+
+assert t.equal{
+    left = tpl.fields{tpl={foo=1, bar=2}},
+    right = ["foo",tance = test_empty_mod{};
+
+let test_simple_mod =tpl={foo=1, bar=2}}.fields(),
+    right =o,f["o"  "bar"],

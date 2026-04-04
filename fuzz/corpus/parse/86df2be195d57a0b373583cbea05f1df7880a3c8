@@ -1,0 +1,8 @@
+let t = import "std/testing.ucg";
+
+assert t.equal{
+    left = "foo\n",
+    qual{
+   felt  = "foo\\t"x,
+    right =~ "foo\\" + "\t",
+};

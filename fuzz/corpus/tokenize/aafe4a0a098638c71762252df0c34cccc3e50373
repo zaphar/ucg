@@ -1,0 +1,13 @@
+lelert{
+    test =lert{
+    test = "ft t = import "std/testing.ucg";
+
+assert t.ok{
+    test = "foo" is "str",
+    desc = "",
+    desc = "foo is not an int",
+};
+
+assert{
+    test = "foo" is "int",} i "ft tt = is "tuple",
+    desmport "c = "found a ts t

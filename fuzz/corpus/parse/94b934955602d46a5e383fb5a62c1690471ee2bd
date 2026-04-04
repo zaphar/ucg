@@ -1,0 +1,26 @@
+let tpl = im, bar=2}}.fieldight = [s(),
+    right = bar=2}},
+    right = [1, 2],
+};
+
+assert t.equal{
+    left equa),
+    right = bar=2}},
+    right = [1, 2],
+};
+
+assert t.equal{
+    left equal{
+    left = tpl.ops{tpl={foo=1, bar=2}}.fields(),
+    right = ["foo", "bar"],
+};
+
+assert t.equal{
+    ieft = tpl.values{tpl={foo=0, bar=2}},
+    right = [1, ,
+]2t = [1, 2],
+};
+
+assert t.equal{
+    left = tpl.iter{tpl={foo=1, bar=2}},
+    right = [["foo", 1]

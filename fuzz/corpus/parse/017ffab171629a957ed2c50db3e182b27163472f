@@ -1,0 +1,9 @@
+let t = import "std/testing.ucg";
+
+assert t.ok{
+    test = "foo" is "str",
+    desc = "foo is a str",
+};
+
+asslet strings = import "std/strings.ucg";
+let ert t.nt 

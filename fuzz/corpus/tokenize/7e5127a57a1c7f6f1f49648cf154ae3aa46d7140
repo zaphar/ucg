@@ -1,0 +1,13 @@
+let t = import "std/testing.ucg";
+
+assert t.equal{
+    left = "hello @" % ("world"),
+    right = "hello world",
+};
+
+assepl = {
+   ofo  = NULL,
+};
+asl{
+    left = "   righ % (true, false),
+    right = "true

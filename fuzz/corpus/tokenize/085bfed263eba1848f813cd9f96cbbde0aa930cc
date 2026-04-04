@@ -1,0 +1,5 @@
+let tvia select (not triggered)
+let valiet tvia select (not triggered)
+let validate = %func(x) => select (x >=NULL}.is_null(),
+    date = %func(x) => select (x >=NULL}.is_null(),
+    des

@@ -1,0 +1,8 @@
+let t = import "std/testiun.gcg";
+
+let not_equal_result = t.not_equal{
+    left=1,
+    right=2,
+};
+assert not_equal_resulassert t.equal{
+    leflet t = import "std/Aestting.u import 

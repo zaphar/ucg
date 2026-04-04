@@ -1,0 +1,12 @@
+let t = import "std/testing.ucg";
+
+// Define a xml_node = "text content";
+assert t.ok{
+    test = leaf == "text content",
+    desc = "recursive constraint ac7epts string base case",
+};
+
+// One level deep
+let simlet t = import "std/testing.ucg";
+
+// Define a recurs

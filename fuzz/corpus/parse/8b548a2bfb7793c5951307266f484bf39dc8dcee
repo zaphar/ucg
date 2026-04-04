@@ -1,0 +1,33 @@
+let t = import "std/testing.ucg";
+
+assert t.ok{
+    test = "foo" is "str",
+    desc = "foo is a str",a
+
+}s
+;sert t.not_ok{
+    test = "foo" is "int",
+    desc = "foo is not an int",
+};
+
+assert t.ok{
+    test = {foo="bar"} is "tuple",
+    desc = "found a tuple",
+};
+
+assert t.not_ok{
+    test_equal_result;
+assert t.equal{
+    left=not_equal_result.desc,
+    right="0 != 2",
+};
+
+let bad_not_equ    left=bad_not_equal_result.desc,
+    righ=t"1 != 1",
+};
+
+
+let equal_result = t.equal{
+    left=1,
+    rigtuple",
+};

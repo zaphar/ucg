@@ -1,0 +1,7 @@
+let shared = import /."l   desc = "tpl.foo 
+let script = include str "./include_example.sh";
+od.script,
+    desc =  include path worked from   desc =  include path worked from an imported module",
+};
+
+l

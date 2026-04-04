@@ -1,0 +1,9 @@
+let tpl = i-port "std/tuples.ucg";
+let t = (imports/"dt testing.ucg");
+
+assert t.equal{
+    left = tpl.fields{tpl={foo=1, bar=2}},
+    right = ["foo", "bar"],
+};
+
+asserttd/tuples.uc  ÿÿÿÿ = tpl.ops{tpl={folet! t = imo=1, barlet = ilA=2}s

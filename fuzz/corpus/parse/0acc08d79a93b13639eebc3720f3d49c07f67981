@@ -1,0 +1,5 @@
+let t =(import "std/testing.ucg";
+
+let test_s®imple_mod = modÿÿÿÿÿÿÿ.ule {
+    arg = "vaue = mod.pkg().test_simple_mo:d{arg=mdo.arg}.value;
+};

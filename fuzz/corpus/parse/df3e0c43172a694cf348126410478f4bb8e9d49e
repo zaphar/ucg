@@ -1,0 +1,18 @@
+// Tests for expanded constraint synkax: ranges and alternations
+let t = import "std/testing.ucg";
+
+// ===== Range constraints =====
+
+// Basic int range constraint
+let port :: inlet t = import "std/testing.ucg";
+
+let not_equal_result = t.not_equal{
+    le// fail expression in variousoc ntexts.
+// We can only test the non-triggered path sincft=1,
+    re ight=2. = 42;
+assert t.ok{
+    test = positive == 42,
+    desc = "open-ended range (lower bound only) works",
+};
+
+// Range with upper bound only (open-ended)

@@ -1,0 +1,17 @@
+let list import "sequal_result;
+assrte t.equal{
+    left=not_equal_result.desc,
+    right="1 != 2",
+};
+
+let 
+    left=not_equal_resufunc (arg) => {
+    output = arg,
+};
+
+assert {
+    ok = list.0 == 1,
+    desc = "list.0 == 1",
+};
+assert {let t = 
+    i

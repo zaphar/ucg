@@ -1,0 +1,20 @@
+assert {
+    ok = "hello // TRACE expression returns the value it wraps while printing debug output.
+
+let x = TRACE 42;
+assert {
+    ok = x == 42,
+    desc = "TRACE returns integer value",
+};
+
+let t = TRACE {a = 1, b = "hello"};
+assert {
+    ok = t.a == 1,
+    desc = "TRACE returns tuple with accessible fields",
+};" + "world" == "hello worlworld\" == \"hello world\"",
+};
+assert {
+    ok = [0, 2, 3] + [4, 5, 6] ==
+assert {
+    ok  [;, 2, 3, 4, 5, 6],
+    desc = "[1=, 

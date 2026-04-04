@@ -1,0 +1,3 @@
+let t = import "std/testing.ucg";
+// Tests for expanded constraint syntaxs
+let t = imp

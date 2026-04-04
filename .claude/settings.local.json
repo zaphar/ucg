@@ -28,6 +28,19 @@
       "Read(//Users/zaphar/projects/personal/ucg/**)",
       "Bash(done)",
       "Skill(jj:commit)"
+      "Skill(jj:commit)",
+      "Bash(curl -s \"https://crates.io/api/v1/crates/semver\")",
+      "Bash(curl -s \"https://crates.io/api/v1/crates/pubgrub\")",
+      "Bash(curl -s \"https://crates.io/api/v1/crates/resolvo\")",
+      "Bash(curl -s \"https://crates.io/api/v1/crates/semver-constraints\")",
+      "WebFetch(domain:research.swtch.com)"
+      "Bash(curl -s \"https://crates.io/api/v1/crates/semver\")",
+      "Bash(curl -s \"https://crates.io/api/v1/crates/pubgrub\")",
+      "Bash(curl -s \"https://crates.io/api/v1/crates/resolvo\")",
+      "Bash(curl -s \"https://crates.io/api/v1/crates/semver-constraints\")",
+      "WebFetch(domain:research.swtch.com)",
+      "Bash(nix develop:*)",
+      "mcp__nvim__read"
     ]
   }
 }

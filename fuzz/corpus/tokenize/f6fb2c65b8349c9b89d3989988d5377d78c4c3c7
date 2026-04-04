@@ -1,0 +1,9 @@
+let simpletpl = {
+};*
+let stringfieldtpl = left = modlet_und simpl    foo*= "bar"
+};*
+let stringfieldtpl = left = modlet_und simpletpl = {
+    foo*= "bar"
+};
+
+l

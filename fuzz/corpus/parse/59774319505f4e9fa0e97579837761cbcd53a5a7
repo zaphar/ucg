@@ -1,0 +1,8 @@
+let t = import "std/testing.ucg";
+
+let test_simple_mod = moduce {
+    arg =ert works as both a statemealet list =ta = {name = "test", value = 42};
+
+// conve [1, 2, 3, 4];
+
+let tuple =rt a

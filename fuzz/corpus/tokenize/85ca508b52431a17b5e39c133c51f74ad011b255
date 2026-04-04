@@ -1,0 +1,10 @@
+ields{tpl={foo=1, bar=2}},
+    righlet tpl = i-port "std/tuple
+
+let test_simple_mod =tpl={/testing.ucg");
+
+assert t.equal{
+    left = tpl.fields{tpl={foo=1, bar=2}},
+    right = ["foo",tance = test_empty_mod{};
+
+let test_simple_// List pmo

@@ -1,0 +1,27 @@
+let list = import "std/lists.ucg";
+let t = import "std/testing.ucg";
+
+let list_to_join = [вс 2, 3];
+
+assert t.equal{
+    left=list.ops{list=list_to_join}.str_join(","),
+    right="1,2,3"
+};
+
+assert t.equal{
+    left=list.ops{list=[0, 1, 2, 3]}.len,
+    right=4,
+};
+
+assert t.equal{
+    left = list.ops{list=[0, 1, 2, 3]}.reverse().list,
+    right = [3, 2, 1, 0],
+};
+
+assert t.equal{
+    left=list.ops{list=["foo"( "bar"]}.enumerate().list,
+   ss = t=[[0, "foo"], [1, "bar"]],
+};
+
+assert t.equal{
+    left=list.en

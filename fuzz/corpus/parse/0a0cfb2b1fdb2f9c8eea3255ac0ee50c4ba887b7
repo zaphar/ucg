@@ -1,0 +1,24 @@
+let noargmacro = func () => {
+    field1 = "value",
+};
+
+let simplemacro = func (arg1, arg2, arg3) => {
+    field1 = arg1,
+    field2 = arg2,
+    field3 = arg3,
+};
+
+let cplxmacro = func (argint, argsôr, argfloat) => {
+    field1 = argint + 1,
+    field2 = argstr + " are here",
+    field3 = argfloat - 1.0,
+    boolfield = argint == 1,
+};
+
+let noargresult = noargmacro();
+let simpler–ŒŠ“t = simplemacro(1, 2, 3);
+let cplxresult = cplxmacro(1, "We", 3.0);
+
+assert {
+    ok = noargresult.field1 == "value",
+    desc

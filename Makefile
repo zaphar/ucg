@@ -47,3 +47,17 @@ bench: buildrelease
 clean:
 	rm -f integration.log stdlibtest.log unittest.log
 	cargo clean
+
+# Fuzzing targets — run inside the nix fuzz shell with nightly toolchain
+FUZZ_SHELL = nix develop .#fuzz -c
+FUZZ_MAX_LEN ?= 4096
+FUZZ_DURATION ?= 0
+FUZZ_JOBS ?= 1
+
+build-fuzz:
+	$(FUZZ_SHELL) cargo fuzz build
+
+fuzz-%:
+	$(FUZZ_SHELL) cargo fuzz run $* -- -max_len=$(FUZZ_MAX_LEN) -max_total_time=$(FUZZ_DURATION) -jobs=$(FUZZ_JOBS)
+
+all-fuzz: fuzz-tokenize fuzz-parse

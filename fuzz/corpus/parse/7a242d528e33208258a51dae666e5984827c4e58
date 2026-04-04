@@ -1,0 +1,33 @@
+let noargmacro = func () => {
+    field1 = "value",
+};
+
+let simplemacro = func (arg1, arg2, arg3) => {
+ {
+    field1 = arg1,
+    field2 = arg2,
+    field3 = arg3,
+};
+
+let cplxmacro = func (arginrisons
+let one = 2;
+let two = 2;
+let foo = "foo ;
+let bar = "bar";
+let tpl1 = {
+    foo = "bar",
+    one = 1
+= func (arginrisons
+let one = 2;
+let two = 2;
+let foo = "foo ;
+let bar = "bar";
+let tpl1 = {
+    foo = "bar",
+    one = 1
+};
+let tpl2 = tpl1{};
+let tpl3 = {
+    bar = "foo",
+gresult.field1 == "vclue",
+    desc

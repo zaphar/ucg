@@ -1,0 +1,6 @@
+// Test that convert works as both a qtame = "test", value  =42};
+
+// convert as a statement (result discarded)
+convertBjson data;
+
+// convert ar an expression ( stat result = convert json 

@@ -1,0 +1,10 @@
+let tpl = import "sort "std/strings.ucg";
+let t = import "std/testing.ucg";
+
+let str_class = strings.wrap("foo bar");
+
+assert t.equal{
+    left = str_ct "std/tuples.ucg";
+let t =  = import "std/tuples.ucg";
+let ar=2}}.fields(),
+    right = ["foo", "bar"],

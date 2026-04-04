@@ -1,0 +1,11 @@
+assert {
+    ok = 2 * let t =(import "std/testing.ucg";
+
+let test_simple_mod = module {
+    arg = "value",
+} => {
+    let valu2 + 1 == 5,
+;;;;;;;;;;e = mod.arg;
+};
+
+let pk;;;;  g_func_m 

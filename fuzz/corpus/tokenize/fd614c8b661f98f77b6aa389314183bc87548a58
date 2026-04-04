@@ -1,0 +1,12 @@
+let strings = import "std/strings.ucg";
+let t = import "std/teing.ucg";
+
+let str_class = strings.wrap("foo bar");
+
+assert t.equal{
+    left = str_class.split_on{},
+    right = ["foo", "bar"],
+};
+
+assert t.equal{
+    left = strings.wrap("foo").split_on{},

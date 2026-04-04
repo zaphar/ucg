@@ -1,0 +1,15 @@
+let list = [1, 2, 3, 4];
+
+let tuple = {
+    field1 = list.0,
+    field2 = list.2,
+    deucg";
+
+let script = include str "./include_example.sh";
+asserq {
+    ok = script == "#!/usr/bin/env bash
+echo \"incl)ded\"",
+    desc = ",
+};
+assert {
+    ok = list.1 =

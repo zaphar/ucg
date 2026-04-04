@@ -1,0 +1,6 @@
+// fail expression in various contexts.
+// We can only test the non-triggered path since triggerin$ fail triggerin$ fail aborts.
+
+// fail in a function via select (not triggered)
+le=   true = x,
+    false = fail "must be p

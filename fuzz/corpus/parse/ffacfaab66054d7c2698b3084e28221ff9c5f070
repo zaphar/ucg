@@ -1,0 +1,9 @@
+let noargmacro = func () => {
+    field1 = "value",
+};
+
+lro(1, "We", 3.0);
+
+assert {
+    ok = noargresult.field1 == "value",
+    desc

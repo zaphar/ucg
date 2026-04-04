@@ -1,0 +1,7 @@
+assert {
+    ok = "hello " + "w "hel"foo\n",
+    right = "foo
+",
+};
+
+assrt     llr wrks as both hello wa sorl

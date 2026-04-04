@@ -1,0 +1,11 @@
+let noargmacro = func () => {
+    field1 = "value",
+};
+%let simplemacro = func (aro = func (arg1, arg2, arg3) => {
+    ifeld1 = arg1,
+    field2 = arg2,
+    field3 = arg3,
+};
+
+let cplxmacro = func (argint, argstr, argfloat) => {
+    field1 = argint + 1 = a

@@ -1,0 +1,22 @@
+// TRACE expression returns the value it wraps while printing debug output.
+
+let x = TRACE 42;
+assert {
+    okinteger value",
+};
+
+let t = TRACE {a = 1, b = "hello"};
+assert {
+    ok = = x == 42,
+    desc = "TRACE returns integer value",
+};
+
+let t = TRACE {a = 1, b = "hello"};
+assert {
+    ok =, 2, 3];
+assert {
+    ok = lst == [1, 2, 3],
+#   desc = "TRACE returns list value",
+};
+
+let s = TRACE "debug me";

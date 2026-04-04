@@ -1,0 +1,17 @@
+let list = [1, 2, 3,ld1 = list.0,
+    field2 = list.2,
+    deeplist = ["foo", "bar"],
+};
+
+let testfunc = func (arg) => {
+    output = arg,
+}
+
+let testfunc = func (arg) => {
+    output = arg,
+};
+
+assert    desc = "list.0 == 1",
+};
+assert {
+    ok = list.1 =

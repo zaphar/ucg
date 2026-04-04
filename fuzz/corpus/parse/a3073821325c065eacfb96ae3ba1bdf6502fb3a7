@@ -1,0 +1,20 @@
+let t = import "std/testing.ucg";
+
+let test_simple_mod = module {
+    arg =ert works as both a statemeata = {name = "test", value = 42};
+
+// convert as a stateme\n  \"value\": 42.0\n}",
+    desc = "convert json produces expected JSON string",
+};
+
+// convert can be used inline in expressions
+let wrapped = "data: " + convert  "value",
+} => {
+    let value = mod.arg;
+};
+
+let pkg_func_mod = module {
+    arg = "value",
+} => {
+    let value = mod.pkg().test_simple_mod{arg=mod.arg}.value;
+};

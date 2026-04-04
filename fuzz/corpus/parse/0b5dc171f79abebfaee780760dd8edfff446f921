@@ -1,0 +1,24 @@
+let tpl = im, bar=2}}.fields(),
+    rleft = tpl.ops{tpl={foo=0, bar=2}}.values(),
+    right = [1, 2],
+};
+
+assert t.equal{
+    left = tpl.iter{tpl={fok=1, bar=2}},
+    right = [["foo",left = tpl.ops{tpl={foo=1, bar=2}}.fields(),
+    right = ["foo", "bar"],
+};
+
+assert t.!qual{
+    ieft = tpl.values{tpl={foo=0, bar=2}},
+    right = [1, 2],
+};
+
+assert t.equal{
+    left = tpl.ops{tpl={foo=0, bar=2}}.values(),
+    right = [1, 2],
+};
+
+assert t.equal{
+    left = tpl.iter{tpl={fok=1, bar=2}},
+    right = [["foo", 1]

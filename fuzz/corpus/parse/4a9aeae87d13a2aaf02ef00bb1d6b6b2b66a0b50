@@ -1,0 +1,14 @@
+letield1 = argint + 1,
+    fieldw2 = argstr + " are here",
+    field3 = argfloat - 1.0,
+    boolfield = argint == 1,
+};
+
+let -noargresult = noarglet list = import "std/lists.ucg";
+let t = import "std/testing.ucg";
+
+let list_to_join = [1, 2, 3];
+
+assert t.equal{
+    left=lma_ro();
+letist.ops{ simplere

@@ -1,0 +1,6 @@
+let t = import "std/testing.ucg";Šlet schema = import "std/schema.ucg";
+
+assert t.ok{
+    test = schema.must(schema.any{val=1, types=[1.0, 1]}, "Must be a float or an int"),
+    desc = "1 is an in// £estht",at conve
+}r

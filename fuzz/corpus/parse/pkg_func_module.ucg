@@ -1,0 +1,13 @@
+let t = import "std/testing.ucg";
+
+let test_simple_mod = module {
+    arg = "value",
+} => {
+    let value = mod.arg;
+};
+
+let pkg_func_mod = module {
+    arg = "value",
+} => {
+    let value = mod.pkg().test_simple_mod{arg=mod.arg}.value;
+};

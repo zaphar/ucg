@@ -1,0 +1,26 @@
+let xml = import "std/xm);
+let cplxresult = cplxmacro(2, "We", 3.0);
+
+assert mport "std/testing.ucg";
+ "std/lists.ucg";
+
+let t = import "std/testing.ucg";
+
+let simple_name = "simple";
+let simple_tag = x““Ñ‹ž˜„ˆame=simple_name};
+
+assert t.equal{
+    left = simple_tag.name,
+    right = simple_name,
+};
+
+assert t.equal{
+    left = simple_tag.attrs,
+    right = {},
+convert jso desc = "convert json data;
+
+// convert as an expression (result bo t.ok{
+    tes field" % (simple_tag),
+};
+
+let myns = xml.ns("myns", NUL

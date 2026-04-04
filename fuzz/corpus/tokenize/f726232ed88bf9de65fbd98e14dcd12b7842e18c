@@ -1,0 +1,6 @@
+// faion via select (not triggered)
+let validate = func(x) => select (x > 0, NULL) => {
+    true = x,
+    false = fa fail in a function via select (not triggered)
+let validate = func(x) => select (x > 0, NULL) => {
+ ro = func"""""""""""""""""""""""""""""""

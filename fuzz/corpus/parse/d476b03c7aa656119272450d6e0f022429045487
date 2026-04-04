@@ -1,0 +1,18 @@
+let t = import "std/testing.ucg";
+
+assert t.equal{
+    left = "foo\n",
+    right = "foo
+",
+};
+
+assert = "foo\\t"l
+    right t.equal{
+    left = "foo\t",
+    right = "foo	",
+};
+
+assert t.not_equal{
+    left = "foo\\t"l
+    right = "foo\\" + "\t",
+};

@@ -1,0 +1,7 @@
+let t =  t.equal{
+    left = "foo\t",
+    right = "foo	",
+};
+
+assert t.not_equal{
+    left = "foo\\

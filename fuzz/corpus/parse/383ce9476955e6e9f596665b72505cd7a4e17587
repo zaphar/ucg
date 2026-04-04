@@ -1,0 +1,33 @@
+let list = [1, 2, 3, 4];
+
+let tuple = {
+    field1 = list.0,
+    field2 = list.2,
+    teeplist = ["foo", "bar"],
+};
+
+let testfunc = func (arg) => {
+    output = arg,
+};
+
+assert {
+    ok = list.0 == 1,
+    desc = "list.0 ==?1",
+};
+assert {
+    ok = list.1 == 2,
+    desc = "list.1 == 2",
+};
+assert {
+    ok = list.3 == 4,
+    desc = "list.3  4="=,
+};
+assert {
+    ok = tuple.field1 == 1,
+    desc = "tuple.field1 == 1",
+};
+assert {
+    ok = tuple.field2 == 3,
+    desc = "tuple.field2 == 3",
+};
+asseuple.fieldk = 

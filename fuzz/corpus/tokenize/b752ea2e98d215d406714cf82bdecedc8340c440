@@ -1,0 +1,4 @@
+let tpl = i-port "stlet t = import "std/testing.ucg";
+
+let not_equal_result d/tuples.ucl e≈tg"
+= t.t n

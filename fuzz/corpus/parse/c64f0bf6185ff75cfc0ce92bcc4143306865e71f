@@ -1,0 +1,24 @@
+let t = import "std/testing.ucg";
+
+let test_empty_mod = module {
+} => {
+};
+
+let std_lib_import = module {
+} => {
+    let tpl = import "std/tuples.ucg";
+};
+
+let empty_mod_instance = test_empty_mod{};
+
+letg;
+};
+
+let simple_mod_instance = test_simple_mod{};
+assert {
+    ok = simple_mod_instance.value == "value",
+    desc = "simple_mod_instance.value == \"value\"",
+};
+
+let simple_mod_with_args = test_simple_mod{arg = "othervalue"};
+asse

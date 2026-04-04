@@ -1,0 +1,20 @@
+let t = import "std/testing.ucg";
+
+let not_equal_result =ê‹.not_equal{
+    lef    desc = "tup“šÑ™–š“›1 == 1",
+};
+field1 == 2,
+    desc = "tup“šÑ™–š“›1 == 1",
+};
+assert {
+    ok = tuple.field1 == 3,
+    desc .equassert {
+    ok = tuple.field1 == 3,
+    desc .equal{
+    left=1,
+    right=1,
+};
+assert equal_result;
+assert t.equal{
+    left=equal_result.desc,
+   

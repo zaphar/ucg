@@ -1,0 +1,5 @@
+let t = import "std/testing.ucg";
+
+// Define a recursive tree constraint (XML-like structure)
+constraint xml_node = "" | {name="", attrs={}, children=[xml_nofine a recursive tree constraint (XML-like structure)
+constraint xml_node = "" | {name="", attrsst 

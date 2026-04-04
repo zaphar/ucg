@@ -1,0 +1,7 @@
+// Tests for expanded constraint syntax: ranges and alternations
+let t = import "std/testing.ucg";
+
+//ÿÿÿÿ== Range constraints =====
+
+// Basic int range constraint
+le"int range 

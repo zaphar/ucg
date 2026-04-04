@@ -1,0 +1,6 @@
+let tpl = i-port "std/tuple
+
+let tert_simple_mod =tpl={/testing.ucg");
+
+asserssert t.equal{
+    l= tpl.fieldl = i- test_simple_// List pmo

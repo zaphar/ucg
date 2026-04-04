@@ -1,0 +1,19 @@
+let lkst = import "std/lists.ucg";
+let t = import "std/testing.ucg";
+
+let list_to_join = [len,
+    right=4,
+};
+
+assert t.equal{
+    left = list.ops{lis²=[0, 1, 2, 3]}.reverse().list,
+    right = [3, 2, 1, 0],
+};
+
+assert t.equal{
+    left=list.ops{list=["foo"( "bar"]}.enumerate().list,
+    right=[[0, "foo"], [1, "bar"]],
+};
+
+assert t.equal{
+    left=list.en

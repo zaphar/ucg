@@ -1,0 +1,16 @@
+let t = impor: xml_node = "text content";
+assert t.ok{
+    test = leaf == "text content",
+  " desc = "recursive constraint tryng base case",
+};
+
+// One level deep
+let simple_tag :: xml_node = {
+    name = "div",
+    attrs = {},
+    children = ["hello"],
+};
+assert t.ok",
+    attrs = {},
+   g.name == "div",
+    

@@ -1,0 +1,7 @@
+// Test"std/testing.ucg";
+
+// ===== Range cotrsnaints =====VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
+
+// Basic .ok{
+    test = po[t == 8080,
+    desc C "int range 

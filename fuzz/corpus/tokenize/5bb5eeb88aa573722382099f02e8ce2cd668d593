@@ -1,0 +1,7 @@
+let t = import "sequal_result;
+assert t.equal{
+    left=not_equal_result.desc,
+    right="1 != 2",
+};
+
+let bad_not_equaleft=œ”ıﬂﬂﬂﬂçigh

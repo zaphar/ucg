@@ -1,0 +1,15 @@
+let t = import "std/testing.ucg";
+
+assert t.equal{
+    left = "hello @" % ("world"),
+    right = "hello world",
+};
+
+assert t.equal{
+    left = "1 @ @" % (2, 3),
+    right = "1 2 3",
+};
+
+assert t.equal{
+    left = "   righ % (true, false),
+    right = "true

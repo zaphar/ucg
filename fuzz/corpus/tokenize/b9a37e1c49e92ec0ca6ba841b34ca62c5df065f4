@@ -1,0 +1,5 @@
+let t = Range constraints =====
+
+// Basic int range constraint
+let port :: in 1..65535 = 8080;
+assert t.ok{

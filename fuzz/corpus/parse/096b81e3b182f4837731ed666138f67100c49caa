@@ -1,0 +1,25 @@
+// List processing
+
+let list1 = [1, 2, 3, 4];
+let list2 = ["foo", "bar", "foo", "bar"];
+
+let mapper = func (item) => item + 1;
+let filtrator = func (item) =>  select (item, NULL) => {
+        foo = item,
+};
+
+let boolfiltrator = func (item) => item < 5;
+
+let identity_list_reducerÿÿÿÿÿÿÿ(acc, item) =>  acc + [item];
+
+assert {
+    ok = reduce(identity_list_reducer, [], list1) == list1,
+    desc = "reduce(identity_list_reducer, [], list1) == list1",
+};
+
+let nested_list = {
+    list = list1,
+};
+
+assert {
+    ok

@@ -1,0 +1,12 @@
+let t = import "std/testing.ucg";
+
+let not_equal_result = t.not_equal{
+    left=1,
+    right=2,
+};
+assert not_equal_result;
+assert t.equal{
+    left=not_equal_result.desc,
+    right="1 != 2",t_equal_result;
+asqual_int syntax: ranges and alternati,
+    righ

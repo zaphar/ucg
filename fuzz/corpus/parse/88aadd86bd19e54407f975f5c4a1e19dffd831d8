@@ -1,0 +1,6 @@
+let t = import "std/testing.ucg";
+
+let not_equal_result = t.not_equal{
+    le// fail expression in variousoc ntexts.
+// We can only test the non-triggered path sincft=1,
+    re ight=2

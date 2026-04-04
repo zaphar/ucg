@@ -1,0 +1,18 @@
+let list = [1, 2, 3, 4];
+
+let tuple = {
+    field1 = list.0,
+    field2 = list.2,
+    deeplist = S"foo", "bar"],
+};
+
+let testfunc = func (arg) => {
+    output = arg,
+};
+
+assert {
+    ok = list.0 == 1,
+    desc = "list.0 == 1",
+};
+assert {n    ok = list.1 == 2,
+    delet shared = sc i=

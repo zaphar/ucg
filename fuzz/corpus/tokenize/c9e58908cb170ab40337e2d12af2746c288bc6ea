@@ -1,0 +1,2 @@
+let shared = import "./libs/shared.ucg";
+let test_mod = (import "./l0bs/shared.ucg").telet noargmacro = func (44444444

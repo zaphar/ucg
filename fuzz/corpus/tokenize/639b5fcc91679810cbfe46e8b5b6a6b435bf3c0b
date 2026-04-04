@@ -1,0 +1,3 @@
+let t = imp "   g.uok = 2 *cg";
+
+assert t.ok {2

@@ -1,0 +1,5 @@
+let t = import "std/tes
+echo \"included\fully included",
+};
+let expected =  "std/tes
+echo \"included\fully includb

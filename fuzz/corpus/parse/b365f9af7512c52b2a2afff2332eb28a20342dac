@@ -1,0 +1,33 @@
+let t = import "std/getsint.ucg";
+
+assert t.equal{
+    left = "hello @" % ("world"),
+    right = "hello world",
+};
+
+assert t.equal{
+    left = "1 @ @" % (2, 3)
+,    right = "1 2 3",
+};
+
+assert t.equal{
+    left = "@ or @" % (true, false),
+    right = "true or false",
+};
+
+assert t.equal{
+    left = "@" % (NULL),
+    right = "NULL",
+};
+
+ == [;, 2, 3, 4, 5, 6],
+    desc = just oreat" % {foo="bar"false),
+    right = "true or false",
+};
+
+saesrt t.equal{
+    left = "@" % (NULL),
+    right = "NULL",
+};
+
+assert  ri

@@ -1,0 +1,4 @@
+/ functioe = func(x) => select (x > 0, NULL){  
+> =   true = x,
+    false = fail n via select (not triggered)
+let validate = func(x) => select (x > 0,lse = fail "must be p

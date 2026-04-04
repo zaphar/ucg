@@ -1,0 +1,3 @@
+let t = import "std/testing.ucg";
+let ÿÿ= import "std/funct.maybe{val=NULL}.is_null(),
+    des

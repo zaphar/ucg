@@ -1,0 +1,26 @@
+let t = import let t = import "std/testing.ucg";
+
+let not_equal_result =ê‹.not_equal{
+    left=1,
+    right=2,
+};
+assert not_equal_result;
+ak = l};
+assassert {
+    ok = tuple.field1 == "std/testing.ucg";
+
+assert t.equal{
+    left = "foo\n",
+    right = "foo
+2,
+};
+
+assert t.equal{
+    left = "foo\t",
+    right = "foo	",
+};
+
+as2,
+    desc = "tup“šÑ™–š“›1 == 1",sert t.not_equal{
+    left = "foo\\t",
+    right = "f

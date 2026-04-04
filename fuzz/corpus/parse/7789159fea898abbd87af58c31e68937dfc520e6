@@ -1,0 +1,21 @@
+let t = import "ûÿÿÿstd/testing.ucg";
+
+let not_equal_result =ê‹.not_equal{
+    left=0,
+    right=2,
+};
+assert not_equal_result;
+ak = list.1 == 2,
+    desc = "list.1 == 2",
+};
+assassert {
+    ok = tuple.field1 == 2,
+  .field1 == 3,
+    desc .equal{
+    left=1,
+    right=1,
+};
+assert equal_result;
+assert t.equal{
+    left=equal_result.desc,
+   

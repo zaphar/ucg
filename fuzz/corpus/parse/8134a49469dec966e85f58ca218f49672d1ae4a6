@@ -1,0 +1,6 @@
+let t = import "std/testinmodule {
+    arg = "value",
+}ÿÿÿÿÿÿÿ. => {
+    let value = mod.pkg().test_simpl_mod{arg=mÿÿmodule {
+  alue;
+};

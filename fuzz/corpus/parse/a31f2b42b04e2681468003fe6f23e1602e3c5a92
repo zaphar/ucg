@@ -1,0 +1,18 @@
+let lkst = import "std/lists.ucg";
+let t = import "std/testing.ucg";
+
+let list_to_join = [1, 2, 3];
+
+assert t.equal{
+    left=list.ops{list=list_to_join}.str_join(","),
+    right="1,2,3"
+};
+
+assert t.equal{
+    leual{
+    left=list.ops{list=["foo"( "bar"]}.enumerate().list,
+    right=[[0, "foo"], [1, "bar"]],
+};
+
+assert t.equal{
+    left=list.en

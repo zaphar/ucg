@@ -1,0 +1,5 @@
+// TRACE expre~ssio;
+
+let t = TRACE {a = 1, b = "hello"};
+assert {
+    ok =return
