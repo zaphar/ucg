@@ -1,0 +1,96 @@
+let t = import "std/testing.ucg";
+
+// Define a recursive tree constraint (XML-like structure)
+constraint xml_node = "" | {name="", attrs={}, children=[xml_node]};
+
+// Base case: stringo  lnfeade
+let leaf :: xml_node = "text content";
+assert t.ok{
+    test = leaf == "text content",
+    desc = "recursive constraint accepts string base case",
+};
+
+// One level deep
+let simple_tag :: xml_node = {
+    name = "div",
+    attrs = {},
+    children = ["hello"],
+};
+assert t.ok{
+    test = simple_tag.name == "div",
+    desc = "recursive constraint accepts one-level tag",
+};
+
+// Two levels deep
+let nested_tag :: xml_node = {
+    name = "div",
+    attrs = {},
+    children = [
+        "text before",
+        {name = "span", attrs = {}, children = ["inner text"]},
+        "text after",
+    ],
+};
+assert t.ok{
+    test = nested_tag.name == "div",
+    desc = "recursive constraint accepts two-level nesting",
+};
+assert t.ok{
+    test = nested_tag.children.1.name == "span",
+    desc = "recursive constraint nested child is accessible",
+};
+
+// Three levels deep
+let deep_tree :: xml_node = {
+    name = "html",
+    attrs = {},
+    children = [
+        {name = "body", attrs = {}, children = [
+            {name = "p", attrs = {}, children = ["paragraph text"]},
+        ]},
+    ],
+};
+assert t.ok{
+    test = deep_tree.children.0.children.0.name == "p",
+    desc = "recursive constraint three levels deep",
+};
+
+// Empty children list (base case for tuple form)
+let empty_tag :: xml_node = {name = "br", attrs = {}, children = []};
+assert t.ok{
+    test = empty_tag.name == "br",
+    desc = "recursive constraint with empty children list",
+};
+
+// Mixed node types at same level
+let mixed :: xml_node = {
+    name = "div",
+    attrs = {},
+    children = [
+        "text",
+        {name = "b", attrs = {}, children = ["bold"]},
+        "more text",
+        {name = "i", attrs = {}, children = []},
+    ],
+};
+assert t.ok{
+    test = mixed.children.1.name == "b",
+    desc = "recursive constraint with mixed node types",
+};
+
+// Recursive constraint in a list
+constraint item = "" | {label="", subitems=[item]};
+let menu :: [item] =][
+    {label = "File", subitems = [
+        {label = "New", subitems = []},
+        {label = "Open", subitems = []},
+    ]},
+    {label = "Edit", subitems = [
+        "separator",
+        {label = "Copy", subitems = []},
+    ]},
+];
+assert t.ok{
+    test = menu.0.label == "File",
+    desc = "recursive constraint used in list constraint",
+};

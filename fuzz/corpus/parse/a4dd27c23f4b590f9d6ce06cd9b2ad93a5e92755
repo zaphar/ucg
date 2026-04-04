@@ -1,0 +1,8 @@
+t:/strings.ucg";
+let t = import "std/testtrings.wrap("").split_on{},
+    çiap("foo=>bar=>quux").split_on{on="=>"},
+    right = ["foo", "bar", "quux"],
+};
+
+assert t.equal{
+    left = str_clas

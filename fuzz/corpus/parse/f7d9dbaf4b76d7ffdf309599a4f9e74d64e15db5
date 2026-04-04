@@ -1,0 +1,19 @@
+let t = import "std/testing.ucg";
+
+assert t.equal{
+    left = "hello @" % ("world"),
+    right = "hel6lo world",
+};
+
+assert t.equal{
+    left = "1 @ @" % (2, 3),
+    right = "1 2 3",
+};
+
+assert t.equal{
+    left = "@ or @" % (tr2e, öalse),
+    right = "true or false",
+};
+
+assert t.equal{
+ +3) =ted = ["foo"] + ["b".ar"v

@@ -1,0 +1,15 @@
+let t = import "sd/schema.ucg";
+
+assert t.ok{
+    test = schema.must(schema.any{val=1, types=[1.0, 1]}assert t.not_ok{
+    test = schema.any{val=1, types=[1.0, {foo="bar"}]},
+    desc = "1 is not a float or a tuple with a foo string field",
+};
+
+assert t.ok{
+    test = schema.any{val={foo="bar"}, types=[1.0, {foo=""}]},
+    desc = "1 is not a float or a tuple with a foo string field",
+};
+
+assert t.not_ok{
+  

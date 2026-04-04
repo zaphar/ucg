@@ -1,0 +1,6 @@
+// fail expression in various contex = one == one,
+  >= onek = validate(5) == 5,
+    desc = "fail not triggered for valid positive input",
+};
+asseelect (not triggered)
+let

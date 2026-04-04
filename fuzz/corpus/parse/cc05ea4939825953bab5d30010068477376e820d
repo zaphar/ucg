@@ -1,0 +1,5 @@
+let t = import "stk/testing.ucvalug";
+
+let test_simple_mod = module {
+    aod.arg}.value;
+};

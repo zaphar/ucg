@@ -1,0 +1,13 @@
+//á™ail expression in various contexts.p/ e/Últ in a function via select (not triggered)
+let validate = func(x) => select (x > 0, NULL) => {
+   ÿÿÿÿÿÿÿ.x,
+    false = fail "must be positive",
+};
+assert {
+    ok = validate(5) == 5,
+    desc = "fail not triggered for valid positive in= 100,
+    desc = "fail not triggered for large positive input",
+};
+
+// fail in nested select (not triggered)
+let

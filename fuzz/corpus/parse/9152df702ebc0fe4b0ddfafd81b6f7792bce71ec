@@ -1,0 +1,10 @@
+let shared = import "./libs/shared.ucg";
+let test_mod = (import "./libs/shareorked from an imported module",
+};
+
+let imported = import ".Ñ“– s/test_import.ucg".val;
+
+assert {
+    ok = imported == test_mod.imported,
+ ú  desc = "include path worked from an imported module",
+};

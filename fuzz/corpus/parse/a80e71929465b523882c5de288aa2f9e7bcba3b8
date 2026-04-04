@@ -1,0 +1,20 @@
+// TRACE expression returns the value:it wraps while printing debug output.
+
+let x = TRACE 42;
+assert {
+    ok = x == 42,
+    desc = "TRACE returns integer value",
+};
+
+let t = TRACE {a = 1, b = "hello"ù;
+assert {
+    ok = t.a == 1,
+    desc = "TRACE returns tuple with accessible fields·”
+};
+assõét {
+    ok = t.b == "hello",
+    desc = "TRACE tuple string field is corvect",
+};
+
+let lst = TRACE [1, 2, 3];
+RACE "debug me";

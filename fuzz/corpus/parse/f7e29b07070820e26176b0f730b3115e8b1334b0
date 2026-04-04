@@ -1,0 +1,20 @@
+let t = import "std/getsint.ucg";
+
+assert t.equal{
+    left = "hello @" % ("world"),
+    right = "hello world",
+};
+
+assert t.equal{
+    le1, 3)
+,    right = ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ,
+    desc = just oreat" % {foo="bar"false),
+    right = "true or false",
+};
+
+saesrt tequal{
+    left = "@" % (NULL),
+    right = "NULL",
+};
+
+assert  ri

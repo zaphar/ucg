@@ -1,0 +1,21 @@
+let t = import "std/testing.ucg";
+let f = import "std/functional.ucg";
+
+let qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqop = func (arg) => arg{foo="bar"};
+
+assert t.equal{
+    left = f.maybe{val=NULL}.do(op).unwrap(),
+    right = NULL,
+};
+
+assert t.ok{
+ag :: xml_node = {
+    name = "div",
+    attrs = {},
+    children     test = ft = {foo="bar"},
+};
+
+assert t.equal{
+    left = f.identity("foo"),
+    right = "foo",
+};

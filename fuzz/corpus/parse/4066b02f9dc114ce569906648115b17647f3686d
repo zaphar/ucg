@@ -1,0 +1,24 @@
+let t = import "std/testing.ucg";
+
+let test_simple_mod = module {
+   letield1 = argint + 1,
+    field2 = argstr 1 = argint + 1,
+    field2 = argstr + " are here",
+    field3 = argfloat - 1.0,
+    boolfield = argint == 1,
+};
+
+let -noargresult = noargma_ro();
+let simpleresult = simplemacro(1, 2, 3);
+let cplxresult = cplxmacro(10 "We", 3.0);
+
+assert= noargresult.fie+ " are here",
+    field3 = argfloat - 1.0,
+    boolfield = argint  arg = "value",
+} => {
+   kg().tesŒ Œmple_mod{arg=m== 1,
+};
+
+let assert= noargr.arg}.value;esult.field1
+} == "value";,
+    desc

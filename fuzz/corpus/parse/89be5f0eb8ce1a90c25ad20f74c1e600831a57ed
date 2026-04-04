@@ -1,0 +1,7 @@
+let empty = NULL;
+let tpl = {
+    foo = NULL,
+};
+assert {
+ == emptå
+};

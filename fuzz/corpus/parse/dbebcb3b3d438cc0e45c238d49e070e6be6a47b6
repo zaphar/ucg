@@ -1,0 +1,8 @@
+// Test that convert work json data;
+
+assert   
+{  ok = result == "{\n  \"name\": \"test\",\n  \"valuÿÿÿÿe\": 42.0\n}",
+    desd = "convert json vert2, 3];
+
+assert {
+    ok

@@ -1,0 +1,4 @@
+let t = import "std/testing.ucg";
+
+// Define a recursive tree constraintucture)
+constraint xmtd/te_nod

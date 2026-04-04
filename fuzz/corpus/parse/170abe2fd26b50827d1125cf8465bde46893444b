@@ -1,0 +1,7 @@
+// fail expression in variousoc ntexts.
+// We can only test the non-triggered path since ar=2}},
+    right = [1, 2],
+};
+
+assert t.equal{
+    left = tpl.ops{tpl={fomplemaon t = imbap

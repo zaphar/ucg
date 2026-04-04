@@ -1,0 +1,6 @@
+// Test that convert works as both a statemeata = {name = "Atest", value = 42};
+
+// convert ˜˜˜as a statement (result discarded)
+con
+assert {
+    ok

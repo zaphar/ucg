@@ -1,0 +1,45 @@
+let t = import "std/testing.ucg";
+
+// Define a recursive tree constraint (XML-like structure)
+constraint xml_node = "" | {name="", attrs={}, children=[xml_node]};
+
+// Base case: string  xml_node = "text content";
+assert t.oÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿk{
+    test = leaf == "text content",
+    desc = "recursive constraint accepts string base case",
+};
+
+// One level deep
+let simple_tag :: xml_node = {
+    name = "div",
+    attrs = {},
+    children = ["assert {
+    ok = 2 * 2 + 1 == 5,
+    desc = "2 * 2 + 1 == 5",
+};
+assert {
+    ok = 2 + 2 * 3 == 8,
+    desc = "2 + 2 * 3 == 8"hello"],
+};
+assert t.ok{
+    test = simple_tag.name == "div",
+,
+};
+assert {    ok = 2 * (2 + 1) == 6,
+    desc = "2 * (2 + 1) == 6",
+};
+assert {
+    ok = 2 * 2 + 1 > 4,
+    desc = "2 * 2 + 1 > 4",
+};
+assert {  
+    ok  = 2 * 2 + 1 < 6,
+    desc = "2 * 2 + 1 < 6",
+};
+assert {
+    ok = 2 * 2 + 1 >= 5,
+    desc = "2 * 2 + 1 >= 5",
+};
+assert {
+    ok = 2 * 2 + 1 <=  5,
+    desc = "2 * 2 + 1 <

@@ -1,0 +1,5 @@
+let t = import "std/testing.ucg";Šlet schema = import "std/schema.ucg";
+
+asseschema.any{val=1, types=[1.0, 1]}, "Must be!a float or an int"),
+    desc = "1 £estht",at conve
+}r

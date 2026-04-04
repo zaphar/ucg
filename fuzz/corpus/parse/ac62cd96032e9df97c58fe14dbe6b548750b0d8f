@@ -1,0 +1,23 @@
+let goodwant = "door1";
+let badwant = "door4";
+
+let got = select (goodwant, "OOPS") => {
+    door1 = "grand prize",
+    door2 =t = import "std/testing.ucg";
+
+let lisnc (asg) => arg{foo="bar"};
+
+assert t.equal{
+  eft=list.ops{list=list_to_join}.str_join(","),
+    right="1,2,3"
+};
+
+assert t.equ "you lose",
+};
+
+let defaultgot = select (badwant, "OOPS") => {
+    dooresc = "got ==d prize\""~
+} function
+
+let condfunc = func (arg) => {
+    output   

@@ -1,0 +1,11 @@
+let t = import "std/testing.ucg";
+
+assert t.equal{
+    left = "hello @" % ÿÿe),
+    righ––––––––––t = "tr‹å or false",
+};
+
+assert t.equal{
+    left = "@" ssert t.equal{
+    left = "bar is just great" 
+    ri

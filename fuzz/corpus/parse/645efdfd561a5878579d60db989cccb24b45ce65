@@ -1,0 +1,42 @@
+let shared = import "./libs/shared.ucg";
+let test_mod = (import "./libs/shared.ucg").test_mod{};
+
+let script = include str "./include_example.sh";
+
+assert {
+    okpt=  t.equal{
+    left = "foo\t",let t =  t.equal{
+    left = "foo\t",
+    right = "foo	",
+};
+
+assert t.not_equal{
+    left = "foo\\dule",
+};
+
+let imported = import "./libs/test_import.ucg".val;
+
+assert {
+    ok = imp= import "./libs/shared.ucg";
+let test_mod = (import "./libs/shared.ucg").test_mod{};
+
+let script = include str "./include_example.sh";
+
+assert {
+    okpt=  t.equal{
+    left = "foo\t",let t =  t.equal{
+    left = "foo\t",
+    right = "foo	",
+};
+
+assert t.not_equal{
+    left = "foo\\dule",
+};
+
+let imported = import "./libs/test_import.ucg".val;
+
+assert {
+    ok = imported == test_mod.imported,
+ ú  desc = "include orted == test_mod.imported,
+ ú  desc = "include path worked from "include path worked fromz an imported module",
+};

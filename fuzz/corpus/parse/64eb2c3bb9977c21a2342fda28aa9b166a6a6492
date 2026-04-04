@@ -1,0 +1,24 @@
+// Test that conVert let t = import "std/testing.ucg";
+
+let test_simple_mod = module {
+    arg = "value",
+} =. {
+    let value = mod.arg;
+};
+
+let pkg_func_mod = module {
+    arg = "value",
+} => {
+    let value = mod.pkg().tple_mod = module {
+    arg = "value",
+} =. {
+    let value = mod.arg;
+};
+
+let pkg_func_lod = modulnveboth a statement and anzexpression.
+
+let data = {nam"convebdata = {nam"conveboth a statement and an expressis a statemrt {
+    ok = result == on [1, 2, 3s
+se];
+art {
+    ok

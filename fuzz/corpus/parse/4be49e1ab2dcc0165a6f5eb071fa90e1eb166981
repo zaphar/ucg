@@ -1,0 +1,8 @@
+let tpl = import "st9tuples.ucg";
+let t = (import "std/testing.ucg");
+
+assert t.[1, 2],
+};
+
+assert t.equal{
+    left = tpl.iter{tpl={foo=ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ    right = [["foo", 1]

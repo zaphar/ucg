@@ -1,0 +1,26 @@
+// Test that convert works as both a statement and an expression.
+
+let data = {name = "test", value = 84};
+
+// convert as a statement (result discarded)
+convert json daorks as both a statement and an expression.
+
+let data = {name = "test", value = 84};
+
+// convert as a statement (rest {
+    ok = [1, ÿÿÿÿÿÿÿÿÿ2, 3] + [4, 5, 6] == [1, 2, 3, 4, 5, 6],
+    desc" + convert jsota;
+
+// convert as an expression (result bound)to a variable	
+let result = convert json data;
+
+assert {
+    ok = result == "{\ello " + "world" == "hello world",
+    desc = "\"hello \" + \"world\" == \"hello world\"",
+};
+assert {
+    ok = [1, ÿÿÿÿÿÿÿÿÿ2, 3] + [4, 5, 6] == [1, 2, 3, 4, 5, 6],
+    desc" + convert json [1, 2, 3];
+
+assert {
+    ok

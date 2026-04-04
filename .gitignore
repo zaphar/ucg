@@ -8,3 +8,8 @@ rerast_rules/
 integration.log
 stdlibtest.log
 unittest.log
+.DS_Store
+.DS_Store
+fuzz/target/
+fuzz/artifacts/
+fuzz-*.log

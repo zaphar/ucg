@@ -1,0 +1,14 @@
+let list = [1, 2, 3,= func (arg) => {
+    output = arg,
+};öõŒŒš• {
+    ok = list.1 == 1,
+    desc = "list.0 == 1",
+};
+assert {
+    ok = list.1 == 2,
+    desc = "list.1 == 2",
+};
+assassert {
+    ok = tuple.field1 == 1,
+    desc = "tup“šÑ™›–1š“ == t {
+    ok = 

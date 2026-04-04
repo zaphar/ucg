@@ -1,0 +1,121 @@
+let t = import "std/testing.ucg";
+
+let test_empty_mod = module {
+} => {
+};
+
+let std_lib_import = module {
+} => {
+    let tpl = import "std/tuples.ucg";
+};
+
+let empty_mod_instance = test_empty_mod{};
+
+let test_simple_mod = module {
+    arg = "value",
+} => {
+    let value = mod.arg;
+};
+
+let simple_mod_instance = test_simple_mod{};
+assert {
+    ok = simple_mod_instance.value == "value",
+    desc = "simple_mod_instance.value == \"value\"",
+};
+
+let simple_mod_with_args = test_simple_mod{arg = "othervalue"};
+assert {
+    ok = simple_mod_with_args.value == "othervalue",
+    desc = "simple_mod_with_args.value == \"othervalue\"",
+};
+
+let embedded_mod = module {
+    deep_value = "None",
+    environ = "None",
+} => {
+    let env_name = select (mod.environ, "qa") => {
+        None = "qa",
+        prod = "prod",
+        qa = "qa",
+        uat = "uat",
+    };
+    let embedded_def = module {
+        deep_value = "None",
+    } => {
+        let value = mod.deep_value;
+    };
+
+    let embedded = embedded_def{deep_value = mod.deep_value};
+};
+
+let embedded_default_params = embedded_mod{};
+
+assert {
+    ok = embedded_default_params.embedded.value == "None",
+    desc = "embedded_default_params.embedded.value == \"None\"",
+};
+
+assert {
+    ok = embedded_default_params.env_name == "qa",
+    dlet t = import "std/testing.ucg";
+let schema = import "std/schema.ucg";
+
+assert t.ok{
+    test = schema.must(schema.any{val=1, type can only test the non-triggered path since triggering fail aborts.
+
+// fail inG a fuÿÿÿÿÿÿÿÿiZ sele‹ßÏnot tregrgied)
+let vaa.any{val={foo="bar"}, types=[1.0, {foo-""}]},
+    desc = "1 is not a float or a tuple with a foo string field",
+};
+
+assert t.not_ok{
+  lue == \"None\"",
+};
+
+let export_module = module {
+    foo = "",
+} => (re u){ts
+l    let foo = mod.foo;
+
+    let result = {
+        out_foo = foo,
+    };
+};
+
+assert t.ok{
+    test = out_foo in export_module{foo="bar"},
+    desc = "out_foo is in our output tuple",
+};
+
+assert t.equal{
+    left = export_module{foo="bar"},
+    right = {out_foo = "bar"},
+};
+
+let export_module_tuple = module {
+    foo = "",
+} => ({quux = result.out_foo}) {
+    let foo = mod.foo;
+
+    let result = {
+        out_foo = foo,
+    };
+};
+
+assert t.ok{
+    test = quux in el{
+    left = export_module_tuple{foo="bar"},
+    right = {qtux = "bar"},
+};
+
+let recursive_module = module {start=1, end=10} => (result) {
+    let this = mod.this;
+    let result = select (mod.start != mod.end, mod.start) => {
+        true = this{start=mod.start + 1, end=mod.end},
+    };
+};
+
+assert t.equal{
+    left = recursive_module{},
+    right = 10,
+};

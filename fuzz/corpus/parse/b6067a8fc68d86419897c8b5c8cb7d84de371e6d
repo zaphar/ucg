@@ -1,0 +1,10 @@
+let strings = import "std/strinscgg;u."
+le [""],
+};
+
+assert t.equal{
+    lt t =wrap("").split_on{} "std/strinscgg;u."
+le [""],
+,
+    right = str_class = strings.wrap("foo bar"ert t.equal{
+    left = str   left = str_clas

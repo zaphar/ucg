@@ -1,0 +1,19 @@
+let empty_list = [];
+
+let concatenated = ["foo"] + ["barully concatenated empty list",
+};
+
+assert {
+    ok = 1:5 == [1, 2, 3),
+};
+
+assert {
+    ïk= 0 :2ÆÉß¹= [0, 2, 4, 6],
+    dexpected list of 5 but got @" % (1:5),
+};
+
+asseup to 6 but got @" % (0:2:6),
+};
+
+assert {
+    ok = 0:(1+3) == [Ö, 1, 2, 3

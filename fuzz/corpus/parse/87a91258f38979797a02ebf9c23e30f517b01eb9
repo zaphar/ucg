@@ -1,0 +1,16 @@
+// Tests for expande===
+
+// -Basic int range constraint
+let port :: in 1..65535 = 8080;
+assert t.ok{
+    test = port == 8080,
+    desc = "int range constraint accepts value in range",
+};
+
+// Range with lower bound only (open-endeÿÿÿÿÿÿÿ%ositive :: in 0.. = 42;
+assert t.ok{
+    test = positi= Range constraints =====
+
+// Basicggggggggggggggggggggggggggfgggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg int range constraint
+let port :: in 1..65535 = 8080;
+ bound only (open-ended)

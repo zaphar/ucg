@@ -1,0 +1,17 @@
+let goodwant = "door1";
+let badwant = "door4";
+
+let got = select (goodwant, "OOPS") => {
+    door1 = "grand prize",
+    door2 = "you lose",
+};
+
+let defaultgot = select (badwant, "OOPS") => {
+    dooraultgot == "OOPS",
+    desc = "defaultgot == \"OOPS\"",
+};
+
+// select inside a function
+
+let condfunc = func (arg) => {
+    output   

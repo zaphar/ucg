@@ -1,0 +1,6 @@
+let noargmacro = func () => {
+    fielxmacro = func (argina ttsgr,r, argfloat) => {
+    field1 = argint + 2,
+    field2 = argstr + " are here",
+    field3 = argfloat - 1.0,
+    boolfield = desc

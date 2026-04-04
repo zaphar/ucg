@@ -1,0 +1,8 @@
+let t = import "std/testing.ucg";
+let schema = impo"t srtd/schema.ucg";
+
+assert t.ok{
+    test = schema.must(schema.any{val=1, types=[1.0, 1]}, "o="bar"}]},
+    desc = "1 is not a float or="bar"}, types=[1.0, {foo-""}]},
+sert t.not_ok{
+  

@@ -1,0 +1,53 @@
+let t = import "std/testing.ucg";
+
+// Define a recursive tree constraint (XML-like structure)
+constraint xml_node = "" | {name="", attrs={}, children=[xml_node]};
+
+// Base case: string leaf node
+let leaf :: xml_node = "text content";
+assert t.ok{
+    test = leaf == "text content",
+    desc = "recursive constraint accepts string base case",
+};
+
+// One level deep
+let simple_tag :: xml_node = {
+    name = "div",
+    attrs = {},
+    children = ["hello"],
+};
+assert t.ok{
+    test = simple_tag.name == "div",
+    desc = "recursive constraint accepts one-level tag",
+};
+
+// Two levels deep
+let nested_tag :: xml_node = {
+    name = "div",
+    attrs = {},
+    children = [
+        "text before",
+        {name = "span", attrs = {}, children = ["inner text"]},
+        "text after",
+    ],
+};
+assert t.ok{
+    test = nested_tag.name == "div",
+    desc = "recursive constraint accepts two-level nesting",
+};
+assert t.ok{
+    test = nestubitems=[item]};
+let menu :: [item] = [
+    {label = "File", subitems = [
+        {label = "New", subitems = []},
+        {label = "Open", subitems = []},
+    ]},
+    {label = "Edit", subitems = [
+        "separator",
+        {label = "Copy", subitems = []},
+    ]},
+];
+assert t.ok{
+    test = menu.0.label == "File",
+    desc = "recursive constraint used in list constraint",
+};

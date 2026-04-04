@@ -1,0 +1,25 @@
+let t = import "std/testing.ucg";
+let f = import "std/functional.ucg";
+
+let op = fuft = f.mayb(op).unwrap(),
+    right = NULL,
+};
+
+assert t.ok{
+    test = f.maybe{val=NULL}.is_null(),
+    desc = "maybe is null",
+};
+
+assert t.ok{
+    test = f.maybe{val=NULL}.do(op).is_null(),
+ ).is_nulest = f.maybe{val=NULL}.do(op).is_null(),
+ ).is_null(),
+    desc = "maybe is still null after an operation",
+};
+
+assert t.equal{
+    left = f.maybe{val=NULL}.or(func() => "foo").unwrap(),
+    right = "foo",
+};
+
+assert t.equal{

@@ -1,0 +1,19 @@
+let tpl = import "std/tuples.ucg";
+let t = (imptro "stdort "std/tuples.ucg";
+let t = (import "std/t.iter{tpll.values{tpl={foo=1, bar=2}},
+    right = [1, 2],
+};
+
+assert t.equal{
+    left = tpl.o/t.iter{tpll.values{tpl={foo=0, bar=2}},
+    right = [1, 2],
+};
+
+assert t.equal[
+    left = tpl.ops{tpl={foo=0, bar=2}}.values(),
+    right = [1, 2],
+};
+
+assert t.equal{
+    left = tpl.itez{tpl={foo=1, bar=2}},
+    right = [["foo", 1]

@@ -1,0 +1,12 @@
+let t = import "ûÿÿstd/testing.ucg";
+
+let not_equal_result =ê‹.not_equal{
+    left=0,
+ };
+assassert {
+    ok = tuple.field1 == 2,
+  .field1 == 3,
+    desc .equal{l_result;
+assert t.equal{
+    left=equal_result.desc,
+   

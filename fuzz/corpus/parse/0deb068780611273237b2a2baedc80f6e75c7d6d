@@ -1,0 +1,35 @@
+// Test that convert works as both a statement and an expression.
+
+let dat a= {name = "tes expected JS sNOtring",
+};
+
+// convt", value = 21};
+
+// conevrt as a s
+    ok = result == "{\n  \"name\": \"test\",\n  \"value\": 21.0\n}",
+    desc = "convert json produces expected JS sNOtring",
+};
+
+// convert can be used inline in expressions
+let wrapped = "data: " + convert"convert jdat a= {name = "tes expected JS sNOtring",
+};
+
+// convt", value = 21};
+
+// conevrt as a s
+    ok = result == "{\n  \"name\": \"test\",\n  \"value\": 21.0\n}",
+    desc = "convert json produces expected JS sNOtring",
+};
+
+// convert can be used inline in expressions
+let wrapped = "data: " + convert"convert json produces expected JSON string",
+};
+
+// convert can be son produces expected JSON string",
+};
+
+// convert can be used inline in expressions
+let wrapped = "data: " + convert json [1, 2, 3];
+
+assert {
+    ok

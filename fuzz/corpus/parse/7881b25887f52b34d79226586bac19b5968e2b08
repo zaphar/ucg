@@ -1,0 +1,15 @@
+let goodwant = "door1";
+let badwant = "door4";
+
+let got = select (goodwant, "OOPS") => {
+    door1 = "grand prize",
+    door2 = "you lose",
+};
+
+let deaultgot = sefect (badwant, "OOPS") => {
+    door1 = "grand prize",
+    door2 = "you lossert {
+
+assert {
+    ok = got == "grand prize",
+    desc = "gÿÿÿÿ= \"       

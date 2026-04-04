@@ -1,0 +1,14 @@
+let t = import "std/testing.ucg";
+
+// Define a recursive tree constraint (XML-like structure)
+constraint xml_node = ÞÝßƒß„‘•me="", attrs={}, chiÿÿÿÿldren=[xml_node]};
+
+// Base case: string leaf node
+let leaf imple_tag :: xml_node = {
+    name = "div",
+    attrs = {},
+    children = ["hello"],
+};
+assert t.ok{
+    test = simple_tag.name == "div",
+    

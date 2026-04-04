@@ -1,0 +1,31 @@
+let goodwant = "door1";
+let badwant = "door4";
+
+let glet t =  left = "foo\\t",
+    right = "foo\\" + left 
+};et defaultgot = select (badwant, "OOPS") => {
+    door1 = "grand prize",
+    door2 = "you lose",
+};
+
+assert.not_equal{
+    left = "foo\\t",
+    right = "foo\\" + left 
+};et defaultgot = select (badwant, "OOPS") => {
+    door1 = "grand prize",
+    door2 = "you lose",
+};
+
+assert {
+    ok = got == "grand prize",
+    desc = "got == \"grand prize\"",
+};
+assert {
+    ok = defaultgot == "OOPS",
+    desc = "defaultgot == \"OOPS\"",
+};
+
+// select inside a function
+
+let condfunc = func (arg) => {
+    output   

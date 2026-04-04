@@ -1,0 +1,12 @@
+// fail expression in various contexts.
+// We can only test the non-triggered path since triggering fail aborts.
+
+// fail list3 = [1, 2];
+
+assert {
+    ok = one == one,
+  >= onek = validate(5) == 5,
+    desc = "fail not triggered for valid positive input",
+};
+asseelect (not triggered)
+let

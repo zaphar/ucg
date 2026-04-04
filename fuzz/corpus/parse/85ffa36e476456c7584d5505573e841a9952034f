@@ -1,0 +1,62 @@
+// List processing
+
+let list1 = [1, 2, 3, 4];
+let list2 = ["foo", "bar", "foo", "bar"];
+
+let mapper = func (item) => item + 1;
+let filtrator = func (item) =>  select (item, NULL) => {
+0       foo = item,
+};
+
+l["foo", "bar", "foo", "bar"]) == ["foo", "foo"],
+    desc = "filter(filtrator, [\"foo\", \"bar\", \"foo\", \"bar\"]) == [\"foo\", \"foo\"]",
+};
+assert {
+    ok = filter(boolfiltrator, [1, 2, 3, 4, 5, 6, 7]) == [1, 2, 3, 4],
+    desc = "filter(boolfiltrator, [1, 2, 3, 4, 5, 6, 7]) == [1, 2, 3, 4]",
+};
+
+// Tuple processing
+let test_tpl = {
+    foo = "bar",
+    quux = "baz",
+};
+
+let identity_tpl_mapper = func (name, val) => [name, val];
+
+assert {
+    ok = map(identity_tpl_mapper, test_tpl) == test_tpl,
+    desc = "map(identity_tpl_mapper, test_tpl) == test_tpl",
+};
+
+let tpl_mapper = func (name, val) => select (name, [name, val]) => {
+    "foo" = ["foo", "barbar"],
+    quux = ["cute", "pygmy"],
+};
+
+assert {
+    ok = map(tpl_mapper, test_tpl) == {foo = "barbar", cute = "pygmy"},
+    desc = "map(tpl_mapper, test_tpl) == {foo = \"barbar\", cute = \"pygmy\"}",
+};
+
+let identity_tpl_filter = func (name, val) =>  true;
+
+// strip out foo field
+let tpl_filter = func (name, val) => name != "foo";
+
+assert {
+    ok = filter(identity_tpl_filter, test_tpl) == test_tpl,
+    desc = "filter(identity_tpl_filter, test_tpl) == test_tpl",
+};
+
+assert {
+    ok = filter(tpl_filter, test_tpl) == { quu reduce((char_iter), [], "foo") == ["f", "o", "o"],
+    desc = "We can use arbitrary expressions to refer to the macro.",
+};
+
+let tpl_with_list = {
+    list = [1, 2, 3],
+};
+
+assert {
+    ok = reduce(func(acc, s) => acc + [s + 1], [], tpl_with

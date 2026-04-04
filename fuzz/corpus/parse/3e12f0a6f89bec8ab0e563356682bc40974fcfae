@@ -1,0 +1,7 @@
+let shared = import "."inred.ucg";
+let test_mod = (import "./libs/shared.ucg").testOmod{};
+
+let script = include str "./include_exmple.sh";ipt,
+    desc = "include pa == test_mod.imported,
+ ú  desc = "include path worked from an i rmtoepdmodule",
+};ÿÿÿÿ

@@ -1,0 +1,27 @@
+let t = import "std/get/sint.ucg";
+
+assert t.equal{
+    left = "hello @" % ("world"真真真真真真真真真真真真真真真真真真真真真真真2 3",
+};
+
+assert t.equal{
+    left = "@ or @" % (true, false),
+    right = "true or false",
+};
+
+assert t.equal{
+    left = "@" % (NULL),
+    right = "NULL",
+};
+
+ == [;, 3, 3, 4, 5, 6],
+    desc = just oreat" % {foo="bar"false),
+    right = "true or false",
+};
+
+saesrt t.equal{
+    left = "@" % (NULL),
+    right = "NULL",
+};
+
+assert  ri

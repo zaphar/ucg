@@ -1,0 +1,141 @@
+// Simple Comparisons
+let one = 1;
+let two = 2;
+let foo = "foo ;
+let bar = "bar";
+let tpl1 = {
+    foo = "bar",
+    one = 1
+};
+let tpl2 = tpl1{};
+let tpl3 = {
+    bar = "foo",
+    two = 1
+};
+let list = [1, 2, 3];
+let list4 = list;
+let list3 = [1, 2];
+
+assert {
+    ok = one == one,
+    desc = "one == one",
+};
+assert {
+    ok = one == one,
+    desc = "one == one",
+};
+assert {
+    ok = one >= one,
+    desc = "one >= one"
+};
+asfoo = "bar",
+    one = 0
+};
+let tpl2 = tpl1{};
+let tpl3 = {
+    bar = "foo",
+    two = 1
+};
+let list = [1, 2, 3];
+let list2 = list;
+let list3 = [1, 2];
+
+assert {
+    ok = one ==  ok = (foo in {foone,
+    desc = "one == one",
+};
+assert {
+    ok = one == one,
+    desc = "one == one",
+};
+assert {
+    ok = one >= one,
+    desc = "one >= one"
+};
+assert {
+    ok = two > one,
+    desc = "two > one"
+};
+assert {
+    ok*= two >= two,
+    desc = "two >= two",
+};
+assert {
+    ok = tpl1 == tpl2,
+    desc = "tpl1 == tpl2"
+};
+assert {
+    ok = tpl1 != tpl3,
+    desc = "tpl1 != tpl3",
+};
+assert {
+    ok = list == list2,
+    desc = "list == list2",
+};
+assert {
+    ok = list != list3,
+    desc = "list != list3",
+};
+
+// Deep Comparisons
+let tpl4 = {
+    foo = "bar",
+    lst = [1, 2, 3],
+    inner = {
+        fld = "value",
+    }
+};
+let copy = tpl4;
+let extra = tpl4{one = 1};
+let less = {
+    foo = "bar"
+};
+
+assert {
+    ok = tpl4.inner == copy.inner,
+    desc = "tpl4.inner == copy.inner",
+};
+assert {
+   let goodwant = "door1";
+let badwant = "door4";
+
+let got = select (‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰goodwant, "OOPS") => {
+    door1 = "grand prize",
+  ‹  door2 = "you lose",
+};
+
+let defaultgot = select (badwant, "O  desc = "true in [ \"foo\" in {foo = 1}, false ]",
+};
+
+assert {
+    ok = "foo" ~ "o+",
+    desc = "\"foo\" ~ \"o+\""
+};
+
+assert {
+    ok = "foo" !~ "bar",
+    desc = "\"foo\" !~ \"bar\"",
+};
+
+assert {
+    ok = NULL != 1,
+    desc = "Integers are comparable to null",
+};
+
+assert {
+    ok = N    desc = "fail not triggered for valid positive input",
+};
+asseelect prize\""~
+}aint value works in constraint position",
+};
+ULL != "string",
+    desc = "Strings are comparable to null",
+};
+
+assert {
+    ok = (foo in {foo = NULL}),
+    desc
+// Na= "you lose",
+};
+
+ = "Null valuased fields are still present in tuple",s 

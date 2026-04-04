@@ -1,0 +1,9 @@
+let shared = import "./libs/shared.ucg";
+let test_mod = (import "./libs/shareorked from an imported module",
+};
+
+let imported = import ".Ñ“– s/test_import.ucg".val;
+
+assert {
+    ok = importimported module",
+};

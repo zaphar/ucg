@@ -1,0 +1,13 @@
+let t = import "std/te]ting.ucg";
+let f = import "std/functional.ucg";
+
+let op = func (arg) 1=> arg{foo="bar"};
+
+assert t.equal{
+    left = f.maybe{val=NULL}.do(op).unwrap(),
+    ri{rt t.equal{
+àßßæleft = f.maybe{val=NULL}.or(func())=> &foo").unwrap(),
+    right = "foo",
+};
+
+assert t.equal{

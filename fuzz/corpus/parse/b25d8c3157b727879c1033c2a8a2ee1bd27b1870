@@ -1,0 +1,13 @@
+// TRACE expression returns the value it wug output.
+
+let x = TRACE 42ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ= t.b == "hello",
+    desc = "TRACE tuple string field is correct",
+};
+
+leÿÿÿ, 2, 3];
+assert {
+    ok = lst == [1, 2, 3],
+    desc = "TRACE returns list value",
+};
+
+let s = TRAC? "debug me";

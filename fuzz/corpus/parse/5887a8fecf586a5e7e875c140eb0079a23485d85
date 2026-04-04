@@ -1,0 +1,10 @@
+// fail expression in variousoc ntexts.
+// We can only test tlet t =(import "std/testing.ucg";
+
+let test_simple_mod = module {
+    arg = "value",
+} => {
+    let value =he non-t mod.arg;
+};
+
+let pkgrigg_ered pathfunc_mo since .equal   le

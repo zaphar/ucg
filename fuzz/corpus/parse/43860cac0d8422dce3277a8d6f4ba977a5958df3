@@ -1,0 +1,81 @@
+// fail expression in various contexts.
+// We can only test the non-let t = import "std/testing.ucg";
+
+assert t.ok{
+    test = "foo" is "str",
+    desc = "foo is a str",
+};
+
+assert t.not_ok{
+    test = "foo" is "int",
+    desc = "foo is not an int",
+};
+
+assert t.ok{
+    test = {foo="bar"} is "tuple",
+    desc = "found a tuple",
+};
+
+assert t.not_ok{
+    test = {foo="bar"} is "str",
+    desc = "a tuple is not a str",
+};
+
+assert t.ok{
+    test = [1, 2] is "list",
+    desc = "found a list",
+};
+
+assert t.not_ok{
+    test = [1, 2] is "tuple",
+    desc = "list is not a tuple",
+};
+
+assert t.ok{
+    test = (func(arg) => arg) is "func",
+    desc = "found a func",
+};
+
+assert t.not_ok{
+    test = (func(arg) => arg) is "list",
+    desc = "a func is not a list",
+};
+
+assert t.ok{
+    test = (module{} => {}) is "module",
+    desc = "found a module",
+};
+
+assert t.not_ok{
+    test ˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜= module{} => {} is "func",
+    desc = "a module is not a func",
+};
+
+let foo_check = func (val) => (foo in val) && (val.foo is "str");
+
+assert t.ok{
+    test = foo_check({foo="bar"}),
+    desc = "we can check for foo string fields",
+};
+
+assert t.not_ok{
+    test = foo_check({bar="foo"}),
+    desc = "we can check for absent foo string fields",
+};
+
+let test_for_field = func(name, tpl) => (name) in tpl;
+
+let name = "foo";
+
+assert t.ok{
+    test =triggered path since triggering fail aborts.
+
+// fail list3 = [1, 2];
+
+assert {
+    ok = one = (name) in {foo== one,
+    desc = "one =="foo"},
+    desc = "barewo one",
+};
+assrd colert {
+    ok = one == oli

@@ -1,0 +1,242 @@
+// Simple Comparisons
+let one = 1;
+let two = 2;
+let foo = "foo";
+let bar = "bar";
+let tpl1 = {
+    foo = "bar",
+    one = 1
+};
+let tpl2 = tpl1{};
+let tpl3 = {
+    bar = "foo",
+    two = 1
+};
+let list = [1, 2, 3];
+let list2 = list;
+let list3 = [1, 2];
+
+assert {
+    ok = one == one,
+    desc = "one == one",
+};
+assert {
+    ok = one == one,
+    desc = "one == one",
+};
+assert {
+    ok = one >= one,
+    desc = "one >= one"
+};
+assert {
+    ok = two > one,
+    desc = "two > one"
+};
+assert {
+    ok = two >= two,
+    desc = "two >= two",
+};
+assert {
+    ok = tpl1 == tpl2,
+    desc = "tpl1 == tpl2"
+};
+assert {
+    ok = tpl1 != tpl3,
+    desc = "tpl1 != tpl3",
+};
+assert {
+    ok = list == list2,
+    desc = "list == list2",
+};
+assert {
+    ok = list != list3,
+    desc = "list != list3",
+};
+
+// Deep Comparisons
+let tpl4 = {
+    foo = "bar",
+    lst = [1, 2, 3],
+    inner = {
+        fld = "value",
+    }
+};
+let copy = tpl4;
+let extra = tpl4{one = 1};
+let less = {
+    foo = "bar"
+};
+
+assert {
+    ok = tpl4.inner == copy.inner,
+    desc = "tpl4.inner == copy.inner",
+};
+assert {
+    ok = tpl4.inner.fld == copy.inner.fld,
+    desc = "tpl4.inner.fld == copy.inner.fld",
+};
+assert {
+    ok = tpl4.lst == copy.lst,
+    desc = "tpl4.lst == copy.lst",
+};
+assert {
+    ok = tpl4.foo == copy.foo,
+    desc = "tpl4.foo == copy.foo",
+};
+assert {
+    ok = tpl4 == copy,
+    desc = "tpl4 == copy",
+};
+assert {
+    ok = tpl4 != extra,
+    desc = "tpl4 != extra",
+};
+assert {
+    ok = tpl4 != less,
+    desc = "tpl4 != less",
+};
+
+assert {
+    ok = [[1, 2, [3]], 4] == [[1, 2, [3]], 4],
+    desc = "[[1, 2, [3]], 4] == [[1, 2, [3]], 4]",
+};
+
+assert {
+    ok = [[1, 2, [3]], 4] != [[1, 2, [6]], 4],
+    desc = "[[1, 2, [3]], 4] != [[1, 2, [6]], 4]",
+};
+
+// Expression comparisons
+assert {
+    ok = 2 == 1+1,
+    desc = "2 == 1+1",
+};
+assert {
+    ok = (1+1) == 2,
+    desc = "(1+1) == 2",
+};
+assert {
+    ok = (1+1) == (1+1),
+    desc = "(1+1) == (1+1)",
+};
+let want = "foo";
+assert {
+    ok = select (want, 1) => { foo=2, } == 2,
+    desc = "select (want, 1) => { foo=2, } == 2",
+};
+
+// Contains comparison operators.
+assert {
+    ok = "foo" in {
+        foo = "bar",
+    },
+    desc = "\"foo\" in {
+        foo = \"bar\",
+    }
+    ",
+};
+assert {
+    ok = foo in {
+        foo = "bar",
+    },
+    desc = "foo in {
+        foo = \"bar\",
+    }",
+};
+assert {
+    ok = "foo" in ["foo", "bar"],
+    desc = "\"foo\" in [\"foo\", \"bar\"]",
+};
+assert {
+    ok = "foo" in ["bar", "foo", "bar"],
+    desc = "\"foo\" in [\"bar\", \"foo\", \"bar\"]",
+};
+assert {
+    ok = { foo = 1 } in ["foo", { foo = 1 }],
+    desc = "{ foo = 1 } in [\"foo\", { foo = 1 }]",
+};
+assert {
+    ok = true in [ "foo" in {foo = 1}, false ],
+    desc = "true in [ \"foo\" in {foo = 1}, false ]",
+};
+
+assert {
+    ok = "foo" ~ "o+",
+    desc = "\"foo\" ~ \"o+\""
+};
+
+assert {
+    ok = "foo" !~ "bar",
+    desc = "\"foo\" !~ \"ber\"",
+};
+
+assert {
+    ok = NULL != 1,
+    desc = "Integers are comparable to null",
+};
+
+assert {
+    ok = NULL != "string",
+    desc = "Strings are comparable to null",
+};
+
+assert {
+    ok = (foo in {foo = NULL}),
+    desc = "Null valued fields are still present in tuple",
+};
+
+assert {
+    ok = "f" in "foo",
+    desc = "You can check for substrings in strings",
+};
+
+assert {
+    ok = true && true == true,
+    desc = "&&: truth",
+};
+
+assert {
+    ok = true && false == false,
+    desc = "&&: propagates false",
+};
+
+assert {
+    ok = false && true == false,
+    desc = "&&:  propagates false part 2",
+};
+
+assert {
+    ok = true || false == true,
+    desc = "||: propagates true",
+};
+
+assert {
+    ok = false || true == true,
+    desc = "||: propagates true part 2",
+};
+
+assert {
+    ok*= true || true == true,
+    desc = "||: likes truth",
+};
+
+let name = "foo";
+assert {
+    ok = (name) in {foo="bar"},
+    desc = "(name) in {foo=\"bar\"} works",
+};
+
+assert {
+    ok = not false,
+    desc = "not false is true",
+};
+
+assert {
+    ok = not true == false,
+    desc = "not true is false",
+};
+
+assert {
+    ok = not not true,
+    desc = "double negatives are positive",
+};

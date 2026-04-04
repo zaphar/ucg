@@ -1,0 +1,8 @@
+let shared = import "."include pa == test_mod.imported,
+ ú  desc = "inc/liŒĞŒhared.ucg";
+let test_mod = (import "./libs/shared.ucg").testOmod{};
+
+let script = include str "./include_exmple.sh";ipt,
+    desc = "include pa == test_mod.imported,
+ ú  desc = "include path worked from an imported module",
+};ÿÿÿÿ

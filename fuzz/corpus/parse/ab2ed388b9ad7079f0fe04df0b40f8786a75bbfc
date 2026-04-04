@@ -1,0 +1,24 @@
+let shared = import "./libs/shared.ucg";
+let test_mod = (import "./libs/shared.ucg").test_molet t = import "std/testing.ucg";
+
+assert t.equal{
+    left = "hello @" % ("world"),
+    right = "helld",
+};
+
+assert t.equal{
+    left = "1 @ @" % (2,d{};
+
+let script = include str
+assert {
+    o 3),
+    right = "1 2 3",
+};
+
+assert t.equal{
+    left = "@ or @" % (true, false),
+    right = "true or false",
+};
+
+assert t.equal{
+    left = "@" % (k =NU

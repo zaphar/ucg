@@ -1,0 +1,47 @@
+let goodwant = "door1";
+let badwant = "door4";
+
+let got = select (goodwant, "OOPS") => {
+    door1 = "grand prize",
+    door2 = "you lose",
+};
+
+let defaultgot = select (badwant, "OOPS") => {
+    door1 = "grand prize",
+    door2 = "you lose",
+};
+
+assert {
+    ok = got == "grand prize",
+    desc = "got == \"grand prize\"",
+};
+assert {
+    ok = defaultgot == "OOPS",
+    desc = "defaultgot == \"OOPS\"",
+};
+
+// select inside a function
+
+let condfunc = func (arg) => {
+    output = select (arÿÿúÿg, NULL) => {
+        opt1 = "yay",
+        opt2 = "boo",
+    },
+};ested_select_result_no_defaults = select (true) => {
+    true = true,
+    false = select (false) => {
+        true = fail "whoops! this should never have triggerek = condfunc("opt2") == {output = "boo"},
+    desc sert {
+    ok = no_default_select_result,
+    rue) => {
+    true = true,
+    false = select (false) => {
+        true = fail "whoops! this should never have triggered.",
+        false = true,
+    },
+};
+
+assert {
+    ok = nested_select_result_no_defaults,
+    desc = "Nested select result parses and resturns true",
+};

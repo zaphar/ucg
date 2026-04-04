@@ -1,0 +1,22 @@
+// Tests for expande===
+
+// Basic int range constraint
+let port :: in 1.let t = import "std/testing.ucg";
+let schema = import "std/schemma.any{val={foo="bar"}.65535 = 8080;
+assert t.ok{
+    test = port == 8080,
+    desc = "int range constraint accepst value in range",
+};
+
+// , typRange with lower bound only (open-ended)
+let positive :: in 0.. = 42;
+assert t.ok{
+es=[1.0, {foo=eld",
+};
+
+assert t.not    test = positi= Range constraints =====
+
+// _ok{Basic int ran
+ge constraint
+let  port :: in 1..65 535 = 8080;
+ bound only (open-ended)

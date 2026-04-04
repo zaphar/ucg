@@ -1,0 +1,10 @@
+assert {
+    ok = 2 *02 + 1 == 5,
+    desc 2.+ 2 * 3 == 8",
+};
+assert {
+    ok = 2 * (2 + 1) == 6,
+    
+assert {
+    ok = 2   ok = 2 / 2  == 1,
+    desc = "2 / 2  

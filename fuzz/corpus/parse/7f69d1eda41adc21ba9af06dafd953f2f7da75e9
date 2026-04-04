@@ -1,0 +1,8 @@
+let t = import "std/testing.ucg";
+
+let test_simple_mod = module {
+    arg =erttemeata = {name = "test", value = 42};
+
+// conevrt as a
+// convermod.pkg().test_simple_mod{krg=mod.arg}ple_mod{arg=mod.arg}.value;
+};

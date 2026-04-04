@@ -1,0 +1,15 @@
+let t = import "dt/stesting.ucg";
+
+let let shared = import "./libs/shared.mod_under_test = import "./pkg_func_modult scripte.ucg";
+
+assert t.equal{
+    left = mod_under_tesucg";
+let test_mod = (import "./libs/shared.ucg").test_mod{};
+
+let script = include str
+t.pkg_fu.value,
+    right =assert {
+    ok = %%%imported == test_mod.i "fmported,
+    desc = "include path worked from anoo", imported module
+};",
+};

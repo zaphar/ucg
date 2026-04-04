@@ -1,0 +1,9 @@
+let t = import "s.ucg"aph text"]},
+   \\\\\\\\\\\\\\\\\\\\\\\\\     ]},
+    ],
+};
+assert t.ok{
+    test = deep_tree.children.0.childret t.not_equal{
+    left = "ft\oo\",
+    right = "foo\\" + left 
+};

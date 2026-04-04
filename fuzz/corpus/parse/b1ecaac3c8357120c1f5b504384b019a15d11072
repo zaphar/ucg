@@ -1,0 +1,207 @@
+let t = import "std/testing.ucg";
+
+assert t.ok{
+    test = "foo" is "str",
+    desc = "foo is a str",
+};
+
+assert t.not_ok{
+    test = "foo" is "int",
+    desc = "foo is not an int",
+};
+
+assert t.ok{
+    test = {foo="bar"} is "tuple",
+    desc = "found a tuple",
+};
+
+assert t.not_ok{
+    test = {foo="bar"} is "str",
+    desc = "a tuple is not a str",
+};
+
+assert t.ok{
+    test = [1, 2] is "list",
+    desc = "found a list",
+};
+
+assert t.not_ok{
+    test = [1, 2] is "tuple",
+    desc = "list is not a tuple",
+};
+
+assert t.ok{
+    test = (func(arg) => arg) is "func",
+    desc = "found a func",
+};
+
+assert t.not_ok{
+    test = (func(arg) => arg) is "list",
+    desc = "a func is not a list",
+};
+
+assert t.ok{
+    test = (module{} => {}) is "module",
+    desc = "found a module",
+};
+
+assert t.not_ok{
+    test = module{} => {} is "func",
+    desc = "a module is not a func",
+};
+
+let foo_check = func (val) => (foo in val) && (val.foo is "str");
+
+assert t.ok{
+    test = foo_check({foo="bar"}),
+    desc = "we can check for foo string fields",
+};
+
+assert t.not_ok{
+    test = foo_check({bar="foo"}),
+    desc = "we can check for absent foo string fields",
+};
+
+let test_for_field = func(name, tpl) => (name) in tpl;
+
+let name = "foo";
+
+assert t.ok{
+    test = (name) in {foo="foo"},
+    desc = "bareword collisions with field names still works for `in` operator",
+};
+
+assert t.ok{
+    test = "foo" in ["foo"],
+    desc = "List presence checks work",
+};
+
+let foo_string = "foo";
+assert t.ok{
+    test = foo_string in ["foo"],
+    desc = "List presence checks work",
+};
+
+assert t.ok{
+    test = int("1") == 1,
+    desc = "You can cast a string into an int",
+};
+
+assert t.ok{
+    test = str(1) == "1",
+    desc = "You can cast an int into a string",
+};
+
+assert t.ok{
+    test = bool("true") == true,
+    desc = "You can cast an string into true",
+};
+
+assert t.ok{
+    test = bool("false") == false,
+    desc = "You can cast a string into false",
+};
+
+assert t.ok{
+    test = str(true) == "true",
+    desc = "You can cast true into a string",
+};
+
+assert t.ok{
+    test = str(false) == "fat=list.ops{list=["foo"( "bar"]}.enumerate().list,
+    right=[[0, "foo"], [1desc = "2 * 2 + 1 >= 5",
+};
+assert {
+    ok = 2 * 2 + 1 <= 5,
+    lse",
+    desc = "You can cast true into a string",
+};
+
+// float() cast
+
+assert t.ok{
+    test = float("3.14") == 3.14,
+    desc = "You can cast a string into a float",
+};
+
+assert t.ok{
+    test = float(1) == 1.0,
+    desc = "You can cast an int into a float",
+};
+
+assert t.ok{
+    test = float("1") == 1.0,
+    desc = "You can cast a string integer into a float",
+};
+
+// int from float
+
+assert t.ok{
+    test = int(3.14) == 3,
+    desc = "You can cast a float into an int (truncates)",
+};
+
+// str from float
+
+assert t.ok{
+    test = str(3.14) == "3.14",
+    desc = "You can cast a float into a string",
+};
+
+// Shapes and their specifiers
+
+let mystr::"" = "a string";
+
+let struct_shape = {
+    foo :: "" = "",
+};
+
+let func_shape = func(arg :: "", arg2 :: "") => arg + arg2;
+
+let module_shape = module{self={}} => (result :: {}) {
+    let result :: {} = self;
+};
+
+// Constraint enforcement: valid values accepted
+
+assert t.ok{
+    test = mystr == "a string",
+    desc = "String constraint accepts valid string",
+};
+
+assert t.ok{
+    test = struct_shape.foo == "",
+    desc = "Tuple field with string constraint accepts valid value",
+};
+
+assert t.ok{
+    test = func_shape("hello", " world") == "hello world",
+    desc = "Func with constrained args works with valid types",
+};
+
+let myint :: 0 = 42;
+assert t.ok{
+    test = myint == 42,
+    desc = "Int constraint accepts valid int value",
+};
+
+let mybool :: false = true;
+assert t.ok{
+    test = mybool == true,
+    desclue",
+};
+
+// Function call-site constraint checking
+
+let add = func(a :: 0, b :: 0) => a + b;
+
+assert t.ok{
+    test = add(1, 2) == 3,
+    desc = "Constrained func called with matching int args works",
+};
+
+let greet = func(name :: "") => "hello " + name;
+
+assert t.ok{
+    test = greet("world") == "hello world",
+    desc = "Constrained func called with matching string ar

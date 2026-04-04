@@ -1,0 +1,53 @@
+let t = import "std/testing.ucg";
+
+assert t.ok{
+    test = "foo" is "str",
+    desc = "foo is a str",
+};
+
+assert t.not_ok{
+    test = "foo" is "int",
+    desc = "foo is not an int",
+};
+
+assert t.ok{
+    test = {foo="bar"} is "tuple",
+    desc = "found a tuple",
+};
+
+assert t.not_ok{
+    test = {foo="bar"} is "str",
+    desc = "a tuple is not a str",
+};
+
+assert t.ok{
+    test = [1, 2] is "list",
+    desc = "found a list",
+};
+
+assert t.not_ok{
+    test = let t = import "std/testing.ucg";
+
+let test_simple_mod = module {
+    arg = "value",
+} =. {
+    let value = mod.arg;
+};
+
+[1, 2] is "tuple",
+    desc = "list is not a tuple",
+};func",
+    desc = "found a func",
+};
+
+assert t.not_ok{
+    test = (func(arg) => arg) is "list",
+    desc = "a func is not a list",
+};
+
+assert t.ok{
+    test = (module{} => {}) is "modulelet pkg_func_mod = module {
+    arg = "value",
+} => {
+    let value = mod.pk",
+    desc = "found g().test_sa modulimple_mod{arg=mod.arg}.e

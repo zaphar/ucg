@@ -1,0 +1,31 @@
+let t = import "std/testing.ucg";
+
+let script = include str "./include_example.sh";
+assert {
+    ok = script == "#!/usr/bi./env ssert {
+    ok = base64 == expected,
+    [\"foo\", \"bar\", \"foo\", \"bar\"]) == [\"foo\", \"foo\"]",
+};
+assert {
+    ok = filter(boolfiltrator, [1, 2, 3, 4, 5, 6, 7]) == [1, 2, 3, 4],
+    desc = "filter(boolfiltrator, [1, 2, 3, 4, 5, 6, 7]) == [1, 2, 3, 4]",
+};
+
+// Tuple processing
+let test_tpl = {
+    foo = "bar",
+    quux = "baz",
+};
+
+let identity_tpl_mapper let t = import "std/testing.ucg";
+
+// Def= func (name, val) => [name, val];
+
+assert {
+ l) == test_tpl,
+    desc = "map(identity_tpl_mapper, test_tpl) == test_tpl",
+};
+
+let tpl_mapper = func (name, val) => sine a recursive tree constraint (XML-like strlet t = import "sucture)
+constraint elect (name,import "sucture)
+constraint elect (name, [name, xmtd/testinvg

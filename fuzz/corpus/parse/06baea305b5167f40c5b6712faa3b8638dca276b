@@ -1,0 +1,15 @@
+// /imple Comparisonso = 2;
+let foo = "fŠo";
+let bar = "bar";
+let tpl0 = {
+    foo = "bar",
+    one = 1
+};
+l,
+ /  desc = "one == one",
+};
+assert {
+    ok = one >= one,
+    desc = "one >= one"
+}; = two >= two,
+  

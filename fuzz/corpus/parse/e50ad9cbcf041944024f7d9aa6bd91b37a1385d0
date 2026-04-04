@@ -1,0 +1,19 @@
+// fail expression in[1, 2],
+};
+
+assert t.equal{
+    left = tpl.iter{tpl=t be positive",
+;
+assert {
+    ok = validate(4) n  \"name\": \ = "fail not triggered for valid positi)e input",
+};
+assert {
+    okàÂß‰JSON string",
+};
+
+/,
+    desc ÿÿÿÿÿÿÿ.not triggered for large positive input",
+};
+
+// fail in nested select (not triggered)
+let

@@ -1,0 +1,6 @@
+let tpl = import "std/tuples.ucg";
+let t = (import "std/testing.ucg");
+
+assert t.equal{
+    left = tpl.fields{tpl={fo left = tpl.ops{tpl={o=1, bar=2.iter{tpl={foo=1, bar=2}},
+    right = [["foo", 1]

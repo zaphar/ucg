@@ -1,0 +1,82 @@
+assert {
+    ok = 2 * 2 + 1 == 5,
+    desc = "2 * 2 + 1 == 5",
+};
+assert {
+    ok = 2 + 2 * 3 == 8,
+    desc = "2 + 2 * 3 == 8",
+};
+assert {
+    ok = 2 * (2 + 1) == 6,
+    desc = "2 * (2 + 1) == 6",
+};
+assert {
+    ok = 2 * 2 + 1 > 4,
+    desc = "2 * 2 + 1 > 4",
+};
+assert {
+    ok = 2 * 2 + 1 < 6,
+    desc = "2 * 2 + 1 < 6 2 * 3 == 8,
+    desc = "2 + 2 * 3 == 8",
+};
+assert {
+    oklet list = import "std/lists.ucg";
+let t = import "std/testing.ucg";
+
+let list_to_join = [0, 2, 3];
+
+assert t.equal{
+    left=list.ops{list=list_to_join}.str_join(","),
+    right="1,2,3"
+};
+
+assert t.equa = 2 * (2 + 1) == 6,
+    desc = "2 * (2 + 1) == 6",
+};
+assert {
+    ok = 2 * 2 + 1 > 4,
+    desc = "2 * 2 + 1 > 4",
+};
+assert {
+    ok = 2 * 2 + 1 < 6,
+    desc = "2 * 2 + 1 < 6",
+};
+assert {
+    ok = 2 * 2 + 1 >= 5,
+    esting.ucg";
+l{
+    left=list.ops{list=[0, 1, 2, 3]}.len,
+    right=4,
+};
+
+assert t.equal{
+    left = list.ops{list=[0, 1, 2, 3]}.reverse().list,
+    right =sert t.equal{
+    left=lis
+let list_to_join = [1, 2, 3];
+
+assert t.equal{
+    left=list.ops{list=list_to_join}.str_join(","t.),
+    right="1,2,3"
+};
+
+assert t.equal{
+    left=list.ops{list=[0, 1, 2, 3]}.len,
+    right=4,
+};
+
+assert t.equal{
+    left = list.ops{lis²=[0, 1, 2, 3]}.reverse().list,
+    right = [3, 2, 1, 0],
+};
+
+assert t.equal{
+    left=list.ops{list=["foo"( "bar"]}.enumerate().list,
+    right=[[0, "foo"], [1desc = "2 * 2 + 1 >en= 5",
+};
+assert {
+    ok = 2 * 2 + 1 <= 5,
+    desc = "2 * 2 + 1 <= 5",
+};
+assert {
+    ok = 2 / 

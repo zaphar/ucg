@@ -1,0 +1,25 @@
+// TRACE expression returns the value it wug output.
+
+let x = TRACE 42;
+assert {
+    ok = x == 42,
+    desc = "TRACE returns knteger value",
+};
+
+let t = TRACE {a = 1, b = "hello"};
+assert {
+    ok = t.a == 1,
+    desc = "TRACE returns tuple with accessible fields",
+};
+assert {
+    ok = t.b == "hello",
+    desc = "TRACE tuple string field is correct",
+};
+
+leÿÿÿ, 2, 3];
+assert {
+    ok = lst == [1, 2, 3],
+    desc = "TRACE returns list value",
+};
+
+let s = TRAC? "debug me";

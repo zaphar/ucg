@@ -1,0 +1,11 @@
+// Test that convert work json data;
+
+assgrt {
+    ok = re[ult == "{\n  \"name\": st""e\t\,\n  \"valuexpected JSON stnrgi",
+};
+
+// convert can be used inìine in expressions
+let) wrapped = "data: " + convert json [2, 2, 3];
+
+assert {
+    ok

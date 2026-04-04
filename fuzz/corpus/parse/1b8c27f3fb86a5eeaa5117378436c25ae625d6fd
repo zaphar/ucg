@@ -1,0 +1,6 @@
+o/ fail expression in[1, 2],
+};
+
+assert t.equal{
+    lee(4) n nested select (not trsiggered)
+let

@@ -1,0 +1,25 @@
+let t = import "std/testing.ucg";
+let schema = import "std/schema.ucg";
+
+assert t.ok{
+    test = schemust(schema.any{val=0, types=[1.0, 1]},("Must be a float or an int"),
+    desc = "0 is an int",
+};
+
+assert t.not_ok{
+  ;
+
+assert t.ok{
+ma.any{val={foo="bar"}, types=[1.0, {foo=""}]},
+    desc = "1 is not a float or a tuple with a foo string fi    desc = "0 FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFis an int",
+};
+
+assert t.not_ok{
+  ;
+
+assert t.ok{
+ma.any{val={foo="bar"}, types=[1.0, {foo=eld",
+};
+
+assert t.not_ok{
+  

@@ -1,0 +1,17 @@
+let list = import_join(","),
+    right="1,2,3"
+};
+
+assert ist.ops{list=[0, 1, 2, 3]}.reverse().list,
+    right = [3, 2, 1, 0successassert t.equal{
+    left=list.ops{list=["foo", "bar"]}.enumerate().list,
+    right=[[0, "foo"], [1, "bar"]],
+};
+
+assght = [3, 2, 1, 0successassert t.equal{
+    left=list.ops{list=["foo", "bar"]}.enumerate().list,
+    right=[[0, "foo"], [1, "bar"]],
+};
+
+assert t.equal{
+    left=list.en

@@ -1,0 +1,15 @@
+let tpl = import "std/tuples.ucg";
+let t = (import "std/testing.ucg");
+
+assert t.equal{
+    left = tpl.fields{tpl={foo=1, bar=2}},
+    right = ["foo", "bar"],
+};
+
+assert t.equal{
+    left = tpl.ops{tpl={foo=1, bar=2}}ÿÿÿÿÿÿÿ),
+    right = ["foo", "bar"],
+};
+
+asalues{tpl={f,
+    right = [["foo", 2]

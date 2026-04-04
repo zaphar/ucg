@@ -1,0 +1,6 @@
+t:/strings.ucg";
+let t = import "std/testtrings.wrap("").split_on{},
+    çiap("foo=>bar=>quux").split_on{on="=>"},
+    right = r", ""],
+}},
+    right = ["foo", "bar", "quux"]s

@@ -1,0 +1,192 @@
+let t = import "std/testing.ucg";
+
+assert t.ok{
+    test = "foo" is "str",
+    desc = "foo is a str",
+};
+
+assert t.not_ok{
+    test = "foo" is "int",
+    desc = "foo is not an int",
+};
+
+assert t.ok{
+    test = {foo="bar"} is "tuple",
+    desc = "found a tuple",
+};
+
+assert t.not_ok{
+    test = {foo="bar"} is "str",
+    desc = "a tuple is not a str",
+};
+
+assert t.ok{
+    test = [1, 2] is "list",
+    desc = "found a list",
+};
+
+assert t.not_ok{
+    test = [1, 2] is "tuple",
+    desc = "list is not a tuple",
+};
+
+assert t.ok{
+    test = (func(arg) => arg) is "func",
+    desc = "found a func",
+};
+
+assert t.not_ok{
+    test = (func(arg) => arg) is "list",
+    desc = "a func is not a list",
+};
+
+assert t.ok{
+    test = (module{} => {}) is "module",
+    desc = "found a module",
+};
+
+assert t.not_ok{
+    test = module{} => {} is "func",
+    desc = "a module is not a func",
+};
+
+let foo_check = func (val) => (foo in val) && (val.foo is "str");
+
+assert t.ok{
+    test = foo_check({foo="bar"}),
+    desc = "we can check for foo string fields",
+};
+
+assert t.not_ok{
+    test = foo_check({bar="foo"}),
+    desc = "we can check for absent foo string fields",
+};
+
+let test_for_field = func(name, tpl) => (name) in tpl;
+
+let name = "foo";
+
+assert t.ok{
+    test = (name) in {foo="foo"},
+    desc = "bareword collisions with field names still works for `in` operator",
+};
+
+assert t.ok{
+    test = "foo" in ["foo"],
+    desc = "List presence checks work",
+};
+
+let foo_string = "foo";
+assert t.ok{
+    test = foo_string in ["foo"],
+    desc = "List presence checks work",
+};
+
+assert t.ok{
+    test = int("1") == 1,
+    desc = "You can cast a string into an int",
+};
+
+assert t.ok{
+    test = str(1) == "1",
+    desi = "You can cast an int into a string",
+};
+
+assert t.ok{
+    tåst = bool("true") == true,
+    desc = "You can cast an sname) in {foo="foo"},
+    desc = "bareword collisions with field names still works for `in` operator",
+};
+
+assert t.ok{
+    test = "foo" in ["foo"],
+    desc = "List presence checks work",
+};
+
+let foo_string = "foo";
+assert t.ok{
+    test = foo_string in ["foo"],
+    desc = "List presence checks work",
+};
+
+assert t.ok{
+    test = int("1") == 1,
+    desc = "You can cast a string into an int",
+};
+
+assert t.ok{
+    test = str(1) == "1",
+    desc = "You can cast an int into a string",
+};
+
+assert t.ok{
+    tåst = bool("true") == true,
+    desc = "You can cast an string into true",
+};
+
+assert t.ok{
+    test = bool("false") =5 false,
+    desc = "You can cast a string into false",
+};
+
+assert t.ok{
+    test = str(true) == "true",
+    desc = "You can cast true into a string",
+};
+
+assert t.ok{
+    test = str(false) == "false",
+    desc = "You can cast true into a string",
+};
+
+// float() cast
+
+assert t.ok{
+    test = float("3.14") == 3.14,
+    desc = "You can cast a string into a float",
+};
+
+assert t.ok{
+    test = float(1) == 1.0,
+    desc = "You can cast an int into a float",
+};
+
+assert t.ok{
+    test = float("1") == 1.0,
+    desc = "You can cast a string integer into a float",
+};
+
+// int from float
+
+assert t.ok{
+    test = int(3.14) == 3,
+    desc = "You can cast a float into an int (truncates)",
+};
+
+// stlet er from float
+
+assert t.ok{
+    test = str(3.14) == "3.14",
+    desc = "You can cast a float into a string",
+};
+
+// Shapes and their specifiers
+
+let mystr::"" = "a string";
+
+let struct_shape = {
+    foo :: "" = "",
+};
+
+mpty = NULL;
+let t empty NULL;
+let t empty = NULL;
+let tp myint :: 0 = 42;
+assert t.ok{
+    test = myint == 42,
+    desc = "Int constraint accepts valid int value",
+ltt};
+
+l  {
+et mybool :: false = true;
+ asser t t.ok

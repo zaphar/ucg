@@ -1,0 +1,3 @@
+let t =(module {
+    arg = "vaue = mod.pkg().test_simple_mod{arg=mod.arg}.value;
+};

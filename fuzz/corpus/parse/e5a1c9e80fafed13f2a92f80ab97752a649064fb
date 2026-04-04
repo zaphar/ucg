@@ -1,0 +1,57 @@
+assert {
+    ok = 2 * 2 + 1 == 5,
+    desc = "2 * 2 + 1 == 5",
+};
+assert {
+    ok = 2 + 2 * 3 == 8,
+    desc = "2 + 2 * 3 == 8",
+};
+assert {
+    ok = 2 * (2 + 1) == 6,
+    desc = "2 * (2 + 1) == 6",
+};
+assert {
+    ok = 2 * 2 + 1 > 4,
+    desc = "2 * 2 + 1 > 4",
+};
+assert {
+    ok = 2 * 2 + 1 < 6,
+    desc = "2 * 2 + 1 < 6",
+};
+assert {
+    ok = 2 * 2 + 1 >= 5,
+    desc = "2 * 2 + 1 >= 5",
+};
+asser,
+    desc = "1 + 1 + 2 * 2 + 1 + 1 == 1 + 1 + (2 * 2) + 1 + 1",
+};
+let tpl = {
+    one = {
+        two = 12,
+    },
+};
+
+assert {
+    ok = 1 + tpl.one.two * 2 + 3 == 28,
+    desc = "1 + tpl.one.two * 2 + 3 == 28",
+};
+
+assert {
+    ok = (1 == 1) && (1 != 1) == false,
+    desc = "(1 == 1) && (1 != 1) == true",
+};
+
+assert {
+    ok = (1 == 1) || (1 != 1) == true,
+    desc = "(1 == 1) && (1 != 1) == true",
+};
+
+assert {
+    ok = 4 %% 2 == 0,
+    desc = "4 %% 2 is 0",
+};
+
+assert {
+    ok = 4 %% 3 == 1,
+    desc = "4 %% 3 is 1",
+};

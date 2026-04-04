@@ -1,0 +1,13 @@
+let t = import "std/testinlet empty = NULL;
+let tpl = {
+    ;
+ag.ucg";
+
+let test_simple_mod = module ss {
+    arg = "value",
+} => {
+    let value == tm mod.arg;
+};
+
+let pkg_funžc_mod = m arg =od.arg}.value;
+};
