@@ -110,9 +110,11 @@ impl Scope {
 
     /// Lookup up a list index in the current value
     pub fn lookup_idx(&self, pos: &Position, idx: &Val) -> Result<Rc<Val>, Box<dyn Error>> {
-        if self.search_curr_val && self.curr_val.is_some() {
-            if let Val::List(fs) = self.curr_val.as_ref().unwrap().as_ref() {
-                return Self::lookup_in_list(pos, idx, fs);
+        if self.search_curr_val {
+            if let Some(ref cv) = self.curr_val {
+                if let Val::List(fs) = cv.as_ref() {
+                    return Self::lookup_in_list(pos, idx, fs);
+                }
             }
         }
         Err(error::BuildError::with_pos(
@@ -129,7 +131,7 @@ impl Scope {
     ///
     /// * `env` is always an environment variable lookup.
     /// * `self` is always the current value. This symbol is only
-    ///    valid when the current value is a tuple.
+    ///   valid when the current value is a tuple.
     /// * everything else is looked up in the currently accumulated build output
     ///   for this execution context.
     pub fn lookup_sym(&self, sym: &PositionedItem<Rc<str>>, is_symbol: bool) -> Option<Rc<Val>> {
@@ -139,8 +141,9 @@ impl Scope {
         if sym.val.as_ref() == "self" && is_symbol {
             return self.curr_val.clone();
         }
-        if self.search_curr_val && self.curr_val.is_some() {
-            match self.curr_val.as_ref().unwrap().as_ref() {
+        if self.search_curr_val {
+            if let Some(ref cv) = self.curr_val {
+            match cv.as_ref() {
                 Val::Env(fs) => {
                     for (name, val) in fs.iter() {
                         if name == &sym.val {
@@ -174,6 +177,7 @@ impl Scope {
                     // noop
                 }
             };
+            }
         }
         if self.build_output.contains_key(sym) {
             return Some(self.build_output[sym].clone());

@@ -112,10 +112,10 @@ impl XmlConverter {
                 )
                 .to_boxed());
             }
-            if name.is_some() {
-                let mut start = XmlEvent::start_element(name.unwrap());
-                if attrs.is_some() {
-                    for (name, val) in attrs.unwrap().iter() {
+            if let Some(name) = name {
+                let mut start = XmlEvent::start_element(name);
+                if let Some(attrs) = attrs {
+                    for (name, val) in attrs.iter() {
                         if val.is_empty() {
                             continue;
                         }
@@ -130,15 +130,15 @@ impl XmlConverter {
                     }
                 }
                 w.write(start)?;
-                if children.is_some() {
-                    for child in children.unwrap().iter() {
+                if let Some(children) = children {
+                    for child in children.iter() {
                         self.write_node(child.as_ref(), w)?;
                     }
                 }
                 w.write(XmlEvent::end_element())?;
             }
-            if text.is_some() {
-                w.write(XmlEvent::characters(text.unwrap()))?;
+            if let Some(text) = text {
+                w.write(XmlEvent::characters(text))?;
             }
         } else if let Val::Str(s) = v {
             w.write(XmlEvent::characters(s.as_ref()))?;

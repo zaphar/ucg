@@ -363,6 +363,7 @@ pub enum Shape {
 }
 
 impl Shape {
+    #[allow(clippy::only_used_in_recursion)]
     pub fn equivalent(&self, right: &Shape, symbol_table: &BTreeMap<Rc<str>, Shape>) -> bool {
         match (self, right) {
             (Shape::Str(_), Shape::Str(_))
@@ -944,19 +945,6 @@ impl Value {
         format!("{}", v.len())
     }
 
-    /// Returns a stringified version of the Value.
-    pub fn to_string(&self) -> String {
-        match self {
-            &Value::Empty(_) => "EmptyValue".to_string(),
-            Value::Boolean(b) => format!("{}", b.val),
-            Value::Int(i) => format!("{}", i.val),
-            Value::Float(f) => format!("{}", f.val),
-            Value::Str(s) => format!("{}", s.val),
-            Value::Symbol(s) => format!("{}", s.val),
-            Value::Tuple(fs) => Self::fields_to_string(&fs.val).to_string(),
-            Value::List(def) => format!("[{}]", Self::elems_to_string(&def.elems)),
-        }
-    }
 
     /// Returns the position for a Value.
     pub fn pos(&self) -> &Position {
@@ -986,6 +974,21 @@ impl Value {
             &Value::Tuple(_),
             &Value::List(_)
         )
+    }
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Value::Empty(_) => write!(f, "EmptyValue"),
+            Value::Boolean(b) => write!(f, "{}", b.val),
+            Value::Int(i) => write!(f, "{}", i.val),
+            Value::Float(fl) => write!(f, "{}", fl.val),
+            Value::Str(s) => write!(f, "{}", s.val),
+            Value::Symbol(s) => write!(f, "{}", s.val),
+            Value::Tuple(fs) => write!(f, "{}", Self::fields_to_string(&fs.val)),
+            Value::List(def) => write!(f, "[{}]", Self::elems_to_string(&def.elems)),
+        }
     }
 }
 
@@ -1436,7 +1439,7 @@ impl fmt::Display for Expression {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Expression::Simple(v) => {
-                write!(w, "{}", v.to_string())?;
+                write!(w, "{}", v)?;
             }
             &Expression::Binary(_) => {
                 write!(w, "<Expr>")?;

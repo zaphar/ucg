@@ -66,14 +66,12 @@ impl fmt::Display for ErrorType {
 }
 
 /// Error defines an Error type for parsing and building UCG code.
+#[non_exhaustive]
 pub struct BuildError {
     pub err_type: ErrorType,
     pub pos: Option<Position>,
     pub msg: String,
     pub cause: Option<Box<dyn error::Error>>,
-    // This field is only present to prevent people from constructing these
-    // outside of the module they are defined in.
-    _pkgonly: (),
 }
 
 impl BuildError {
@@ -83,7 +81,6 @@ impl BuildError {
             pos: Some(pos),
             msg: msg.into(),
             cause: None,
-            _pkgonly: (),
         }
     }
 
@@ -93,7 +90,6 @@ impl BuildError {
             pos: None,
             msg: msg.into(),
             cause: None,
-            _pkgonly: (),
         }
     }
 
@@ -137,9 +133,9 @@ impl error::Error for BuildError {
     }
 }
 
-impl<'a, C> std::convert::From<abortable_parser::Error<C>> for BuildError
+impl<C> std::convert::From<abortable_parser::Error<C>> for BuildError
 where
-    C: FilePositioned + 'a,
+    C: FilePositioned,
     C: abortable_parser::Offsetable + Debug,
 {
     fn from(e: abortable_parser::Error<C>) -> BuildError {

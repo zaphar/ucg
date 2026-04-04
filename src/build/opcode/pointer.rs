@@ -40,6 +40,7 @@ impl OpPointer {
         self.path = Some(path);
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Option<&Op> {
         if let Some(i) = self.ptr {
             let nxt = i + 1;
@@ -48,7 +49,7 @@ impl OpPointer {
             } else {
                 return None;
             }
-        } else if self.pos_map.len() != 0 {
+        } else if !self.pos_map.is_empty() {
             self.ptr = Some(0);
         }
         self.op()

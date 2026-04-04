@@ -614,6 +614,7 @@ fn record_def_position(
 /// `scope_range` is the `(start_offset, end_offset)` of the enclosing top-level
 /// let binding, used to bound token scans so that two different functions with
 /// the same argument name don't overwrite each other's entries.
+#[allow(clippy::too_many_arguments)]
 fn collect_scoped_names(
     expr: &Expression,
     sym_map: &mut BTreeMap<Rc<str>, Shape>,

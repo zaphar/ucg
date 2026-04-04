@@ -201,8 +201,8 @@ where
     fn eval_ops(&mut self, ops: OpPointer, path: Option<PathBuf>) -> BuildResult {
         self.link_ops(&ops)?;
         let mut vm = VM::with_pointer(self.strict, ops, &self.working_dir);
-        if path.is_some() {
-            vm.set_path(path.unwrap());
+        if let Some(path) = path {
+            vm.set_path(path);
         }
         if self.validate_mode {
             vm.enable_validate_mode();

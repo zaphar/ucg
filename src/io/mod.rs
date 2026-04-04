@@ -14,6 +14,7 @@
 use std::convert::Into;
 
 /// Accumulates lines and tells you when a ucg Statement has been read.
+#[derive(Default)]
 pub struct StatementAccumulator {
     acc: Vec<String>,
 }

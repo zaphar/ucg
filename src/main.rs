@@ -335,12 +335,12 @@ fn fmt_command(matches: &clap::ArgMatches) -> std::result::Result<(), Box<dyn Er
     };
 
     let mut paths = Vec::new();
-    if files.is_none() {
-        paths.push(std::env::current_dir()?);
-    } else {
-        for f in files.unwrap() {
+    if let Some(files) = files {
+        for f in files {
             paths.push(PathBuf::from(f));
         }
+    } else {
+        paths.push(std::env::current_dir()?);
     }
     for p in paths {
         if p.is_dir() {
@@ -360,17 +360,10 @@ fn test_command(
 ) {
     let files = matches.values_of("INPUT");
     let recurse = matches.is_present("recurse");
-    if files.is_none() {
-        let curr_dir = std::env::current_dir().unwrap();
-        let ok = visit_ucg_files(curr_dir.as_path(), recurse, true, strict, import_paths, env);
-        if let Ok(false) = ok {
-            process::exit(1)
-        }
-    } else {
+    if let Some(files) = files {
         let mut ok = true;
-        for file in files.unwrap() {
+        for file in files {
             let pb = PathBuf::from(file);
-            //if pb.is_dir() {
             if let Ok(false) =
                 visit_ucg_files(pb.as_path(), recurse, true, strict, import_paths, env)
             {
@@ -378,6 +371,12 @@ fn test_command(
             }
         }
         if !ok {
+            process::exit(1)
+        }
+    } else {
+        let curr_dir = std::env::current_dir().unwrap();
+        let ok = visit_ucg_files(curr_dir.as_path(), recurse, true, strict, import_paths, env);
+        if let Ok(false) = ok {
             process::exit(1)
         }
     }

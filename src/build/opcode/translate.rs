@@ -66,6 +66,10 @@ impl OpsMap {
         self.ops.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.ops.is_empty()
+    }
+
     pub fn push(&mut self, op: Op, pos: Position) {
         self.ops.push(op);
         self.pos.push(pos);

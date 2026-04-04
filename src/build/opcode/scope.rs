@@ -44,7 +44,7 @@ impl Stack {
     }
 
     pub fn is_bound(&self, name: &str) -> bool {
-        self.curr.get(name).is_some()
+        self.curr.contains_key(name)
     }
 
     pub fn add(&mut self, name: Rc<str>, val: Rc<Value>, pos: Position) {
