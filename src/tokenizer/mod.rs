@@ -53,11 +53,7 @@ fn escapequoted<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Strin
     let mut frag = String::new();
     let mut escape = false;
     let mut _input = input.clone();
-    loop {
-        let c = match _input.next() {
-            Some(c) => *c,
-            None => break,
-        };
+    while let Some(&c) = _input.next() {
         if escape {
             match c as char {
                 'n' => {

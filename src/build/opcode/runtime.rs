@@ -429,8 +429,7 @@ impl Builtins {
             C(List(ref elems, ref elems_pos_list)) => {
                 let mut result_elems = Vec::new();
                 let mut pos_elems = Vec::new();
-                let mut counter = 0;
-                for e in elems.iter() {
+                for (counter, e) in elems.iter().enumerate() {
                     // push function argument on the stack.
                     let e_pos = elems_pos_list[counter].clone();
                     stack.push((e.clone(), e_pos.clone()));
@@ -439,15 +438,13 @@ impl Builtins {
                         VM::fcall_impl(f, self.strict, stack, env, import_stack))?;
                     pos_elems.push(result_pos);
                     result_elems.push(result);
-                    counter += 1;
                 }
                 stack.push((Rc::new(C(List(result_elems, pos_elems))), list_pos));
             }
             C(Tuple(ref flds, ref flds_pos_list)) => {
                 let mut new_fields = Vec::new();
                 let mut new_flds_pos_list = Vec::new();
-                let mut counter = 0;
-                for (name, val) in flds {
+                for (counter, (name, val)) in flds.iter().enumerate() {
                     let name_pos = flds_pos_list[counter].0.clone();
                     let val_pos = flds_pos_list[counter].1.clone();
                     stack.push((Rc::new(P(Str(name.clone()))), name_pos));
@@ -473,7 +470,6 @@ impl Builtins {
                         new_flds_pos_list.push((name_pos, result_pos));
                         new_fields.push((name, fval[1].clone()));
                     }
-                    counter += 1;
                 }
                 stack.push((Rc::new(C(Tuple(new_fields, new_flds_pos_list))), pos));
             }
@@ -539,8 +535,7 @@ impl Builtins {
             C(List(ref elems, ref elems_pos_list)) => {
                 let mut result_elems = Vec::new();
                 let mut pos_elems = Vec::new();
-                let mut counter = 0;
-                for e in elems.iter() {
+                for (counter, e) in elems.iter().enumerate() {
                     // push function argument on the stack.
                     let e_pos = elems_pos_list[counter].clone();
                     stack.push((e.clone(), e_pos.clone()));
@@ -549,7 +544,6 @@ impl Builtins {
                         VM::fcall_impl(f, self.strict, stack, env, import_stack))?;
                     // Check for empty or boolean results and only push e back in
                     // if they are non empty and true
-                    counter += 1;
                     match condition.as_ref() {
                         &P(Empty) | &P(Bool(false)) => {
                             continue;
@@ -565,8 +559,7 @@ impl Builtins {
             C(Tuple(ref flds, ref pos_list)) => {
                 let mut new_fields = Vec::new();
                 let mut new_flds_pos_list = Vec::new();
-                let mut counter = 0;
-                for (name, val) in flds {
+                for (counter, (name, val)) in flds.iter().enumerate() {
                     let name_pos = pos_list[counter].0.clone();
                     let val_pos = pos_list[counter].1.clone();
                     stack.push((Rc::new(P(Str(name.clone()))), name_pos.clone()));
@@ -575,7 +568,6 @@ impl Builtins {
                         VM::fcall_impl(f, self.strict, stack, env, import_stack))?;
                     // Check for empty or boolean results and only push e back in
                     // if they are non empty and true
-                    counter += 1;
                     match condition.as_ref() {
                         &P(Empty) | &P(Bool(false)) => {
                             continue;
@@ -689,8 +681,7 @@ impl Builtins {
 
         match *list.as_ref() {
             C(List(ref elems, ref elems_pos_list)) => {
-                let mut counter = 0;
-                for e in elems.iter() {
+                for (counter, e) in elems.iter().enumerate() {
                     let e_pos = elems_pos_list[counter].clone();
                     // push function arguments on the stack.
                     stack.push((acc.clone(), acc_pos.clone()));
@@ -700,12 +691,10 @@ impl Builtins {
                         VM::fcall_impl(f, self.strict, stack, env, import_stack))?;
                     acc = new_acc;
                     acc_pos = new_acc_pos;
-                    counter += 1;
                 }
             }
             C(Tuple(ref _flds, ref flds_pos_list)) => {
-                let mut counter = 0;
-                for (name, val) in _flds.iter() {
+                for (counter, (name, val)) in _flds.iter().enumerate() {
                     let name_pos = flds_pos_list[counter].0.clone();
                     let val_pos = flds_pos_list[counter].1.clone();
                     // push function arguments on the stack.
@@ -717,7 +706,6 @@ impl Builtins {
                         VM::fcall_impl(f, self.strict, stack, env, import_stack))?;
                     acc = new_acc;
                     acc_pos = new_acc_pos;
-                    counter += 1;
                 }
             }
             P(Str(ref s)) => {

@@ -132,12 +132,8 @@ impl VM {
         O: std::io::Write + Clone,
         E: std::io::Write + Clone,
     {
-        loop {
-            let op = if let Some(op) = self.ops.next() {
-                op.clone()
-            } else {
-                break;
-            };
+        while let Some(op) = self.ops.next() {
+            let op = op.clone();
             let pos = self.ops.pos().unwrap().clone();
             let idx = self.ops.idx()?;
             match op {
@@ -1023,8 +1019,7 @@ impl VM {
             C(Tuple(ref flds, ref pos_list)) => {
                 let mut flds = flds.clone();
                 let mut pos_list = pos_list.clone();
-                let mut counter = 0;
-                for (name, val) in overrides {
+                for (counter, (name, val)) in overrides.into_iter().enumerate() {
                     let name_pos = override_pos_list[counter].0.clone();
                     let val_pos = override_pos_list[counter].1.clone();
                     self.merge_field_into_tuple(
@@ -1035,7 +1030,6 @@ impl VM {
                         val,
                         &val_pos,
                     )?;
-                    counter += 1;
                 }
                 // Put the copy on the Stack
                 self.push(Rc::new(C(Tuple(flds, pos_list))), tgt_pos.clone())?;
@@ -1058,8 +1052,7 @@ impl VM {
 
                 let mut flds = flds.clone();
                 let mut flds_pos_list = flds_pos_list.clone();
-                let mut counter = 0;
-                for (name, val) in overrides {
+                for (counter, (name, val)) in overrides.into_iter().enumerate() {
                     let name_pos = override_pos_list[counter].0.clone();
                     let val_pos = override_pos_list[counter].1.clone();
                     self.merge_field_into_tuple(
@@ -1070,7 +1063,6 @@ impl VM {
                         val,
                         &val_pos,
                     )?;
-                    counter += 1;
                 }
                 self.merge_field_into_tuple(
                     &mut flds,
@@ -1132,8 +1124,7 @@ impl VM {
         value: Rc<Value>,
         val_pos: &Position,
     ) -> Result<(), Error> {
-        let mut counter = 0;
-        for fld in src_fields.iter_mut() {
+        for (counter, fld) in src_fields.iter_mut().enumerate() {
             if fld.0 == name {
                 if fld.1.type_name() != value.type_name()
                     && !(fld.1.type_name() == "NULL" || value.type_name() == "NULL")
@@ -1153,7 +1144,6 @@ impl VM {
                 fld.1 = value;
                 return Ok(());
             }
-            counter += 1;
         }
         src_fields.push((name, value));
         pos_fields.push((name_pos.clone(), val_pos.clone()));

@@ -178,11 +178,7 @@ where
             links.push((link.clone(), pos.clone()));
         }
         let mut found = BTreeSet::new();
-        loop {
-            let (link, path_pos) = match links.pop() {
-                Some(t) => t,
-                None => break,
-            };
+        while let Some((link, path_pos)) = links.pop() {
             if found.contains(&link) {
                 continue;
             }

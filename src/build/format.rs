@@ -92,11 +92,7 @@ impl ExpressionTemplate {
     fn consume_expr(&self, iter: &mut Chars) -> Result<Expression, Box<dyn Error>> {
         let mut result = String::new();
         let mut brace_count = 0;
-        loop {
-            let c = match iter.next() {
-                Some(c) => c,
-                None => break,
-            };
+        for c in iter.by_ref() {
             if c == '{' {
                 brace_count += 1;
                 // We ignore the starting brace
@@ -146,11 +142,7 @@ impl TemplateParser for ExpressionTemplate {
         let mut should_escape = false;
         let mut iter = input.chars();
         let mut buf: Vec<char> = Vec::new();
-        loop {
-            let c = match iter.next() {
-                Some(c) => c,
-                None => break,
-            };
+        while let Some(c) = iter.next() {
             if c == '@' && !should_escape {
                 parts.push(TemplatePart::Str(buf));
                 buf = Vec::new();
