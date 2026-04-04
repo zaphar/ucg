@@ -30,7 +30,7 @@ use ucglib::build;
 use ucglib::build::opcode::Environment;
 use ucglib::convert::{ConverterRegistry, ImporterRegistry};
 use ucglib::dep;
-use ucglib::dep::registry::{RemoteFetcher, RepoFetcher, TagSource};
+use ucglib::dep::registry::{RemoteFetcher, RepoFetcher};
 use ucglib::iter::OffsetStrIter;
 use ucglib::parse::parse;
 
@@ -85,7 +85,7 @@ fn do_flags<'a, 'b>() -> clap::App<'a, 'b> {
              (@subcommand add =>
               (about: "Add or update a dependency.")
               (@arg URL: +required "Repository URL to add")
-              (@arg version: --version +takes_value "Version constraint (default: \">= <latest>\")")
+              (@arg version: --version +required +takes_value "Version constraint (e.g. \">= 1.0.0\")")
               (@arg type: --type +takes_value "Repository type: \"git\" or \"hg\" (default: \"git\")")
              )
              (@subcommand remove =>
@@ -527,11 +527,10 @@ fn resolve_and_lock(dry_run: bool) -> Result<ResolveResult, Box<dyn Error>> {
     let manifest = dep::manifest::Manifest::from_toml(&content)?;
     manifest.validate()?;
 
-    let tag_source = dep::registry::RemoteTagSource;
     let manifest_source = VendorManifestSource {
         vendor_dir: cwd.join(manifest.vendor_dir()),
     };
-    let resolved = dep::resolve::resolve_mvs(&manifest, &tag_source, &manifest_source)?;
+    let resolved = dep::resolve::resolve_mvs(&manifest, &manifest_source)?;
 
     // Read existing lockfile for diff
     let lock_path = cwd.join(dep::LOCK_FILE);
@@ -639,7 +638,7 @@ fn lockfile_diff(
         .map(|l| {
             l.package
                 .iter()
-                .map(|p| (dep::url::normalize_url(p.url()), p))
+                .filter_map(|p| p.url().ok().map(|u| (dep::url::normalize_url(u), p)))
                 .collect()
         })
         .unwrap_or_default();
@@ -647,7 +646,7 @@ fn lockfile_diff(
     let new_map: BTreeMap<String, &dep::lockfile::LockedPackage> = new
         .package
         .iter()
-        .map(|p| (dep::url::normalize_url(p.url()), p))
+        .filter_map(|p| p.url().ok().map(|u| (dep::url::normalize_url(u), p)))
         .collect();
 
     // Added or changed
@@ -719,21 +718,7 @@ fn dep_add(matches: &clap::ArgMatches) -> Result<(), Box<dyn Error>> {
     let content = std::fs::read_to_string(&manifest_path)?;
     let mut manifest = dep::manifest::Manifest::from_toml(&content)?;
 
-    // Determine version constraint
-    let version = if let Some(v) = matches.value_of("version") {
-        v.to_string()
-    } else {
-        // Query tags and default to ">= <latest>"
-        let tag_source = dep::registry::RemoteTagSource;
-        let versions = tag_source.list_semver_tags(url, repo_type)?;
-        if versions.is_empty() {
-            return Err(format!("dependency {} has no semver tags (v*.*.*)", normalized).into());
-        }
-        let mut sorted = versions;
-        sorted.sort();
-        let latest = sorted.last().unwrap();
-        format!(">= {}", latest)
-    };
+    let version = matches.value_of("version").unwrap().to_string();
 
     // Check if already exists (update case)
     let deps = manifest.deps();
@@ -772,11 +757,10 @@ fn dep_add(matches: &clap::ArgMatches) -> Result<(), Box<dyn Error>> {
     manifest.validate()?;
 
     // Resolve
-    let tag_source = dep::registry::RemoteTagSource;
     let manifest_source = VendorManifestSource {
         vendor_dir: cwd.join(manifest.vendor_dir()),
     };
-    let resolved = dep::resolve::resolve_mvs(&manifest, &tag_source, &manifest_source)?;
+    let resolved = dep::resolve::resolve_mvs(&manifest, &manifest_source)?;
 
     // Create temp dir for fetching
     let temp_dir = std::env::temp_dir().join("ucg_dep_vendor");
@@ -862,11 +846,10 @@ fn dep_remove(matches: &clap::ArgMatches) -> Result<(), Box<dyn Error>> {
     manifest.deps = Some(new_deps);
 
     // Re-resolve
-    let tag_source = dep::registry::RemoteTagSource;
     let manifest_source = VendorManifestSource {
         vendor_dir: cwd.join(manifest.vendor_dir()),
     };
-    let resolved = dep::resolve::resolve_mvs(&manifest, &tag_source, &manifest_source)?;
+    let resolved = dep::resolve::resolve_mvs(&manifest, &manifest_source)?;
 
     // Check if removed dep is still transitive
     if resolved.iter().any(|d| d.normalized_url == normalized) {
