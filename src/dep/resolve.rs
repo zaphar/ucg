@@ -67,11 +67,14 @@ pub fn resolve_mvs(
             });
     }
 
-    // Fixed-point iteration
+    // Fixed-point iteration: MVS guarantees convergence because constraints
+    // only grow and versions only increase (the minimum satisfying version
+    // rises monotonically as constraints tighten). Unsatisfiable constraints
+    // are caught immediately by find_minimum_satisfying, and cycles are
+    // caught by check_for_cycles.
     let mut resolved: BTreeMap<String, ResolvedDep> = BTreeMap::new();
-    let max_iterations = 100;
 
-    for _ in 0..max_iterations {
+    loop {
         let prev_resolved = resolved.clone();
 
         // Resolve each dependency
@@ -130,9 +133,11 @@ pub fn resolve_mvs(
                 dep,
                 manifest_source,
                 &mut new_constraints,
-                &mut vec![], // ancestor chain for cycle detection
             )?;
         }
+
+        // Check for circular dependencies in the constraint graph
+        check_for_cycles(&new_constraints)?;
 
         // Check if we've reached a fixed point
         if new_constraints == all_constraints && resolved == prev_resolved {
@@ -146,29 +151,22 @@ pub fn resolve_mvs(
     Ok(result)
 }
 
+/// Collect the direct transitive dependencies from a resolved dep's manifest.
+///
+/// Does not recurse — the outer fixed-point loop in `resolve_mvs` handles
+/// deeper transitive deps by resolving newly discovered deps and calling
+/// this again on subsequent iterations with their correct versions.
 fn collect_transitive(
     normalized_url: &str,
     dep: &ResolvedDep,
     manifest_source: &dyn ManifestSource,
     constraints: &mut BTreeMap<String, Vec<Constraint>>,
-    ancestors: &mut Vec<String>,
 ) -> Result<(), DepError> {
-    // Circular dependency check: if this URL is already in our ancestor chain
-    if ancestors.contains(&normalized_url.to_string()) {
-        ancestors.push(normalized_url.to_string());
-        return Err(DepError::ParseError(format!(
-            "circular dependency detected: {}",
-            ancestors.join(" -> ")
-        )));
-    }
-
     let manifest = manifest_source.get_manifest(normalized_url, &dep.version)?;
     let manifest = match manifest {
         Some(m) => m,
         None => return Ok(()), // Leaf node
     };
-
-    ancestors.push(normalized_url.to_string());
 
     for (url, entry) in manifest.deps() {
         let trans_normalized = normalize_url(&url);
@@ -188,27 +186,76 @@ fn collect_transitive(
                 fetch_url: url.clone(),
             });
         }
-
-        // Recursively collect transitive deps
-        // We need a placeholder ResolvedDep to recurse; version doesn't matter
-        // for manifest lookup in mock, and real resolution will re-resolve anyway
-        let placeholder = ResolvedDep {
-            normalized_url: trans_normalized.clone(),
-            fetch_url: url.clone(),
-            repo_type: entry.repo_type.clone(),
-            version: semver::Version::new(0, 0, 0), // placeholder
-        };
-        collect_transitive(
-            &trans_normalized,
-            &placeholder,
-            manifest_source,
-            constraints,
-            ancestors,
-        )?;
     }
 
-    ancestors.pop();
     Ok(())
+}
+
+/// Check for circular dependencies in the constraint graph.
+///
+/// Builds a dependency graph from the `from_package` fields in constraints
+/// and detects cycles using DFS.
+fn check_for_cycles(
+    constraints: &BTreeMap<String, Vec<Constraint>>,
+) -> Result<(), DepError> {
+    // Build adjacency list: package -> packages it depends on
+    // A constraint with from_package P on dep D means P depends on D.
+    let mut edges: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+    for (dep_url, dep_constraints) in constraints {
+        for c in dep_constraints {
+            if c.from_package != "root" {
+                edges
+                    .entry(c.from_package.as_str())
+                    .or_default()
+                    .push(dep_url.as_str());
+            }
+        }
+    }
+
+    // DFS cycle detection
+    let mut visited: BTreeMap<&str, bool> = BTreeMap::new(); // true = in current path
+    for &node in edges.keys() {
+        if let Some(cycle) = dfs_find_cycle(node, &edges, &mut visited, &mut vec![]) {
+            return Err(DepError::ParseError(format!(
+                "circular dependency detected: {}",
+                cycle.join(" -> ")
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn dfs_find_cycle<'a>(
+    node: &'a str,
+    edges: &BTreeMap<&'a str, Vec<&'a str>>,
+    visited: &mut BTreeMap<&'a str, bool>,
+    path: &mut Vec<&'a str>,
+) -> Option<Vec<String>> {
+    match visited.get(node) {
+        Some(true) => {
+            // Found a cycle — build the cycle path
+            path.push(node);
+            let start = path.iter().position(|&n| n == node).unwrap();
+            return Some(path[start..].iter().map(|s| s.to_string()).collect());
+        }
+        Some(false) => return None, // Already fully explored
+        None => {}
+    }
+
+    visited.insert(node, true);
+    path.push(node);
+
+    if let Some(neighbors) = edges.get(node) {
+        for &neighbor in neighbors {
+            if let Some(cycle) = dfs_find_cycle(neighbor, edges, visited, path) {
+                return Some(cycle);
+            }
+        }
+    }
+
+    path.pop();
+    visited.insert(node, false);
+    None
 }
 
 fn check_repo_type_conflicts(

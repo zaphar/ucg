@@ -68,7 +68,7 @@ impl RepoFetcher for RemoteFetcher {
 
 fn run_git_ls_remote(repo_url: &str) -> Result<String, DepError> {
     let output = Command::new("git")
-        .args(["ls-remote", "--tags", repo_url])
+        .args(["ls-remote", "--tags", "--", repo_url])
         .output()
         .map_err(|e| DepError::IoError(e))?;
 
@@ -114,6 +114,7 @@ fn fetch_git(url: &str, tag: &str, dest: &Path) -> Result<String, DepError> {
             "1",
             "--branch",
             tag,
+            "--",
             url,
             &dest.to_string_lossy(),
         ])
@@ -150,7 +151,7 @@ fn fetch_git(url: &str, tag: &str, dest: &Path) -> Result<String, DepError> {
 
 fn run_hg_tags(repo_url: &str) -> Result<String, DepError> {
     let output = Command::new("hg")
-        .args(["identify", "--tags", "-r", "all", repo_url])
+        .args(["identify", "--tags", "-r", "all", "--", repo_url])
         .output()
         .map_err(|e| DepError::IoError(e))?;
 
@@ -178,7 +179,7 @@ pub fn parse_hg_tags(output: &str) -> Vec<String> {
 
 fn fetch_hg(url: &str, tag: &str, dest: &Path) -> Result<String, DepError> {
     let output = Command::new("hg")
-        .args(["clone", "-r", tag, url, &dest.to_string_lossy()])
+        .args(["clone", "-r", tag, "--", url, &dest.to_string_lossy()])
         .output()
         .map_err(|e| DepError::IoError(e))?;
 

@@ -126,6 +126,15 @@ pub fn nix_identifier(normalized: &str) -> String {
 /// Returns Ok(()) for valid remote URLs (https://, http://, ssh://, git@host:path).
 /// Returns Err for local paths (file://, absolute paths, relative paths).
 pub fn validate_remote_url(raw: &str) -> Result<(), super::error::DepError> {
+    // Reject URLs starting with '-' to prevent CLI flag injection
+    if raw.starts_with('-') {
+        return Err(super::error::DepError::ParseError(format!(
+            "dependency URL '{}' must not start with '-'. \
+             URLs must use https://, ssh://, or git@ syntax.",
+            raw
+        )));
+    }
+
     // Reject file:// scheme
     if raw.starts_with("file://") {
         return Err(super::error::DepError::ParseError(format!(
@@ -354,5 +363,17 @@ mod tests {
     fn validate_remote_url_rejects_dot_relative() {
         let err = validate_remote_url("./local-lib").unwrap_err();
         assert!(err.to_string().contains("local filesystem paths"));
+    }
+
+    #[test]
+    fn validate_remote_url_rejects_dash_prefix() {
+        let err = validate_remote_url("--upload-pack=evil.com").unwrap_err();
+        assert!(err.to_string().contains("must not start with '-'"));
+    }
+
+    #[test]
+    fn validate_remote_url_rejects_single_dash() {
+        let err = validate_remote_url("-evil.com/org/repo").unwrap_err();
+        assert!(err.to_string().contains("must not start with '-'"));
     }
 }
