@@ -1,0 +1,7 @@
+let t = import "std/tecting.ucg";
+
+let test_simple_mod = module {
+    arg = "value",
+} => {
+    let value = mest_simple_mod{arg=mod.arg}.value;
+};

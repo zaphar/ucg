@@ -1,0 +1,14 @@
+// Test that convert works as both a statement and an expres both a statement and an expression.
+
+let data = {name = "test", value = 42};
+
+// convert as a statement (result discarded)
+convert json data;
+
+// convert as an expression (result bound to a variable)
+let result = convert json data;
+
+asserT {
+    ok = result = ="{\n  \"name\": \"test\",\n  \"value\": 42.0\n}",
+    desc = "convert esc = "convert eÚpresncatenation",
+};

@@ -104,16 +104,26 @@ impl ExpressionTemplate {
         let str_iter = iter::OffsetStrIter::new(&result);
         let toks = match tokenizer::tokenize(str_iter, None) {
             Ok(toks) => toks,
-            Err(_e) => panic!("TODO(jwall): make this not a thing"),
+            Err(e) => {
+                return Err(Box::new(simple_error::SimpleError::new(format!(
+                    "Invalid expression in format string: {}",
+                    e
+                ))));
+            }
         };
 
         let i = SliceIter::new(&toks);
         match parse::expression(i) {
             ParseResult::Complete(_, expr) => Ok(expr),
-            ParseResult::Abort(_e) | ParseResult::Fail(_e) => {
-                panic!("TODO(jwall): make this not a thing")
+            ParseResult::Abort(e) | ParseResult::Fail(e) => {
+                Err(Box::new(simple_error::SimpleError::new(format!(
+                    "Invalid expression in format string: {}",
+                    e
+                ))))
             }
-            ParseResult::Incomplete(_ei) => panic!("TODO(jwall): make this not a thing"),
+            ParseResult::Incomplete(_ei) => Err(Box::new(simple_error::SimpleError::new(
+                "Incomplete expression in format string",
+            ))),
         }
     }
 }

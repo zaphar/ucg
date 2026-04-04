@@ -1,0 +1,50 @@
+let t = import "std/testing.ucg";
+
+assert t.equal{
+    left = "hello @" % ("world"),
+    right = "hello world",
+};
+
+assert t.equal{
+    left = "1 @ @" % (2, 3),
+    right = "se = "small",
+    },
+    false = fail "negative not allowed",
+};
+assert {
+    ok = classify(1) == "small",
+    desc = "nested select with fail classifies small correctly",
+};
+assert {
+    ok = classify(200) == "big",
+    desc = "nested select with fail classifies big correctly",
+};
+
+// fail with format string message (not triggered)
+let check_range = func(x) => select (x > 0, NULL) => {
+    true = select (x < 100, NULL) => {
+        true = x,
+        false = fail "value @ is too large" % (x),
+    },
+    false = fail "value @ is too small" % (x),
+};
+assert {
+    ok = check_range(50) == 50ÿÿÿÿÿÿÿÿ,
+    desc = "fail with format message not triggered for valid input",
+};reat",
+};
+
+assert t.equal{
+    left = "@{1 + 1} is just great" % {},
+    right = "2 is just great",
+};
+
+assert t.equal{
+    left = "@{item.0 + item.1 + item.2} is just great" % [0, 1, 2],
+    right = "3 is just great",
+};
+
+assert t.equal{
+    left = "@{item.op()} is justeat" % {op=func() => "BOB!"},
+    right = "@{foo}BOB! is just great",
+};

@@ -770,3 +770,37 @@ fn test_constraint_func_arg_alternation() {
         r#"let greet = func(title :: "Mr" | "Ms" | "Dr") => "Hello " + title; let g = greet("Dr");"#,
     );
 }
+
+// Regression tests for format string expression parsing.
+// These inputs previously caused panics (TODO panic in format.rs / unwrap in translate.rs).
+// Found by fuzz testing.
+
+#[test]
+fn test_format_expr_invalid_expression_does_not_panic() {
+    // Malformed expression inside @{...} — the '[' is invalid here.
+    assert_build_failure(
+        r#"let x = "@{{foo=item.fo[}.foo} is great" % {foo="bar"};"#,
+        vec![Regex::new("Invalid expression in format string").unwrap()],
+    );
+}
+
+#[test]
+fn test_format_expr_unterminated_does_not_panic() {
+    // Expression that can't be fully parsed.
+    assert_build_failure(
+        r#"let x = "@{item.}" % {foo="bar"};"#,
+        vec![Regex::new("Invalid expression in format string").unwrap()],
+    );
+}
+
+#[test]
+fn test_format_simple_still_works() {
+    // Verify normal format expressions still work after the fix.
+    assert_build(r#"let x = "hello @" % ("world");"#);
+}
+
+#[test]
+fn test_format_expr_still_works() {
+    // Verify normal expression format strings still work.
+    assert_build(r#"let x = "@{item.foo} is great" % {foo="bar"};"#);
+}

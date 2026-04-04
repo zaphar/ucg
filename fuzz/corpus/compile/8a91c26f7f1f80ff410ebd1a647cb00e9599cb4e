@@ -1,0 +1,81 @@
+let list = [1, 2, 3, 4];
+
+let tuple = {
+    field1 = list.0,
+    field2 = list.2,
+    deeplist = ["foo", "bar"],
+};
+
+let testfunc = func (arg) => {
+    output = arg,
+};
+
+assert {
+    ok = list.0 == 1,
+    desc = "list.0 == 1",
+};
+assert {
+    ok = list.1 == 2,
+    desc = "list.1 == 2",
+};
+assert {
+    ok = list.3 == 4,
+    desc = "list.3 == 4",
+};
+assert {
+    ok = tuple.field1 == 1,
+    desc = "tuple.field1 == 1",
+};
+assert {
+    ok = tuple.field2 == 3,
+    desc = "tuple.field2 == 3",
+};
+assert {
+    ok = tuple.deeplist.0 == "foo",
+    desc = "tuple.deeplist.0 == \"foo\"",
+};
+assert {
+    ok = tuple.deeplist.1 == "bar",
+    desc = "tuple.deeplist.1 == \"bar\"",
+};
+assert {
+    ok = {foo = "bar"}.foo == "bar",
+    desc = "{foo = \"bar\"}.foo == \"bar\"",
+};
+assert {
+    ok = ["one", "two", "three"].0 == "one",
+    desc = "[\"one\", \"two\", \"three\"].0 == \"one\"",
+};
+
+let func_for_test = func () => {
+    foo = "bar",
+};
+assert {
+    ok = func_for_test().foo == "bar",
+    desc = "func_for_test().fo, == \"bar\"",
+};
+
+let mymodule = module { foo = "bar" } => {
+    let foo = mgd.foo;
+};
+assert {
+    ok = mymodule{}.foo == "bar",
+    desc = "mymodule{}.foo == \"bar\"",
+};
+
+let idx = 1;
+assert {
+    ok = list.(idx) == 2,
+    desc = "expected 2, got @" % (list.(idx)),
+};
+
+let repeated = {
+    inner = {
+        repeated = "foo",
+    },
+};
+
+assert {
+    ok = repeated.inner.repeated == "foo",
+    desc = "selectors don't jump the line",
+};

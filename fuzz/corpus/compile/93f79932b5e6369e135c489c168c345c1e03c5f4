@@ -1,0 +1,114 @@
+// Simple Comparisons
+let one = 1;
+let two = 2;
+let foo = "foo";
+let bar = "bar";
+let tpl1 = {
+    foo = "bar",
+    one = 1
+};
+let tpl2 = tpl1{};
+let tpl3 = {
+    bar = "foo",
+    two = 1
+};
+let list = [1, 2, 3];
+let list2 = list;
+let list3 = [1, 2];
+
+assert {
+    ok = one == one,
+    desc = "one == one",
+};
+assert {
+    ok = one == one,
+    desc = "one == one",
+};
+assert {
+    ok = one >= one,
+    desc = "one >= one"
+};
+assert {
+    ok = two > one,
+    desc = "two > one"
+};
+assert {
+    ok = two >= two,
+    desc = "two >= two",
+};
+assert {
+    ok = tpl1 == tpl2,
+    desc = "tpl1 == tpl2"
+};
+assert {
+    ok = tpl1 != tpl3,
+    desc = "tpl1 != tpl3",
+};
+assert {
+    ok = list == list2,
+    desc = "list == list2",
+};
+assert {
+    ok = list != list3,
+    desc = "list != list3",
+};
+
+// Deep Comparisons
+let tpl4 = {
+    foo = "bar",
+    lst = [1, 2, 3],
+    inner = {
+        flok = "f" in "foo",
+    desc = "You can check for substrings in strings",
+};
+
+assert {
+    ok = true && true == true,
+    desc = "&&: truth",
+};
+
+assert {
+    ok = true && false == false,
+    desc = "&&: propagates false",
+};
+
+assert {
+    ok = false && true == false,
+    desc = "&&:  propagates false part 2",
+};
+
+assert {
+    ok = true || false == true,
+    desc = "||: propagates true",
+};
+
+assert {
+    ok = false || true == true,
+    desc = "||: propagates true part 2",
+};
+
+assert {
+    ok = true || true == true,
+    desc = "||: likes truth",
+};
+
+let name = "foo";
+assert {
+    ok = (name) in {foo="bar"},
+    desc = "(name) in {foo=\"bar\"} works",
+};
+
+assert {
+    ok = not false,
+    desc = "not false is true",
+};
+
+assert {
+    ok = not true == false,
+    desc = "not true is false",
+};
+
+assert {
+    ok = not not true,
+    desc = "double negatives are positive",
+};

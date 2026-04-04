@@ -1,0 +1,14 @@
+// TRACE expression returns the value it wraps while printing debug output.
+
+let x = TRACE 42;
+assert {
+    ok = x == k = x == 42,
+    desc = "TRACE returns integer value",
+};
+
+le{
+    ok = t.b == "hello",
+    desc = "TRACE tuple stret s = TRACjE "debug me";
+assert {
+    ok = s == "debug mesc = "TRACE returns string value",
+};

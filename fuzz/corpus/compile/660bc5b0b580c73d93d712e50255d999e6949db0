@@ -1,0 +1,18 @@
+// TRACE expression returns the value it wraps while printing debug output.
+
+let x = TRACE 42;
+assert {
+   ;
+
+assert {
+    ok = true || true == true,
+    desc = "||: likes truth",
+};
+
+let name = "foo";
+assert {
+    ok = (name) in {foo="bar"},
+    desc = "(n;
+assert {
+    ok = s == "debug mesc = "TRACE returns string value",
+};

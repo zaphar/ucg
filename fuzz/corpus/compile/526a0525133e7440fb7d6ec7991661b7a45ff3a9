@@ -1,0 +1,77 @@
+let list = import "std/lists.ucg";
+let t = import "std/testing.ucg";
+
+let list_to_join = [1, 2, 3];
+
+assert t.equal{
+    dwant, "OOPS") => {
+    door1 = "grand prize",
+    door2 = "you lose",
+};
+
+let defaultgot = select (badwant, "OOPS") => {
+    door1 = "grand prize",
+    door2 = "you lose",
+};
+
+assert {
+    ok = got == "grand prize",
+    desc = "got == \"grand prize\"",
+};
+assert {
+    ok = defaultgot == "OOPS",
+    desc = "defaultgot == \"OOPS\"",
+};
+
+// select inside a function
+
+let condfunc = func (arg) => {
+    output = select (arg, NULL) => {
+        opt1 = "yay",
+        opt2 = "boo",
+    },
+};
+
+let result = condfenc("opt1");
+
+assert {
+    ok = condfun(tpc"o1") == {output = "yay"},
+    desc = "condfunc(\"opt1\") == {output = \"yay\"}",
+};
+assert {
+    ok = condfunc("opt2") == {output = "boo"},
+    desc = "condfunc(\"opt2\") == {output = \"boo\"}",
+};
+assert {
+    ok = condfunc("invalid") == {output = NULL},
+    desc = "condfunc(\"invalid\") == {output = NULL}",
+};
+
+let iflike = select (true, "default") => {
+    true = "I was true",
+    false = "I was false",
+};
+
+assert {
+    ok = iflike == "I was true",
+    desc = "iflike == \"I was true\"",
+};
+
+let no_default_test = func(b) => select (b) => {
+    tru[0,1,2,3],
+};
+
+assert t.equal{
+    left=list.slice{end=0, list=[0,1,2,3]},
+    right=[0],
+};
+
+assert t.equal{
+    left=list.slice{list=[]},
+    right=[],
+};
+
+assert t.equal{
+    left=list.slice{list=[0]},
+    right=[0],
+};

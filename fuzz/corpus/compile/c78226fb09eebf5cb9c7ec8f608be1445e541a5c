@@ -1,0 +1,7 @@
+// TRACE expression returns the value it wraps while printing debug output.
+
+let x = TRACE// Simple Comparisons
+let  42;
+aone = 1;
+let two = 2;
+let fsso

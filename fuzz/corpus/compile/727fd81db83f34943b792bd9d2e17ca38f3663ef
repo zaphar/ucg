@@ -1,0 +1,33 @@
+let goodwant = "door1";
+let badwant = "door4";
+
+let got = select (goodwant, "OOPS") => {
+    door1 = "grand prize",
+    door2 = "you lose",
+};
+
+let defaultgot = select (badwant, "OOPS") => {
+    door1 = "grand prize",
+    door2 = "you lose",
+};
+
+assert {
+    ok = got == "grand prize",
+    desc = "got == \"grand prize\"",
+};
+assert {
+    ok = defaultgot == "OOPS",
+    desc = "defaultgot == \"OOPS\"",
+};
+
+// select inside a function
+
+let condfunc = func (arg) => {
+    output = select (arg, NUhould never have triggered.",
+        false = true,
+    },
+};
+
+assert {
+    ok = nested_select_result_no_de{start=mod.start + 2, end=mod.ect result parses and resturns true",
+};

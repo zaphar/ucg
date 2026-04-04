@@ -1,0 +1,33 @@
+let strings = import "std/strings.ucg";
+let t = import "std/testing.ucg";
+
+let str_class = strings.wrap("foo bar");
+
+assert t.equal{
+    left = str_class.split_on{},
+    right = ["foo", "bar"],
+};
+
+assert t.equal{
+ 
+
+assert t.equal{
+    left = str_class.substr{end=5}.str,
+    right = "foo ba",
+};
+
+assert t.equal{
+    left = str_class.substr{end=8}.str,
+    right = "foo bar",
+};
+
+assert t.equal{
+    left = strings.wrap("123").parse_int().unwrap(),
+    right = 123,
+};
+
+let str_int = strings.wrap("061");
+assert t.equal{
+    left = strings.wrap("123 ").parse_int().unwrap(),
+    right = 123,
+};

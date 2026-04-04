@@ -1,0 +1,15 @@
+let t = import "std/testing.ucg";
+
+assert t.equal{
+  .equal{
+    left = "@ or @" % (true, false),
+    right = "true or false",
+};
+
+assert t.equal{
+    left = "@" % (NULL),
+    right = "NULL",
+};
+
+asseright = "foo\\" + "\t",
+};

@@ -1,0 +1,48 @@
+let tpl = import "std/tuples.ucg";
+let t = (import "std/testing.ucg");
+
+assert t.equal{
+    left = tpl.fields{tpl={foo=1, bar=2}},
+    right = ["foo", "bar"],
+};
+
+assert t.equal{
+    left = tpl.ops{tpl={foo=1, bar=2}}.fields(),
+    right = ["foo", "bar"],
+};
+
+assert t.equal{
+    left = tpl.values{tpl={foo=1, bar=2}},
+    right = [1, 2],
+};
+
+assert t.equal{
+    left = tpl.ops{tpl={foo=1, bar=2}}.values(),
+    right = [1, 2],
+};
+
+assert t.equal{
+    left = tpl.iter{tpl={foo=1, bar=2}},
+    right = [["foo", 1], ["bar", 2]],
+};
+
+assert t.equal{
+    left = tpl.ops{tpl={foo=1, bar=2}}.iter(),
+    right = [["foo", 1], ["bar", 2]],ok{
+    test = tpl.has_fields{tpl={foo=1, bar=2}, fields=["foo", "bar"]},
+    desc = "tuple has foo and bar fields",
+};
+
+assert t.not_ok{
+    test = tpl.has_fields{tpl={blah=1, bar=2}, fields=["foo", "bar"]},
+    desc = "tuple does not have fields foo and bar",
+};
+
+assert t.ok{
+    test = tpl.field_type{
+        tpl={foo=1},
+        field="foo",
+        type="int",
+    },
+    desc = "tuple has field of type int",
+};

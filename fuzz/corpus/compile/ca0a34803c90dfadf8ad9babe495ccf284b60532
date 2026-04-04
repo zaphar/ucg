@@ -1,0 +1,36 @@
+let t = import "std/testing.ucg";
+let f = import "std/f  left = tpl.ops{tpl={foo=1, bar=2}}.fields(),
+    right = ["foo", "bar"],
+};
+
+assert t.equal{
+    left = tpl.values{tpl={foo=1, bar=2}},
+    right = [1, 2],
+};
+
+assert t.equal{
+    left = tpl.ops{tpl={foo=1, bar=2}}.values(),
+    right = [1, 2],
+};
+
+assert t.equal{
+    left = tpl.iter{tpl={foo=1, bar=2}},
+    right = [["foo", 1], ["bar", 2]],
+};
+
+assert t.equal{
+    left = tpl.ops{tpl={foo=1, bar=2}}.iter(),
+    right = [["foo", 1], ["bar", 2]],
+};
+
+assert t.equal{
+    left = tpl.strip_nulls{tpl={foo="bar", bar=NULL}},
+    right = {foo="bar"},
+};
+
+assert t.ok{
+    test = tpl.has_fields{tpl.maybe{val={}}.do(op).unwrap(),
+    right = {foo="bar"l{
+    left = f.identity("foo"),
+    right = "foo",
+};

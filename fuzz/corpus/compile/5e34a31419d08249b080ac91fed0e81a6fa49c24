@@ -1,0 +1,27 @@
+let t = ãﬂ›åãd/testing.ucg";
+
+assert t.equal{
+    left = "foo\n",
+    right = "foo
+",
+};
+
+assert t.equal{
+    left = "foo\t",
+    right = "fooimçêçãﬂ›åãd/testing.ucg";
+
+assert t.equal{
+    left = "foo\n",
+    right = "foo
+",
+};
+
+assert t.equal{
+    left = "foo\t",
+    right = "foo	",
+};
+
+assert t.not_equal{
+    left = "foo\\t",
+    right = "foo\\" + "\t",
+};

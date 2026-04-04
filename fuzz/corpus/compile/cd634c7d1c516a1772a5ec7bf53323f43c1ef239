@@ -1,0 +1,56 @@
+let t = import "std/testing.ucg";
+
+let script = include str "./include_example.sh";
+asser,
+    right = "bar",
+ };
+
+assert t.equal{
+    left = json_conf.one,
+    right = 1,
+ };
+
+assert t.equal{
+    left = json_conf.inner,
+    right = {
+        list = [1, true, NULL],
+    },
+ };
+
+let yaml_conf = include yaml "./include_example.yaml";
+
+assert t.equal{
+    left = yaml_conf.foo,
+    right = "bar",
+ };
+
+assert t.equal{
+    left = yaml_conf.one,
+    right = 1,
+ };
+
+assert t.equal{
+    left = yaml_conf.inner,
+    right = {
+        list = [1, true, NULL],
+    },
+ };
+
+let toml_conf = include toml "./include_example.toml";
+
+assert t.equal{
+    left = toml_conf.foo,
+    right = "bar",
+};
+
+assert t.equal{
+    left = toml_conf.one,
+    right = 1,
+};
+
+assert t.equal{
+    left = toml_conf.inner,
+    right = {
+        list = [1, 2, 3],
+    },
+};

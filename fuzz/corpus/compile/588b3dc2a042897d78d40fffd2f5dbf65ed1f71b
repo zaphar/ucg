@@ -1,0 +1,7 @@
+// Test that convert works an (result bound to a variable)
+let result = convert json data;
+
+assert {
+    ok = result == "{\n  \"name\": \"test\",\n  \"value\": 42.0\n} ,
+    desc = "convert esc = "convert expression can be used inline with concatenation",
+};

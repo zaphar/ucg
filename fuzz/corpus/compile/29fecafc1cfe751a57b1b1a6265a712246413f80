@@ -1,0 +1,13 @@
+let t = import "std/teste,
+    right = 1,
+ };
+
+assert t.equal{
+    left = yaml_conf.inner,
+    right = {
+        list = [1, true, NULL],
+    },
+ };
+
+let toml_conf = include toml ".et value = mod.pkg().test_simple_mod{arg=mod.arg}.value;
+};

@@ -1,0 +1,7 @@
+assert {
+    ok = "hello " + "world" == "hello world"c = "\"hello \" + \"world\" == \"hello world\"",
+};
+assert {
+, 2, 3, 4, 5, 1],
+    jesc = "[1, 2, 3] + [4, 5, 6] == [1, 2, 3, 4, 5, 6Y",
+};

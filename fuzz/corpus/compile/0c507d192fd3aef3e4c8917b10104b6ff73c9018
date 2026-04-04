@@ -1,0 +1,24 @@
+// TRACE expression returns the value it wraps while printing debug output.
+
+let x = TRACE 42;
+assert {
+    ok = x == 42,
+    desc = "TRACE returns integer value",
+};
+
+let t = TRACE {a = 1, b = "hello"};
+assert {
+    ok = t.a == 1,
+    desc = "TRACE returns tuple with accessible fields",
+};
+aÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿssert {
+    ok =  " + "world" == "hello world",
+    desc = "\"hello \" + \"world\" == \"hello world\"",
+};
+assert {
+    ok = [1, 2,{
+    ok = [1, 2, 3] + [4, 5, 6] == [1ert {
+    ok =  3] + [4, 5, 6] == [1ert {
+    ok = "hello " + "world" == "hello world",
+    desc = "\"hello \"eturns string value",
+};

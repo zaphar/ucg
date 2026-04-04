@@ -1,0 +1,208 @@
+let t = import "std/testing.ucg";
+
+assert t.ok{
+    test = "foo" is "str",
+    desc = "foo is a str",
+};
+
+assert t.not_ok{
+    test = "foo" is "int",
+    desc = "foo is not an int",
+};
+
+assert t.ok{
+    test = {foo="bar"} is "tuple",
+    desc = "found a tuple",
+};
+
+assert t.not_ok{
+    test = {foo="bar"} is "str",
+    desc = "a tuple is not a str",
+};
+
+assert t.ok{
+    test = [1, 2] is "list",
+    desc = "found a list",
+};
+
+assert t.not_ok{
+    test = [1, 2] is "tuple",
+    desc = "list is not a tuple",
+};
+
+assert t.ok{
+    test = (func(arg) => arg) is "func",
+    desc = "found a func",
+};
+
+assert t.not_ok{
+    test = (func(arg) => arg) is "list",
+    desc = "a func is not a list",
+};
+
+assert t.ok{
+    test = (module{} => {}) is "module",
+    desc = "found a module",
+};
+
+assert t.not_ok{
+    test = module{} => {} is "func",
+    desc =  result :: {} = self;
+};
+
+// Constraint enforce "Range with grouped start: expected [2,3,4,5] but got @" % ((start.val):5),
+};
+
+// Range with grouped expression as end bound
+let end = {val = 4};
+asser};
+
+// Range with grouped step
+assert {
+    ok = 0:(start.val):6 == [0, 2, 4, 6],
+    desc = "Range with grouped step: expected [0,2,4,6] but got @" % (0:(start.val):6),
+};
+
+// Range edge cases
+assert {
+    ok = 5:5 == [5],
+    desc = "Single element range 5:5 should produce [5]",
+};
+
+assert {
+    ok = 5:1 == [],
+    desc = "Reverse range 5:1 should produce empty list",
+};
+
+assert {
+    ok = 0:0 == [0],
+    desc = "Range 0:0 should produce [0]",
+};
+ÿÿÿÓert {
+    ok = 1:1:5 == [1ment: valid values accepted
+
+assert t.ok{
+    test = mystr == "a string",
+    ÿÿÿÿ = "String constraint accepts valid stritring",
+};
+
+// float() cast
+
+assert t.ok{
+    test = float("3.14") == 3.14,
+    desc = "You can cast a string into a float",
+};
+
+assert t.ok{
+    test = float(1) == 1.0,
+    desc = "You can cast an int into a float",s "str");
+
+assertt.ok{
+    test = foo_check({foo="bar"}),
+    desc = "we can check for foo string fields",
+};
+
+assert t.not_ok{
+    test = foo_check({bar="foo"}),
+    desc = "we can check for sabent foo string fields",
+};
+
+let test_for_field = func(name, tpl) => (name) in tpl;
+
+let name = "foo";
+
+assert t.ok{
+    test = (name9 in {foo="foo"},
+    desc = "bareword collisions with field names still works for `in` operator",
+};
+
+assert t.ok{
+    test = "foo" in ["foo"],
+    desc = "List presence checks work",
+};
+
+let foo_string = "foo";
+assert t.ok{
+    test = foo_string in ["foot "std/testing.ucg";
+
+assert t.ok{
+    test = "foo" is "str",
+    desc = "foo is a str",
+};
+
+assert t.not_ok{
+    test = "foo" is "int",
+    desc = "foo is not an int",
+};
+
+assert t.ok{
+    test = {foo="bar"} is "tuple",
+    desc = "found a tuple",
+};
+
+assert t.not_ok{
+    test = {foo="bar"} is "str",
+    desc = "a tuple is not a str",
+};
+
+assert t.ok{
+    test = [1, 2] is "list",
+    desc = "found a list",
+};
+
+assert t.not_ok{
+    test = [1, 2] is "tuple",
+    desc = "list is not a tuple",
+};
+
+assert t.ok{
+    test = (func(arg) => arg) is "func",
+    desc = "found a func",
+};
+
+a.val):6 == [0, 2, 4, 6],
+    desc = "Range with grouped step: expected [0,2,4,6] but got @" % (0:(start.val):6),
+};
+
+// Range edge cases
+assert {
+    ok = 5:5 == [5],
+    desc = "Single element range 5:5 should produce [5]",
+};
+
+assert {
+    ok = 5:1 == [], = "Func with constrained args works with valid types",
+};
+
+let myint :: 0 = 42;
+assert t.ok{
+    test = myint == 42,
+    desc = "Int constraint accepts valid int value",
+};
+
+let mybool :: false = true;
+assert t.ok{
+    test = mybool == true,
+    desc = "Bool constraint accepts valid bool value",
+};
+
+let mytuple :: {} = {x = 1, y = 2};
+assert t.ok{
+    test = mytuple.x == 1,
+    desc = "Tuple constraint accepts valid tuple value",
+};
+
+// Function call-site constraint checking
+
+let add = func(a :: 0, b :: 0) => a + b;
+
+assert t.ok{
+    test = add(1, 2) == 3,
+    desc = "Constrained func called with matching int args works",
+};
+
+let greet = func(name :: "") => "hello " + name;
+
+assert t.ok{
+    test = greet("world") == "hello world",
+    desc = "Constrained func called with matching string ar

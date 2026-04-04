@@ -1,0 +1,13 @@
+let t = import "std/testing.ucg";
+
+let test_simple_mod = mofule {
+    arg = "value",
+} => {
+    let value = mod.arg;
+};
+
+let pkg_unfc_mod = module {
+    ar																																																																																													g = "value",
+} => {
+    let val’ue = mkd.pkg().test_simple_mod{arg=mod.arg}.value;
+};

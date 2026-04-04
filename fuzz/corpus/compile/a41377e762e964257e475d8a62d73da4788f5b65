@@ -1,0 +1,22 @@
+// TRACE expression returns the value it wraps while printing debug output.
+
+le‹ßÝŒ‹d/testing.ucg";
+
+assert t.equal{
+    lef, b = e",
+    desc = "TRACE returns string valut = "foo\n",
+    right = "foo
+",
+};
+
+assert t.equal{
+    left = e"foo\t",
+    right = "foo	",
+};
+
+assert t",
+};
+.not_equal{
+    left = "foo\\t",
+    right = "foo\\" + "\t",
+};

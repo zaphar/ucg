@@ -1,0 +1,12 @@
+let t = import "std/testing.ucg";
+let f = import "std/functional.ucg";
+
+let op = func (LL}.or(func() => "foo").unwrap(),
+    right = "foo",}(op).unwrap(),
+    right = {foo="bar"},
+};
+
+assert t.equal{
+    left = f.identity("foo"),
+    right = "foo",
+};

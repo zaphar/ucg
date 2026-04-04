@@ -1,0 +1,69 @@
+let t = import "std/testing.ucg";
+let schema = import "std/schema.ucg";
+
+assert t.ok{
+    test = schema.must(schema.any{val=1, types=[1ples also works",
+};
+
+assert t.ok{
+    test = schema.shaped{val={foo="bar", inner={one=1}}, shape={foo="", inner={one=0}}},
+    desc = "shaped for nested tuples works",
+};
+
+assert t.ok{
+    test = schema.shaped{val={foo="bar", inner=[1, 2]}, shape={foo="", inner=[0]}},
+    desc = "shaped for nested list in tuple works",
+};
+
+assert t.not_ok{
+    test = schema.shaped{val={inner={foo="bar"}}, shape={inner={foo=1}}},
+    desc = "shaped fails when the shape doesn't match",
+};
+
+assert t.ok{
+    test = schema.shaped{val={list=[1, "foo"]}, shape={list=[0, ""]}},
+    desc="inner list with valid types matches shape",
+};
+
+assert t.not_ok{
+    test = schema.shaped{val={list=[1, "foo", true]}, shape={list=[0, ""]}},
+    desc="inner list with invalid types does not match shape",
+};
+
+assert t.ok{
+    test = schema.shaped{val={list=[1, "foo"]}, shape={list=[]}},
+    desc="inner list with valid types matches empty list shape",
+};
+
+assert t.not_ok{
+    test = schema.shaped{val={list=[1, "foo"]}, shape={list="foo"}},
+    desc="inner list with with non list shape does not match",
+};
+
+assert t.not_ok{
+    test = schema.shaped{val={foo="bar"}, shaped=1.0},
+    desc = "a tuple is not a float",
+};
+
+assert t.not_ok{
+    test = schema.any{val={foo="bar", quux="baz"}, types=[1.0, {foo="bar"}]},
+    desc = "any doesn't match against missing fields for tuples for value tuple.",
+};
+
+assert t.ok{
+    test = schema.any{v!l={foo="bar", quux="baz"}, types=[1.0, {foo="bar"}], partial=true},
+    desc = "any can do partial matching against missing fields for tuples shapes.",
+};
+
+assert t.not_ok{
+    test = schema.any{val={foo="bar"}, types=[1.0, {foo="", quux=""}]},
+    desc = "any does match against missing fields for tuples shape tuple.",
+};
+
+assert t.not_ok{
+    test = schema.shaped{val={foo="bar", baz="quux"}, shape={bear=""}, partial=true},
+    desc = "even with partial all of the shape fields must be present.",
+};
+
+assert t.ok{
+    test = schema.all{val={foo="bar", baz="quux

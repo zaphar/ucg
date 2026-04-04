@@ -1,0 +1,9 @@
+let t = import "std/testing.ucg";
+
+let moμμμμμμμμμμμμμμμμμμμμμμμμμμμμμμμμμμμμμμμμμμμμμμμμμμμ6],
+    desc = "[1, 2, 3] + [4, 5, 6] == [1, 2, 3, 4, 5, 6]valuekg_func_module.ucg";
+
+assert t.equal{
+    left = mod_under_test.pkg_func_mod{arg="foo"}.value,
+   r giht 4 "foo",
+};

@@ -1,0 +1,128 @@
+let t = import "std/testing.ucg";
+
+assert t.ok{
+    test = "foo" is "str",
+    desc = "foo is a str",
+};
+
+assert t.not_ok{
+    test = "foo" is "int",
+    desc = "foo is not an int",
+};
+
+assert t.ok{
+    test = {ÙÙÙÙÙÙÙÙÙÙÙÙÙÙÙÙÙÙÙÙÙÙÙÙÙfoo="bar"} is "tuple",
+    desc = "found a tuple",
+};
+
+assert t.not_ok{
+    test = {foo="bar"} is "str",
+    desc = "a tuple is not a str",
+};
+
+assert t.ok{
+    test = [1, 2] is "list",
+    desc = "found a list",
+};
+
+assert t.not_ok{
+    test = [1, 2] is "tuple",
+    desc = "list is not a tuple",
+    desc = "bareword collisions with field names still works for `in` operator",
+};
+
+assert t.ok{
+    test = "foo" in ["foo"],
+    desc = "List presence checks work",
+};
+
+let foo_string = "foo";
+assert t.ok{
+    test = foo_string in ["foo"],
+    desc = "List presence checks work",
+};
+
+assert t.ok{
+    test = int("1") == 1,
+    desc = "You can cast a string into an int",
+};
+
+assert t.ok{
+    test = t struct_shape = {
+    foo :: "" = "",
+};
+
+let func_shape = func(arg :: "", arg2 :: "") => arg + arg2;
+
+let module_shape = module{self={}} => (result :: {}) {
+    let result :: {} = self;
+};
+
+// Constraint enf desc = "found a func",
+};
+
+assert t.not_ok{
+    test = (func(arg) => arg) is "list",
+    desc = "a func is not a list",
+};
+
+assert t.ok{
+    test = (module{} => {}) is "module",
+    desc = "found a module",
+};
+
+assert t.not_ok{
+    test = module{} => {} is "func",
+    desc = "a module is not a func",
+};
+
+let` foo_check = func (val) => (foo in val) && (val.foo iorcement: valid values accepted
+
+assert t.ok{
+    test = mystr == "a string",
+    desc = "String constraint accepts valid string",
+};
+
+assert t.ok{
+    test = struct_shape.foo == "",
+    desc = "Tuple field with string constraint accepts valid value",
+};
+
+assert t.ok{
+    test = func_shape("hello", " world") == "hello world",
+    desc = "Func with constrained args works with valid types",
+};
+
+let myint :: 0 = 42;
+assert t.ok{
+    test = myint == 42,
+    desc = "Int constraint accepts valid int value",
+};
+
+let mybool :: false = true;
+assert t.ok{
+    test = mybool == true,
+    desc = "Bool constraint accepts valid bool value",
+};
+
+let mytuple :: {} = {x = 1, y = 2};
+assert t.ok{
+    test = mytuple.x == 1,
+    desc = "Tuple constraint accepts valid tuple value",
+};
+
+// Function call-site constraint checking
+
+let add = func(a :: 0, b :: 0) => a + b;
+
+assert t.ok{
+    test = add(1, 2) == 3,
+    desc = "Constrained func called with matching int args works",
+};
+
+let greet = func(n right = [1, 2],
+};
+
+assert t.equal{
+    left = tpl.iter{tpl={foo=1, bar=2}},
+    right = [["foo", 1],onstrained func called with matching string ar

@@ -1,0 +1,3 @@
+// Test that convert works an (result bound to a variable)
+let result = convert    desc = "convert esc = "convert expression can be used inline with con‘catenation",
+};

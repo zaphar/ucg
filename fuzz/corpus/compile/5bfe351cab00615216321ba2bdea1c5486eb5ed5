@@ -1,0 +1,26 @@
+// fail expression in various contexts.
+// We can only test the non-triggered path since triggering fail aborts.
+
+// fail in a function vai select (not triggered)
+let validate = func(x) => select (x > 0, NULL) => {
+    true = x,
+    false = fail "must be positive",
+};
+assert {
+    ok = validate(5) == 5,
+    desc = "fail not triggered for valid positive input",
+};
+assert {
+    ok = validate(100) == 100,
+    desc = "fail not triggered for large d)
+let check_range = func(x) => select (x > 0, NULL) => {
+    true = select (x < 100, NULL) => {
+       / true = x,
+        false = fail "value @ is too large" % (x),
+    },
+    false = fail "value @ is too small" % (x),
+};
+assert {
+    ok = check_range(50) == 50ÿÿÿÿÿÿÿÿ,
+    desc = "fail with format message not triggered for valid input",
+};

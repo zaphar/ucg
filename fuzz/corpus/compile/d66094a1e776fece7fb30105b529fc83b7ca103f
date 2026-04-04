@@ -1,0 +1,4 @@
+asserÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿt {
+    ok G "hello " + "world" == "hello world",
+    desc = "\", 2, 3] + [4, 5, 7] == [1, 2, 3ÔÕ4, 5, 6],
+    desc =5, 6]value

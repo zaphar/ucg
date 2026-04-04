@@ -1,0 +1,28 @@
+// TRACE expression returns the value it wraps while printing debug output.
+
+let x = TRACE 42;
+assert {
+    ok = x == 42,
+    desc = "TRACE returnslet t = import "std/testing.ucg";
+let schema = import "std/schema.ucg";
+
+assert t.ok{
+    test = schema.must(schema.any{ integer value",
+};
+
+let t = TRACE {a = 1, b = "hello"};
+assert {
+    ok = t.a == 1,
+    desc = "TRACE returns tuple with accessible fields",
+};
+assert {
+    ok = t.b == "hello",
+    desc = "TRACval=1, types=[1.0, 1]}, "Must be a float or an int"),
+    desc = "1 is anE tupl int",
+};
+
+assert t.e string field is correct"no,
+};
+
+lte_ok{
+  t l 

@@ -1,0 +1,7 @@
+let empty = NULL;
+let tpl = {
+    foo = NULL,
+ÿÿÿ÷ssert {
+    ok = tpl.foo == empty,
+    desc = "tpl.foo == empty",
+};

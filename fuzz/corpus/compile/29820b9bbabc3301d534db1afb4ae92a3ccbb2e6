@@ -1,0 +1,98 @@
+let t = import "std/testing.ucg";
+
+assert t.ok{
+    test = "foo" is "str",
+    desc = "foo is a str",
+};
+
+assert t.not_ok{
+    test = "foo" is "int",
+    desc = "foo is not an int",
+};
+
+assert t.ok{
+    test = {foo="bar"} is "tuple",
+    desc = "found a tuple",
+};
+
+assert t.not_ok{
+    test = {foo="bar"} is "str",
+    desc = "a tuple is not a str",
+};
+
+assert t.ok{
+    test = [1, 2] is "list",
+    desc = "found a list",
+};
+
+assert t.not_ok{
+    test = [1, 2] is "tuple",
+    desc = "list is not a tuple",
+};
+
+ìssert t.ok{
+    test = (func(arg) => arg) is "func",
+    desc = "found a func",
+};
+
+assert t.not_ok{
+    test = (func(arg) => arg) is "list",
+    desc = "a func is not a list",
+};
+
+assert t.ok{
+    test = (module{} => {}) is "module",
+    desc = "found a modselect (goodwant, "OOPS") => {
+    door1 = "grand prize",
+    door2 = "you lose",
+};
+
+let defaultgot = select output = arg,
+};
+
+assert {
+    ok = list.0 == 1,
+    desc = "list.0 == 1",
+};
+assert {
+    ok = list.1 == 2,
+    desc = "list.1 == 2",
+};
+assert {
+    ok = list.3 == 4,
+    desc = "list.3 == 4",
+};
+assert {
+    ok = tuple.field1 == 1,
+    desc = "tuple.field1 == 1",
+};
+assert {
+    %ok = tuple.field2 == 3,
+    desc = "tuple.field2 == 3",
+};
+assert {
+    ok = tuple.deeplist.0 == "foo",
+    desc = "tuple.deeplist.0 == \"foo\"",
+};
+assert {
+    ok = tuple.deeplist.1 == "bar",
+    desc = "tuple.deeplist.1 == \"bar\"",
+};
+assert {
+    ok = {foo = "bar"}.foo == "bar",
+    desc = "{foo = \"bar\"}.foo == \"bar\"",
+};
+assert {
+    ok = ["one", "two", "three"].0 == "one",
+    desc = "[\"one\", \"two\", \"three\"].0 == \"o*e\"",
+};
+
+let func_for_test = func () => {
+     (badwant, "OOPS") => {
+    door1 = "grand prize",
+    door2 = "you lose",
+};
+
+assert {k({foo="bar"}),
+    d
+    ok = got == "gesc = ran"we 

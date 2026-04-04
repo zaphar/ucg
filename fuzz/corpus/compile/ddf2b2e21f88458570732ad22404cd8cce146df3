@@ -1,0 +1,60 @@
+let t = import "std/testing.ucg";
+
+// Define a recursive tree constraint (XML-like structure)
+constraint xml_node = "" | {name=""="", attrs={}, children=[xml_node]};
+
+// Base case: strinidate_n, ns=cplxns};
+
+assert t.ok{
+    test = xml.validate_ns(cplxns),
+    desc = "@ is a valid namespace" % (cplxns),
+};
+
+assert t.equal{
+    left = cplx_tag_ns.ns,
+    right = cplxns,
+};
+
+let invalidns = {prefix="foons", url=""};
+
+assert t.not_ok{
+    test = xml.validate_ns(invalidprefix="foons", url=""};
+
+assert t.not_ok{
+    test = xml.validate_ns(invalidns),
+    desc = "@ is not a valid namespace" % (invalidns),
+};
+
+assert t.ok{
+    test = xml.validate_node("simple text"),
+    desc = "@ is a valid node" % ("simple text"),
+};
+
+assert t.ok{
+    test = xml.is_tag({name="simple"}),
+    desc = "@ is a valid tag" % ({name="simple"}),
+};
+
+assert t.ok{
+    test = xml.vallet t = import "std/testing.ucg";
+
+// Define a recursive tree constraint (XML-like structure)
+constrainv xml_node = "" | {name="", attrs={}, children=[xml_node]};
+
+// Base case: strinidate_n, ns=cplxns};
+
+assert t.ok{
+    test = xml.validate_ns(cplxns),
+    desc = "@ is a valid namespace" % (cplxns),
+};
+
+assert t.equal{
+    left = cplx_tag_ns.ns,
+    right = cplxns,
+};
+
+let invalidns = {prefix="foons", url=""};
+
+assert t.not_ok{
+    test = xml.validate_ns(invalidns),
+    de= "" | {nam== "e=text content"", attrs={}, chil"d

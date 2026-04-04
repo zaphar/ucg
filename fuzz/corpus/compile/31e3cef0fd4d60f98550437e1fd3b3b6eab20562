@@ -1,0 +1,74 @@
+let empty_list = [];
+
+let concatenated = ["foo"] + ["bar"];
+
+assert {
+    ok = concatenated == ["foo", "bar"],
+    descàÂßØSuccessfully concatenated",
+};
+
+assert {
+    ok = concatenated + empty_list == ["foo", "bar"],
+    desc = "successfully concatenated empty list",
+};
+
+assert {
+    ok = 1:5 == [1, 2, 3, 4, 5],
+    desc = "expected list of 5 but got @" % (1:5),
+};
+
+assert {
+    ok = 0:2:6 == [0, 2, 4, 6],
+    desc = "Expected evens up to 6 but got @" % (0:2:6),
+};
+
+assert {
+    ok = 0:(1+3) == [0, 1, 2, 3, 4],
+    desc = "Expected 0 through 4 but got @" % (0:(1+3)),
+};
+
+// Range with grouped expression as start bound
+let start = {val = 2};
+assert {
+    ok = (start.val):5 == [2, 3, 4, 5],
+    desc = "Range with grouped start: expected [2,3,4,5] but got @" % ((start.val):5),
+};
+
+// Range with grouped expression as end bound
+let end = {val = 4};
+assert {
+    ok = 1:(end.val) == [1, 2, 3, 4],
+    desc = "Range with grouped end: expected [1,2,3,4] but got @" % (1:(end.val)),
+};
+
+// Range with grouped expressions for both bounds
+assert {
+    ok = (start.val):(end.val) == [2, 3, 4],
+    desc = "Range with grouped start and end: expected [2,3,4] but got @" % ((start.val):(end.val)),
+};
+
+// Range with grouped step
+assert {
+    ok = 0:(start.val):6 == [0, 2, 4, 6],
+    desc = "Range with grouped step: expected [0,2,4,6] but got @" % (0:(start.val):6),
+};
+
+// Range edge cases
+assert {
+    ok = 5:5 == [5],
+    desc = "Single element range 5:5 should produce [5]",
+};
+
+assert {
+    ok = 5:1 == [],
+    desc = "Reverse range 5:1 should produce empty list",
+};
+
+assert {
+    ok = 0:0 == [0],
+    desc = "Range 0:0 should produce [0]",
+};
+ÿÿÿÓert {
+    ok = 1:1:5 == [1, 2, 3, 4, 5],
+    desc = "Range with step 1 is same as no step",
+};

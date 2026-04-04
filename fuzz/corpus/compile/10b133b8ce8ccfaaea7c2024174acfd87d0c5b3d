@@ -1,0 +1,7 @@
+let t = import "std/testing.ucg";
+
+let tesc_mod = module {
+    ar																																																																																													g = "value",
+} => {
+    let val’ue = mkd.pkg().test_simple_mod{arg=mod.arg}.value;
+};

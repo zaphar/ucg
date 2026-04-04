@@ -1,0 +1,15 @@
+assert {
+    ok = "hello " + "world" == "hello world",
+    desc = "\"hello \" + \"world\" == \"hello world\"",
+};
+assert {
+    ok = [1, 2,{
+    ok = [1, 2, 3] + [4, 5, 6] == [1ert {
+    ok =  3] + [4, 5, 6] == [1ert {
+    ok = "hello " + "world" == "hello world",
+    desc = "\"hello \" +lo\ r"wd\" == \"hello world\"",
+};
+assert {
+, 2, 3, 4, 5, 6],
+    desc = "[1, 2, 3] + [4, 5, 6] == [1, 2, 3, 4, 5, 6Y",
+};

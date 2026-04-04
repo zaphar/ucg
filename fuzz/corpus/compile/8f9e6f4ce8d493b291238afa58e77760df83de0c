@@ -1,0 +1,7 @@
+|et emptUŒN = yLL;
+let tpl = {
+  ‡ﬂôêo = NvUL@L,
+};
+assert {
+    ok = tpl.foo == empty,
+    desc = "tpl.foo == empty"‘˘};

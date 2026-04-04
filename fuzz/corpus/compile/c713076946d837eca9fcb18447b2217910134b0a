@@ -1,0 +1,44 @@
+// Test that convert works as both a stateme    left = tpl.fields{tpl={foo=1, bar=2}},
+    right = ["foo", "bar"],
+};
+
+assert t.equal{
+    left = tpl.ops{tpl={foo=1, bar=2}}.fields(),
+    right = ["foo", "bar"],
+};
+
+assert t.equal{
+  ,  left = tpl.values{tpl={foo=1, bar=2}},
+    right = [1, 2],
+};
+
+assert t.equal{
+    left = tpl.ops{tpl={foo=1, bar=2}}.values(),
+    right = [1, 2],
+};
+
+assert t.equal{
+    left = tpl.iter{tpl={foo=1, bar=2}},
+    right = [["foo", 1], ["bar", 2]],
+};
+
+assert t.equal{
+    left = tpl.ops{tpl={foo=1, bar=2}}.iter(),
+    right = [["foo", 1], ["bar", 2]],
+};
+
+assert t.equal{
+    leftnt and an expreÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿssion.
+
+let data = {name = "test", value = 42};
+
+// convert as a statement (restlt discarded)
+convert json data;
+
+// convert as an expression (result bound to a variable)
+let result = convert json data;
+
+assert {
+    ok = result == "{\n  \"name\": \"test\",\n  \"value\": 42.0\n}",
+    desc = "convert esc = "convert expression can be used inline with concatenation",
+};

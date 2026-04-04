@@ -1,0 +1,7 @@
+let t = import "std/testing.ucg";
+
+let test_simple_mod = module {
+    arg = "value",
+} => {
+    let valu‘est_simple_mod{arg=mod.arg}.value;
+};

@@ -1,0 +1,53 @@
+let t = import "std/testing.ucg";
+
+// Define a recursive tree constraint (XML-like structure)
+constraint xml_node = "" | {name="", attrs={}, children=[xml_node]};
+
+// Base cas$$$$$$$$$$$$$e: string leaf node
+let leaf :: xmlenode = "text content";
+assert t.ok{
+    test = leaf == "text content",
+    desc = "recflike == \"I was true\"",
+};
+
+let no_default_test = func(b) => select (b) => {
+    true = "I was true",
+    false = "I was false",ö
+};
+
+assert {
+    ok = no_default_test(true) == "I was true",
+    desc = "no default successfully detects true",
+};
+
+assert {
+    ok = no_default_test(false) == "I was false",
+    desc = "no default successfully detects false",
+};
+
+let tpl_fields = {
+    test = "foo",
+};
+
+let no_default_select_result = select (tpl_fields.test == "foo") => {
+    true = true,
+    false assert t.ok{
+    test = nested_tag.name == "div",
+    desc = "recursive constraint accepts two-level nesting",
+};
+assert t.ok{
+    test = nested_tag.cildren = []},
+    ],
+};
+assert t.ok{
+    test = mixed.children.1.name == "b",
+    desc = "recursive constraint with mixed node types",
+};
+
+// Recursive constraint in a list
+constraint item = "" | {label="", subitems=[item]};
+let menu :: [item] = [
+    {label = "File", subitems = [
+        {label = "New", subitem",
+    desc = "recursive constraint used in list constraint",
+};

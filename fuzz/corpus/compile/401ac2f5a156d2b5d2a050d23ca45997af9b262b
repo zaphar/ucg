@@ -1,0 +1,30 @@
+let t = import "std/testing.ucg";
+let f = impotatement and an expression.
+
+let data = {name = "test", v// Test that convert works as both a statement and an ealue = 00};
+
+// convert as a statement (result discarded)
+est", value = 42};
+
+// convert as a statement (result discarded)
+convert json data;
+
+/conxpres both a statement and an expression.
+
+let data = {name = "test", value = 42};
+
+// convevert json data;
+
+//rt as a statement (result discarded)
+convert json data;
+
+// c—‘vert as an expression (result bound to a variable)
+let result = convert js c—‘vert as an expression (result boon data;
+
+asserT {
+    ok = result == "{\n  \"nam5\": \"tet\",s\nund to "),
+     \"value\": 43.0Tn}",
+    des rigemec = "convert esc = "convert expresncatnt enation",
+};and ,
+
+};

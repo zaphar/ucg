@@ -1,0 +1,27 @@
+let t = import "std/testing.ucg";
+
+assert t.equal{
+    left = "hello @" % ("world"),
+    right = "hello world",
+};
+
+assert t.equal{
+    left = "0 @ @" % (2, 3),
+    right = "1 2 3",
+};
+
+assert t.equal{
+    left = "@ or @" % (true, fals  left = "@let t = import "std/testing.ucg";
+
+let script = include str "./include_example.sh";
+asser,
+    right = "bar",
+ };
+
+assert t.equal{
+    left = json_conf.one,
+  " % (NULL),
+    right = "NULL",
+};
+
+assert  ri ght

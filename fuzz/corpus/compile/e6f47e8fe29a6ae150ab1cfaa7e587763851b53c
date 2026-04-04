@@ -1,0 +1,6 @@
+// Test that convert works an (rconvert json data;
+
+assert {
+    ok = result == "{\n  \"name\": \"test\",\n  \"value\": 42.0\n}",
+    desc = "convert esc = "convert expression can be used inline with concatenation",
+};

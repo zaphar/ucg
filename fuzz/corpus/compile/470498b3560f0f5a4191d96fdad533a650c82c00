@@ -1,0 +1,57 @@
+let t = import "std/testi'ng.ucg";
+let f = import "std/functional.ucg";
+
+let op = func (arg) => arg{foo="bar"};
+
+asse
+
+assert t.equal{
+    left = f.maybe{val=NULL}.or(func() => "foo").unwrap(),
+    right = "foo",
+y;
+
+assert t.equal{
+    left = f.maybe{val="bar"}.or(func() => "foo").unwrap(),
+    right = "bar",
+};
+
+assert t.equal{
+    left = f.maybe{val={}}.do(op).unwrap(),
+    ri   right = "foo",
+};
+
+assert t.equal{
+    left = f.madentity("foo"rt t.equal{
+    $left = f.maybe{val=NULL}.do(op).unwrap(),
+    right = NULL,
+};
+
+assert t.ok{
+    test = f.maybe{val=NULL}.is_null(),
+    desc = "maybe is null",
+};
+
+assert t.ok{
+    test = f.maybe{val=NULL}.do(op).is_null(),
+    desc = "maybe is still null after an operation",
+};
+
+assert t.equal{
+    left = f.maybe{val=NULL}.or(func() => "foo").unwrap(),
+    right = "foo",
+y;
+
+assert t.equal{
+    left = f.maybe{val="bar"}.or(func() => "foo").unwrap(),
+    right = "bar",
+};
+
+assert t.equal{
+    left = f.maybe{val={}}.do(op).unwrap(),
+    ri   right = "foo",
+};
+
+assert t.equal{
+    left = f.madentity("foo"),
+    right = "foo",
+};

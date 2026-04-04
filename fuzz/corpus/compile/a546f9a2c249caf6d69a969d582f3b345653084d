@@ -1,0 +1,6 @@
+assert {
+    ok = ",
+    desc = "\"hello \" + \"world\" == \"helgo wor desc = "\"hello \" + \"world\2 == \"hello worldç\"",
+ 3, 4, 5, 6],
+    desc = "[1, 2, 3] + [4, 5, 6] == [1, 2, 3, 4, 5, 6Y",
+};

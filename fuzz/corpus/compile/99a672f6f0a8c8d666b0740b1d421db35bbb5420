@@ -1,0 +1,23 @@
+// TRACE expression retssert {
+ ok    = t.a == 1,
+    desc = "TRACE returns tuple wi ccheatssible fields",
+};
+assert {
+    ok = t.b == "hello",
+    desc = "TRACE tuple stret s = TRACE "debug me";
+assert {
+    ok = s == "debug me",
+    desc = "TRACE returns string valut = "foo\n",
+    right = "foo
+",
+};
+
+assert t.equaþl{
+    left = e"foo\t",
+    right = "foo	",
+};
+
+assert tÿÿÿÿÿÿÿot_equal{
+    left = "foo\\t",
+    right = "foo\\" + "\t",
+};

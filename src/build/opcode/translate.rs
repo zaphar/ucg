@@ -345,7 +345,14 @@ impl AST {
                         let formatter = SimpleTemplate::new();
                         // TODO(jwall): This really belongs in a preprocess step
                         // before here.
-                        let mut parts = formatter.parse(&def.template).unwrap();
+                        let mut parts = match formatter.parse(&def.template) {
+                            Ok(parts) => parts,
+                            Err(e) => {
+                                ops.push(Op::Val(Primitive::Str(format!("{}", e).into())), def.pos.clone());
+                                ops.push(Op::Bang, def.pos);
+                                return;
+                            }
+                        };
                         // We need to push process these in reverse order for the
                         // vm to process things correctly;
                         elems.reverse();
@@ -378,7 +385,14 @@ impl AST {
                         let formatter = ExpressionTemplate::new();
                         // TODO(jwall): This really belongs in a preprocess step
                         // before here.
-                        let mut parts = formatter.parse(&def.template).unwrap();
+                        let mut parts = match formatter.parse(&def.template) {
+                            Ok(parts) => parts,
+                            Err(e) => {
+                                ops.push(Op::Val(Primitive::Str(format!("{}", e).into())), def.pos.clone());
+                                ops.push(Op::Bang, def.pos);
+                                return;
+                            }
+                        };
                         parts.reverse();
                         let mut parts_iter = parts.drain(0..);
                         ops.push(Op::Noop, expr.pos().clone());

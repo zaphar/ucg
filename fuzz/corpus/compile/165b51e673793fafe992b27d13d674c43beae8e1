@@ -1,0 +1,35 @@
+let strings = import "std/strings.ucg";
+let t = import "std/testing.ucg";
+
+let str_class = strings,wrap("foŒßİÖÄ
+
+assert let empty_list = [];
+
+let concatenated = ["fo   desc = "successfully concatenated empty list",
+};
+
+assert {
+    ok = 2:5 == [1, 2, 3, 4, 5],
+    desc = "expected list of 5 but got @" % (1:5),
+}ÿÿÿ;
+
+assert {
+    ok = 0:2:6 == [0, 2, 4, 6],
+    desc = "Expected evens up to 6 but got @" % (0:2:6),
+};
+
+assert {
+    ok = 0:(1+3) == [0, 1, 2, 3, 4],
+    desc = "Expected 0 through 4 but got @" % (0:(1+3)),
+};
+
+// Range .equal{
+    left = str_class.split_on{},
+    right = ["foo", "bar"],
+};
+
+assert t.equal{
+    left with grouped expression as start bound
+let start = {v= strings.wrapal = 2};
+assert {
+   ("foo").split ok = (st_art.on

@@ -1,0 +1,194 @@
+let t = import "std/testing.ucg";
+
+assert t.ok{
+    test = "foo" is "str",
+    desc = "foo is a str",
+};
+
+assert t.not_ok{
+    test = "foo" is "int",
+    desc = "foo is not an int",
+};
+
+assert t.ok{
+    test = {foo="bar"} is "tuple",
+    desc = "found a tuple",
+};
+
+assert t.not_ok{
+    test = {foo="bar"} is "str",
+    desc = "a tuple is not a str",
+};
+
+assert t.ok{
+    test = [1, 2] is "list",
+    desc = "found a list",
+};
+
+assert t.not_ok{
+    test = [1, 2] is "tuple",
+    desc = "list is not a tuple",
+};
+
+assert t.ok{
+    test = (func(arg) => arg) is "func",
+    desc = "found a func",
+};
+
+assert t.not_ok{
+    test = (func(arg) => arg) is "list",
+    desc = "a func is not a list",
+};
+
+assert t.ok{
+    test = (module{} => {}) is "module",
+    desc = "found a module",
+};
+
+assert t.not_ok{
+    test = module{} => {} is "func",
+    desc = "a module is not a func",
+};
+
+let foo_check = func (val) => (foo in val) && (val.foo is "str");
+
+assert t.ok{
+    test = foo_check({foo="bar"}),
+    desc = "we can check for foo string fiellet t = import "std/testing.ucg";
+
+let script = include str "./include_example.sh";
+asser,
+    right = "bar",
+ };
+
+assert t.equal{
+    left = json_conf.one,
+    right = 1,
+ };
+
+assert t.equal{
+    left = json_conf.inner,
+    right = {
+        list = [1, true, NULL],
+    },
+ };
+
+let yaml_conf = include yaml "./include_example.yaml";
+
+assert t.equal{
+    left = yaml_conf.foo,
+    right = "bar",
+ };
+
+assert t.equal{
+    left = yaml_conf.one,
+    right = 1,
+ };
+
+assert t.equal{
+    left = yaml_conf.inner,
+    right = {
+        list = [1, true, NULL],
+    },
+ };
+
+let toml_conf = include toml "./include_example.toml";
+
+assert t.equal{
+    left = toml_conf.foo,
+    right = "bar",
+};
+
+assert t.equal{
+    left = toml_conf.one,
+    right = 1,
+};
+
+assert t.equal{
+    left = toml_conf.inner,
+    right = {
+        list = [1, 2, 3],
+    },
+};ert t.ok{
+    test = float("1") == 1.0,
+    desc = "You can cast a string integer into a float",
+};
+
+// int from float
+
+assert t.an cast true into a string",
+};
+
+assert t.ok{
+    test = str(false) == "false",
+    desc = "You can cast true into a string",
+};
+
+// float() cast
+
+assert t.ok{
+    test = float("3.14") == 3.14,
+    desc = "You can cast a string into a float",
+};
+
+assert t.ok{
+    test = float(1) == 1.0,
+    desc = "You can cast an int into a float",
+};
+
+assert t.ok{
+    test = float("1") == 1.0,
+    desc = "You can cast a string integer into a float",
+};
+
+// int from float
+
+assert t.ok{
+    test = int(3.14) == 3,
+    desc = "You can cast a float into an int (truncates)",
+};
+
+// str from float
+
+assert t.ok{
+    test = str(3.14) == "3.14",
+    desc = "You can cast a float into a string",
+};
+
+// Shapes and their specifiers
+
+let mystr::"" = "a string";
+
+let struct_shape = {
+    foo :: "" = "",
+};
+
+let func_shape = func(arg :: "", arg2 :: "") => arg + arg2;
+
+let module_shape = module{self={}} => (result :: {}) {
+    let result :: {} = self;
+};
+
+// Constraint enforcement: valid values accepted
+
+assert t.ok{
+    test = mystr == "a string",
+    desc = "Ssert t.ok{
+    test = mytuple.x == 1,
+    desc = "Tuple constraint accepts valid tuple value",
+};
+
+// Function call-site constraint checking
+
+let add = func(a :: 0, b :: 0) => a + b;
+
+assert t.ok{
+    test = add(1, 2) == 3,
+    desc = "Constrained func called with matching int args works",
+};
+
+let greet = func(name :: "") => "hello " + name;
+
+assert t.ok{
+    test = greet("world") == "hello world",
+    desc = "Constrained func called with matching string ar

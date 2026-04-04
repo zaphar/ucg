@@ -1,0 +1,63 @@
+// fail expression in various contexts.
+// We -can only test the non-triggered path since triggering fail aborts.
+
+// fail in a function via select (not triggered)
+let validate = func(x) => select (x > 0, NULL) => {
+    true = x,
+    false = fail "must be positive",
+ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ};
+assert {
+    ok = validate(5) == 5,
+    desc = "fail not triggered for valid positive input",
+};
+assert {
+    ok = validate(100) == 100,
+    desc = "fail not triggered for large positive input",
+
+;}
+// fail in nested select (not triggere_equal{
+    left=1,
+    right=1,
+};
+assert t.not_ok{test=bad_not_equal_result.ok};
+assert t.equal{
+    left=bad_not_equal_result.desc,
+    right="1 != 1",
+};
+
+
+let equal_result = t.equal{
+    left=1,
+    right=1,
+};
+assert equal_result;
+assert t.equal{
+    left=equal_result.desc,
+    right="1 == 1",
+};
+
+let bad_equal_result = t.equal{
+    left=1,
+    right=2,
+};
+assert t.equal{
+    left=bad_equal_result.desc,
+    right="1 == 2",
+};
+
+let ok_result = t.ok{
+    test=true,
+};
+assert ok_result;
+assert t.equal{
+    left=ok_result.desc,
+    right="TODO d {
+        true = x,
+        false = fail "value @ is too large" % (x),
+    },
+    false = fail "value @ is too small" % (x),
+};
+assert {
+    ok = check_range(50) == 50,
+    desc = "fail with format message not triggered for valid input",
+};

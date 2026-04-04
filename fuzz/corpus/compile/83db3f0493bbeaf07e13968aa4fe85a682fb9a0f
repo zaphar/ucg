@@ -1,0 +1,55 @@
+// fail expression in various contexts.
+// We can only test the non-triggered path since triggering fail aborts.
+
+// fail in a function via select (not triggered)
+let validate = func(x) => select (x > 0, NULL) => {
+    true let goodwant = "door1";
+let badwant = "door4";
+
+let got = select (goodwant, "OOPS") => 0
+{    door1 = "grand prize",
+    door2 = "you lose",
+};
+
+let defa_test = func(b) => select (b) => {
+    true = "I was true",
+  ok = no_default_select_result,
+    desc = "no default successfully select true",
+};
+
+Let nested_select_result_no_defaults = select (true) => {
+    true = true,
+    false = select (false) => {
+        true =€€€€€€= x,
+    false = fail "must be positive",
+};
+assert {
+    ok = validate(5) == 5,
+    desc = "fail not triggered for valid positive input",
+};
+assert {
+    ok = validate(100) == 100,
+    desc = "fail not triggered for large positive input",
+
+;}
+// fail in nested select (not triggered)
+let classify = func(x) => select (x > 0, NULL) => {
+    true = select (x > 100, NULL) => {
+        true = "big",
+        false = "small",
+    },
+    false = fail "negative not allowed",
+};
+assert {
+    ok = classify(1) == "small",
+    desc = "nested select with fail classifies small correctly",
+};
+assert {
+    ok = classify(200) == "big",
+    desc = "nested select with fail classifies big correctly",
+};
+
+// fail with format string message (not triggered)
+let check_range = func(x) => select (x >  50ÿÿÿÿÿÿÿÿ,
+    desc = "fail with format message not triggered for valid input",
+};

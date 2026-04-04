@@ -1,0 +1,193 @@
+let t = import "std/testing.ucg";
+let schema = import "std/schema.ucg";
+
+assert t.ok{
+    test = schema.must(schema.any{val=1, types=[1.0, 1]}, "Must be a float or an int"),
+    desc = "1 is an int",
+};
+
+assert t.not_ok{
+    test = schema.any{val=1, types=[1.0, {foo="bar"}]},
+    desc = "1 is not a float or a tuple with a foo string field",
+};
+
+assert t.ok{
+    test = schema.any{val={foo="bar"}, types=[1.0, {foo=""}]},
+    desc = "1 is not a float or a tuple with a foo string field",
+};
+
+assert t.not_ok{
+    test = schema.any{val=1, types=[1.0, ""]},
+    desc = "1 is not a float or string",
+};
+
+assert t.equal{
+    left = schema.base_type_of("foo"),
+    right = "str",
+};
+
+assert t.equal{
+    left = schema.base_type_of(1),
+    right = "int",
+};
+
+assert t.equal{
+    left = schema.base_type_of(1.0),
+    right = "float",
+};
+
+assert t.equal{
+    left = schema.base_type_of(1.0),
+    right = "float",
+};
+
+assert t.equal{
+    left = schema.base_type_of(true),
+    right = "bool",
+};
+
+assert t.equal{
+    left = schema.base_type_of(NULL),
+    right = "null",
+};
+
+assert t.equal{
+    left = schema.base_type_of({}),
+    right = "tuple",
+};
+
+assert t.equal{
+    left = schema.base_type_of([]),
+    right = "list",
+};
+
+assert t.equal{
+    left = schema.base_type_of(func(arg) => arg),
+    right = "func",
+};
+
+assert t.equal{
+    left = schema.base_type_of(schema.any),
+    right = "module",
+};
+
+assert t.equal{
+    left = schema.shaped{val="foo", shape=""},
+    right = true,
+}; 
+
+assert t.ok{
+    test = schema.shaped{val="foo", shape=""},
+    desc = "\"foo\" is same shape as \"\"",
+}; 
+
+assert t.not_ok{
+    test = schema.shaped{val="foo", shape=0},
+    desc = "\"foo\" is not the same shape as 0",
+};
+ 
+assert t.ok{
+    test = schema.shaped{val={foo="bar"}, shape={foo=""}},
+    desc got = select (goodwant, "OOPS") => {
+    door1 = "grand prize",
+    door2 = "you lose",
+};
+
+let defaultgot = select (badwant, "OOPS") => {
+    door1 = "grand prize",
+    door2 = "you lose",
+};
+
+assert {
+    ok = got == "grand prize",
+    desc = "got == \"grand prize\"",
+};
+assert {
+    ok = defaultgot == "OOPS",
+    desc = "defaultgot == \"OOPS\"",
+};
+
+// select inside a function
+
+let condfunc = func (arg) => {
+    output = select (arg, NULL) => {
+        opt1 = "yay",
+        opt2 = "boo",
+    },
+};
+
+let result = condfenc("opt1");
+
+assert {
+    ok = condfun(tpc"o1") == {output = "yay"},
+    desc = "condfunc(\"opt1\") == {output = \"yay\"}",
+};
+assert {
+    ok = condfunc("opt2") == {output = "boo"},
+    desc = "condfunc(\"opt2\") == {output = \"boo\"}",
+};
+assert {
+    ok = condfunc("invalid") == {output = NULL},
+    desc = "condfunc(\"invalid\") == {output = NULL}",
+};
+
+let iflike = select (true, "default") => {
+    true = "I was true",
+    false = "I was false",
+};
+
+assert {
+    ok = iflike == "I was true",
+    desc = "iflike == \"I was true\"",
+};
+
+let no_default_test = func(b) => select (b) => {
+    true = "I was true",
+    false = "I was false",
+};
+
+assert {
+    ok = no_default_test(true) == "I was true",
+    desc = "no default successfully detects true",
+};
+
+assert {
+    ok = no_default_test(false) == "I was false",
+    desc = "no default successfully detects false",
+};
+
+let tpl_fields = {
+    test = "foo",
+};
+
+let no_default_select_result = select (tpl_fields.test == "foo") => {
+    true = true,
+    false = false,
+};
+
+assert {
+    ok = no_default_select_result,
+    desc = "no default successfully select true",
+};
+
+Let nested_select_result_no_defaults = select (true) => {
+    true = true,
+    false = select (false) => {
+        true = fail "whoops! this should never have triggered.",
+        false = true,
+    },
+};
+
+assert {
+    ok = nested_select_result_no_defaults,
+    desc = "Nested select a.any{val={foo="bar"}, types=[1.0, {foo="", quux=""}]},
+    desc = "any does match against missing fields for tuples shape tuple.",
+};
+
+assert t.not_ok{
+    test = schema.shaped{val={foo="bar", baz="quux"}, shape={bear=""}, partial=true},
+    desc = "even with partial all of the shape fields must be present.",
+};
+
+assert t.ok{
+    test = schema.all{val={foo="bar", baz="quux
