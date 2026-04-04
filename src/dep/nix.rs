@@ -80,6 +80,25 @@ struct NixPackage {
     hash: String,
 }
 
+/// Escape a string for use inside a Nix double-quoted string literal.
+/// Escapes backslashes, double quotes, and `${` interpolation sequences.
+fn escape_nix_string(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '$' if chars.peek() == Some(&'{') => {
+                out.push_str("\\${");
+                chars.next();
+            }
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
 fn render_nix_expression(packages: &[NixPackage]) -> String {
     let mut out = String::new();
 
@@ -97,9 +116,9 @@ fn render_nix_expression(packages: &[NixPackage]) -> String {
 
     for pkg in packages {
         out.push_str(&format!("  {} = {} {{\n", pkg.nix_id, pkg.fetch_fn));
-        out.push_str(&format!("    url = \"{}\";\n", pkg.fetch_url));
-        out.push_str(&format!("    rev = \"{}\";\n", pkg.commit));
-        out.push_str(&format!("    hash = \"{}\";\n", pkg.hash));
+        out.push_str(&format!("    url = \"{}\";\n", escape_nix_string(&pkg.fetch_url)));
+        out.push_str(&format!("    rev = \"{}\";\n", escape_nix_string(&pkg.commit)));
+        out.push_str(&format!("    hash = \"{}\";\n", escape_nix_string(&pkg.hash)));
         out.push_str("  };\n");
     }
 
@@ -203,5 +222,33 @@ mod tests {
             super::super::url::nix_identifier("github.com/org/my-lib"),
             "github_com_org_my-lib"
         );
+    }
+
+    #[test]
+    fn escape_nix_string_basics() {
+        assert_eq!(escape_nix_string("simple"), "simple");
+        assert_eq!(escape_nix_string(r#"has"quote"#), r#"has\"quote"#);
+        assert_eq!(escape_nix_string(r"has\backslash"), r"has\\backslash");
+        assert_eq!(escape_nix_string("has${interp}"), "has\\${interp}");
+    }
+
+    #[test]
+    fn nix_expression_escapes_values() {
+        let lockfile = Lockfile {
+            package: vec![LockedPackage {
+                git: Some("https://example.com/org/lib\";evil".into()),
+                hg: None,
+                version: "1.0.0".into(),
+                commit: "abc123".into(),
+                sha256: "sha256-test".into(),
+            }],
+        };
+
+        let vendor_dir = std::path::PathBuf::from("/nonexistent");
+        let result = generate_nix_expression(&lockfile, &vendor_dir).unwrap();
+
+        // The quote should be escaped, not raw
+        assert!(result.contains(r#"\";evil"#));
+        assert!(!result.contains("\";\nevil"));
     }
 }
