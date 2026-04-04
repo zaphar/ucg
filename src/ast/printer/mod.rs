@@ -147,7 +147,7 @@ where
         if has_fields {
             write!(self.w, "{}", self.make_indent())?;
         }
-        self.w.write(b"]")?;
+        self.w.write_all(b"]")?;
         Ok(())
     }
 
@@ -155,7 +155,7 @@ where
         &mut self,
         def: &Vec<(Token, Option<Expression>, Expression)>,
     ) -> std::io::Result<()> {
-        self.w.write(b"{")?;
+        self.w.write_all(b"{")?;
         // If the field list is just 1 we might be able to collapse the tuple.
         self.curr_indent += self.indent_size;
         let indent = self.make_indent();
@@ -189,7 +189,7 @@ where
         if has_fields {
             write!(self.w, "{}", self.make_indent())?;
         }
-        self.w.write(b"}")?;
+        self.w.write_all(b"}")?;
         Ok(())
     }
 
@@ -254,24 +254,24 @@ where
                 };
                 let right_line = _def.right.pos().line;
                 self.render_expr(&_def.left)?;
-                self.w.write(op.as_bytes())?;
+                self.w.write_all(op.as_bytes())?;
                 if self.has_comment(right_line) {
                     // if we'll be rendering a comment then we should
                     // add a new line here
-                    self.w.write("\n".as_bytes())?;
+                    self.w.write_all(b"\n")?;
                 }
                 self.render_expr(&_def.right)?;
             }
             Expression::Cast(def) => {
-                self.w.write(format!("{}", def.cast_type).as_bytes())?;
-                self.w.write("(".as_bytes())?;
+                self.w.write_all(format!("{}", def.cast_type).as_bytes())?;
+                self.w.write_all(b"(")?;
                 self.render_comment_if_needed(def.target.pos().line)?;
                 self.render_expr(&def.target)?;
-                self.w.write(")".as_bytes())?;
+                self.w.write_all(b")")?;
             }
             Expression::Call(_def) => {
                 self.render_value(&_def.funcref)?;
-                self.w.write("(".as_bytes())?;
+                self.w.write_all(b"(")?;
                 self.curr_indent += self.indent_size;
                 let indent = self.make_indent();
                 let has_args = _def.arglist.len() > 1;
@@ -285,30 +285,30 @@ where
                     }
                     self.render_expr(e)?;
                     if has_args {
-                        self.w.write(",\n".as_bytes())?;
+                        self.w.write_all(b",\n")?;
                     }
                 }
                 self.curr_indent -= self.indent_size;
                 if has_args {
                     write!(self.w, "{}", self.make_indent())?;
                 }
-                self.w.write(")".as_bytes())?;
+                self.w.write_all(b")")?;
             }
             Expression::Copy(_def) => {
                 self.render_value(&_def.selector)?;
                 self.render_tuple_def(&_def.fields)?;
             }
             Expression::Debug(_def) => {
-                self.w.write("TRACE ".as_bytes())?;
+                self.w.write_all(b"TRACE ")?;
                 if self.has_comment(_def.expr.pos().line) {
-                    self.w.write("\n".as_bytes())?;
+                    self.w.write_all(b"\n")?;
                 }
                 self.render_expr(&_def.expr)?;
             }
             Expression::Fail(_def) => {
-                self.w.write("fail ".as_bytes())?;
+                self.w.write_all(b"fail ")?;
                 if self.has_comment(_def.message.pos().line) {
-                    self.w.write("\n".as_bytes())?;
+                    self.w.write_all(b"\n")?;
                 }
                 self.render_expr(&_def.message)?;
             }
@@ -322,12 +322,12 @@ where
                 match _def.args {
                     FormatArgs::Single(ref e) => {
                         if self.has_comment(e.pos().line) {
-                            self.w.write("\n".as_bytes())?;
+                            self.w.write_all(b"\n")?;
                         }
                         self.render_expr(e)?;
                     }
                     FormatArgs::List(ref es) => {
-                        self.w.write("(\n".as_bytes())?;
+                        self.w.write_all(b"(\n")?;
                         self.curr_indent += self.indent_size;
                         let indent = self.make_indent();
                         let mut prefix = if es
@@ -344,12 +344,12 @@ where
                             prefix = ",\n";
                         }
                         self.curr_indent -= self.indent_size;
-                        self.w.write(")".as_bytes())?;
+                        self.w.write_all(b")")?;
                     }
                 }
             }
             Expression::Func(_def) => {
-                self.w.write("func (".as_bytes())?;
+                self.w.write_all(b"func (")?;
                 if _def.argdefs.len() == 1 {
                     let (arg, constraint) = _def.argdefs.first().unwrap();
                     write!(self.w, "{}", arg)?;
@@ -368,7 +368,7 @@ where
                         prefix = ", ";
                     }
                 }
-                self.w.write(") => ".as_bytes())?;
+                self.w.write_all(b") => ")?;
                 self.render_expr(&_def.fields)?;
             }
             Expression::FuncOp(_def) => match _def {
@@ -386,7 +386,7 @@ where
                             self.curr_indent += self.indent_size;
                         }
                         did_indent = true;
-                        self.w.write("\n".as_bytes())?;
+                        self.w.write_all(b"\n")?;
                     } else {
                         write!(self.w, ", ")?;
                     }
@@ -407,7 +407,7 @@ where
                             self.curr_indent += self.indent_size;
                         }
                         did_indent = true;
-                        self.w.write("\n".as_bytes())?;
+                        self.w.write_all(b"\n")?;
                     } else {
                         write!(self.w, ", ")?;
                     }
@@ -418,7 +418,7 @@ where
                             self.curr_indent += self.indent_size;
                         }
                         did_indent = true;
-                        self.w.write("\n".as_bytes())?;
+                        self.w.write_all(b"\n")?;
                     } else {
                         write!(self.w, ", ")?;
                     }
@@ -439,7 +439,7 @@ where
                             self.curr_indent += self.indent_size;
                         }
                         did_indent = true;
-                        self.w.write("\n".as_bytes())?;
+                        self.w.write_all(b"\n")?;
                     } else {
                         write!(self.w, ", ")?;
                     }
