@@ -399,7 +399,7 @@ impl Builtins {
         &self,
         stack: &mut Vec<(Rc<Value>, Position)>,
         env: &RefCell<Environment<O, E>>,
-        import_stack: &Vec<Rc<str>>,
+        import_stack: &[Rc<str>],
         pos: Position,
     ) -> Result<(), Error>
     where
@@ -509,7 +509,7 @@ impl Builtins {
         &self,
         stack: &mut Vec<(Rc<Value>, Position)>,
         env: &RefCell<Environment<O, E>>,
-        import_stack: &Vec<Rc<str>>,
+        import_stack: &[Rc<str>],
         pos: Position,
     ) -> Result<(), Error>
     where
@@ -655,7 +655,7 @@ impl Builtins {
         &self,
         stack: &mut Vec<(Rc<Value>, Position)>,
         env: &RefCell<Environment<O, E>>,
-        import_stack: &Vec<Rc<str>>,
+        import_stack: &[Rc<str>],
         pos: Position,
     ) -> Result<(), Error>
     where
