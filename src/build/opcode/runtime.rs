@@ -39,7 +39,7 @@ impl Builtins {
     pub fn new(strict: bool) -> Self {
         // FIXME(jwall): This should probably be injected in.
         Self {
-            strict: strict,
+            strict,
             import_path: Vec::new(),
             validate_mode: false,
         }
@@ -57,12 +57,12 @@ impl Builtins {
         self.validate_mode = true;
     }
 
-    pub fn handle<'a, P, O, E>(
+    pub fn handle<P, O, E>(
         &mut self,
         path: Option<P>,
         h: Hook,
         stack: &mut Vec<(Rc<Value>, Position)>,
-        env: &'a RefCell<Environment<O, E>>,
+        env: &RefCell<Environment<O, E>>,
         import_stack: &mut Vec<Rc<str>>,
         pos: Position,
     ) -> Result<(), Error>
@@ -94,10 +94,10 @@ impl Builtins {
         Ok(contents.into())
     }
 
-    fn import<'a, O, E>(
+    fn import<O, E>(
         &mut self,
         stack: &mut Vec<(Rc<Value>, Position)>,
-        env: &'a RefCell<Environment<O, E>>,
+        env: &RefCell<Environment<O, E>>,
         import_stack: &mut Vec<Rc<str>>,
         pos: Position,
     ) -> Result<(), Error>
@@ -158,10 +158,10 @@ impl Builtins {
         panic!("BUG: stack underflow in import - translator emitted wrong opcode sequence");
     }
 
-    fn include<'a, O, E>(
+    fn include<O, E>(
         &self,
         stack: &mut Vec<(Rc<Value>, Position)>,
-        env: &'a RefCell<Environment<O, E>>,
+        env: &RefCell<Environment<O, E>>,
         pos: Position,
     ) -> Result<(), Error>
     where
@@ -204,7 +204,7 @@ impl Builtins {
                 Rc::new(match env.borrow().importer_registry.get_importer(&typ) {
                     Some(importer) => {
                         let contents = self.get_file_as_string(&path)?;
-                        if contents.len() == 0 {
+                        if contents.is_empty() {
                             eprintln!("including an empty file. Use NULL as the result");
                             P(Empty)
                         } else {
@@ -227,10 +227,10 @@ impl Builtins {
         Ok(())
     }
 
-    fn assert<'a, O, E>(
+    fn assert<O, E>(
         &mut self,
         stack: &mut Vec<(Rc<Value>, Position)>,
-        env: &'a RefCell<Environment<O, E>>,
+        env: &RefCell<Environment<O, E>>,
     ) -> Result<(), Error>
     where
         O: std::io::Write + Clone,
@@ -242,7 +242,7 @@ impl Builtins {
                 let mut desc = None;
                 // look for the ok field.
                 let mut ok = None;
-                for &(ref name, ref val) in tuple_flds.iter() {
+                for (name, val) in tuple_flds.iter() {
                     if name.as_ref() == "desc" {
                         desc = Some(val.as_ref());
                     }
@@ -282,14 +282,14 @@ impl Builtins {
         } else {
             panic!("BUG: stack underflow in assert - translator emitted wrong opcode sequence");
         }
-        return Ok(());
+        Ok(())
     }
 
-    fn out<'a, P, O, E>(
+    fn out<P, O, E>(
         &self,
         path: Option<P>,
         stack: &mut Vec<(Rc<Value>, Position)>,
-        env: &'a RefCell<Environment<O, E>>,
+        env: &RefCell<Environment<O, E>>,
         pos: Position,
     ) -> Result<(), Error>
     where
@@ -352,10 +352,10 @@ impl Builtins {
         panic!("BUG: all branches should return in out - translator emitted wrong opcode sequence");
     }
 
-    fn convert<'a, O, E>(
+    fn convert<O, E>(
         &self,
         stack: &mut Vec<(Rc<Value>, Position)>,
-        env: &'a RefCell<Environment<O, E>>,
+        env: &RefCell<Environment<O, E>>,
         pos: Position,
     ) -> Result<(), Error>
     where
@@ -395,10 +395,10 @@ impl Builtins {
         panic!("BUG: all branches should return in convert - translator emitted wrong opcode sequence");
     }
 
-    fn map<'a, O, E>(
+    fn map<O, E>(
         &self,
         stack: &mut Vec<(Rc<Value>, Position)>,
-        env: &'a RefCell<Environment<O, E>>,
+        env: &RefCell<Environment<O, E>>,
         import_stack: &Vec<Rc<str>>,
         pos: Position,
     ) -> Result<(), Error>
@@ -419,14 +419,14 @@ impl Builtins {
             panic!("BUG: stack underflow in map (func) - translator emitted wrong opcode sequence");
         };
 
-        let f = if let &F(ref f) = fptr.as_ref() {
+        let f = if let F(f) = fptr.as_ref() {
             f
         } else {
-            return Err(Error::new(format!("Not a function!!").into(), fptr_pos));
+            return Err(Error::new("Not a function!!".to_string().into(), fptr_pos));
         };
 
-        match list.as_ref() {
-            &C(List(ref elems, ref elems_pos_list)) => {
+        match *list.as_ref() {
+            C(List(ref elems, ref elems_pos_list)) => {
                 let mut result_elems = Vec::new();
                 let mut pos_elems = Vec::new();
                 let mut counter = 0;
@@ -443,7 +443,7 @@ impl Builtins {
                 }
                 stack.push((Rc::new(C(List(result_elems, pos_elems))), list_pos));
             }
-            &C(Tuple(ref flds, ref flds_pos_list)) => {
+            C(Tuple(ref flds, ref flds_pos_list)) => {
                 let mut new_fields = Vec::new();
                 let mut new_flds_pos_list = Vec::new();
                 let mut counter = 0;
@@ -477,7 +477,7 @@ impl Builtins {
                 }
                 stack.push((Rc::new(C(Tuple(new_fields, new_flds_pos_list))), pos));
             }
-            &P(Str(ref s)) => {
+            P(Str(ref s)) => {
                 let mut buf = String::new();
                 for c in s.chars() {
                     stack.push((Rc::new(P(Str(c.to_string().into()))), list_pos.clone()));
@@ -505,10 +505,10 @@ impl Builtins {
         Ok(())
     }
 
-    fn filter<'a, O, E>(
+    fn filter<O, E>(
         &self,
         stack: &mut Vec<(Rc<Value>, Position)>,
-        env: &'a RefCell<Environment<O, E>>,
+        env: &RefCell<Environment<O, E>>,
         import_stack: &Vec<Rc<str>>,
         pos: Position,
     ) -> Result<(), Error>
@@ -529,14 +529,14 @@ impl Builtins {
             panic!("BUG: stack underflow in filter (func) - translator emitted wrong opcode sequence");
         };
 
-        let f = if let &F(ref f) = fptr.as_ref() {
+        let f = if let F(f) = fptr.as_ref() {
             f
         } else {
             return Err(Error::new("Not a function!!".into(), fptr_pos));
         };
 
-        match list.as_ref() {
-            &C(List(ref elems, ref elems_pos_list)) => {
+        match *list.as_ref() {
+            C(List(ref elems, ref elems_pos_list)) => {
                 let mut result_elems = Vec::new();
                 let mut pos_elems = Vec::new();
                 let mut counter = 0;
@@ -562,7 +562,7 @@ impl Builtins {
                 }
                 stack.push((Rc::new(C(List(result_elems, pos_elems))), pos));
             }
-            &C(Tuple(ref flds, ref pos_list)) => {
+            C(Tuple(ref flds, ref pos_list)) => {
                 let mut new_fields = Vec::new();
                 let mut new_flds_pos_list = Vec::new();
                 let mut counter = 0;
@@ -588,7 +588,7 @@ impl Builtins {
                 }
                 stack.push((Rc::new(C(Tuple(new_fields, new_flds_pos_list))), pos));
             }
-            &P(Str(ref s)) => {
+            P(Str(ref s)) => {
                 let mut buf = String::new();
                 for c in s.chars() {
                     stack.push((Rc::new(P(Str(c.to_string().into()))), list_pos.clone()));
@@ -651,10 +651,10 @@ impl Builtins {
         Ok(())
     }
 
-    fn reduce<'a, O, E>(
+    fn reduce<O, E>(
         &self,
         stack: &mut Vec<(Rc<Value>, Position)>,
-        env: &'a RefCell<Environment<O, E>>,
+        env: &RefCell<Environment<O, E>>,
         import_stack: &Vec<Rc<str>>,
         pos: Position,
     ) -> Result<(), Error>
@@ -681,14 +681,14 @@ impl Builtins {
             panic!("BUG: stack underflow in reduce (func) - translator emitted wrong opcode sequence");
         };
 
-        let f = if let &F(ref f) = fptr.as_ref() {
+        let f = if let F(f) = fptr.as_ref() {
             f
         } else {
             return Err(Error::new("Noe a function!".into(), fptr_pos));
         };
 
-        match list.as_ref() {
-            &C(List(ref elems, ref elems_pos_list)) => {
+        match *list.as_ref() {
+            C(List(ref elems, ref elems_pos_list)) => {
                 let mut counter = 0;
                 for e in elems.iter() {
                     let e_pos = elems_pos_list[counter].clone();
@@ -703,7 +703,7 @@ impl Builtins {
                     counter += 1;
                 }
             }
-            &C(Tuple(ref _flds, ref flds_pos_list)) => {
+            C(Tuple(ref _flds, ref flds_pos_list)) => {
                 let mut counter = 0;
                 for (name, val) in _flds.iter() {
                     let name_pos = flds_pos_list[counter].0.clone();
@@ -720,7 +720,7 @@ impl Builtins {
                     counter += 1;
                 }
             }
-            &P(Str(ref s)) => {
+            P(Str(ref s)) => {
                 for c in s.chars() {
                     // push function arguments on the stack.
                     stack.push((acc.clone(), acc_pos.clone()));
@@ -788,7 +788,7 @@ impl Builtins {
             }
             _ => {
                 return Err(Error::new(
-                    format!("Ranges can only be created with Ints").into(),
+                    "Ranges can only be created with Ints".to_string().into(),
                     pos,
                 ));
             }
@@ -797,11 +797,11 @@ impl Builtins {
         Ok(())
     }
 
-    fn trace<'a, O, E>(
+    fn trace<O, E>(
         &mut self,
         stack: &mut Vec<(Rc<Value>, Position)>,
         pos: Position,
-        env: &'a RefCell<Environment<O, E>>,
+        env: &RefCell<Environment<O, E>>,
     ) -> Result<(), Error>
     where
         O: std::io::Write + Clone,

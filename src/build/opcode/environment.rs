@@ -69,7 +69,7 @@ impl<Stdout: Write + Clone, Stderr: Write + Clone> Environment<Stdout, Stderr> {
             out_lock: BTreeSet::new(),
         };
         me.populate_stdlib();
-        return me;
+        me
     }
 
     pub fn get_env_vars_tuple(&self) -> Value {
@@ -208,6 +208,6 @@ impl<Stdout: Write + Clone, Stderr: Write + Clone> Environment<Stdout, Stderr> {
                 return false;
             }
         }
-        return true;
+        true
     }
 }

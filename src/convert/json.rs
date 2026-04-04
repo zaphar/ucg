@@ -21,6 +21,12 @@ use crate::convert::traits::{ConvertResult, Converter, ImportResult, Importer};
 /// JsonConverter implements the logic for converting a Val into the json output format.
 pub struct JsonConverter {}
 
+impl Default for JsonConverter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl JsonConverter {
     pub fn new() -> Self {
         JsonConverter {}
@@ -36,7 +42,7 @@ impl JsonConverter {
 
     fn convert_tuple(&self, items: &Vec<(Rc<str>, Rc<Val>)>) -> std::io::Result<serde_json::Value> {
         let mut mp = serde_json::Map::new();
-        for &(ref k, ref v) in items.iter() {
+        for (k, v) in items.iter() {
             mp.entry(k.as_ref()).or_insert(self.convert_value(v)?);
         }
         Ok(serde_json::Value::Object(mp))
@@ -44,7 +50,7 @@ impl JsonConverter {
 
     fn convert_env(&self, items: &Vec<(Rc<str>, Rc<str>)>) -> std::io::Result<serde_json::Value> {
         let mut mp = serde_json::Map::new();
-        for &(ref k, ref v) in items.iter() {
+        for (k, v) in items.iter() {
             mp.entry(k.as_ref())
                 .or_insert(serde_json::Value::String(v.to_string()));
         }
@@ -79,10 +85,10 @@ impl JsonConverter {
                 };
                 serde_json::Value::Number(n)
             }
-            &Val::Str(ref s) => serde_json::Value::String(s.to_string()),
-            &Val::Env(ref fs) => self.convert_env(fs)?,
-            &Val::List(ref l) => self.convert_list(l)?,
-            &Val::Tuple(ref t) => self.convert_tuple(t)?,
+            Val::Str(s) => serde_json::Value::String(s.to_string()),
+            Val::Env(fs) => self.convert_env(fs)?,
+            Val::List(l) => self.convert_list(l)?,
+            Val::Tuple(t) => self.convert_tuple(t)?,
             &Val::Constraint(_) => {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,

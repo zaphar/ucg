@@ -35,7 +35,7 @@ impl fmt::Display for Value {
             C(Tuple(flds, _)) => {
                 write!(w, "{{")?;
                 for (k, v) in flds {
-                    write!(w, "\"{}\"={},\n", k, v)?;
+                    writeln!(w, "\"{}\"={},", k, v)?;
                 }
                 write!(w, "}}")
             }

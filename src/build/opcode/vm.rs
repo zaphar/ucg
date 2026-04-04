@@ -66,7 +66,7 @@ impl VM {
             symbols: Stack::new(),
             import_stack: Vec::new(),
             runtime: runtime::Builtins::new(strict),
-            ops: ops,
+            ops,
             last: None,
             self_stack: Vec::new(),
             reserved_words: reserved_words(),
@@ -120,14 +120,14 @@ impl VM {
                 flds.push((sym.clone(), val));
             }
         }
-        return C(Tuple(flds, pos_list));
+        C(Tuple(flds, pos_list))
     }
 
     pub fn remove_symbol(&mut self, sym: &str) -> Option<(Rc<Value>, Position)> {
         self.symbols.remove_symbol(sym)
     }
 
-    pub fn run<'a, O, E>(&mut self, env: &'a RefCell<Environment<O, E>>) -> Result<(), Error>
+    pub fn run<O, E>(&mut self, env: &RefCell<Environment<O, E>>) -> Result<(), Error>
     where
         O: std::io::Write + Clone,
         E: std::io::Write + Clone,
@@ -348,14 +348,10 @@ impl VM {
         // compare them.
         let matched = match (field_name.as_ref(), search.as_ref()) {
             (&S(ref fname), &P(Str(ref sname))) | (&S(ref fname), &S(ref sname)) => fname == sname,
-            (&S(ref fname), &P(Bool(b))) => {
+            (S(fname), &P(Bool(b))) => {
                 if fname.as_ref() == "true" && b {
                     true
-                } else if fname.as_ref() == "false" && !b {
-                    true
-                } else {
-                    false
-                }
+                } else { fname.as_ref() == "false" && !b }
             }
             _ => false,
         };
@@ -369,9 +365,9 @@ impl VM {
 
     fn op_module(&mut self, idx: usize, jptr: i32, pos: Position) -> Result<(), Error> {
         let (mod_val, mod_val_pos) = self.pop()?;
-        let (result_ptr, flds, pos_list) = match mod_val.as_ref() {
-            &C(Tuple(ref flds, ref pos_list)) => (None, flds.clone(), pos_list.clone()),
-            &T(ptr) => {
+        let (result_ptr, flds, pos_list) = match *mod_val.as_ref() {
+            C(Tuple(ref flds, ref pos_list)) => (None, flds.clone(), pos_list.clone()),
+            T(ptr) => {
                 let (tpl_val, tpl_val_pos) = self.pop()?;
                 if let &C(Tuple(ref flds, ref pos_list)) = tpl_val.as_ref() {
                     (Some(ptr), flds.clone(), pos_list.clone())
@@ -416,10 +412,10 @@ impl VM {
         self.push(
             Rc::new(M(Module {
                 ptr: ops,
-                result_ptr: result_ptr,
+                result_ptr,
                 flds_pos_list: pos_list,
-                flds: flds,
-                pkg_ptr: pkg_ptr,
+                flds,
+                pkg_ptr,
             })),
             pos,
         )?;
@@ -434,7 +430,7 @@ impl VM {
         let (list_val, args_pos) = self.pop()?;
         if let &C(List(ref elems, _)) = list_val.as_ref() {
             for e in elems {
-                if let &S(ref sym) = e.as_ref() {
+                if let S(sym) = e.as_ref() {
                     bindings.push(sym.clone());
                 } else {
                     return Err(Error::new(
@@ -453,7 +449,7 @@ impl VM {
         self.push(
             Rc::new(F(Func {
                 ptr: ops, // where the function starts.
-                bindings: bindings,
+                bindings,
                 snapshot: scope_snapshot,
             })),
             pos,
@@ -461,11 +457,11 @@ impl VM {
         self.op_jump(jptr)
     }
 
-    pub fn fcall_impl<'a, O, E>(
+    pub fn fcall_impl<O, E>(
         f: &Func,
         strict: bool,
         stack: &mut Vec<(Rc<Value>, Position)>,
-        env: &'a RefCell<Environment<O, E>>,
+        env: &RefCell<Environment<O, E>>,
         import_stack: &Vec<Rc<str>>,
     ) -> Result<(Rc<Value>, Position), Error>
     where
@@ -490,7 +486,7 @@ impl VM {
         }
         // proceed to the function body
         vm.run(env)?;
-        return vm.pop();
+        vm.pop()
     }
 
     fn op_new_scope<O, E>(
@@ -527,7 +523,7 @@ impl VM {
     {
         let (f, f_pos) = self.pop()?;
         let (arg_length, _) = self.pop()?;
-        if let &F(ref f) = f.as_ref() {
+        if let F(f) = f.as_ref() {
             if let &P(Int(arg_length)) = arg_length.as_ref() {
                 let arity = f.bindings.len() as i64;
                 if arg_length > arity {
@@ -571,14 +567,14 @@ impl VM {
             self.push(Rc::new(P(Bool(!val))), operand_pos)?;
             return Ok(());
         }
-        return Err(Error::new(
+        Err(Error::new(
             format!(
                 "Expected Boolean but got {:?} in expression at {}",
                 operand, pos
             )
             .into(),
             operand_pos,
-        ));
+        ))
     }
 
     fn op_equal(&mut self, pos: Position) -> Result<(), Error> {
@@ -854,7 +850,7 @@ impl VM {
         // pop name off stack.
         let (name, name_pos) = self.pop()?;
         // TODO(jwall): We need to restrict against our reserved word list.
-        if let &S(ref name) = name.as_ref() {
+        if let S(name) = name.as_ref() {
             self.binding_push(name.clone(), val, strict, &val_pos, &name_pos)?;
         } else {
             unreachable!();
@@ -917,7 +913,7 @@ impl VM {
     fn op_bang(&mut self) -> Result<(), Error> {
         let (msg_val, err_pos) = self.pop()?;
         if let &P(Str(ref msg)) = msg_val.as_ref() {
-            return Err(Error::new(msg.clone(), err_pos));
+            Err(Error::new(msg.clone(), err_pos))
         } else {
             unreachable!();
         }
@@ -927,8 +923,8 @@ impl VM {
         // left and then right
         let (right, right_pos) = self.pop()?;
         let (left, _) = self.pop()?;
-        match right.as_ref() {
-            &P(Int(i)) => {
+        match *right.as_ref() {
+            P(Int(i)) => {
                 if let &C(List(ref elems, _)) = left.as_ref() {
                     if i < (elems.len() as i64) && i >= 0 {
                         self.push(elems[i as usize].clone(), right_pos)?;
@@ -936,9 +932,9 @@ impl VM {
                     }
                 }
             }
-            &P(Str(ref s)) => {
+            P(Str(ref s)) => {
                 if let &C(Tuple(ref flds, _)) = left.as_ref() {
-                    for &(ref key, ref val) in flds.iter() {
+                    for (key, val) in flds.iter() {
                         if key == s {
                             self.push(val.clone(), right_pos)?;
                             return Ok(());
@@ -954,17 +950,17 @@ impl VM {
             self.push(Rc::new(P(Empty)), pos)?;
             return Ok(());
         }
-        return Err(Error::new(
+        Err(Error::new(
             format!("Invalid selector index: {:?} target: {:?}", right, left).into(),
             pos,
-        ));
+        ))
     }
 
     fn op_exist(&mut self, pos: Position) -> Result<(), Error> {
         let (right, right_pos) = self.pop()?;
         let (left, left_pos) = self.pop()?;
-        match left.as_ref() {
-            &C(Tuple(ref flds, _)) => {
+        match *left.as_ref() {
+            C(Tuple(ref flds, _)) => {
                 if let &P(Str(ref name)) = right.as_ref() {
                     for (nm, _) in flds {
                         if nm == name {
@@ -979,7 +975,7 @@ impl VM {
                     ));
                 }
             }
-            &C(List(ref elems, _)) => {
+            C(List(ref elems, _)) => {
                 for e in elems {
                     if e == &right {
                         self.push(Rc::new(P(Bool(true))), pos)?;
@@ -987,7 +983,7 @@ impl VM {
                     }
                 }
             }
-            &P(Str(ref s)) => {
+            P(Str(ref s)) => {
                 if let &P(Str(ref part)) = right.as_ref() {
                     self.push(Rc::new(P(Bool(s.contains(part.as_ref())))), pos)?;
                     return Ok(());
@@ -1023,8 +1019,8 @@ impl VM {
             } else {
                 unreachable!();
             };
-        match tgt.as_ref() {
-            &C(Tuple(ref flds, ref pos_list)) => {
+        match *tgt.as_ref() {
+            C(Tuple(ref flds, ref pos_list)) => {
                 let mut flds = flds.clone();
                 let mut pos_list = pos_list.clone();
                 let mut counter = 0;
@@ -1045,7 +1041,7 @@ impl VM {
                 self.push(Rc::new(C(Tuple(flds, pos_list))), tgt_pos.clone())?;
                 self.last = Some((tgt.clone(), tgt_pos));
             }
-            &M(Module {
+            M(Module {
                 ref ptr,
                 ref result_ptr,
                 ref flds,
@@ -1054,7 +1050,7 @@ impl VM {
             }) => {
                 let this = M(Module {
                     ptr: ptr.clone(),
-                    result_ptr: result_ptr.clone(),
+                    result_ptr: *result_ptr,
                     flds: flds.clone(),
                     flds_pos_list: flds_pos_list.clone(),
                     pkg_ptr: pkg_ptr.clone(),
@@ -1109,7 +1105,7 @@ impl VM {
                 vm.push(Rc::new(C(Tuple(flds, flds_pos_list))), pos.clone())?;
                 decorate_call!(pos => vm.run(env))?;
                 if let Some(ptr) = result_ptr {
-                    vm.ops.jump(ptr.clone())?;
+                    vm.ops.jump(*ptr)?;
                     vm.run(env)?;
                     let (result_val, result_pos) = vm.pop()?;
                     self.push(result_val, result_pos)?;
@@ -1222,10 +1218,10 @@ impl VM {
         match tpl {
             Some((v, pos)) => Ok((v, pos)),
             None => {
-                return Err(Error::new(
+                Err(Error::new(
                     format!("No such binding {}", name).into(),
                     pos.clone(),
-                ));
+                ))
             }
         }
     }
@@ -1298,8 +1294,8 @@ impl VM {
             (P(Float(f)), Value::P(Float(ff))) => P(Float(f + ff)),
             (P(Str(s)), Value::P(Str(ss))) => {
                 let mut ns = String::new();
-                ns.push_str(&s);
-                ns.push_str(&ss);
+                ns.push_str(s);
+                ns.push_str(ss);
                 P(Str(ns.into()))
             }
             (

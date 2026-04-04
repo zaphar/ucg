@@ -100,7 +100,7 @@ fn build_error_to_diagnostic(e: &BuildError) -> Diagnostic {
     let range = e
         .pos
         .as_ref()
-        .map(|p| ucg_pos_to_range(p))
+        .map(ucg_pos_to_range)
         .unwrap_or_default();
     Diagnostic {
         range,

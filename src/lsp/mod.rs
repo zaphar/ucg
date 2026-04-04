@@ -295,7 +295,7 @@ fn handle_request(
         let data = state
             .documents
             .get(uri)
-            .map(|doc| encode_semantic_tokens(doc))
+            .map(encode_semantic_tokens)
             .unwrap_or_default();
         let response = SemanticTokens {
             result_id: None,
@@ -357,9 +357,7 @@ fn token_prefix_at(doc: &AnalysisResult, line: u32, character: u32) -> String {
     // Note: this intentionally does NOT use token_ref_at because it wants the
     // last token starting at-or-before the cursor, not the token spanning it.
     doc.tokens
-        .iter()
-        .filter(|tok| tok.pos.line == target_line && tok.pos.column <= target_col)
-        .last()
+        .iter().rfind(|tok| tok.pos.line == target_line && tok.pos.column <= target_col)
         .map(|tok| {
             let chars_before = target_col.saturating_sub(tok.pos.column);
             tok.fragment.chars().take(chars_before).collect::<String>()

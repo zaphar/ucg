@@ -48,7 +48,7 @@ impl TryFrom<&Primitive> for i64 {
                 }),
             },
             Primitive::Float(f) => Ok(*f as i64),
-            Primitive::Int(i) => Ok(i.clone()),
+            Primitive::Int(i) => Ok(*i),
         }
     }
 }
@@ -70,7 +70,7 @@ impl TryFrom<&Primitive> for f64 {
                 }),
             },
             Primitive::Int(i) => Ok(*i as f64),
-            Primitive::Float(f) => Ok(f.clone()),
+            Primitive::Float(f) => Ok(*f),
         }
     }
 }
@@ -118,7 +118,7 @@ impl From<&Value> for Val {
             P(Bool(b)) => Val::Boolean(*b),
             C(Tuple(fs, _)) => {
                 let mut flds = Vec::new();
-                for &(ref k, ref v) in fs.iter() {
+                for (k, v) in fs.iter() {
                     let v = v.clone();
                     flds.push((k.clone(), Rc::new(v.into())));
                 }
@@ -173,7 +173,7 @@ impl From<&Val> for Value {
             Val::Tuple(flds) => {
                 let mut field_list = Vec::new();
                 let mut positions = Vec::new();
-                for &(ref key, ref val) in flds.iter() {
+                for (key, val) in flds.iter() {
                     let val = val.clone();
                     field_list.push((key.clone(), Rc::new(val.into())));
                     positions.push((Position::new(0, 0, 0), Position::new(0, 0, 0)));
@@ -183,7 +183,7 @@ impl From<&Val> for Value {
             Val::Env(flds) => {
                 let mut field_list = Vec::new();
                 let mut positions = Vec::new();
-                for &(ref key, ref val) in flds.iter() {
+                for (key, val) in flds.iter() {
                     field_list.push((key.clone(), Rc::new(P(Str(val.clone())))));
                     positions.push((Position::new(0, 0, 0), Position::new(0, 0, 0)));
                 }
@@ -198,25 +198,25 @@ impl From<&Composite> for Rc<str> {
     fn from(c: &Composite) -> Self {
         let mut buf = String::new();
         match c {
-            &List(ref elems, _) => {
-                buf.push_str("[");
+            List(elems, _) => {
+                buf.push('[');
                 for e in elems.iter() {
                     let val: Rc<str> = e.as_ref().into();
                     buf.push_str(val.as_ref());
-                    buf.push_str(",");
+                    buf.push(',');
                 }
-                buf.push_str("]");
+                buf.push(']');
             }
-            &Tuple(ref flds, _) => {
-                buf.push_str("{");
-                for &(ref k, ref v) in flds.iter() {
-                    buf.push_str(&k);
+            Tuple(flds, _) => {
+                buf.push('{');
+                for (k, v) in flds.iter() {
+                    buf.push_str(k);
                     buf.push_str(" = ");
                     let val: Rc<str> = v.as_ref().into();
                     buf.push_str(&val);
-                    buf.push_str(",");
+                    buf.push(',');
                 }
-                buf.push_str("}");
+                buf.push('}');
             }
         }
         buf.into()
@@ -226,9 +226,9 @@ impl From<&Composite> for Rc<str> {
 impl From<&Value> for Rc<str> {
     fn from(v: &Value) -> Self {
         match v {
-            &S(ref s) => s.clone(),
-            &P(ref p) => p.into(),
-            &C(ref c) => c.into(),
+            S(s) => s.clone(),
+            P(p) => p.into(),
+            C(c) => c.into(),
             &T(_) => "<Thunk>".into(),
             &F(_) => "<Func>".into(),
             &M(_) => "<Module>".into(),

@@ -41,7 +41,7 @@ where
             indent_size: indent,
             curr_indent: 0,
             comment_map: None,
-            w: w,
+            w,
             last_line: 0,
             comment_group_lines: Vec::new(),
         }
@@ -57,8 +57,7 @@ where
     fn make_indent(&self) -> String {
         // TODO(jwall): This is probably inefficient but we'll improve it after
         // we get it correct.
-        let indent: Vec<u8> = std::iter::repeat(' ' as u8)
-            .take(self.curr_indent)
+        let indent: Vec<u8> = std::iter::repeat_n(b' ', self.curr_indent)
             .collect();
         String::from_utf8_lossy(&indent).to_string()
     }
@@ -77,23 +76,20 @@ where
                 return false;
             }
         }
-        return true;
+        true
     }
 
     fn print_comment_group(&mut self, line: usize) -> std::io::Result<()> {
-        if let Some(ref map) = self.comment_map {
+        if let Some(map) = self.comment_map {
             let empty: Vec<Token> = Vec::new();
             let cg = map.get(&line).unwrap_or(&empty);
             let indent = self.make_indent();
             for c in cg.iter() {
-                let first_char = match c.fragment.chars().nth(0) {
-                    Some(c) => c,
-                    None => '\0',
-                };
+                let first_char = c.fragment.chars().nth(0).unwrap_or('\0');
                 if !first_char.is_whitespace() {
-                    write!(self.w, "{}// {}\n", indent, c.fragment.trim_end())?;
+                    writeln!(self.w, "{}// {}", indent, c.fragment.trim_end())?;
                 } else {
-                    write!(self.w, "{}//{}\n", indent, c.fragment.trim_end())?;
+                    writeln!(self.w, "{}//{}", indent, c.fragment.trim_end())?;
                 }
             }
             self.comment_group_lines.pop();
@@ -111,7 +107,7 @@ where
                     break;
                 }
                 if next_comment_line < line - 1 {
-                    write!(self.w, "\n")?;
+                    writeln!(self.w)?;
                 }
                 continue;
             }
@@ -137,21 +133,21 @@ where
         write!(self.w, "[")?;
         self.curr_indent += self.indent_size;
         let indent = self.make_indent();
-        let has_fields = def.elems.len() > 0;
+        let has_fields = !def.elems.is_empty();
         if has_fields {
-            write!(self.w, "\n")?;
+            writeln!(self.w)?;
         }
         for e in def.elems.iter() {
             self.render_comment_if_needed(e.pos().line)?;
             write!(self.w, "{}", indent)?;
             self.render_expr(e)?;
-            write!(self.w, ",\n")?;
+            writeln!(self.w, ",")?;
         }
         self.curr_indent -= self.indent_size;
         if has_fields {
             write!(self.w, "{}", self.make_indent())?;
         }
-        self.w.write(&[']' as u8])?;
+        self.w.write(b"]")?;
         Ok(())
     }
 
@@ -159,13 +155,13 @@ where
         &mut self,
         def: &Vec<(Token, Option<Expression>, Expression)>,
     ) -> std::io::Result<()> {
-        self.w.write(&['{' as u8])?;
+        self.w.write(b"{")?;
         // If the field list is just 1 we might be able to collapse the tuple.
         self.curr_indent += self.indent_size;
         let indent = self.make_indent();
-        let has_fields = def.len() > 0;
+        let has_fields = !def.is_empty();
         if has_fields {
-            write!(self.w, "\n")?;
+            writeln!(self.w)?;
         }
         for (t, constraint, expr) in def.iter() {
             let field_line = t.pos.line;
@@ -187,13 +183,13 @@ where
             write!(self.w, " = ")?;
             self.render_expr(expr)?;
             write!(&mut self.w, ",")?;
-            write!(self.w, "\n")?;
+            writeln!(self.w)?;
         }
         self.curr_indent -= self.indent_size;
         if has_fields {
             write!(self.w, "{}", self.make_indent())?;
         }
-        self.w.write(&['}' as u8])?;
+        self.w.write(b"}")?;
         Ok(())
     }
 
@@ -280,7 +276,7 @@ where
                 let indent = self.make_indent();
                 let has_args = _def.arglist.len() > 1;
                 if has_args {
-                    write!(self.w, "\n")?;
+                    writeln!(self.w)?;
                 }
                 for e in _def.arglist.iter() {
                     self.render_comment_if_needed(e.pos().line)?;
@@ -335,8 +331,7 @@ where
                         self.curr_indent += self.indent_size;
                         let indent = self.make_indent();
                         let mut prefix = if es
-                            .first()
-                            .and_then(|e| Some(self.has_comment(e.pos().line)))
+                            .first().map(|e| self.has_comment(e.pos().line))
                             .unwrap_or(false)
                         {
                             "\n"
@@ -382,7 +377,7 @@ where
                     if self.has_comment(_def.func.pos().line) {
                         self.curr_indent += self.indent_size;
                         did_indent = true;
-                        write!(self.w, "\n")?;
+                        writeln!(self.w)?;
                     }
                     self.render_expr(&_def.func)?;
                     if self.has_comment(_def.target.pos().line) {
@@ -403,7 +398,7 @@ where
                     if self.has_comment(_def.func.pos().line) {
                         self.curr_indent += self.indent_size;
                         did_indent = true;
-                        write!(self.w, "\n")?;
+                        writeln!(self.w)?;
                     }
                     self.render_expr(&_def.func)?;
                     if self.has_comment(_def.acc.pos().line) {
@@ -435,7 +430,7 @@ where
                     if self.has_comment(_def.func.pos().line) {
                         self.curr_indent += self.indent_size;
                         did_indent = true;
-                        write!(self.w, "\n")?;
+                        writeln!(self.w)?;
                     }
                     self.render_expr(&_def.func)?;
                     if self.has_comment(_def.target.pos().line) {
@@ -457,11 +452,11 @@ where
                 if self.has_comment(expr.pos().line) {
                     self.curr_indent += self.indent_size;
                     did_indent = true;
-                    write!(self.w, "\n")?;
+                    writeln!(self.w)?;
                 }
                 self.render_expr(expr)?;
                 if did_indent {
-                    write!(self.w, "\n")?;
+                    writeln!(self.w)?;
                 }
                 write!(self.w, ")")?;
             }
@@ -499,7 +494,7 @@ where
                     }
                     write!(self.w, ") ")?;
                 }
-                write!(self.w, "{{\n")?;
+                writeln!(self.w, "{{")?;
                 self.curr_indent += self.indent_size;
                 let indent = self.make_indent();
                 let mut prefix_newline = false;
@@ -589,7 +584,7 @@ where
     pub fn render_stmt(&mut self, stmt: &Statement, prefix_newline: bool) -> std::io::Result<()> {
         // All statements start at the beginning of a line.
         if prefix_newline {
-            write!(self.w, "\n")?;
+            writeln!(self.w)?;
         }
         let line = stmt.pos().line;
         self.render_comment_if_needed(line)?;
@@ -604,22 +599,22 @@ where
                 self.render_expr(&def.value)?;
             }
             Statement::Expression(_expr) => {
-                self.render_expr(&_expr)?;
+                self.render_expr(_expr)?;
             }
             Statement::Assert(_, def) => {
                 write!(&mut self.w, "assert ")?;
-                self.render_expr(&def)?;
+                self.render_expr(def)?;
             }
             Statement::Output(_, _tok, _expr) => {
                 write!(&mut self.w, "out {} ", _tok.fragment)?;
-                self.render_expr(&_expr)?;
+                self.render_expr(_expr)?;
             }
             Statement::Constraint(def) => {
                 write!(&mut self.w, "constraint {} = ", def.name.fragment)?;
                 self.render_expr(&def.value)?;
             }
         };
-        write!(self.w, ";\n")?;
+        writeln!(self.w, ";")?;
         self.last_line = line;
         Ok(())
     }

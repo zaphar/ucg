@@ -35,6 +35,12 @@ pub struct OpsMap {
     pub links: BTreeMap<Rc<str>, Position>,
 }
 
+impl Default for OpsMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OpsMap {
     pub fn new() -> Self {
         OpsMap {
@@ -77,26 +83,26 @@ impl AST {
         rewriter.walk_statement_list(mut_stmts);
         let mut ops = OpsMap::new();
         Self::translate_stmts(stmts, &mut ops, root.as_ref());
-        return ops;
+        ops
     }
 
-    fn translate_stmt(stmt: Statement, mut ops: &mut OpsMap, root: &Path) {
+    fn translate_stmt(stmt: Statement, ops: &mut OpsMap, root: &Path) {
         match stmt {
             Statement::Expression(expr) => {
                 let expr_pos = expr.pos().clone();
-                Self::translate_expr(expr, &mut ops, root);
+                Self::translate_expr(expr, ops, root);
                 ops.push(Op::Pop, expr_pos);
             }
             Statement::Assert(pos, expr) => {
-                Self::translate_expr(expr, &mut ops, root);
+                Self::translate_expr(expr, ops, root);
                 ops.push(Op::Runtime(Hook::Assert), pos);
             }
             Statement::Let(def) => {
                 let binding = def.name.fragment;
                 ops.push(Op::Sym(binding), def.name.pos);
-                Self::translate_expr(def.value, &mut ops, root);
+                Self::translate_expr(def.value, ops, root);
                 if let Some(constraint) = def.constraint {
-                    Self::translate_expr(constraint, &mut ops, root);
+                    Self::translate_expr(constraint, ops, root);
                     ops.push(Op::CheckConstraint, def.pos.clone());
                 }
                 ops.push(Op::Bind, def.pos);
@@ -112,122 +118,122 @@ impl AST {
                 ops.push(Op::Bind, def.pos.clone());
                 // Now evaluate the real expression and overwrite the binding.
                 ops.push(Op::Sym(binding), def.name.pos);
-                Self::translate_expr(def.value, &mut ops, root);
+                Self::translate_expr(def.value, ops, root);
                 ops.push(Op::BindOver, def.pos);
             }
             Statement::Output(pos, tok, expr) => {
                 ops.push(Op::Val(Primitive::Str(tok.fragment)), tok.pos);
-                Self::translate_expr(expr, &mut ops, root);
+                Self::translate_expr(expr, ops, root);
                 ops.push(Op::Runtime(Hook::Out), pos);
             }
         }
     }
 
-    fn translate_stmts(stmts: Vec<Statement>, mut ops: &mut OpsMap, root: &Path) {
+    fn translate_stmts(stmts: Vec<Statement>, ops: &mut OpsMap, root: &Path) {
         for stmt in stmts {
-            Self::translate_stmt(stmt, &mut ops, root);
+            Self::translate_stmt(stmt, ops, root);
         }
     }
 
-    fn translate_expr(expr: Expression, mut ops: &mut OpsMap, root: &Path) {
+    fn translate_expr(expr: Expression, ops: &mut OpsMap, root: &Path) {
         match expr {
             Expression::Simple(v) => {
-                Self::translate_value(v, &mut ops, root);
+                Self::translate_value(v, ops, root);
             }
             Expression::Binary(def) => {
                 match def.kind {
                     BinaryExprType::Add => {
-                        Self::translate_expr(*def.right, &mut ops, root);
-                        Self::translate_expr(*def.left, &mut ops, root);
+                        Self::translate_expr(*def.right, ops, root);
+                        Self::translate_expr(*def.left, ops, root);
                         ops.push(Op::Add, def.pos);
                     }
                     BinaryExprType::Sub => {
-                        Self::translate_expr(*def.right, &mut ops, root);
-                        Self::translate_expr(*def.left, &mut ops, root);
+                        Self::translate_expr(*def.right, ops, root);
+                        Self::translate_expr(*def.left, ops, root);
                         ops.push(Op::Sub, def.pos);
                     }
                     BinaryExprType::Div => {
-                        Self::translate_expr(*def.right, &mut ops, root);
-                        Self::translate_expr(*def.left, &mut ops, root);
+                        Self::translate_expr(*def.right, ops, root);
+                        Self::translate_expr(*def.left, ops, root);
                         ops.push(Op::Div, def.pos);
                     }
                     BinaryExprType::Mul => {
-                        Self::translate_expr(*def.right, &mut ops, root);
-                        Self::translate_expr(*def.left, &mut ops, root);
+                        Self::translate_expr(*def.right, ops, root);
+                        Self::translate_expr(*def.left, ops, root);
                         ops.push(Op::Mul, def.pos);
                     }
                     BinaryExprType::Equal => {
-                        Self::translate_expr(*def.right, &mut ops, root);
-                        Self::translate_expr(*def.left, &mut ops, root);
+                        Self::translate_expr(*def.right, ops, root);
+                        Self::translate_expr(*def.left, ops, root);
                         ops.push(Op::Equal, def.pos);
                     }
                     BinaryExprType::GT => {
-                        Self::translate_expr(*def.right, &mut ops, root);
-                        Self::translate_expr(*def.left, &mut ops, root);
+                        Self::translate_expr(*def.right, ops, root);
+                        Self::translate_expr(*def.left, ops, root);
                         ops.push(Op::Gt, def.pos);
                     }
                     BinaryExprType::LT => {
-                        Self::translate_expr(*def.right, &mut ops, root);
-                        Self::translate_expr(*def.left, &mut ops, root);
+                        Self::translate_expr(*def.right, ops, root);
+                        Self::translate_expr(*def.left, ops, root);
                         ops.push(Op::Lt, def.pos);
                     }
                     BinaryExprType::GTEqual => {
-                        Self::translate_expr(*def.right, &mut ops, root);
-                        Self::translate_expr(*def.left, &mut ops, root);
+                        Self::translate_expr(*def.right, ops, root);
+                        Self::translate_expr(*def.left, ops, root);
                         ops.push(Op::GtEq, def.pos);
                     }
                     BinaryExprType::LTEqual => {
-                        Self::translate_expr(*def.right, &mut ops, root);
-                        Self::translate_expr(*def.left, &mut ops, root);
+                        Self::translate_expr(*def.right, ops, root);
+                        Self::translate_expr(*def.left, ops, root);
                         ops.push(Op::LtEq, def.pos);
                     }
                     BinaryExprType::NotEqual => {
-                        Self::translate_expr(*def.right, &mut ops, root);
-                        Self::translate_expr(*def.left, &mut ops, root);
+                        Self::translate_expr(*def.right, ops, root);
+                        Self::translate_expr(*def.left, ops, root);
                         ops.push(Op::Equal, def.pos.clone());
                         ops.push(Op::Not, def.pos);
                     }
                     BinaryExprType::REMatch => {
-                        Self::translate_expr(*def.right, &mut ops, root);
-                        Self::translate_expr(*def.left, &mut ops, root);
+                        Self::translate_expr(*def.right, ops, root);
+                        Self::translate_expr(*def.left, ops, root);
                         ops.push(Op::Runtime(Hook::Regex), def.pos);
                     }
                     BinaryExprType::NotREMatch => {
-                        Self::translate_expr(*def.right, &mut ops, root);
-                        Self::translate_expr(*def.left, &mut ops, root);
+                        Self::translate_expr(*def.right, ops, root);
+                        Self::translate_expr(*def.left, ops, root);
                         ops.push(Op::Runtime(Hook::Regex), def.pos.clone());
                         ops.push(Op::Not, def.pos);
                     }
                     BinaryExprType::IS => {
-                        Self::translate_expr(*def.right, &mut ops, root);
-                        Self::translate_expr(*def.left, &mut ops, root);
+                        Self::translate_expr(*def.right, ops, root);
+                        Self::translate_expr(*def.left, ops, root);
                         ops.push(Op::Typ, def.pos.clone());
                         ops.push(Op::Equal, def.pos);
                     }
                     BinaryExprType::AND => {
-                        Self::translate_expr(*def.left, &mut ops, root);
+                        Self::translate_expr(*def.left, ops, root);
                         ops.push(Op::Noop, def.pos);
                         let idx = ops.len() - 1;
-                        Self::translate_expr(*def.right, &mut ops, root);
+                        Self::translate_expr(*def.right, ops, root);
                         let jptr = (ops.len() - 1 - idx) as i32;
                         ops.replace(idx, Op::And(jptr));
                     }
                     BinaryExprType::OR => {
-                        Self::translate_expr(*def.left, &mut ops, root);
+                        Self::translate_expr(*def.left, ops, root);
                         ops.push(Op::Noop, def.pos); // Placeholder
                         let idx = ops.len() - 1;
-                        Self::translate_expr(*def.right, &mut ops, root);
+                        Self::translate_expr(*def.right, ops, root);
                         let jptr = (ops.len() - 1 - idx) as i32;
                         ops.replace(idx, Op::Or(jptr));
                     }
                     BinaryExprType::Mod => {
-                        Self::translate_expr(*def.right, &mut ops, root);
-                        Self::translate_expr(*def.left, &mut ops, root);
+                        Self::translate_expr(*def.right, ops, root);
+                        Self::translate_expr(*def.left, ops, root);
                         ops.push(Op::Mod, def.pos);
                     }
                     BinaryExprType::IN => {
                         // Dot expressions expect the right side to be pushed first
-                        Self::translate_expr(*def.right.clone(), &mut ops, root);
+                        Self::translate_expr(*def.right.clone(), ops, root);
                         // Symbols on the left side should be converted to strings to satisfy
                         // the Index operation contract.
                         match *def.left.clone() {
@@ -257,10 +263,10 @@ impl AST {
                                     )],
                                     pos: def.left.pos().clone(),
                                 });
-                                Self::translate_expr(new_expr, &mut ops, root);
+                                Self::translate_expr(new_expr, ops, root);
                             }
                             expr => {
-                                Self::translate_expr(expr, &mut ops, root);
+                                Self::translate_expr(expr, ops, root);
                             }
                         }
                         ops.push(Op::Exist, def.pos.clone());
@@ -271,7 +277,7 @@ impl AST {
                         match *def.right {
                             Expression::Copy(copy_def) => {
                                 // Dot expressions expect the left side to be pushed first
-                                Self::translate_expr(*def.left, &mut ops, root);
+                                Self::translate_expr(*def.left, ops, root);
                                 // first handle the selector
                                 match copy_def.selector {
                                     Value::Str(sym) | Value::Symbol(sym) => {
@@ -290,11 +296,11 @@ impl AST {
                                 // first push our arguments.
                                 let count = call_def.arglist.len() as i64;
                                 for e in call_def.arglist {
-                                    Self::translate_expr(e, &mut ops, root);
+                                    Self::translate_expr(e, ops, root);
                                 }
                                 ops.push(Op::Val(Primitive::Int(count)), call_def.pos.clone());
                                 // Dot expressions expect the left side to be pushed first
-                                Self::translate_expr(*def.left, &mut ops, root);
+                                Self::translate_expr(*def.left, ops, root);
                                 // then handle the selector
                                 let func_pos = call_def.funcref.pos().clone();
                                 match call_def.funcref {
@@ -312,17 +318,17 @@ impl AST {
                             }
                             Expression::Simple(Value::Symbol(name)) => {
                                 // Dot expressions expect the left side to be pushed first
-                                Self::translate_expr(*def.left, &mut ops, root);
+                                Self::translate_expr(*def.left, ops, root);
                                 Self::translate_expr(
                                     Expression::Simple(Value::Str(name)),
-                                    &mut ops,
+                                    ops,
                                     root,
                                 );
                             }
                             expr => {
                                 // Dot expressions expect the left side to be pushed first
-                                Self::translate_expr(*def.left, &mut ops, root);
-                                Self::translate_expr(expr, &mut ops, root);
+                                Self::translate_expr(*def.left, ops, root);
+                                Self::translate_expr(expr, ops, root);
                             }
                         }
                         ops.push(Op::Index, def.pos);
@@ -330,11 +336,11 @@ impl AST {
                 };
             }
             Expression::Grouped(expr, _) => {
-                Self::translate_expr(*expr, &mut ops, root);
+                Self::translate_expr(*expr, ops, root);
             }
             Expression::Fail(def) => {
                 let msg_pos = def.message.pos().clone();
-                Self::translate_expr(*def.message, &mut ops, root);
+                Self::translate_expr(*def.message, ops, root);
                 ops.push(Op::Val(Primitive::Str("UserDefined: ".into())), msg_pos);
                 ops.push(Op::Add, def.pos.clone());
                 ops.push(Op::Bang, def.pos);
@@ -363,7 +369,7 @@ impl AST {
                             def.pos.clone(),
                             parts_iter.next().unwrap(),
                             &mut elems_iter,
-                            &mut ops,
+                            ops,
                             true,
                             root,
                         );
@@ -372,7 +378,7 @@ impl AST {
                                 def.pos.clone(),
                                 p,
                                 &mut elems_iter,
-                                &mut ops,
+                                ops,
                                 true,
                                 root,
                             );
@@ -402,7 +408,7 @@ impl AST {
                         // existed.
                         let expr_pos = expr.pos().clone();
                         ops.push(Op::Sym("item".into()), expr.pos().clone());
-                        Self::translate_expr(*expr, &mut ops, root);
+                        Self::translate_expr(*expr, ops, root);
                         ops.push(Op::BindOver, expr_pos.clone());
                         let mut elems = Vec::new();
                         let mut elems_iter = elems.drain(0..);
@@ -410,7 +416,7 @@ impl AST {
                             def.pos.clone(),
                             parts_iter.next().unwrap(),
                             &mut elems_iter,
-                            &mut ops,
+                            ops,
                             false,
                             root,
                         );
@@ -419,7 +425,7 @@ impl AST {
                                 def.pos.clone(),
                                 p,
                                 &mut elems_iter,
-                                &mut ops,
+                                ops,
                                 false,
                                 root,
                             );
@@ -441,7 +447,7 @@ impl AST {
                 }
                 ops.push(Op::Noop, def.pos.clone());
                 let idx = ops.len() - 1;
-                Self::translate_expr(*def.fields, &mut ops, root);
+                Self::translate_expr(*def.fields, ops, root);
                 ops.push(Op::Return, def.pos);
                 let jptr = ops.len() - 1 - idx;
                 ops.replace(idx, Op::Func(jptr as i32));
@@ -450,27 +456,27 @@ impl AST {
                 match def {
                     FuncOpDef::Map(def) => {
                         // push the function on the stack first.
-                        Self::translate_expr(*def.func, &mut ops, root);
+                        Self::translate_expr(*def.func, ops, root);
                         // push the target on the stack third
-                        Self::translate_expr(*def.target, &mut ops, root);
+                        Self::translate_expr(*def.target, ops, root);
                         // finally push the Hook::Map opcode
                         ops.push(Op::Runtime(Hook::Map), def.pos);
                     }
                     FuncOpDef::Filter(def) => {
                         // push the function on the stack first.
-                        Self::translate_expr(*def.func, &mut ops, root);
+                        Self::translate_expr(*def.func, ops, root);
                         // push the target on the stack third
-                        Self::translate_expr(*def.target, &mut ops, root);
+                        Self::translate_expr(*def.target, ops, root);
                         // finally push the Hook::Map opcode
                         ops.push(Op::Runtime(Hook::Filter), def.pos);
                     }
                     FuncOpDef::Reduce(def) => {
                         // push the function on the stack first.
-                        Self::translate_expr(*def.func, &mut ops, root);
+                        Self::translate_expr(*def.func, ops, root);
                         // push the accumulator on the stack third
-                        Self::translate_expr(*def.acc, &mut ops, root);
+                        Self::translate_expr(*def.acc, ops, root);
                         // push the target on the stack third
-                        Self::translate_expr(*def.target, &mut ops, root);
+                        Self::translate_expr(*def.target, ops, root);
                         // finally push the Hook::Map opcode
                         ops.push(Op::Runtime(Hook::Reduce), def.pos);
                     }
@@ -497,7 +503,7 @@ impl AST {
                     // FIXME(jwall): if there is a projection
                     // then add the projection check here?
                     ops.push(Op::Sym(t.fragment), t.pos.clone());
-                    Self::translate_expr(e, &mut ops, root);
+                    Self::translate_expr(e, ops, root);
                     ops.push(Op::Field, t.pos);
                 }
                 // If there is one then emit our return expression
@@ -506,7 +512,7 @@ impl AST {
                     let expr_pos = expr.pos().clone();
                     ops.push(Op::Noop, expr.pos().clone());
                     let idx = ops.len() - 1;
-                    Self::translate_expr(*expr, &mut ops, root);
+                    Self::translate_expr(*expr, ops, root);
                     ops.push(Op::Return, expr_pos.clone());
                     let jptr = ops.len() - idx - 1;
                     ops.replace(idx, Op::InitThunk(jptr as i32));
@@ -518,36 +524,36 @@ impl AST {
                 // Bind our mod tuple.
                 ops.push(Op::Bind, def.pos.clone());
                 // emit all of our statements;
-                Self::translate_stmts(stmts, &mut ops, root);
+                Self::translate_stmts(stmts, ops, root);
                 // Return from the module
                 ops.push(Op::Return, def.pos);
                 let jptr = ops.len() - idx - 1;
                 ops.replace(idx, Op::Module(jptr as i32));
             }
             Expression::Not(def) => {
-                Self::translate_expr(*def.expr, &mut ops, root);
+                Self::translate_expr(*def.expr, ops, root);
                 ops.push(Op::Not, def.pos);
             }
             Expression::Range(def) => {
-                Self::translate_expr(*def.end, &mut ops, root);
+                Self::translate_expr(*def.end, ops, root);
                 if let Some(expr) = def.step {
-                    Self::translate_expr(*expr, &mut ops, root);
+                    Self::translate_expr(*expr, ops, root);
                 } else {
                     ops.push(Op::Val(Primitive::Empty), def.pos.clone());
                 }
-                Self::translate_expr(*def.start, &mut ops, root);
+                Self::translate_expr(*def.start, ops, root);
                 ops.push(Op::Runtime(Hook::Range), def.pos);
             }
             Expression::Select(def) => {
                 let default_pos = def.val.pos().clone();
-                Self::translate_expr(*def.val, &mut ops, root);
+                Self::translate_expr(*def.val, ops, root);
                 let mut jumps = Vec::new();
                 for (key, _constraint, val) in def.tuple {
                     ops.push(Op::Sym(key.fragment), key.pos.clone());
                     ops.push(Op::Noop, key.pos);
                     let idx = ops.len() - 1;
                     let expr_pos = val.pos().clone();
-                    Self::translate_expr(val, &mut ops, root);
+                    Self::translate_expr(val, ops, root);
                     ops.push(Op::Noop, expr_pos);
                     jumps.push(ops.len() - 1);
                     let jptr = ops.len() - idx - 1;
@@ -555,7 +561,7 @@ impl AST {
                 }
                 ops.push(Op::Pop, def.pos.clone());
                 if let Some(default) = def.default {
-                    Self::translate_expr(*default, &mut ops, root);
+                    Self::translate_expr(*default, ops, root);
                 } else {
                     ops.push(
                         Op::Val(Primitive::Str(
@@ -574,20 +580,20 @@ impl AST {
             Expression::Call(call_def) => {
                 let count = call_def.arglist.len() as i64;
                 for e in call_def.arglist {
-                    Self::translate_expr(e, &mut ops, root);
+                    Self::translate_expr(e, ops, root);
                 }
                 ops.push(Op::Val(Primitive::Int(count)), call_def.pos.clone());
                 // then push the func reference
                 let func_pos = call_def.funcref.pos().clone();
-                Self::translate_value(call_def.funcref, &mut ops, root);
+                Self::translate_value(call_def.funcref, ops, root);
                 ops.push(Op::FCall, func_pos);
             }
             Expression::Cast(cast_def) => {
-                Self::translate_expr(*cast_def.target, &mut ops, root);
+                Self::translate_expr(*cast_def.target, ops, root);
                 ops.push(Op::Cast(cast_def.cast_type), cast_def.pos);
             }
             Expression::Copy(def) => {
-                Self::translate_value(def.selector, &mut ops, root);
+                Self::translate_value(def.selector, ops, root);
                 Self::translate_copy(ops, def.fields, def.pos, root);
             }
             Expression::Debug(def) => {
@@ -598,7 +604,7 @@ impl AST {
                 }
                 let expr_pretty = String::from_utf8(buffer).unwrap();
                 ops.push(Op::Val(Primitive::Str(expr_pretty.into())), def.pos.clone());
-                Self::translate_expr(*def.expr, &mut ops, root);
+                Self::translate_expr(*def.expr, ops, root);
                 ops.push(Op::Runtime(Hook::Trace(def.pos.clone())), def.pos);
             }
             Expression::Convert(def) => {
@@ -606,7 +612,7 @@ impl AST {
                     Op::Val(Primitive::Str(def.converter.fragment)),
                     def.converter.pos,
                 );
-                Self::translate_expr(*def.target, &mut ops, root);
+                Self::translate_expr(*def.target, ops, root);
                 ops.push(Op::Runtime(Hook::Convert), def.pos);
             }
             Expression::Constraint(def) => {
@@ -619,20 +625,20 @@ impl AST {
                         ConstraintArm::Range(rdef) => {
                             // Push start (or Empty if open-ended)
                             if let Some(start) = rdef.start {
-                                Self::translate_expr(*start, &mut ops, root);
+                                Self::translate_expr(*start, ops, root);
                             } else {
                                 ops.push(Op::Val(Primitive::Empty), rdef.pos.clone());
                             }
                             // Push end (or Empty if open-ended)
                             if let Some(end) = rdef.end {
-                                Self::translate_expr(*end, &mut ops, root);
+                                Self::translate_expr(*end, ops, root);
                             } else {
                                 ops.push(Op::Val(Primitive::Empty), rdef.pos);
                             }
                             arm_types.push(ConstraintArmType::Range);
                         }
                         ConstraintArm::Shape(expr) => {
-                            Self::translate_expr(*expr, &mut ops, root);
+                            Self::translate_expr(*expr, ops, root);
                             arm_types.push(ConstraintArmType::Exact);
                         }
                     }
@@ -646,7 +652,7 @@ impl AST {
         pos: Position,
         part: TemplatePart,
         elems: &mut EI,
-        mut ops: &mut OpsMap,
+        ops: &mut OpsMap,
         place_holder: bool,
         root: &Path,
     ) {
@@ -660,7 +666,7 @@ impl AST {
                     // In theory this should never be reachable
                     unreachable!();
                 } else {
-                    Self::translate_expr(elems.next().unwrap(), &mut ops, root);
+                    Self::translate_expr(elems.next().unwrap(), ops, root);
                     ops.push(Op::Render, pos);
                 }
             }
@@ -668,7 +674,7 @@ impl AST {
                 if place_holder {
                     unreachable!();
                 } else {
-                    Self::translate_expr(expr, &mut ops, root);
+                    Self::translate_expr(expr, ops, root);
                     ops.push(Op::Render, pos);
                 }
             }
@@ -676,7 +682,7 @@ impl AST {
     }
 
     fn translate_copy(
-        mut ops: &mut OpsMap,
+        ops: &mut OpsMap,
         flds: Vec<(Token, Option<Expression>, Expression)>,
         pos: Position,
         root: &Path,
@@ -685,14 +691,14 @@ impl AST {
         ops.push(Op::InitTuple, pos.clone());
         for (t, _constraint, e) in flds {
             ops.push(Op::Sym(t.fragment), t.pos.clone());
-            Self::translate_expr(e, &mut ops, root);
+            Self::translate_expr(e, ops, root);
             ops.push(Op::Field, t.pos.clone());
         }
         ops.push(Op::Cp, pos.clone());
         ops.push(Op::PopSelf, pos);
     }
 
-    fn translate_value(value: Value, mut ops: &mut OpsMap, root: &Path) {
+    fn translate_value(value: Value, ops: &mut OpsMap, root: &Path) {
         match value {
             Value::Int(i) => ops.push(Op::Val(Primitive::Int(i.val)), i.pos),
             Value::Float(f) => ops.push(Op::Val(Primitive::Float(f.val)), f.pos),
@@ -706,7 +712,7 @@ impl AST {
                 ops.push(Op::InitTuple, flds.pos);
                 for (k, _constraint, v) in flds.val {
                     ops.push(Op::Sym(k.fragment), k.pos.clone());
-                    Self::translate_expr(v, &mut ops, root);
+                    Self::translate_expr(v, ops, root);
                     ops.push(Op::Field, k.pos.clone());
                 }
             }
@@ -714,7 +720,7 @@ impl AST {
                 ops.push(Op::InitList, els.pos);
                 for el in els.elems {
                     let el_pos = el.pos().clone();
-                    Self::translate_expr(el, &mut ops, root);
+                    Self::translate_expr(el, ops, root);
                     ops.push(Op::Element, el_pos);
                 }
             }

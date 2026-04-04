@@ -22,6 +22,12 @@ pub struct Stack {
     curr: BTreeMap<Rc<str>, (Rc<Value>, Position)>,
 }
 
+impl Default for Stack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Stack {
     pub fn new() -> Self {
         Stack {

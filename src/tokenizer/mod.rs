@@ -80,10 +80,10 @@ fn escapequoted<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Strin
                 }
             }
         }
-        if c == '\\' as u8 && !escape {
+        if c == b'\\' && !escape {
             // eat this slash and set our escaping sentinel
             escape = true;
-        } else if c == '"' as u8 && !escape {
+        } else if c == b'"' && !escape {
             // Bail if this is an unescaped "
             // we exit here.
             return Result::Complete(_input, frag);
@@ -93,7 +93,7 @@ fn escapequoted<'a>(input: OffsetStrIter<'a>) -> Result<OffsetStrIter<'a>, Strin
             escape = false; // reset our escaping sentinel
         }
     }
-    return Result::Incomplete(_input.clone());
+    Result::Incomplete(_input.clone())
 }
 
 make_fn!(strtok<OffsetStrIter, Token>,
@@ -401,20 +401,20 @@ fn comment(input: OffsetStrIter) -> Result<OffsetStrIter, Token> {
                             Result::Complete(next_rest, _) => next_rest,
                             _ => rest,
                         };
-                    return Result::Complete(rest, make_tok!(CMT => cmt.to_string(), input));
+                    Result::Complete(rest, make_tok!(CMT => cmt.to_string(), input))
                 }
                 // If we didn't find a new line then we just grab everything.
                 _ => {
-                    return Result::Abort(Error::new(
+                    Result::Abort(Error::new(
                         "Unparsable comment".to_string(),
                         Box::new(rest.clone()),
-                    ));
+                    ))
                 }
             }
         }
-        Result::Incomplete(ctx) => return Result::Incomplete(ctx),
-        Result::Fail(e) => return Result::Fail(e),
-        Result::Abort(e) => return Result::Abort(e),
+        Result::Incomplete(ctx) => Result::Incomplete(ctx),
+        Result::Fail(e) => Result::Fail(e),
+        Result::Abort(e) => Result::Abort(e),
     }
 }
 
@@ -565,7 +565,7 @@ pub fn tokenize<'a>(
     // if we had a comments at the end then we need to do a final
     // insert into our map.
     if let Some(ref mut map) = comment_map {
-        if let Some(ref tok) = comment_group.last() {
+        if let Some(tok) = comment_group.last() {
             let line = tok.pos.line;
             map.insert(line, comment_group);
         }

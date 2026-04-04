@@ -25,8 +25,8 @@ impl<'a> OffsetStrIter<'a> {
         OffsetStrIter {
             source_file: None,
             contained: StrIter::new(input),
-            line_offset: line_offset,
-            col_offset: col_offset,
+            line_offset,
+            col_offset,
         }
     }
 

@@ -48,7 +48,7 @@ impl StatementAccumulator {
             if l.trim_end().ends_with(";") {
                 let mut stmt = self.acc.drain(0..).fold(String::new(), |mut acc, s| {
                     acc.push_str(&s);
-                    acc.push_str("\n");
+                    acc.push('\n');
                     acc
                 });
                 stmt.shrink_to_fit();

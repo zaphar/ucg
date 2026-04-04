@@ -23,13 +23,19 @@ use crate::convert::traits::{ConvertResult, Converter};
 /// set of environment variables.
 pub struct EnvConverter {}
 
+impl Default for EnvConverter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EnvConverter {
     pub fn new() -> Self {
         EnvConverter {}
     }
 
     fn convert_tuple(&self, flds: &Vec<(Rc<str>, Rc<Val>)>, w: &mut dyn IOWrite) -> ConvertResult {
-        for &(ref name, ref val) in flds.iter() {
+        for (name, val) in flds.iter() {
             if val.is_tuple() {
                 eprintln!("Skipping embedded tuple...");
                 return Ok(());
@@ -39,7 +45,7 @@ impl EnvConverter {
                 return Ok(());
             }
             write!(w, "{}=", name)?;
-            self.write(&val, w)?;
+            self.write(val, w)?;
         }
         Ok(())
     }
@@ -56,24 +62,24 @@ impl EnvConverter {
                 return Ok(());
             }
             &Val::Boolean(b) => {
-                write!(w, "{}\n", if b { "true" } else { "false" })?;
+                writeln!(w, "{}", if b { "true" } else { "false" })?;
             }
-            &Val::Float(ref f) => {
-                write!(w, "{}\n", f)?;
+            Val::Float(f) => {
+                writeln!(w, "{}", f)?;
             }
-            &Val::Int(ref i) => {
-                write!(w, "{}\n", i)?;
+            Val::Int(i) => {
+                writeln!(w, "{}", i)?;
             }
-            &Val::Str(ref s) => {
-                write!(w, "'{}'\n", super::shell_escape_single_quoted(s))?;
+            Val::Str(s) => {
+                writeln!(w, "'{}'", super::shell_escape_single_quoted(s))?;
             }
-            &Val::List(ref items) => {
+            Val::List(items) => {
                 self.convert_list(items, w)?;
             }
-            &Val::Tuple(ref flds) => {
+            Val::Tuple(flds) => {
                 self.convert_tuple(flds, w)?;
             }
-            &Val::Env(ref _fs) => {
+            Val::Env(_fs) => {
                 // This is ignored
                 eprintln!("Skipping env...");
             }

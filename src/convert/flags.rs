@@ -26,6 +26,12 @@ pub struct FlagConverter {
     sep: &'static str,
 }
 
+impl Default for FlagConverter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FlagConverter {
     pub fn new() -> Self {
         FlagConverter { sep: "." }
@@ -42,7 +48,7 @@ impl FlagConverter {
         } else {
             write!(w, "-{} ", name)?;
         }
-        return Ok(());
+        Ok(())
     }
 
     fn write_list_flag(
@@ -65,7 +71,7 @@ impl FlagConverter {
                 self.write_simple_value(vref, w)?;
             }
         }
-        return Ok(());
+        Ok(())
     }
 
     fn write_simple_value(&self, v: &Val, w: &mut dyn Write) -> ConvertResult {
@@ -77,13 +83,13 @@ impl FlagConverter {
             &Val::Boolean(b) => {
                 write!(w, "{} ", if b { "true" } else { "false" })?;
             }
-            &Val::Float(ref f) => {
+            Val::Float(f) => {
                 write!(w, "{} ", f)?;
             }
-            &Val::Int(ref i) => {
+            Val::Int(i) => {
                 write!(w, "{} ", i)?;
             }
-            &Val::Str(ref s) => {
+            Val::Str(s) => {
                 write!(w, "'{}' ", super::shell_escape_single_quoted(s))?;
             }
             &Val::List(_) | &Val::Tuple(_) | &Val::Env(_) | &Val::Constraint(_) => {
@@ -95,7 +101,7 @@ impl FlagConverter {
     }
 
     fn write(&self, pfx: &str, flds: &Vec<(Rc<str>, Rc<Val>)>, w: &mut dyn Write) -> ConvertResult {
-        for &(ref name, ref val) in flds.iter() {
+        for (name, val) in flds.iter() {
             if let &Val::Empty = val.as_ref() {
                 self.write_flag_name(pfx, name, w)?;
                 continue;
@@ -104,7 +110,7 @@ impl FlagConverter {
                 &Val::Tuple(_) | &Val::Env(_) | &Val::Constraint(_) => {
                     eprintln!("Skipping {} in flag output tuple.", val.type_name());
                 }
-                &Val::List(ref def) => {
+                Val::List(def) => {
                     self.write_list_flag(pfx, name, def, w)?;
                 }
                 &Val::Boolean(_) | &Val::Empty | &Val::Float(_) | &Val::Int(_) | &Val::Str(_) => {
@@ -119,13 +125,13 @@ impl FlagConverter {
 
 impl Converter for FlagConverter {
     fn convert(&self, v: Rc<Val>, mut w: &mut dyn Write) -> ConvertResult {
-        if let &Val::Tuple(ref flds) = v.as_ref() {
+        if let Val::Tuple(flds) = v.as_ref() {
             self.write("", flds, &mut w)
         } else {
-            return Err(Box::new(BuildError::new(
+            Err(Box::new(BuildError::new(
                 "Flag outputs must be a tuple",
                 ErrorType::ConvertError,
-            )));
+            )))
         }
     }
 

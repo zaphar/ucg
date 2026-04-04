@@ -227,13 +227,13 @@ fn derive_not_shape(def: &NotDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -
             // noop
         }
     }
-    return Shape::TypeErr(
+    Shape::TypeErr(
         def.pos.clone(),
         format!(
             "Expected Boolean value in Not expression but got: {:?}",
             shape
         ),
-    );
+    )
 }
 
 fn derive_copy_shape(def: &CopyDef, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Shape {
@@ -587,18 +587,15 @@ impl DeriveShape for Expression {
                         if let Shape::TypeErr(_, _) = &shape {
                             // Don't update symbol table on type errors
                         } else {
-                            match &left_shape {
-                                Shape::Hole(_) => {
-                                    let inferred = infer_container_shape_from_dot(
-                                        &left_shape,
-                                        &def.right,
-                                        &shape,
-                                        &def.pos,
-                                        symbol_table,
-                                    );
-                                    symbol_table.insert(pi.val.clone(), inferred);
-                                }
-                                _ => {}
+                            if let Shape::Hole(_) = &left_shape {
+                                let inferred = infer_container_shape_from_dot(
+                                    &left_shape,
+                                    &def.right,
+                                    &shape,
+                                    &def.pos,
+                                    symbol_table,
+                                );
+                                symbol_table.insert(pi.val.clone(), inferred);
                             }
                         }
                     }
@@ -1160,9 +1157,15 @@ pub struct Checker {
     import_stack: Vec<PathBuf>,
 }
 
+impl Default for Checker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Checker {
     pub fn new() -> Self {
-        return Self {
+        Self {
             symbol_table: BTreeMap::new(),
             err_stack: Vec::new(),
             shape_stack: Vec::new(),
@@ -1171,7 +1174,7 @@ impl Checker {
             working_dir: None,
             shape_cache: Rc::new(RefCell::new(BTreeMap::new())),
             import_stack: Vec::new(),
-        };
+        }
     }
 
     pub fn with_strict(mut self, strict: bool) -> Self {

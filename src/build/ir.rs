@@ -50,14 +50,14 @@ impl ConstraintVal {
         self.arms.iter().any(|arm| match arm {
             ConstraintValArm::Range(ConstraintBound::Int(min, max)) => {
                 if let Val::Int(v) = val {
-                    min.map_or(true, |lo| *v >= lo) && max.map_or(true, |hi| *v <= hi)
+                    min.is_none_or(|lo| *v >= lo) && max.is_none_or(|hi| *v <= hi)
                 } else {
                     false
                 }
             }
             ConstraintValArm::Range(ConstraintBound::Float(min, max)) => {
                 if let Val::Float(v) = val {
-                    min.map_or(true, |lo| *v >= lo) && max.map_or(true, |hi| *v <= hi)
+                    min.is_none_or(|lo| *v >= lo) && max.is_none_or(|hi| *v <= hi)
                 } else {
                     false
                 }
@@ -84,16 +84,16 @@ pub enum Val {
 impl Val {
     /// Returns the Type of a Val as a string.
     pub fn type_name(&self) -> String {
-        match self {
-            &Val::Empty => "EmptyValue".to_string(),
-            &Val::Boolean(_) => "Boolean".to_string(),
-            &Val::Int(_) => "Integer".to_string(),
-            &Val::Float(_) => "Float".to_string(),
-            &Val::Str(_) => "String".to_string(),
-            &Val::List(_) => "List".to_string(),
-            &Val::Tuple(_) => "Tuple".to_string(),
-            &Val::Env(_) => "Env".to_string(),
-            &Val::Constraint(_) => "Constraint".to_string(),
+        match *self {
+            Val::Empty => "EmptyValue".to_string(),
+            Val::Boolean(_) => "Boolean".to_string(),
+            Val::Int(_) => "Integer".to_string(),
+            Val::Float(_) => "Float".to_string(),
+            Val::Str(_) => "String".to_string(),
+            Val::List(_) => "List".to_string(),
+            Val::Tuple(_) => "Tuple".to_string(),
+            Val::Env(_) => "Env".to_string(),
+            Val::Constraint(_) => "Constraint".to_string(),
         }
     }
 
@@ -130,11 +130,11 @@ impl Val {
         match (self, target) {
             // Empty values are always equal.
             (&Val::Empty, &Val::Empty) => Ok(true),
-            (&Val::Int(ref i), &Val::Int(ref ii)) => Ok(i == ii),
-            (&Val::Float(ref f), &Val::Float(ref ff)) => Ok(f == ff),
-            (&Val::Boolean(ref b), &Val::Boolean(ref bb)) => Ok(b == bb),
-            (&Val::Str(ref s), &Val::Str(ref ss)) => Ok(s == ss),
-            (&Val::List(ref ldef), &Val::List(ref rdef)) => {
+            (Val::Int(i), Val::Int(ii)) => Ok(i == ii),
+            (Val::Float(f), Val::Float(ff)) => Ok(f == ff),
+            (Val::Boolean(b), Val::Boolean(bb)) => Ok(b == bb),
+            (Val::Str(s), Val::Str(ss)) => Ok(s == ss),
+            (Val::List(ldef), Val::List(rdef)) => {
                 if ldef.len() != rdef.len() {
                     Ok(false)
                 } else {
@@ -146,7 +146,7 @@ impl Val {
                     Ok(true)
                 }
             }
-            (&Val::Tuple(ref ldef), &Val::Tuple(ref rdef)) => {
+            (Val::Tuple(ldef), Val::Tuple(rdef)) => {
                 if ldef.len() != rdef.len() {
                     Ok(false)
                 } else {
@@ -165,7 +165,7 @@ impl Val {
                     Ok(true)
                 }
             }
-            (&Val::Constraint(ref a), &Val::Constraint(ref b)) => Ok(a == b),
+            (Val::Constraint(a), Val::Constraint(b)) => Ok(a == b),
             // EMPTY is always comparable for equality.
             (&Val::Empty, _) => Ok(false),
             (_, &Val::Empty) => Ok(false),
@@ -178,7 +178,7 @@ impl Val {
 
     /// Returns the fields if this Val is a tuple. None otherwise.
     pub fn get_fields(&self) -> Option<&Vec<(Rc<str>, Rc<Val>)>> {
-        if let &Val::Tuple(ref fs) = self {
+        if let Val::Tuple(fs) = self {
             Some(fs)
         } else {
             None
@@ -189,63 +189,63 @@ impl Val {
         if let &Val::Int(_) = self {
             return true;
         }
-        return false;
+        false
     }
 
     pub fn is_empty(&self) -> bool {
         if let &Val::Empty = self {
             return true;
         }
-        return false;
+        false
     }
 
     pub fn is_float(&self) -> bool {
         if let &Val::Float(_) = self {
             return true;
         }
-        return false;
+        false
     }
 
     pub fn is_string(&self) -> bool {
         if let &Val::Str(_) = self {
             return true;
         }
-        return false;
+        false
     }
 
     pub fn is_tuple(&self) -> bool {
         if let &Val::Tuple(_) = self {
             return true;
         }
-        return false;
+        false
     }
 
     pub fn is_env(&self) -> bool {
         if let &Val::Env(_) = self {
             return true;
         }
-        return false;
+        false
     }
 
     pub fn is_list(&self) -> bool {
         if let &Val::List(_) = self {
             return true;
         }
-        return false;
+        false
     }
 
     pub fn is_bool(&self) -> bool {
         if let &Val::Boolean(_) = self {
             return true;
         }
-        return false;
+        false
     }
 
     pub fn is_str(&self) -> bool {
         if let &Val::Str(_) = self {
             return true;
         }
-        return false;
+        false
     }
 }
 
@@ -254,31 +254,31 @@ impl Display for Val {
         match self {
             &Val::Boolean(b) => write!(f, "{}", b),
             &Val::Empty => write!(f, "NULL"),
-            &Val::Float(ref ff) => write!(f, "{}", ff),
-            &Val::Int(ref i) => write!(f, "{}", i),
-            &Val::Str(ref s) => write!(f, "\"{}\"", s.replace("\"", "\\\"")),
-            &Val::List(ref def) => {
+            Val::Float(ff) => write!(f, "{}", ff),
+            Val::Int(i) => write!(f, "{}", i),
+            Val::Str(s) => write!(f, "\"{}\"", s.replace("\"", "\\\"")),
+            Val::List(def) => {
                 write!(f, "[")?;
                 for v in def.iter() {
                     write!(f, "{}, ", v)?;
                 }
                 write!(f, "]")
             }
-            &Val::Tuple(ref def) => {
-                write!(f, "{{\n")?;
+            Val::Tuple(def) => {
+                writeln!(f, "{{")?;
                 for v in def.iter() {
-                    write!(f, "\t{} = {},\n", v.0, v.1)?;
+                    writeln!(f, "\t{} = {},", v.0, v.1)?;
                 }
                 write!(f, "}}")
             }
-            &Val::Env(ref def) => {
-                write!(f, "{{\n")?;
+            Val::Env(def) => {
+                writeln!(f, "{{")?;
                 for v in def.iter() {
-                    write!(f, "\t{}=\"{}\"\n", v.0, v.1)?;
+                    writeln!(f, "\t{}=\"{}\"", v.0, v.1)?;
                 }
                 write!(f, "}}")
             }
-            &Val::Constraint(ref cv) => {
+            Val::Constraint(cv) => {
                 for (i, arm) in cv.arms.iter().enumerate() {
                     if i > 0 {
                         write!(f, " | ")?;

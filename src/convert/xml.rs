@@ -81,7 +81,7 @@ impl XmlConverter {
                                 prefix = Self::get_str_val(val.as_ref())?;
                             }
                         }
-                        if uri != "" && prefix != "" {
+                        if !uri.is_empty() && !prefix.is_empty() {
                             ns = Some((prefix, uri));
                         }
                     } else if let Val::Str(s) = val.as_ref() {
@@ -100,11 +100,10 @@ impl XmlConverter {
                         children = Some(Self::get_list_val(val.as_ref())?);
                     }
                 }
-                if field.as_ref() == "text" {
-                    if !val.is_empty() {
+                if field.as_ref() == "text"
+                    && !val.is_empty() {
                         text = Some(Self::get_str_val(val.as_ref())?);
                     }
-                }
             }
             if name.is_some() && text.is_some() {
                 return Err(BuildError::new(
@@ -124,7 +123,7 @@ impl XmlConverter {
                     }
                 }
                 if let Some((prefix, uri)) = ns {
-                    if prefix == "" {
+                    if prefix.is_empty() {
                         start = start.default_ns(uri);
                     } else {
                         start = start.ns(prefix, uri);
@@ -159,7 +158,7 @@ impl XmlConverter {
             let mut encoding: Option<&str> = None;
             let mut standalone: Option<bool> = None;
             let mut root: Option<Rc<Val>> = None;
-            for &(ref name, ref val) in fs.iter() {
+            for (name, val) in fs.iter() {
                 if name.as_ref() == "version" {
                     version = Some(Self::get_str_val(val)?);
                 }
@@ -205,8 +204,8 @@ impl XmlConverter {
                     writer.write(XmlEvent::StartDocument {
                         // We default to version 1.1 documents if not specified.
                         version: version.unwrap_or(XmlVersion::Version10),
-                        encoding: encoding,
-                        standalone: standalone,
+                        encoding,
+                        standalone,
                     })?;
                     self.write_node(n.as_ref(), &mut writer)
                 }

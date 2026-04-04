@@ -22,6 +22,12 @@ use crate::convert::yaml::YamlConverter;
 
 pub struct MultiYamlConverter(YamlConverter);
 
+impl Default for MultiYamlConverter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MultiYamlConverter {
     pub fn new() -> Self {
         MultiYamlConverter(YamlConverter::new())

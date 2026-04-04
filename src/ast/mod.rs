@@ -98,7 +98,7 @@ impl<'a> From<&'a Position> for Position {
 impl std::fmt::Display for Position {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         if let Some(ref file) = self.file {
-            write!(f, "file: {} ", file.to_string_lossy().to_string())?;
+            write!(f, "file: {} ", file.to_string_lossy())?;
         }
         write!(f, "line: {} column: {}", self.line, self.column)
     }
@@ -804,10 +804,10 @@ impl Shape {
 
     pub fn pos(&self) -> &Position {
         match self {
-            Shape::Str(p) => &p,
-            Shape::Int(p) => &p,
-            Shape::Float(p) => &p,
-            Shape::Boolean(p) => &p,
+            Shape::Str(p) => p,
+            Shape::Int(p) => p,
+            Shape::Float(p) => p,
+            Shape::Boolean(p) => p,
             Shape::List(lst) => &lst.pos,
             Shape::Tuple(flds) => &flds.pos,
             Shape::Func(def) => def.ret.pos(),
@@ -859,7 +859,7 @@ fn is_tuple_subset(
     right_slist: &PositionedItem<Vec<(PositionedItem<Rc<str>>, Shape)>>,
     symbol_table: &mut BTreeMap<Rc<str>, Shape>,
 ) -> bool {
-    return loop {
+    loop {
         if let Some((lt, ls)) = left_iter.next() {
             let mut matched = false;
             for (rt, rs) in right_slist.val.iter() {
@@ -879,7 +879,7 @@ fn is_tuple_subset(
             }
         }
         break true;
-    };
+    }
 }
 
 fn is_list_subset(
@@ -916,15 +916,15 @@ fn is_list_subset(
 impl Value {
     /// Returns the type name of the Value it is called on as a string.
     pub fn type_name(&self) -> String {
-        match self {
-            &Value::Empty(_) => "EmptyValue".to_string(),
-            &Value::Boolean(_) => "Boolean".to_string(),
-            &Value::Int(_) => "Integer".to_string(),
-            &Value::Float(_) => "Float".to_string(),
-            &Value::Str(_) => "String".to_string(),
-            &Value::Symbol(_) => "Symbol".to_string(),
-            &Value::Tuple(_) => "Tuple".to_string(),
-            &Value::List(_) => "List".to_string(),
+        match *self {
+            Value::Empty(_) => "EmptyValue".to_string(),
+            Value::Boolean(_) => "Boolean".to_string(),
+            Value::Int(_) => "Integer".to_string(),
+            Value::Float(_) => "Float".to_string(),
+            Value::Str(_) => "String".to_string(),
+            Value::Symbol(_) => "Symbol".to_string(),
+            Value::Tuple(_) => "Tuple".to_string(),
+            Value::List(_) => "List".to_string(),
         }
     }
 
@@ -932,43 +932,43 @@ impl Value {
         let mut buf = String::new();
         buf.push_str("{\n");
         for (tok, _, _) in v.iter() {
-            buf.push_str("\t");
+            buf.push('\t');
             buf.push_str(&tok.fragment);
-            buf.push_str("\n");
+            buf.push('\n');
         }
-        buf.push_str("}");
-        return buf;
+        buf.push('}');
+        buf
     }
 
     fn elems_to_string(v: &Vec<Expression>) -> String {
-        return format!("{}", v.len());
+        format!("{}", v.len())
     }
 
     /// Returns a stringified version of the Value.
     pub fn to_string(&self) -> String {
         match self {
             &Value::Empty(_) => "EmptyValue".to_string(),
-            &Value::Boolean(ref b) => format!("{}", b.val),
-            &Value::Int(ref i) => format!("{}", i.val),
-            &Value::Float(ref f) => format!("{}", f.val),
-            &Value::Str(ref s) => format!("{}", s.val),
-            &Value::Symbol(ref s) => format!("{}", s.val),
-            &Value::Tuple(ref fs) => format!("{}", Self::fields_to_string(&fs.val)),
-            &Value::List(ref def) => format!("[{}]", Self::elems_to_string(&def.elems)),
+            Value::Boolean(b) => format!("{}", b.val),
+            Value::Int(i) => format!("{}", i.val),
+            Value::Float(f) => format!("{}", f.val),
+            Value::Str(s) => format!("{}", s.val),
+            Value::Symbol(s) => format!("{}", s.val),
+            Value::Tuple(fs) => Self::fields_to_string(&fs.val).to_string(),
+            Value::List(def) => format!("[{}]", Self::elems_to_string(&def.elems)),
         }
     }
 
     /// Returns the position for a Value.
     pub fn pos(&self) -> &Position {
         match self {
-            &Value::Empty(ref pos) => pos,
-            &Value::Boolean(ref b) => &b.pos,
-            &Value::Int(ref i) => &i.pos,
-            &Value::Float(ref f) => &f.pos,
-            &Value::Str(ref s) => &s.pos,
-            &Value::Symbol(ref s) => &s.pos,
-            &Value::Tuple(ref fs) => &fs.pos,
-            &Value::List(ref def) => &def.pos,
+            Value::Empty(pos) => pos,
+            Value::Boolean(b) => &b.pos,
+            Value::Int(i) => &i.pos,
+            Value::Float(f) => &f.pos,
+            Value::Str(s) => &s.pos,
+            Value::Symbol(s) => &s.pos,
+            Value::Tuple(fs) => &fs.pos,
+            Value::List(def) => &def.pos,
         }
     }
 
@@ -1104,7 +1104,7 @@ impl<'a> From<&'a Token> for PositionedItem<String> {
     }
 }
 
-impl<'a> From<&'a PositionedItem<Rc<str>>> for PositionedItem<Rc<str>> {
+impl From<&PositionedItem<Rc<str>>> for PositionedItem<Rc<str>> {
     fn from(t: &PositionedItem<Rc<str>>) -> PositionedItem<Rc<str>> {
         PositionedItem {
             pos: t.pos.clone(),
@@ -1409,25 +1409,25 @@ impl Expression {
     /// Returns the position of the Expression.
     pub fn pos(&self) -> &Position {
         match self {
-            &Expression::Simple(ref v) => v.pos(),
-            &Expression::Binary(ref def) => &def.pos,
-            &Expression::Copy(ref def) => &def.pos,
-            &Expression::Range(ref def) => &def.pos,
-            &Expression::Grouped(_, ref pos) => pos,
-            &Expression::Format(ref def) => &def.pos,
-            &Expression::Call(ref def) => &def.pos,
-            &Expression::Cast(ref def) => &def.pos,
-            &Expression::Func(ref def) => &def.pos,
-            &Expression::Module(ref def) => &def.pos,
-            &Expression::Select(ref def) => &def.pos,
-            &Expression::FuncOp(ref def) => def.pos(),
-            &Expression::Include(ref def) => &def.pos,
-            &Expression::Import(ref def) => &def.pos,
-            &Expression::Fail(ref def) => &def.pos,
-            &Expression::Not(ref def) => &def.pos,
-            &Expression::Debug(ref def) => &def.pos,
-            &Expression::Convert(ref def) => &def.pos,
-            &Expression::Constraint(ref def) => &def.pos,
+            Expression::Simple(v) => v.pos(),
+            Expression::Binary(def) => &def.pos,
+            Expression::Copy(def) => &def.pos,
+            Expression::Range(def) => &def.pos,
+            Expression::Grouped(_, pos) => pos,
+            Expression::Format(def) => &def.pos,
+            Expression::Call(def) => &def.pos,
+            Expression::Cast(def) => &def.pos,
+            Expression::Func(def) => &def.pos,
+            Expression::Module(def) => &def.pos,
+            Expression::Select(def) => &def.pos,
+            Expression::FuncOp(def) => def.pos(),
+            Expression::Include(def) => &def.pos,
+            Expression::Import(def) => &def.pos,
+            Expression::Fail(def) => &def.pos,
+            Expression::Not(def) => &def.pos,
+            Expression::Debug(def) => &def.pos,
+            Expression::Convert(def) => &def.pos,
+            Expression::Constraint(def) => &def.pos,
         }
     }
 }
@@ -1435,7 +1435,7 @@ impl Expression {
 impl fmt::Display for Expression {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            &Expression::Simple(ref v) => {
+            Expression::Simple(v) => {
                 write!(w, "{}", v.to_string())?;
             }
             &Expression::Binary(_) => {
@@ -1480,16 +1480,16 @@ impl fmt::Display for Expression {
             &Expression::Fail(_) => {
                 write!(w, "<Fail>")?;
             }
-            &Expression::Not(ref def) => {
+            Expression::Not(def) => {
                 write!(w, "!{}", def.expr)?;
             }
-            &Expression::Debug(ref def) => {
+            Expression::Debug(def) => {
                 write!(w, "!{}", def.expr)?;
             }
-            &Expression::Convert(ref _def) => {
+            Expression::Convert(_def) => {
                 write!(w, "<Convert>")?;
             }
-            &Expression::Constraint(ref _def) => {
+            Expression::Constraint(_def) => {
                 write!(w, "<Constraint>")?;
             }
         }

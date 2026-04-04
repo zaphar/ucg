@@ -82,23 +82,23 @@ fn parse_expression(i: SliceIter<Element>) -> Result<SliceIter<Element>, Express
     let mut i_ = i.clone();
     abort_on_end!(i_);
     let el = i_.next();
-    if let Some(&Element::Expr(ref expr)) = el {
+    if let Some(Element::Expr(expr)) = el {
         return Result::Complete(i_, expr.clone());
     }
-    return Result::Fail(Error::new(
+    Result::Fail(Error::new(
         format!(
             "Error while parsing Binary Expression Expected Expression got {:?}",
             el
         ),
         Box::new(i_),
-    ));
+    ))
 }
 
 fn parse_bool_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, BinaryExprType> {
     let mut i_ = i.clone();
     abort_on_end!(i_);
     let el = i_.next();
-    if let Some(&Element::Op(ref op)) = el {
+    if let Some(Element::Op(op)) = el {
         match op {
             BinaryExprType::AND | BinaryExprType::OR => {
                 return Result::Complete(i_, op.clone());
@@ -108,20 +108,20 @@ fn parse_bool_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, Bina
             }
         };
     }
-    return Result::Fail(Error::new(
+    Result::Fail(Error::new(
         format!(
             "Error while parsing Binary Expression Unexpected Operator {:?}",
             el
         ),
         Box::new(i_),
-    ));
+    ))
 }
 
 fn parse_dot_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, BinaryExprType> {
     let mut i_ = i.clone();
     abort_on_end!(i_);
     let el = i_.next();
-    if let Some(&Element::Op(ref op)) = el {
+    if let Some(Element::Op(op)) = el {
         match op {
             &BinaryExprType::DOT => {
                 return Result::Complete(i_, op.clone());
@@ -131,20 +131,20 @@ fn parse_dot_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, Binar
             }
         };
     }
-    return Result::Fail(Error::new(
+    Result::Fail(Error::new(
         format!(
             "Error while parsing Binary Expression Unexpected Operator {:?}",
             el
         ),
         Box::new(i_),
-    ));
+    ))
 }
 
 fn parse_sum_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, BinaryExprType> {
     let mut i_ = i.clone();
     abort_on_end!(i_);
     let el = i_.next();
-    if let Some(&Element::Op(ref op)) = el {
+    if let Some(Element::Op(op)) = el {
         match op {
             &BinaryExprType::Add => {
                 return Result::Complete(i_, op.clone());
@@ -157,20 +157,20 @@ fn parse_sum_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, Binar
             }
         };
     }
-    return Result::Fail(Error::new(
+    Result::Fail(Error::new(
         format!(
             "Error while parsing Binary Expression Unexpected Operator {:?}",
             el
         ),
         Box::new(i_),
-    ));
+    ))
 }
 
 fn parse_product_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, BinaryExprType> {
     let mut i_ = i.clone();
     abort_on_end!(i_);
     let el = i_.next();
-    if let Some(&Element::Op(ref op)) = el {
+    if let Some(Element::Op(op)) = el {
         match op {
             &BinaryExprType::Mul => {
                 return Result::Complete(i_, op.clone());
@@ -186,13 +186,13 @@ fn parse_product_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, B
             }
         };
     }
-    return Result::Fail(Error::new(
+    Result::Fail(Error::new(
         format!(
             "Error while parsing Binary Expression Unexpected Operator {:?}",
             el
         ),
         Box::new(i_),
-    ));
+    ))
 }
 
 make_fn!(
@@ -215,7 +215,7 @@ fn parse_compare_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, B
     let mut i_ = i.clone();
     abort_on_end!(i_);
     let el = i_.next();
-    if let Some(&Element::Op(ref op)) = el {
+    if let Some(Element::Op(op)) = el {
         match op {
             &BinaryExprType::GT
             | &BinaryExprType::GTEqual
@@ -234,13 +234,13 @@ fn parse_compare_operator(i: SliceIter<Element>) -> Result<SliceIter<Element>, B
             }
         };
     }
-    return Result::Fail(Error::new(
+    Result::Fail(Error::new(
         format!(
             "Error while parsing Binary Expression Unexpected Operator {:?}",
             el
         ),
         Box::new(i),
-    ));
+    ))
 }
 
 /// Parse a list of expressions separated by operators into a Vec<Element>.
@@ -311,7 +311,7 @@ fn parse_operand_list<'a>(i: SliceIter<'a, Token>) -> ParseResult<'a, Vec<Elemen
         }
         firstrun = false;
     }
-    return Result::Complete(_i, list);
+    Result::Complete(_i, list)
 }
 
 make_fn!(
@@ -377,10 +377,10 @@ fn parse_op(
             kind: op.clone(),
             left: Box::new(lhs.clone()),
             right: Box::new(rhs),
-            pos: pos,
+            pos,
         });
     }
-    return Result::Complete(i, lhs);
+    Result::Complete(i, lhs)
 }
 
 pub fn parse_precedence(i: SliceIter<Element>) -> Result<SliceIter<Element>, Expression> {

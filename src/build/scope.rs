@@ -11,12 +11,12 @@ use crate::build::ir::Val;
 use crate::error;
 
 pub fn find_in_fieldlist(target: &str, fs: &Vec<(Rc<str>, Rc<Val>)>) -> Option<Rc<Val>> {
-    for (key, val) in fs.iter().cloned() {
+    for (key, val) in fs {
         if target == key.as_ref() {
             return Some(val.clone());
         }
     }
-    return None;
+    None
 }
 
 /// Defines a set of values in a parsed file.
@@ -45,7 +45,7 @@ impl Scope {
     pub fn new(env: Rc<Val>) -> Self {
         Self {
             import_stack: Vec::new(),
-            env: env,
+            env,
             // CurrVal represents the currently processing value.
             // (eg: Tuple, List. left side of a dot selection.)
             curr_val: None,
@@ -111,7 +111,7 @@ impl Scope {
     /// Lookup up a list index in the current value
     pub fn lookup_idx(&self, pos: &Position, idx: &Val) -> Result<Rc<Val>, Box<dyn Error>> {
         if self.search_curr_val && self.curr_val.is_some() {
-            if let &Val::List(ref fs) = self.curr_val.as_ref().unwrap().as_ref() {
+            if let Val::List(fs) = self.curr_val.as_ref().unwrap().as_ref() {
                 return Self::lookup_in_list(pos, idx, fs);
             }
         }
@@ -186,7 +186,7 @@ impl Scope {
         field: &str,
         fs: &Vec<(Rc<str>, Rc<Val>)>,
     ) -> Result<Rc<Val>, Box<dyn Error>> {
-        if let Some(vv) = find_in_fieldlist(&field, fs) {
+        if let Some(vv) = find_in_fieldlist(field, fs) {
             Ok(vv)
         } else {
             Err(error::BuildError::with_pos(
@@ -205,7 +205,7 @@ impl Scope {
     ) -> Result<Rc<Val>, Box<dyn Error>> {
         let idx = match field {
             &Val::Int(i) => i as usize,
-            &Val::Str(ref s) => s.parse::<usize>()?,
+            Val::Str(s) => s.parse::<usize>()?,
             _ => {
                 return Err(error::BuildError::with_pos(
                     format!("Invalid idx type {} for list lookup", field),

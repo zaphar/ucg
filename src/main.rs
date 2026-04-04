@@ -169,7 +169,7 @@ fn do_validate<'a>(
             return false;
         }
     }
-    return true;
+    true
 }
 
 fn do_compile<'a>(
@@ -189,7 +189,7 @@ fn do_compile<'a>(
     if builder.out.is_none() {
         eprintln!("Build results in no artifacts.");
     }
-    return true;
+    true
 }
 
 fn visit_ucg_files(
@@ -230,11 +230,10 @@ fn visit_ucg_files(
                     } else {
                         summary.push_str(format!("{} - PASS\n", path_as_string).as_str())
                     }
-                } else if !validate && path_as_string.ends_with(".ucg") {
-                    if !do_compile(&path_as_string, strict, import_paths, env) {
+                } else if !validate && path_as_string.ends_with(".ucg")
+                    && !do_compile(&path_as_string, strict, import_paths, env) {
                         result = false;
                     }
-                }
             }
         }
     } else if validate && our_path.ends_with("_test.ucg") {
@@ -244,11 +243,10 @@ fn visit_ucg_files(
         } else {
             summary.push_str(format!("{} - PASS\n", &our_path).as_str());
         }
-    } else if !validate {
-        if !do_compile(&our_path, strict, import_paths, env) {
+    } else if !validate
+        && !do_compile(&our_path, strict, import_paths, env) {
             result = false;
         }
-    }
     if validate && !summary.is_empty() {
         println!("RESULTS:");
         println!("{}", summary);
@@ -394,7 +392,7 @@ fn converters_command(matches: &clap::ArgMatches, registry: &ConverterRegistry) 
                 println!("* {}", name);
                 println!("Description: {}", c.description());
                 println!("Output Extension: `.{}`", c.file_ext());
-                println!("");
+                println!();
                 println!("{}", c.help());
                 found = true;
             }
@@ -405,19 +403,19 @@ fn converters_command(matches: &clap::ArgMatches, registry: &ConverterRegistry) 
         }
     } else {
         println!("Available converters:");
-        println!("");
+        println!();
         for (name, c) in registry.get_converter_list().iter() {
             println!("* {}", name);
             println!("Description: {}", c.description());
             println!("Output Extension: `.{}`", c.file_ext());
-            println!("");
+            println!();
         }
     }
 }
 
 fn importers_command(registry: &ImporterRegistry) {
     println!("Available importers");
-    println!("");
+    println!();
     for (name, _importer) in registry.get_importer_list().iter() {
         println!("- {}", name);
     }
@@ -426,7 +424,7 @@ fn importers_command(registry: &ImporterRegistry) {
 fn env_help() {
     println!(
         include_str!("help/env.txt"),
-        std::env::var("UCG_IMPORT_PATH").unwrap_or(String::new())
+        std::env::var("UCG_IMPORT_PATH").unwrap_or_default()
     );
 }
 
@@ -468,7 +466,7 @@ fn do_repl(
             }
         }
     }
-    let mut builder = build::FileBuilder::new(std::env::current_dir()?, import_paths, &env);
+    let mut builder = build::FileBuilder::new(std::env::current_dir()?, import_paths, env);
     builder.set_strict(strict);
 
     builder.repl(editor, config_home)?;
@@ -519,36 +517,32 @@ fn main() {
             import_paths.push(p);
         }
     }
-    let strict = if app_matches.is_present("nostrict") {
-        false
-    } else {
-        true
-    };
+    let strict = !app_matches.is_present("nostrict");
     if let Some(matches) = app_matches.subcommand_matches("build") {
         build_command(matches, &import_paths, strict, &env);
     } else if let Some(matches) = app_matches.subcommand_matches("test") {
         test_command(matches, &import_paths, strict, &env);
     } else if let Some(matches) = app_matches.subcommand_matches("converters") {
         converters_command(matches, &registry)
-    } else if let Some(_) = app_matches.subcommand_matches("importers") {
+    } else if app_matches.subcommand_matches("importers").is_some() {
         let registry = ImporterRegistry::make_registry();
         importers_command(&registry)
-    } else if let Some(_) = app_matches.subcommand_matches("env") {
+    } else if app_matches.subcommand_matches("env").is_some() {
         env_help()
-    } else if let Some(_) = app_matches.subcommand_matches("repl") {
+    } else if app_matches.subcommand_matches("repl").is_some() {
         repl(&import_paths, strict, &env)
     } else if let Some(matches) = app_matches.subcommand_matches("fmt") {
         if let Err(e) = fmt_command(matches) {
             eprintln!("{}", e);
             process::exit(1);
         }
-    } else if let Some(_) = app_matches.subcommand_matches("lsp") {
+    } else if app_matches.subcommand_matches("lsp").is_some() {
         if let Err(e) = ucglib::lsp::run_server() {
             eprintln!("lsp server error: {}", e);
             process::exit(1);
         }
     } else {
         app.print_help().unwrap();
-        println!("");
+        println!();
     }
 }

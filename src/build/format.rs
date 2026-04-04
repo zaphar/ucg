@@ -36,6 +36,12 @@ pub trait TemplateParser {
 
 pub struct SimpleTemplate();
 
+impl Default for SimpleTemplate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SimpleTemplate {
     pub fn new() -> Self {
         Self()
@@ -63,7 +69,7 @@ impl TemplateParser for SimpleTemplate {
             }
             should_escape = false;
         }
-        if buf.len() != 0 {
+        if !buf.is_empty() {
             result.push(TemplatePart::Str(buf));
         }
         Ok(result)
@@ -71,6 +77,12 @@ impl TemplateParser for SimpleTemplate {
 }
 
 pub struct ExpressionTemplate();
+
+impl Default for ExpressionTemplate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl ExpressionTemplate {
     pub fn new() -> Self {
@@ -152,7 +164,7 @@ impl TemplateParser for ExpressionTemplate {
             }
             should_escape = false;
         }
-        if buf.len() != 0 {
+        if !buf.is_empty() {
             parts.push(TemplatePart::Str(buf));
         }
         Ok(parts)

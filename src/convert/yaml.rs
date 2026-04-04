@@ -12,6 +12,12 @@ use crate::build::Val;
 
 pub struct YamlConverter {}
 
+impl Default for YamlConverter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl YamlConverter {
     pub fn new() -> Self {
         YamlConverter {}
@@ -27,7 +33,7 @@ impl YamlConverter {
 
     fn convert_env(&self, items: &Vec<(Rc<str>, Rc<str>)>) -> std::io::Result<serde_yaml::Value> {
         let mut mp = serde_yaml::Mapping::new();
-        for &(ref k, ref v) in items.iter() {
+        for (k, v) in items.iter() {
             mp.insert(
                 serde_yaml::Value::String(k.to_string()),
                 serde_yaml::Value::String(v.to_string()),
@@ -38,7 +44,7 @@ impl YamlConverter {
 
     fn convert_tuple(&self, items: &Vec<(Rc<str>, Rc<Val>)>) -> std::io::Result<serde_yaml::Value> {
         let mut mapping = serde_yaml::Mapping::new();
-        for &(ref k, ref v) in items.iter() {
+        for (k, v) in items.iter() {
             mapping.insert(
                 serde_yaml::Value::String(k.to_string()),
                 self.convert_value(v)?,
@@ -69,10 +75,10 @@ impl YamlConverter {
                     ));
                 }
             },
-            &Val::Str(ref s) => serde_yaml::Value::String(s.to_string()),
-            &Val::Env(ref fs) => self.convert_env(fs)?,
-            &Val::List(ref l) => self.convert_list(l)?,
-            &Val::Tuple(ref t) => self.convert_tuple(t)?,
+            Val::Str(s) => serde_yaml::Value::String(s.to_string()),
+            Val::Env(fs) => self.convert_env(fs)?,
+            Val::List(l) => self.convert_list(l)?,
+            Val::Tuple(t) => self.convert_tuple(t)?,
             &Val::Constraint(_) => {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
@@ -85,7 +91,7 @@ impl YamlConverter {
 
     fn merge_mapping_keys(
         &self,
-        mut fs: &mut Vec<(String, Rc<Val>)>,
+        fs: &mut Vec<(String, Rc<Val>)>,
         m: &serde_yaml::Mapping,
     ) -> Result<(), Box<dyn Error>> {
         for (key, value) in m {
@@ -105,10 +111,10 @@ impl YamlConverter {
             };
             if key == "<<" {
                 if let serde_yaml::Value::Mapping(merge_map) = value {
-                    self.merge_mapping_keys(&mut fs, merge_map)?;
+                    self.merge_mapping_keys(fs, merge_map)?;
                 }
             } else {
-                fs.push((key, Rc::new(self.convert_yaml_val(&value)?)));
+                fs.push((key, Rc::new(self.convert_yaml_val(value)?)));
             }
         }
         Ok(())
@@ -160,7 +166,7 @@ impl YamlConverter {
     pub fn write(&self, v: &Val, mut w: &mut dyn Write) -> ConvertResult {
         let jsn_val = self.convert_value(v)?;
         serde_yaml::to_writer(&mut w, &jsn_val)?;
-        writeln!(w, "")?;
+        writeln!(w)?;
         Ok(())
     }
 }

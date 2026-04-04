@@ -54,6 +54,12 @@ pub struct AssertCollector {
     pub failures: String,
 }
 
+impl Default for AssertCollector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AssertCollector {
     pub fn new() -> Self {
         Self {
@@ -107,7 +113,7 @@ where
         environment: &'a RefCell<Environment<Stdout, Stderr>>,
     ) -> Self {
         FileBuilder {
-            environment: environment,
+            environment,
             strict: false,
             // Our import stack is initialized with ourself.
             working_dir: working_dir.into(),
@@ -148,7 +154,7 @@ where
                 Ok(())
             }
             Err(e) => {
-                let err = simple_error::SimpleError::new(&format!(
+                let err = simple_error::SimpleError::new(format!(
                     "Error building file: {}\n{}",
                     file.to_string_lossy(),
                     e.as_ref()
@@ -223,7 +229,7 @@ where
         if std::io::stdin().is_terminal() {
             println!("Welcome to the UCG repl. Ctrl-D to exit, Ctrl-C to abort expression.");
             println!("Type '#help' for help.");
-            println!("");
+            println!();
         }
         // Initialize VM with an empty OpPointer
         let mut vm = VM::new(self.strict, Rc::new(OpsMap::new()), &self.working_dir);
@@ -260,7 +266,7 @@ where
                         eprintln!("The '#del' command expects a single argument specifying \nthe binding to delete.");
                     } else {
                         let key = args[0].to_string();
-                        if let None = vm.remove_symbol(&key) {
+                        if vm.remove_symbol(&key).is_none() {
                             eprintln!("No such binding {}", key);
                         }
                     }
@@ -268,7 +274,7 @@ where
                     process::exit(0);
                 } else {
                     eprintln!("Invalid repl command...");
-                    eprintln!("");
+                    eprintln!();
                     println!(include_str!("../help/repl.txt"));
                 }
                 continue;
@@ -287,12 +293,9 @@ where
                         // print the result
                         Err(e) => eprintln!("{}", e),
                         Ok(_) => {
-                            match vm.last {
-                                Some((ref val, _)) => {
-                                    println!("{}", val);
-                                    vm.last = None;
-                                }
-                                None => {}
+                            if let Some((ref val, _)) = vm.last {
+                                println!("{}", val);
+                                vm.last = None;
                             }
                             editor.history_mut().add(stmt);
                             editor.save_history(&config_home)?;
@@ -344,7 +347,7 @@ where
 
     pub fn get_out_by_name(&self, name: &str) -> Option<Rc<Val>> {
         if let Some(val) = self.out.clone() {
-            if let &Val::Tuple(ref flds) = val.as_ref() {
+            if let Val::Tuple(flds) = val.as_ref() {
                 for (k, v) in flds.iter() {
                     if k.as_ref() == name {
                         return Some(v.clone());
@@ -352,7 +355,7 @@ where
                 }
             }
         }
-        return None;
+        None
     }
 
     pub fn assert_results(&self) -> bool {

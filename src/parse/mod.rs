@@ -136,7 +136,7 @@ fn triple_to_number<'a>(
             ));
         }
     };
-    return Ok(Value::Float(value_node!(f, pref_pos)));
+    Ok(Value::Float(value_node!(f, pref_pos)))
 }
 
 // trace_macros!(true);
@@ -215,7 +215,7 @@ make_fn!(
 
 // Helper function to make the return types work for down below.
 fn vec_to_tuple(pos: Position, fields: Option<FieldList>) -> Value {
-    Value::Tuple(value_node!(fields.unwrap_or(Vec::new()), pos))
+    Value::Tuple(value_node!(fields.unwrap_or_default(), pos))
 }
 
 make_fn!(
@@ -237,7 +237,7 @@ make_fn!(
 
 fn tuple_to_list<Sp: Into<Position>>(pos: Sp, elems: Option<Vec<Expression>>) -> Value {
     Value::List(ListDef {
-        elems: elems.unwrap_or_else(|| Vec::new()),
+        elems: elems.unwrap_or_default(),
         pos: pos.into(),
     })
 }
@@ -258,7 +258,7 @@ make_fn!(
     do_each!(
         pos => pos,
         _ => match_type!(EMPTY),
-        (Value::Empty(pos.into()))
+        (Value::Empty(pos))
     )
 );
 
@@ -410,14 +410,11 @@ make_fn!(
 
 fn tuple_to_copy(sym: Value, fields: Option<FieldList>) -> Expression {
     let pos = sym.pos().clone();
-    let fields = match fields {
-        Some(fields) => fields,
-        None => Vec::new(),
-    };
+    let fields = fields.unwrap_or_default();
     Expression::Copy(CopyDef {
         selector: sym,
-        fields: fields,
-        pos: pos,
+        fields,
+        pos,
     })
 }
 
@@ -438,10 +435,7 @@ fn tuple_to_func<'a>(
     vals: Option<Vec<(Value, Option<Expression>)>>,
     val: Expression,
 ) -> ConvertResult<'a, Expression> {
-    let mut default_args = match vals {
-        None => Vec::new(),
-        Some(vals) => vals,
-    };
+    let mut default_args = vals.unwrap_or_default();
     let arglist = default_args
         .drain(0..)
         .map(|(s, constraint)| {
@@ -458,7 +452,7 @@ fn tuple_to_func<'a>(
         scope: None,
         argdefs: arglist,
         fields: Box::new(val),
-        pos: pos,
+        pos,
     }))
 }
 
@@ -502,7 +496,7 @@ fn module_expression(input: SliceIter<Token>) -> Result<SliceIter<Token>, Expres
         Result::Fail(e) => Result::Fail(e),
         Result::Incomplete(offset) => Result::Incomplete(offset),
         Result::Complete(rest, (pos, arglist, out_expr_and_constraint, stmt_list)) => {
-            let mut def = ModuleDef::new(arglist.unwrap_or_else(|| Vec::new()), stmt_list, pos);
+            let mut def = ModuleDef::new(arglist.unwrap_or_else(Vec::new), stmt_list, pos);
             if let Some((expr, constraint)) = out_expr_and_constraint {
                 def.set_out_expr(expr);
                 def.out_constraint = constraint.map(Box::new);
@@ -561,9 +555,9 @@ make_fn!(
         _ => must!(punct!("}")),
         (Expression::Select(SelectDef {
             val: Box::new(val),
-            default: default.map(|e| Box::new(e)),
+            default: default.map(Box::new),
             tuple: tpl,
-            pos: pos,
+            pos,
         }))
     )
 );
@@ -595,7 +589,7 @@ make_fn!(
             "Expected format arguments"),
         (Expression::Format(FormatDef {
             template: tmpl.fragment.to_string(),
-            args: args,
+            args,
             pos: tmpl.pos,
         }))
     )
@@ -609,9 +603,9 @@ make_fn!(
         typ => must!(match_type!(BAREWORD)),
         path => must!(match_type!(STR)),
         (Expression::Include(IncludeDef{
-            pos: pos,
-            typ: typ,
-            path: path,
+            pos,
+            typ,
+            path,
         }))
     )
 );
@@ -624,7 +618,7 @@ fn tuple_to_call<'a>(
     if let Value::Symbol(_) = val {
         Ok(Expression::Call(CallDef {
             funcref: val,
-            arglist: exprs.unwrap_or_else(|| Vec::new()),
+            arglist: exprs.unwrap_or_default(),
             pos: (&input).into(),
         }))
     } else {
@@ -702,7 +696,7 @@ make_fn!(
             func: Box::new(func),
             acc: Box::new(acc),
             target: Box::new(tgt),
-            pos: pos,
+            pos,
         })))
     )
 );
@@ -721,7 +715,7 @@ make_fn!(
         (Expression::FuncOp(FuncOpDef::Map(MapFilterOpDef{
             func: Box::new(func),
             target: Box::new(list),
-            pos: pos,
+            pos,
         })))
     )
 );
@@ -740,7 +734,7 @@ make_fn!(
         (Expression::FuncOp(FuncOpDef::Filter(MapFilterOpDef{
             func: Box::new(func),
             target: Box::new(list),
-            pos: pos,
+            pos,
         })))
     )
 );
@@ -765,7 +759,7 @@ make_fn!(
         ),
         end => must!(wrap_err!(either!(simple_expression, grouped_expression), "Expected simple or grouped expression")),
         (Expression::Range(RangeDef{
-            pos: pos,
+            pos,
             start: Box::new(start),
             step: maybe_step,
             end: Box::new(end),
@@ -780,8 +774,8 @@ make_fn!(
         _ => word!("import"),
         path => must!(wrap_err!(match_type!(STR), "Expected import path")),
         (Expression::Import(ImportDef{
-            pos: pos,
-            path: path,
+            pos,
+            path,
         }))
     )
 );
@@ -801,7 +795,7 @@ make_fn!(
         _ => word!("fail"),
         msg => must!(wrap_err!(expression, "Expected failure message")),
         (Expression::Fail(FailDef{
-            pos: pos,
+            pos,
             message: Box::new(msg),
         }))
     )
@@ -814,7 +808,7 @@ make_fn!(
         _ => word!("TRACE"),
         expr => must!(wrap_err!(expression, "Expected failure message")),
         (Expression::Debug(DebugDef{
-            pos: pos,
+            pos,
             expr: Box::new(expr),
         }))
     )
@@ -827,7 +821,7 @@ make_fn!(
         _ => word!("not"),
         expr => must!(wrap_err!(expression, "Expected failure message")),
         (Expression::Not(NotDef{
-            pos: pos,
+            pos,
             expr: Box::new(expr),
         }))
     )
@@ -841,7 +835,7 @@ make_fn!(
         typ => wrap_err!(must!(match_type!(BAREWORD)), "Expected converter name"),
         expr => wrap_err!(must!(expression), "Expected expression to convert"),
         (Expression::Convert(ConvertDef{
-            pos: pos,
+            pos,
             converter: typ.clone(),
             target: Box::new(expr),
         }))
@@ -934,9 +928,9 @@ make_fn!(
         val => trace_parse!(wrap_err!(expression, "Expected Expression to bind")),
         _ => punct!(";"),
         (Statement::Let(LetDef {
-            pos: pos,
-            name: name,
-            constraint: constraint,
+            pos,
+            name,
+            constraint,
             value: val,
         }))
     )
@@ -995,14 +989,14 @@ make_fn!(
 
 //trace_macros!(true);
 fn statement(i: SliceIter<Token>) -> Result<SliceIter<Token>, Statement> {
-    return either!(
+    either!(
         i,
         trace_parse!(assert_statement),
         trace_parse!(constraint_statement),
         trace_parse!(let_statement),
         trace_parse!(out_statement),
         trace_parse!(expression_statement)
-    );
+    )
 }
 //trace_macros!(false);
 
@@ -1045,10 +1039,10 @@ pub fn parse<'a>(
                     }
                 }
             }
-            return Ok(out);
+            Ok(out)
         }
         Err(e) => {
-            return Err(e);
+            Err(e)
         }
     }
 }

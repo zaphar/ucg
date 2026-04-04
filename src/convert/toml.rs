@@ -28,6 +28,12 @@ pub struct TomlConverter {}
 
 type Result = std::result::Result<toml::Value, Box<dyn error::Error>>;
 
+impl Default for TomlConverter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TomlConverter {
     pub fn new() -> Self {
         TomlConverter {}
@@ -43,7 +49,7 @@ impl TomlConverter {
 
     fn convert_tuple(&self, items: &Vec<(Rc<str>, Rc<Val>)>) -> Result {
         let mut mp = toml::value::Table::new();
-        for &(ref k, ref v) in items.iter() {
+        for (k, v) in items.iter() {
             mp.entry(k.to_string()).or_insert(self.convert_value(v)?);
         }
         Ok(toml::Value::Table(mp))
@@ -51,7 +57,7 @@ impl TomlConverter {
 
     fn convert_env(&self, items: &Vec<(Rc<str>, Rc<str>)>) -> Result {
         let mut mp = toml::value::Table::new();
-        for &(ref k, ref v) in items.iter() {
+        for (k, v) in items.iter() {
             mp.entry(k.to_string())
                 .or_insert(toml::Value::String(v.to_string()));
         }
@@ -67,10 +73,10 @@ impl TomlConverter {
             }
             &Val::Float(f) => toml::Value::Float(f),
             &Val::Int(i) => toml::Value::Integer(i),
-            &Val::Str(ref s) => toml::Value::String(s.to_string()),
-            &Val::Env(ref fs) => self.convert_env(fs)?,
-            &Val::List(ref l) => self.convert_list(l)?,
-            &Val::Tuple(ref t) => self.convert_tuple(t)?,
+            Val::Str(s) => toml::Value::String(s.to_string()),
+            Val::Env(fs) => self.convert_env(fs)?,
+            Val::List(l) => self.convert_list(l)?,
+            Val::Tuple(t) => self.convert_tuple(t)?,
             &Val::Constraint(_) => {
                 let err = SimpleError::new("Constraint values cannot be converted to TOML!");
                 return Err(Box::new(err));

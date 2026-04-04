@@ -31,6 +31,12 @@ pub struct ExecConverter {}
 // command = "",
 // args = [],
 // };
+impl Default for ExecConverter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ExecConverter {
     pub fn new() -> Self {
         ExecConverter {}
@@ -39,7 +45,7 @@ impl ExecConverter {
     #[allow(unused_assignments)]
     fn write(&self, v: &Val, w: &mut dyn Write) -> ConvertResult {
         // We always expect the Val to be a Tuple.
-        if let &Tuple(ref fields) = v {
+        if let Tuple(fields) = v {
             // We expect no more than three fields in our exec tuple.
             if fields.len() > 3 {
                 return Err(BuildError::new(
@@ -51,7 +57,7 @@ impl ExecConverter {
             let mut env: Option<&Vec<(Rc<str>, Rc<Val>)>> = None;
             let mut command: Option<&str> = None;
             let mut args: Option<&Vec<Rc<Val>>> = None;
-            for &(ref name, ref val) in fields.iter() {
+            for (name, val) in fields.iter() {
                 // We require a command field in our exec tuple.
                 if name.as_ref() == "command" {
                     if command.is_some() {
@@ -61,7 +67,7 @@ impl ExecConverter {
                         )
                         .to_boxed());
                     }
-                    if let &Val::Str(ref s) = val.as_ref() {
+                    if let Val::Str(s) = val.as_ref() {
                         command = Some(s);
                         continue;
                     }
@@ -73,7 +79,7 @@ impl ExecConverter {
                 }
                 // We optionally allow an env field in our exec tuple.
                 if name.as_ref() == "env" {
-                    if let &Val::Tuple(ref l) = val.as_ref() {
+                    if let Val::Tuple(l) = val.as_ref() {
                         if env.is_some() {
                             return Err(BuildError::new(
                                 "There can only be one env field in an exec tuple",
@@ -92,7 +98,7 @@ impl ExecConverter {
                 }
                 // We optionally allow an args field in our exec tuple.
                 if name.as_ref() == "args" {
-                    if let &Val::List(ref l) = val.as_ref() {
+                    if let Val::List(l) = val.as_ref() {
                         if args.is_some() {
                             return Err(BuildError::new(
                                 "There can only be one args field of an exec tuple",
@@ -120,16 +126,16 @@ impl ExecConverter {
             // Okay if we have made it this far then we are ready to start creating our script.
             let mut script = Cursor::new(vec![]);
             // 1. First the script prefix line.
-            write!(script, "#!/usr/bin/env bash\n")?;
+            writeln!(script, "#!/usr/bin/env bash")?;
             // 2. then some initial setup. for bash hygiene.
-            write!(script, "# Turn on unofficial Bash-Strict-Mode\n")?;
-            write!(script, "set -euo pipefail\n")?;
+            writeln!(script, "# Turn on unofficial Bash-Strict-Mode")?;
+            writeln!(script, "set -euo pipefail")?;
             // 3. Then assign our environment variables
             if let Some(env_list) = env {
-                for &(ref name, ref v) in env_list.iter() {
+                for (name, v) in env_list.iter() {
                     // We only allow string fields in our env tuple.
-                    if let &Val::Str(ref s) = v.as_ref() {
-                        write!(script, "{}=\"{}\"\n", name, convert::shell_escape_double_quoted(s))?;
+                    if let Val::Str(s) = v.as_ref() {
+                        writeln!(script, "{}=\"{}\"", name, convert::shell_escape_double_quoted(s))?;
                         continue;
                     }
                     return Err(BuildError::new(
@@ -139,7 +145,7 @@ impl ExecConverter {
                     .to_boxed());
                 }
             }
-            write!(script, "\n")?;
+            writeln!(script)?;
             let flag_converter = convert::flags::FlagConverter::new();
             // 4. Then construct our command line. (be sure to use exec)
             write!(script, "exec '{}' ", convert::shell_escape_single_quoted(command.unwrap()))?;
@@ -147,7 +153,7 @@ impl ExecConverter {
                 for v in arg_list.iter() {
                     // We only allow tuples or strings in our args list.
                     match v.as_ref() {
-                        &Val::Str(ref s) => {
+                        Val::Str(s) => {
                             write!(script, "'{}' ", convert::shell_escape_single_quoted(s))?;
                         }
                         &Val::Tuple(_) => flag_converter.convert(v.clone(), &mut script)?,

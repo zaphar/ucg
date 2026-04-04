@@ -45,21 +45,21 @@ pub enum ErrorType {
 
 impl fmt::Display for ErrorType {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
-        let name = match self {
-            &ErrorType::TypeFail => "TypeFail",
-            &ErrorType::DuplicateBinding => "DuplicateBinding",
-            &ErrorType::Unsupported => "Unsupported",
-            &ErrorType::NoSuchSymbol => "NoSuchSymbol",
-            &ErrorType::BadArgLen => "BadArgLen",
-            &ErrorType::FormatError => "FormatError",
-            &ErrorType::IncludeError => "IncludeError",
-            &ErrorType::ImportError => "ImportError",
-            &ErrorType::ReservedWordError => "ReservedWordError",
-            &ErrorType::ParseError => "ParseError",
-            &ErrorType::AssertError => "AssertError",
-            &ErrorType::OSError => "OSError",
-            &ErrorType::ConvertError => "ConvertError",
-            &ErrorType::UserDefined => "UserDefined",
+        let name = match *self {
+            ErrorType::TypeFail => "TypeFail",
+            ErrorType::DuplicateBinding => "DuplicateBinding",
+            ErrorType::Unsupported => "Unsupported",
+            ErrorType::NoSuchSymbol => "NoSuchSymbol",
+            ErrorType::BadArgLen => "BadArgLen",
+            ErrorType::FormatError => "FormatError",
+            ErrorType::IncludeError => "IncludeError",
+            ErrorType::ImportError => "ImportError",
+            ErrorType::ReservedWordError => "ReservedWordError",
+            ErrorType::ParseError => "ParseError",
+            ErrorType::AssertError => "AssertError",
+            ErrorType::OSError => "OSError",
+            ErrorType::ConvertError => "ConvertError",
+            ErrorType::UserDefined => "UserDefined",
         };
         w.write_str(name)
     }
