@@ -927,12 +927,12 @@ make_fn!(
         _ => punct!("="),
         val => trace_parse!(wrap_err!(expression, "Expected Expression to bind")),
         _ => punct!(";"),
-        (Statement::Let(LetDef {
+        (Statement::Let(Box::new(LetDef {
             pos,
             name,
             constraint,
             value: val,
-        }))
+        })))
     )
 );
 

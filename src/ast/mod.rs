@@ -1522,7 +1522,7 @@ pub enum Statement {
     Expression(Expression),
 
     // Named bindings
-    Let(LetDef),
+    Let(Box<LetDef>),
 
     // Constraint bindings
     Constraint(ConstraintBindingDef),

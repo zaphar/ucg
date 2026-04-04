@@ -34,7 +34,7 @@ macro_rules! abort_on_end {
 /// Defines the intermediate stages of our bottom up parser for precedence parsing.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Element {
-    Expr(Expression),
+    Expr(Box<Expression>),
     Op(BinaryExprType),
 }
 
@@ -83,7 +83,7 @@ fn parse_expression(i: SliceIter<Element>) -> Result<SliceIter<Element>, Express
     abort_on_end!(i_);
     let el = i_.next();
     if let Some(Element::Expr(expr)) = el {
-        return Result::Complete(i_, expr.clone());
+        return Result::Complete(i_, expr.as_ref().clone());
     }
     Result::Fail(Error::new(
         format!(
@@ -274,7 +274,7 @@ fn parse_operand_list<'a>(i: SliceIter<'a, Token>) -> ParseResult<'a, Vec<Elemen
                 return Result::Incomplete(i);
             }
             Result::Complete(rest, expr) => {
-                list.push(Element::Expr(expr));
+                list.push(Element::Expr(Box::new(expr)));
                 _i = rest.clone();
             }
         }
