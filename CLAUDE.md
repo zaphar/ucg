@@ -19,6 +19,8 @@ cargo test <test_name> # Run a single unit test
 make build             # Debug build
 make buildrelease      # Release build
 cargo fmt              # Format Rust code (required before merge)
+make bench             # Benchmark integration tests (requires release build + hyperfine)
+make fuzz-<target>     # Run a fuzz target: tokenize, parse, or compile (requires nix develop .#fuzz)
 ```
 
 Nix flake provides the dev environment. Uses direnv for shell activation.
