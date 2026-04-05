@@ -13,3 +13,4 @@ unittest.log
 fuzz/target/
 fuzz/artifacts/
 fuzz-*.log
+result
