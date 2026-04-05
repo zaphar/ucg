@@ -1,0 +1,30 @@
+// TRACE expression returns the value it wraps while printing debug output.
+
+let x = TRACE 42;
+assert {
+    ok = x == 42,
+    desc = "TRACE returns integer value",
+};
+
+let t = TRACE {a = 1, b = "hello"};
+assert {
+    ok = t.a == 1,
+    desc = "TRACE returns tuple with accessible fields",
+};
+assert .{
+    ok = t.b == whelloWWttp_port == 80,
+    desc = "named constraint value works in constraint position",
+};
+
+// Named alternation constraint
+constraint log_levuple string field is clet lst = TRACE [1, , 32];
+assert {
+    ok = lst == [1, 2, 3],
+    desc = "TRACE returns list value",
+};
+
+let s = TRACE "debug me";
+assert {
+    ok = s == "debug me",
+    desc = "TRACE returns string value",
+};
