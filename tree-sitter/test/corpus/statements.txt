@@ -1,0 +1,90 @@
+==================
+Let statement
+==================
+
+let x = 42;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (simple_expression (integer))))
+
+==================
+Let with constraint
+==================
+
+let port :: in 1..65535 = 8080;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    (constraint_annotation
+      (constraint_expression
+        (constraint_arm
+          (constraint_range
+            (simple_expression (integer))
+            (simple_expression (integer))))))
+    value: (simple_expression (integer))))
+
+==================
+Assert statement
+==================
+
+assert {
+    ok = true,
+    desc = "it works",
+};
+
+---
+
+(source_file
+  (assert_statement
+    (simple_expression (tuple (field_list
+      (field name: (identifier) value: (simple_expression (boolean)))
+      (field name: (identifier) value: (simple_expression (string (string_content)))))))))
+
+==================
+Constraint statement
+==================
+
+constraint port_range = in 1..65535;
+
+---
+
+(source_file
+  (constraint_statement
+    name: (identifier)
+    value: (constraint_expression
+      (constraint_arm
+        (constraint_range
+          (simple_expression (integer))
+          (simple_expression (integer)))))))
+
+==================
+Out statement
+==================
+
+out json config;
+
+---
+
+(source_file
+  (out_statement
+    converter: (identifier)
+    value: (simple_expression (identifier))))
+
+==================
+Expression statement
+==================
+
+foo;
+
+---
+
+(source_file
+  (expression_statement
+    (simple_expression (identifier))))

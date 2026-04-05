@@ -1,0 +1,142 @@
+==================
+Shape constraint string
+==================
+
+let mystr :: "" = "hello";
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    (constraint_annotation
+      (constraint_expression
+        (constraint_arm (simple_expression (string)))))
+    value: (simple_expression (string (string_content)))))
+
+==================
+Range constraint
+==================
+
+let port :: in 1..65535 = 8080;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    (constraint_annotation
+      (constraint_expression
+        (constraint_arm
+          (constraint_range
+            (simple_expression (integer))
+            (simple_expression (integer))))))
+    value: (simple_expression (integer))))
+
+==================
+Open-ended range lower bound
+==================
+
+let positive :: in 0.. = 42;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    (constraint_annotation
+      (constraint_expression
+        (constraint_arm
+          (constraint_range
+            (simple_expression (integer))))))
+    value: (simple_expression (integer))))
+
+==================
+Open-ended range upper bound
+==================
+
+let small :: in ..100 = 50;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    (constraint_annotation
+      (constraint_expression
+        (constraint_arm
+          (constraint_range
+            (simple_expression (integer))))))
+    value: (simple_expression (integer))))
+
+==================
+Alternation constraint
+==================
+
+let status :: "active" | "inactive" | "pending" = "active";
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    (constraint_annotation
+      (constraint_expression
+        (constraint_arm (simple_expression (string (string_content))))
+        (constraint_arm (simple_expression (string (string_content))))
+        (constraint_arm (simple_expression (string (string_content))))))
+    value: (simple_expression (string (string_content)))))
+
+==================
+Combined range and alternation
+==================
+
+let allowed :: in 1..1024 | 8080 | 8443 = 8080;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    (constraint_annotation
+      (constraint_expression
+        (constraint_arm
+          (constraint_range
+            (simple_expression (integer))
+            (simple_expression (integer))))
+        (constraint_arm (simple_expression (integer)))
+        (constraint_arm (simple_expression (integer)))))
+    value: (simple_expression (integer))))
+
+==================
+Named constraint
+==================
+
+constraint port_range = in 1..65535;
+
+---
+
+(source_file
+  (constraint_statement
+    name: (identifier)
+    value: (constraint_expression
+      (constraint_arm
+        (constraint_range
+          (simple_expression (integer))
+          (simple_expression (integer)))))))
+
+==================
+Named constraint reference
+==================
+
+let port :: port_range = 80;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    (constraint_annotation
+      (constraint_expression
+        (constraint_arm (simple_expression (identifier)))))
+    value: (simple_expression (integer))))

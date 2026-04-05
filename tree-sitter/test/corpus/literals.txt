@@ -1,0 +1,158 @@
+==================
+Integer literal
+==================
+
+let x = 42;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (simple_expression (integer))))
+
+==================
+Float literal
+==================
+
+let x = 3.14;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (simple_expression (float))))
+
+==================
+String literal
+==================
+
+let x = "hello world";
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (simple_expression (string (string_content)))))
+
+==================
+String with escape sequences
+==================
+
+let x = "hello\nworld\"foo\\bar";
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (simple_expression (string
+      (string_content)
+      (escape_sequence)
+      (string_content)
+      (escape_sequence)
+      (string_content)
+      (escape_sequence)
+      (string_content)))))
+
+==================
+Boolean literals
+==================
+
+let t = true;
+let f = false;
+
+---
+
+(source_file
+  (let_statement name: (identifier) value: (simple_expression (boolean)))
+  (let_statement name: (identifier) value: (simple_expression (boolean))))
+
+==================
+NULL literal
+==================
+
+let x = NULL;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (simple_expression (null))))
+
+==================
+Empty tuple
+==================
+
+let x = {};
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (simple_expression (tuple))))
+
+==================
+Tuple with fields
+==================
+
+let x = {
+    foo = "bar",
+    baz = 42,
+};
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (simple_expression (tuple (field_list
+      (field name: (identifier) value: (simple_expression (string (string_content))))
+      (field name: (identifier) value: (simple_expression (integer))))))))
+
+==================
+Tuple with quoted field name
+==================
+
+let x = {"field 1" = 1};
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (simple_expression (tuple (field_list
+      (field name: (string (string_content)) value: (simple_expression (integer))))))))
+
+==================
+Empty list
+==================
+
+let x = [];
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (simple_expression (list))))
+
+==================
+List with elements
+==================
+
+let x = [1, 2, 3];
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (simple_expression (list
+      (simple_expression (integer))
+      (simple_expression (integer))
+      (simple_expression (integer))))))

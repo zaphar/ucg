@@ -1,0 +1,181 @@
+==================
+Grouped expression
+==================
+
+let x = (a + b);
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (grouped_expression
+      (binary_expression
+        left: (simple_expression (identifier))
+        right: (simple_expression (identifier))))))
+
+==================
+Import expression
+==================
+
+let t = import "std/testing.ucg";
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (import_expression
+      path: (string (string_content)))))
+
+==================
+Include expression
+==================
+
+let script = include str "./example.sh";
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (include_expression
+      type: (include_type)
+      path: (string (string_content)))))
+
+==================
+Fail expression
+==================
+
+let x = fail "error message";
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (fail_expression
+      (simple_expression (string (string_content))))))
+
+==================
+TRACE expression
+==================
+
+let x = TRACE foo;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (trace_expression
+      (simple_expression (identifier)))))
+
+==================
+Format expression
+==================
+
+let x = "hello @" % ("world");
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (format_expression
+      template: (string (string_content))
+      args: (format_args
+        (simple_expression (string (string_content)))))))
+
+==================
+Range expression
+==================
+
+let x = 1:5;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (range_expression
+      start: (simple_expression (integer))
+      end: (simple_expression (integer)))))
+
+==================
+Range expression with step
+==================
+
+let x = 0:2:6;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (range_expression
+      start: (simple_expression (integer))
+      step: (simple_expression (integer))
+      end: (simple_expression (integer)))))
+
+==================
+Cast expression
+==================
+
+let x = int(y);
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (call_expression
+      function: (identifier)
+      (simple_expression (identifier)))))
+
+==================
+Call expression
+==================
+
+let x = foo(1, 2);
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (call_expression
+      function: (identifier)
+      (simple_expression (integer))
+      (simple_expression (integer)))))
+
+==================
+Copy expression
+==================
+
+let x = base{field = 1};
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (copy_expression
+      base: (simple_expression (identifier))
+      (field_list
+        (field name: (identifier) value: (simple_expression (integer)))))))
+
+==================
+Comment
+==================
+
+// this is a comment
+let x = 1;
+
+---
+
+(source_file
+  (comment)
+  (let_statement
+    name: (identifier)
+    value: (simple_expression (integer))))

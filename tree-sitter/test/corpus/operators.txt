@@ -1,0 +1,168 @@
+==================
+Addition
+==================
+
+let x = a + b;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (binary_expression
+      left: (simple_expression (identifier))
+      right: (simple_expression (identifier)))))
+
+==================
+Dot selector
+==================
+
+let x = foo.bar;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (binary_expression
+      left: (simple_expression (identifier))
+      right: (simple_expression (identifier)))))
+
+==================
+Chained dot selector
+==================
+
+let x = foo.bar.baz;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (binary_expression
+      left: (binary_expression
+        left: (simple_expression (identifier))
+        right: (simple_expression (identifier)))
+      right: (simple_expression (identifier)))))
+
+==================
+Comparison operators
+==================
+
+let x = a == b;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (binary_expression
+      left: (simple_expression (identifier))
+      right: (simple_expression (identifier)))))
+
+==================
+Regex match
+==================
+
+let x = a ~ b;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (binary_expression
+      left: (simple_expression (identifier))
+      right: (simple_expression (identifier)))))
+
+==================
+Boolean operators
+==================
+
+let x = a && b || c;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (binary_expression
+      left: (binary_expression
+        left: (simple_expression (identifier))
+        right: (simple_expression (identifier)))
+      right: (simple_expression (identifier)))))
+
+==================
+Modulo operator
+==================
+
+let x = a %% b;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (binary_expression
+      left: (simple_expression (identifier))
+      right: (simple_expression (identifier)))))
+
+==================
+In operator
+==================
+
+let x = a in b;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (binary_expression
+      left: (simple_expression (identifier))
+      right: (simple_expression (identifier)))))
+
+==================
+Is operator
+==================
+
+let x = a is b;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (binary_expression
+      left: (simple_expression (identifier))
+      right: (simple_expression (identifier)))))
+
+==================
+Math precedence: multiply binds tighter than add
+==================
+
+let x = a + b * c;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (binary_expression
+      left: (simple_expression (identifier))
+      right: (binary_expression
+        left: (simple_expression (identifier))
+        right: (simple_expression (identifier))))))
+
+==================
+Not expression
+==================
+
+let x = not true;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (not_expression (simple_expression (boolean)))))

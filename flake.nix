@@ -43,7 +43,7 @@
             program = "${ucg}/bin/ucg";
         };
         devShells.default = craneLib.devShell {
-          packages = with pkgs; [ gnumake rust-analyzer cargo-tarpaulin zola jq];
+          packages = with pkgs; [ gnumake rust-analyzer cargo-tarpaulin zola jq tree-sitter nodejs];
         };
         devShells.fuzz = pkgs.mkShell {
           buildInputs = [ rust-nightly pkgs.cargo-fuzz pkgs.gnumake ];
