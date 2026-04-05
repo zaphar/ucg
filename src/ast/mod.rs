@@ -524,6 +524,28 @@ impl Shape {
     }
 
     pub fn narrow(&self, right: &Shape, symbol_table: &mut BTreeMap<Rc<str>, Shape>) -> Self {
+        let mut seen = Vec::new();
+        self.narrow_cached(right, symbol_table, &mut seen)
+    }
+
+    /// Narrowing with memoization for recursive constraint expansion.
+    ///
+    /// The `seen` cache stores `(constraint_name, other_shape)` pairs that
+    /// have already been checked. When a recursive constraint like:
+    ///
+    ///   constraint xml_node = "" | {name="", children=[xml_node]};
+    ///
+    /// is narrowed against nested data, each nesting level re-expands the
+    /// same constraint against structurally identical shapes. Without the
+    /// cache this gives O(N^depth) calls. With it, each unique
+    /// (constraint, shape) pair is computed once — the second encounter
+    /// returns the cached result, collapsing the cost to O(depth).
+    fn narrow_cached(
+        &self,
+        right: &Shape,
+        symbol_table: &mut BTreeMap<Rc<str>, Shape>,
+        seen: &mut Vec<(Rc<str>, Shape, Shape)>,
+    ) -> Self {
         match (self, right) {
             // Propagate TypeErr
             (Shape::TypeErr(_, _), _) => self.clone(),
@@ -534,8 +556,15 @@ impl Shape {
             {
                 self.clone()
             }
-            // ConstraintRef: expand and re-narrow
+            // ConstraintRef: expand and re-narrow, with memoization
             (Shape::ConstraintRef(cref), other) | (other, Shape::ConstraintRef(cref)) => {
+                // Check the cache: have we already narrowed this constraint
+                // against this shape?
+                if let Some(cached) = seen.iter().find(|(name, shape, _)| {
+                    *name == cref.val && shape == other
+                }) {
+                    return cached.2.clone();
+                }
                 if let Some(expanded) = symbol_table.get(&cref.val).cloned() {
                     // If expansion is still a ConstraintRef with the same name,
                     // we've hit a cycle — treat as compatible.
@@ -544,7 +573,9 @@ impl Shape {
                             return other.clone();
                         }
                     }
-                    other.narrow(&expanded, symbol_table)
+                    let result = other.narrow_cached(&expanded, symbol_table, seen);
+                    seen.push((cref.val.clone(), other.clone(), result.clone()));
+                    result
                 } else {
                     Shape::TypeErr(
                         cref.pos.clone(),
@@ -604,7 +635,7 @@ impl Shape {
                 let compatible: Vec<Shape> = types
                     .iter()
                     .filter(|t| {
-                        let result = t.narrow(other, symbol_table);
+                        let result = t.narrow_cached(other, symbol_table, seen);
                         !matches!(result, Shape::TypeErr(_, _))
                     })
                     .cloned()
@@ -631,7 +662,7 @@ impl Shape {
                 let compatible: Vec<Shape> = types
                     .iter()
                     .filter(|t| {
-                        let result = other.narrow(t, symbol_table);
+                        let result = other.narrow_cached(t, symbol_table, seen);
                         !matches!(result, Shape::TypeErr(_, _))
                     })
                     .cloned()
@@ -649,10 +680,10 @@ impl Shape {
                 }
             }
             (Shape::List(left_slist), Shape::List(right_slist)) => {
-                self.narrow_list_shapes(left_slist, right_slist, right, symbol_table)
+                self.narrow_list_shapes_cached(left_slist, right_slist, right, symbol_table, seen)
             }
             (Shape::Tuple(left_slist), Shape::Tuple(right_slist)) => {
-                self.narrow_tuple_shapes(left_slist, right_slist, right, symbol_table)
+                self.narrow_tuple_shapes_cached(left_slist, right_slist, right, symbol_table, seen)
             }
             (Shape::Func(left_opshape), Shape::Func(right_opshape)) => {
                 if left_opshape.args.len() != right_opshape.args.len() {
@@ -675,7 +706,7 @@ impl Shape {
                         left_opshape.args.get(left_name),
                         right_opshape.args.get(right_name),
                     ) {
-                        let narrowed = ls.narrow(rs, symbol_table);
+                        let narrowed = ls.narrow_cached(rs, symbol_table, seen);
                         if let Shape::TypeErr(_, _) = narrowed {
                             return Shape::TypeErr(
                                 right.pos().clone(),
@@ -684,7 +715,7 @@ impl Shape {
                         }
                     }
                 }
-                let ret_narrowed = left_opshape.ret.narrow(&right_opshape.ret, symbol_table);
+                let ret_narrowed = left_opshape.ret.narrow_cached(&right_opshape.ret, symbol_table, seen);
                 if let Shape::TypeErr(_, _) = ret_narrowed {
                     return Shape::TypeErr(
                         right.pos().clone(),
@@ -699,7 +730,7 @@ impl Shape {
                     let mut found = false;
                     for (rt, rs) in right_opshape.items.iter() {
                         if lt.val == rt.val {
-                            let narrowed = ls.narrow(rs, symbol_table);
+                            let narrowed = ls.narrow_cached(rs, symbol_table, seen);
                             if let Shape::TypeErr(_, _) = narrowed {
                                 return Shape::TypeErr(
                                     right.pos().clone(),
@@ -718,7 +749,7 @@ impl Shape {
                     }
                 }
                 // Narrow return types
-                let ret_narrowed = left_opshape.ret.narrow(&right_opshape.ret, symbol_table);
+                let ret_narrowed = left_opshape.ret.narrow_cached(&right_opshape.ret, symbol_table, seen);
                 if let Shape::TypeErr(_, _) = ret_narrowed {
                     return Shape::TypeErr(
                         right.pos().clone(),
@@ -738,30 +769,32 @@ impl Shape {
         }
     }
 
-    fn narrow_tuple_shapes(
+    fn narrow_tuple_shapes_cached(
         &self,
         left_slist: &PositionedItem<TupleShape>,
         right_slist: &PositionedItem<TupleShape>,
         right: &Shape,
         symbol_table: &mut BTreeMap<Rc<str>, Shape>,
+        seen: &mut Vec<(Rc<str>, Shape, Shape)>,
     ) -> Shape {
         let left_iter = left_slist.val.iter();
         let right_iter = right_slist.val.iter();
-        if is_tuple_subset(left_iter, right_slist, symbol_table) {
+        if is_tuple_subset_cached(left_iter, right_slist, symbol_table, seen) {
             self.clone()
-        } else if is_tuple_subset(right_iter, left_slist, symbol_table) {
+        } else if is_tuple_subset_cached(right_iter, left_slist, symbol_table, seen) {
             right.clone()
         } else {
             Shape::TypeErr(right.pos().clone(), "Incompatible Tuple Shapes".to_owned())
         }
     }
 
-    fn narrow_list_shapes(
+    fn narrow_list_shapes_cached(
         &self,
         left_slist: &NarrowedShape,
         right_slist: &NarrowedShape,
         right: &Shape,
         symbol_table: &mut BTreeMap<Rc<str>, Shape>,
+        seen: &mut Vec<(Rc<str>, Shape, Shape)>,
     ) -> Shape {
         match (&left_slist.types, &right_slist.types) {
             (
@@ -770,9 +803,9 @@ impl Shape {
             ) => {
                 let left_iter = left_types.iter();
                 let right_iter = right_types.iter();
-                if is_list_subset(left_iter, right_slist, symbol_table) {
+                if is_list_subset_cached(left_iter, right_slist, symbol_table, seen) {
                     self.clone()
-                } else if is_list_subset(right_iter, left_slist, symbol_table) {
+                } else if is_list_subset_cached(right_iter, left_slist, symbol_table, seen) {
                     right.clone()
                 } else {
                     Shape::TypeErr(right.pos().clone(), "Incompatible List Shapes".to_owned())
@@ -855,17 +888,18 @@ impl Shape {
     }
 }
 
-fn is_tuple_subset(
+fn is_tuple_subset_cached(
     mut left_iter: std::slice::Iter<(PositionedItem<Rc<str>>, Shape)>,
     right_slist: &PositionedItem<TupleShape>,
     symbol_table: &mut BTreeMap<Rc<str>, Shape>,
+    seen: &mut Vec<(Rc<str>, Shape, Shape)>,
 ) -> bool {
     loop {
         if let Some((lt, ls)) = left_iter.next() {
             let mut matched = false;
             for (rt, rs) in right_slist.val.iter() {
                 if rt.val == lt.val {
-                    if let Shape::TypeErr(_, _) = ls.narrow(rs, symbol_table) {
+                    if let Shape::TypeErr(_, _) = ls.narrow_cached(rs, symbol_table, seen) {
                         // noop
                     } else {
                         matched = true;
@@ -883,10 +917,11 @@ fn is_tuple_subset(
     }
 }
 
-fn is_list_subset(
+fn is_list_subset_cached(
     mut right_iter: std::slice::Iter<Shape>,
     left_slist: &NarrowedShape,
     symbol_table: &mut BTreeMap<Rc<str>, Shape>,
+    seen: &mut Vec<(Rc<str>, Shape, Shape)>,
 ) -> bool {
     let left_slist = match &left_slist.types {
         NarrowingShape::Any => return true,
@@ -900,7 +935,7 @@ fn is_list_subset(
             break true;
         };
         for rs in left_slist.iter() {
-            let s = ls.narrow(rs, symbol_table);
+            let s = ls.narrow_cached(rs, symbol_table, seen);
             if let Shape::TypeErr(_, _) = s {
                 // noop
             } else {
