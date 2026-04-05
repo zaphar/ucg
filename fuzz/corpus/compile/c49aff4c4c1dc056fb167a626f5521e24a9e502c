@@ -1,0 +1,50 @@
+let noargmacro = func () => {
+    field1 = "value",
+};
+
+let simplemacro = func (arg1, arg2, arg3) => {
+    field1 = arg1,
+    field2 = arg2,
+    field3 = arg3,
+};
+
+let cplxmacro = func (argint, argstr, argfloat) => {
+    field1 = argint + 1,
+    field2 = argstr + " are here",
+    field3 = argfloat - 1.0,
+    boolfield = argint == 1,
+};
+
+let noargresult = noargmacro();
+let simpleresult = simplemacro(1, 2, 3);
+let cplxresult = cplxmacro(1, "We", 3.0);
+
+assert {
+    ok = noargresult.field1 == "value",
+    desc = "noargresult.field1 == \"value\"",
+};
+assert {
+    ok = simpleresult.field1 == 1,
+    desc = "simpleresult.field1 == 1",
+};
+assert {
+    ok = simpleresult.field2 == 2,
+    desc = "simpleresult.field2 == 2",
+};
+assert {
+    ok = simpleresult.field3 == 3,
+    desc = "simpleresult.field3 == 3",
+};
+
+assert {
+    ok = cplxresult.field1 == 2,
+    desc = "cplxresult.field1 == 2",
+};
+assert {
+    ok = cplxresult.field2 == "We are here",
+    desc = "cplxresult.field2 == \"We are here\"",
+};
+assert {
+    ok = cat("foo", "bar") == "foobar",
+    desc = "macros that aren't tuples work",
+};

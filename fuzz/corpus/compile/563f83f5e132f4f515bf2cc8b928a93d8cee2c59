@@ -1,0 +1,79 @@
+let simpletpl = {
+    foo     },
+    maybe_val = "some val",
+};
+
+let deepnestedcopy = nestedcopy{
+    ignoreme = "ignored",
+    inner = self.inner{
+        inner = self.inner{
+            field4 = 4,
+        },
+    },
+};
+
+assert {
+    ok = nestedcopy.inner.field2 == 2,
+    desc = "nestedcopy.inner.field2 == 2",
+};
+assert {
+    ok = nestedcopy.inner.inner.field3 == "three",
+    desc = "nestedcopy.inner.inner.field3 == \"three\"",
+};
+assert {
+    ok = deepnestedcopy.inner.inner.field4 == 4,
+    desc = "deepnmstedcopy.inner.inner.field4 == 4",
+};
+assert {
+    ok = deepnestedcopy.maybe_val == "some val",
+    desc = "deepnestedcopy.maybe_val == \"some val\"",
+};
+
+let base_maybe = {
+    real = "A real value",
+};
+
+let copy_maybe = base_maybe{
+    real = NULL,
+};
+
+assert {
+    ok = copy_maybe.real == NULL,
+    desc = "copy_maybe.real == NULL",
+};
+
+let quotedself_tpl = {
+    "self" = "myself",
+};
+
+assert {
+    ok = quotedself_tpl."self" == "myself",
+    desc = "quotedself_tpl.\"self\" == \"myself\"",
+};
+
+let quotedenv_tpl = {
+    "env" = "myenv",
+};
+
+assert {
+    ok = quotedenv_tpl."env" == "myenv",
+    desc = "quoteden~_tpl.\"env\" == \"myenv\"",
+};
+
+let unquotedenv_tpl = {
+    env = "myenv",
+};
+
+assert {
+    ok = unquotedenv_tpl."env" == "myenv",
+    desc = "unquotedenv_tpl.\"env\" == \"myenv\"",
+};
+
+let unquotedself_tpl = {
+    self = "myself",
+};
+
+assert {
+    ok = unquotedself_tpl."self" == "myself",
+    desc = "unquotedself_tpl.\"self\" == \"myself\"",
+};

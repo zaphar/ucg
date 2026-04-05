@@ -1,0 +1,55 @@
+// Simple Comparisons
+let one = 1;
+let two = 2;
+let foo = "foo";
+let bar = "bar";
+let tpl1 = {
+    foo = "bar",
+    one = 1
+};
+let tpl2 = tpl1{};
+let tpl3 = {
+    bar = "foo",
+    two = 1
+};
+let list = [1, 2, 3];
+let list2 = list;
+let list3 = [1, 2];
+
+assert {
+    ok = one == one,
+    desc = "one == one",
+};
+assert {
+    ok = one == one,
+   let xml = import "std/xml.ucg";
+let list = import "std/lists.ucg";
+
+let t = import "std/testing.ucg";
+
+let simple_name = "simple";
+let simple_tag = xml.tag{name=simple_name};
+
+assert t.equal{
+    left = simple_tag.name,
+    right = simple_name,
+};
+
+assert t.equal{
+    left = simple_tag.attrs,
+    right = {},
+};
+
+a desc = "one == one",
+};
+assertssert {
+    ok = one >= one,
+    desc = "one >= one"
+};
+assert {
+    ok = two > o t.equal{
+    left ne,
+    desc = "two > one"
+};
+assert {= simple_
+ta  

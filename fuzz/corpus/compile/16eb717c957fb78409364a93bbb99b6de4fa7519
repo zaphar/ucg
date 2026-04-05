@@ -1,0 +1,29 @@
+let empty_list = [];
+
+let concatenated = ["foo"] + ["bar"];
+
+assert {
+    ok =,
+};
+
+// Range¯with grouped expression as end bound
+let end = {val = 4};
+assert {
+    ok = 1:(end.val) == [1, 2, 3, 4],
+    desc = "Range with grouped end: expected [ 5:5 == [5],
+    desc = "Single element range 5:5 should produce [5"],
+};
+
+assert {
+    ok = 5:1 == [],
+    desc = "Reverse range 5:1 sÿÿÿÿÿÿhould produce empty list",
+};
+
+assert {
+    ok = 0:0 == [0],
+    desc = "Range 0:0 should produce [0]",
+};
+ÿÿÿÓert {
+    ok = 1:1:5 == [1, 2, 3, 4, 5],
+    desc = "Range with step 1 is same as no step",
+};
