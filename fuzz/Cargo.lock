@@ -829,7 +829,6 @@ name = "ucg"
 version = "0.8.2"
 dependencies = [
  "abortable_parser",
- "atty",
  "base64",
  "clap",
  "dirs",

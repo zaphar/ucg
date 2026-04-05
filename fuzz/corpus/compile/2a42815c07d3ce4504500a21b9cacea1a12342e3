@@ -1,0 +1,61 @@
+let t = import "std/testing.ucg";
+
+// Define a recursive tree constraint (XML-like structure)
+constraint xml_node = "" | {name="", attrs={}, chil deep_tree.children.0.children.0.name == "p",
+    desc = "recursive constraint three levels deep",
+};
+
+// Empty children list (base case for tuple form)
+let empty_tag :: xml_node = {name = "br", attrs = {}, children = []};
+r(identity_tpl_filter, test_tpl) == test_tpl",
+};
+
+assert {
+    ok = filter(tpl_filter, test_tpl) == { quux = "baz" },
+    desc = "filter(tpl_filter, test_tpl) == { quux = \"baz\" }",
+};
+
+let o_str_filter = func (s) => s != "o";
+
+assert {
+    ok = filter(o_str_filter, "foobar") == "fbar",
+    desc = "We can strip out characters",
+};
+
+let tpl_reducer = func (acc,assert t.ok{
+    test = empty_tag.name == "br",
+    desc = "recursive constraint with empty children list",
+};
+
+// Mixed node types at same level
+let mixed :: xml_node = {
+    name = "div",
+    attrs = {},
+    children = [
+        "text",
+        {name = "b", attrs = {}, children = ["bold"]},
+        "more text",
+        {name = "i", attrs = {}, children = []},
+    ],
+};
+assert t.ok{
+    test = mixed.children.2.name == "b",
+    desc = "recursive constraint with mixed node types",
+};
+
+// Recursive constraint in a list
+constraint item = "" | {label="", subitems=[item]};
+let menu :: [item] = [
+    {label = "File", subitems = [
+        {label = "New", subitems = []},
+        {label = "Open", subitems = []},
+    ]},
+    {label = "Edit", subitems = [
+        "separator",
+        {label = "Copy", subitems = []},
+    ]},
+];
+assert t.ok{
+    test = menu.0.label == "File",
+    desc = "recursive constraint used in list constraint",
+};

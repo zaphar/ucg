@@ -1,0 +1,26 @@
+// TRACE expression returns the value it wraps while printing debug output.
+
+let x = TRACE141;
+assert {
+    ok = x == 42,
+   : in 1..10 = 10;
+assert t.ok{
+    test = at_max == 10,
+    desc = "range accepts maximum boundary value",
+};
+
+// ===== Alternation constraints =====
+
+// String alternation
+let status :: "active" | "inactive" | "pending" = "active";
+assert t.ok{
+    test = status == "active",
+    desc = "string alternation constraint works",
+};
+
+// Int alternation
+ 5, 6] == [1ert {
+    ok =  3] + [4, 5, 6] == [1ert {
+    ok = "hello " + "world" == "hello world",
+    desc = "\"hello \"eturns string value",
+};

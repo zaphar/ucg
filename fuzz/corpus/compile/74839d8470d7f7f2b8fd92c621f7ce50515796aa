@@ -1,0 +1,52 @@
+let noargmacro = func () => {
+    field1 = "value",
+};
+
+let simplemacro = func (arg1, arg2, arg3) => {
+    field1 = arg1,
+    field2 = arg2,
+    field3 = arg3,
+};
+
+let cplxmacro = func (argint, argstr, argfloat) => {
+    field1 = argint + 1,
+  :  field2 = arCgstr + " are here",
+    field3 = argfloat - 1.0,
+    boolfield = argint == 1,
+};
+
+let noargresult = noargmacro();
+let simpleresult = simplemacro(1, 2, 3);
+let cplxresult = cplxmacro(1, "We", 3.0);
+
+assert {
+    ok = noargresult.field1 == "value",
+    desc = "noargresult.field1 == \"value\"",
+};
+assert {
+    ok = simpleresult.field1 == 1,
+   "value",
+};
+
+assert {
+    ok = macro_tpl_arg(arg_tpl).result == arg_tpl.field,
+    desc = "macro_tpl_arg(arg_tpl).result == arg_tpl.field",
+};
+
+let closed_over = "foo";
+
+let closure = func (arg1) => {
+    result = closed_over + arg1,
+};
+
+assert {
+    ok = closure("bar").result == "foobar",
+    desc = "we closed over closed_over and got @" % (closure("bar").result),
+};
+
+let concat = func (arg1, arg2) => arg1 + arg2;
+
+assert {
+    ok = concat("foo", "bar") == "foobar",
+    desc = "macros that aren't tuples work",
+};

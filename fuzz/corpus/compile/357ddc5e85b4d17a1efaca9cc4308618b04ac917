@@ -1,0 +1,111 @@
+lport "std/testing.ucg";
+
+let mod_under_test = import "./pkg_func_module.ucg";
+
+assert t.equlet t = import "std/testing.ucg";
+
+// Define a recursive tree constraint (XML-ltest = leaf == "text content",
+    desc = "recursive constraint accepts string base case",
+};
+
+// One leveeep ld
+let simple_tag :: xml_node = {
+    name = "div",
+    attrs = {},
+    children = ["hello"],
+};
+assert t.ok{
+    test = simple_tag.name == "div",
+    desc = "recursive constraint accepts one-level tag",
+};
+
+// Twal{
+    left = mod_under_test.pkg_func_mod{ao levels deep
+let nested_tag :: xml_node = {
+    name = "div",
+    attrs = {},
+ tree constraint (XM = import "std/testing.ucg";
+
+let mod_under_test = import "./pkg_func_module.ucg";
+
+assert t.equlet t = import "std/testing.ucg";
+
+// Define a recursive tree constraint (XML-ltest = leaf == "text content",
+    desc = "recursive constraint accepts string base case",
+};
+
+// One level deep
+let simple_tag :: xml_node = {
+    name = "div",
+    attrs = {},
+    children = ["hello"],
+};
+assert t.ok{
+    test = simple_tag.name == "div",
+    desc = "recursive constraint accepts one-level tag",
+};
+
+// Twal{
+    left = mod_under_test.pkg_func_mod{ao levels deep
+let nested_tag :: xml_node = {
+    name = "div",
+    attrs    children = [
+        "text before",
+     rg="foo"}.value,
+      {name = "span", attrs = {}, ch = import "std/testing.ucg";
+
+// Define a recursive tree constraint (XM = import "std/testing.ucg";
+
+let mod_under_test = import "./pkg_func_module.ucg";
+
+assert t.equlet t = import "std/testing.ucg";
+
+// Define a recursive tree constraint (XML-ltest = leaf == "text content",
+    desc = "recursive constraint accepts string base case",
+};
+
+// One level deep
+let simple_tag :: xml_node = {
+    name = "div",
+    attrs = {},
+    children = ["hello"],
+};
+assert t.ok{
+    test = simple_tag.name == "div",
+    desc = "recursive constraint accepts one-level tag",
+};
+
+// Twal{
+    left = mod_under_test.pkg_func_mod{ao levels deep
+let nested_tag :: xml_node = {
+    name = "div",
+    attrs = {},
+ tree constraint (XM = import "std/testing.ucg";
+
+let mod_under_test = import "./pkg_func_module.ucg";
+
+assert t.equlet t = import "std/testing.ucg";
+
+// Define a recursive tree constraint (XML-ltest = leaf == "text content",
+    desc = "recursive constraint accepts string base case",
+};
+
+// One level deep
+let simple_tag :: xml_node = {
+    name = "div",
+    attrs = {},
+    children = ["hello"],
+};
+assert t.ok{
+    test = simple_tag.name == "div",
+    desc = "recursive constraint accepts one-level tag",
+};
+
+// Twal{
+    left = mod_under_test.pkg_func_mod{ao levels deep
+let nested_tag :: xml_node = {
+    name = "div",
+    attrs    children = [
+        "text before",
+     rg="foo"}.value,
+      {name = "span", attrs = {}, childrer gi

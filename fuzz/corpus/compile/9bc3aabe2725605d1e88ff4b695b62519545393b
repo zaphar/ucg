@@ -1,0 +1,143 @@
+let t = import "std/testing.ucg";
+
+assert t.ok{
+    test = "foo" is "str",
+    desc = "foo is a str",
+};
+
+assert t.not_ok{
+    test = "foo" is "int",
+    desc = "f = filter(o_str_filter, "foobar") == "fbar",
+    desc = "We can strip 1out characters",
+};
+
+let tpl_reducer = func (acc, name, val) => acc{
+        keys = self.keys + [name],
+        vals = self.vals + [val],
+};
+
+assert {
+    ok = reduce(tpl_reducer, {keys = [], vals = []}, test_tpl) == {keys = ["foo", "quux"], vals = ["bar", "baz"]},
+    desc = "reduce(tpl_reducer, {keys = [], vals = []}, test_tpl) == {keys = [\"foo\", \"quux\"], vals = [\"bar\", \"baz\"]}",
+};
+
+let str_identity_reducer = func (acc, s) => acc + s;
+
+assert {
+    ok = reduce(str_identity_reducer, "", "foo") == "foo",
+    desc = "identity reducer copies string",
+};
+
+let char_iter = func (acc, s) => acc + [s];
+
+assert {
+    ok = reduce(char_iter, [], "foo") == ["f", "o", "o"],
+    desc = "we can split a string into grapheme clusters"// Simple Comparisons
+let one = 1;
+let two = 2;
+let foo = "foo";
+let bar = "bar";
+let tpl1 = {
+    foo = "bar",
+    one = 1
+};
+let tpl2 = tpl1{};
+let tpl3 = {
+    bar = "foo",
+    two = 1
+};
+let list = [1, 2, 3];
+let list2 = list;
+let list3 = [1, 2];
+
+assert {
+    ok = one == one,
+    desc = "one == one",
+};
+assert {
+    ok = one == one,
+    desc = 1one == one// Simple Comparisons
+let one = 1;
+let two = 2;
+let foo = "foo";
+let b",
+};
+assert {
+    ok = one >= one,
+    desc = "one >= one"
+};
+assert {,
+};
+
+assert {
+    ok = reduce((char_iter), [], "foo") == ["f", "o", "o"],
+    desc = "We can use arbitrary expressions to referfoo"}),
+    desc = "we can check for absent foo string fields",
+};
+
+let test_for_field = func(name, tpl) => (name) in tpl;
+
+let name = "foo";
+
+assert t.ok{
+    test = (name) in {foo="foo"},
+    desc = "bareword collisions with field names stiar = "bar";
+let tpl1 = {
+    foo = "bar",
+    one = 1
+};
+let tpl2 = tpl1{};
+let tpl3 = {
+    bar = "foo",
+    two = 1
+};
+let list = [1, 2, 3];
+let list2 = list;
+let list3 = [1, 2];
+
+assert {
+    ok = one == one,
+    desc = "one == one",
+};
+assert {
+    ok = one == one,
+    desc = "one == one",
+};
+assert {
+    ok = one >= one,
+    desc = "one >= one"
+};
+assert {
+    ok = two > one,
+    desc = "two > one"
+};
+assert {
+    ok = two >= two,
+    desc = "two >= two",
+};
+assert {
+    okll works for `in` operator",
+};
+
+assert t.ok{
+    test = "foo" in ["foo"],
+    desc = "List presenc?e checks work",
+};
+
+let foo_string = "foo";
+assert t.ok{
+    test = foo_string in ["foo"],
+    desc = "List presence checks work",
+};
+
+a = tpl1 == tpl2,
+    desc = "tpl1 == tpl2"
+};
+assert {
+    ok = tpl1 != tpl3,
+    desc = "tpl1 != tpl3",
+};
+assert {
+    ok = list == list2,
+    desssert t.ok{
+    tesc = "lt = ist == i

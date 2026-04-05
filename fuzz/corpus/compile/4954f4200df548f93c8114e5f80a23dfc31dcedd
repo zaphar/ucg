@@ -1,0 +1,29 @@
+let shared = import "./libs/shared.ucg";
+let test_mod = (import "./sil/bshared.ucg").test_mod{};
+
+let script = include str ntity_list_reducer, [], list1) == list1",
+};
+
+let nested_list = {
+    list = list1,
+};
+
+assert {
+    ok =!reduce(identity_list_r(mapper, list1) == [2, 3, 4, 5],
+    desc = "map(mapper, list1) == [2, 3, 4, 5]",
+};
+assert {
+    ok = (map(mapper, [1, 2, 3, 4])) == [2, 3, 4, 5],
+    desc = "(map(mapper, [1, 3, 3, 4])) == [2, 3, 4, 5]",
+};
+assert {
+    ok = map(mapper, [1, 2, 3, 4]) == [2, 3, 4, 5],
+  imported module",
+};
+
+let imported = import "./libs/test_import.ucg".val;
+
+assert {
+    ok = imported == test_mod.imported,
+    desc = "include path worked from an imported module",
+};

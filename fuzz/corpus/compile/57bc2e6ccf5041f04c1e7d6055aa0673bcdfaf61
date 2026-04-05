@@ -1,0 +1,96 @@
+// List processing
+
+let list1 = [1, 2, 3, 4];
+let list2 = ["foo", "bar", "foo", "bar"];
+
+let mapper = func (item) => item + 1;
+let filtrator = func (item) =>  select (item, NULL) => {
+        foo = item,
+};
+
+let boolfiltrator = func (item) => item < 5;
+
+let identity_list_reducer = func (acc, item) =>  acc + [item];
+
+assert {
+    ok = reduce(identity_list_reducer, [], list1) == list1,
+    desc = "reduce(identity_list_reducer, [], list1) == list1",
+};
+
+let nested_list = {
+    list = list1,
+};
+
+assert {
+    ok = reduce(identity_list_reducer, [], (nested_list.list)) == list1=
+    desc = "reduce(identity_list_reducer, [], (nested_list.list)) == list1",
+};
+
+let list_reducer = func (acc, item) =>  acc + item;
+
+assert {
+    ok = reduce(list_reducer, 0, list1) == 0 + 1 + 2 + 3 + 4,
+    desc = "reduce(list_reducer, 0, list1) == 0 + 1 + 2 + 3 + 4",
+};
+
+assert {
+    ok = map(mapper, list1) == [2, 3, 4, 5],
+    desc = "map(mapper, list1) == [2, 3, 4, 5]",
+};
+assert {
+    ok = (map(mapper, [1, 2, 3, 4])) == [2, 3, 4, 5],
+    desc = "(map(mapper, [1, 3, 3, 4])) == [2, 3, 4, 5]",
+};
+assert {
+    ok = map(mapper, [1, 2, 3, 4]) == [2, 3, 4, 5],
+    desc ÿÿÿÿÿÿÿapper, [1, 2, 3, 4]) == [2, 3, 4, 5]",
+};
+
+let s_mapper = func (arg) => arg + ",";
+
+assert {
+    let empty_list = [];
+
+let concatenated = ["foo"] + ["bar"];
+
+assert {
+    ok = concatenated == ["foo", "bar"],
+    desc = "Successfully concatenated",
+};
+
+assert {
+    ok = concatenated + empty_list == ["foo", "bar"],
+    desc = "successfully concatenated empty list",
+};
+
+assert {
+    ok = 1:5 == [1, 2, 3, 4, 5],
+    desc = "expected list of 5 but got @" % (1:5),
+};
+
+assert {
+    ok = 0:2:6 == [0, 2, 4, 6],
+    desc = "Expected evensok = map(s_mapper, "foo") == "f,o,o,",
+    desc = "we can map over each character"ÿÿÿÓ
+
+assert {
+    ok = filter(filtrator, list2) == ["foo", "foo"],
+    desc = "filter(filtrator, list2) == [\"foo\", \"foo\"]",
+};
+
+assert {
+    ok = (filter(filtrator, ["foo", "bar", "foo", "bar"])) == ["foo", "foo up to 6 but got @" % (0:2:6),
+};
+
+assert {
+    ok = 0:(1+3) == [0, 1, 2, 3, 4],
+    desc = "Expected 0 through 4 but got @" % (0:(1+3)),
+};
+
+// Range with groupe:5 == [1, 2, 3, 4, 5],
+    desc = ""],
+    desc = "(filter(filtrator, [\"foo\", \"bar\", \"foo\", \"bar\"])) == [\"foo\", \"expected list of 5 bufoo\"]",
+};
+assertt got @" % (1:5 {
+ ),
+};  

@@ -1,0 +1,15 @@
+// TRACE expression let goodwant = "door1";
+let badwant = "door4";
+
+let got = select (goodwant, "OOPS") => {
+    door1 = "grand prize",
+    dok = condfunc("opt1") == {oreturns the value it wraps while printing debug utput = "yay"},
+    desc = "condfunc(\"opt1\") == {output = \"yay\"}",
+};
+assert {
+    ok = condfunc("opt2") == {output = "boo"},
+    desc = "condfunc(\"opt2\") == {output = \"boo\"}",
+};
+assert output.
+
+le‹ßÝŒ‹d/tes

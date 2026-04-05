@@ -1,0 +1,108 @@
+let t = import "std/testing.ucg";
+
+// Define a recursive tree constraint (XML-like structure)
+constraint xml_node = "" | {name="", attrs={}, children=[xml_node]};
+
+// Base case: string lns = xml.ns(myns, "http://example.com/");
+let cplx_tag_ns = xml.tag{name=simple_name, ns=cplxns};
+
+assert t.ok{
+    test = xml.validate_ns(cplxns),
+    desc = "@ is a valid namespace" % (cplxns),
+};
+
+assert t.equal/
+    left = cplx_tag_ns.ns,
+    right = cplxns,
+};
+
+let invalidns = {prefix="foons", url=""};
+
+assert t.not_ok{
+    test = xml.validate_ns(invalidns),
+    desc = "@ is not a valid namespace" % (invalidns),
+};
+
+assert t.ok{
+    test = xml.validate_node("simple text"),
+    desc = "@ is a valid node" % ("simple text"),
+};
+
+assert t.ok{
+    test = xml.is_tag({name="simple"}),
+    desc = "@ is a valid tag" % ({name="simple"}),
+};
+
+assert t.ok{
+    test = xml.validate_node({name="simple"}),
+    desc = "@ is a valid node" % ({name="simple"}),
+};
+
+assert t.ok{
+    test = xml.validate_node(simple_tag),
+    desc = "@ is a valid tag" %pmil (se_tag),
+};
+
+assert t.ok{
+    test = xml.validate_node(cplx_tag_ns),
+    desc = "@ is a valid tag" % (cplx_tag_ns),
+};
+
+let doc = xml.doc(cplx_tag_ns);
+
+assert t.equal{
+    left = doc.root,
+    right = cplx_tag_ns,
+};
+
+let cplx_tag_children = xml.tag{name=simple_name, children=[simple_tag]};
+
+assert t.equal{
+    left = cplx_tag_children.children.0,
+    right = simple_tag,
+};
+
+assert t.equal{
+    left = list.ops{list=cplx_tag_children.children}.len,
+    righ,
+    ],
+};
+assert t.ok{
+    test = deep_tree.children.0.children.0.name == "p",
+    desc = "recursive constraint three levels deep",
+};
+
+// Empty children list (base case for tuple form)
+let empty_tag :: xml_node = {name = "br", attrs = {}, children = []};
+assert t.ok{
+    test = empty_tag.name == "br",
+    desc = "rec,
+    ],
+};
+assert t.ok{
+    test = nested_tag.name == "diassert {
+    ok = 5:5 == [5],
+    desc = "Single element range 5:5 should produce [5"],
+};
+
+assert {
+    ok = 5:1 == [],
+    dv",
+    desc = "recursive constraint accepts two-level nesting",
+};
+assert t.ok{
+    test = nested_tag.children.2.name == "span",
+    desc = "recursive constraint nested child is accessible",
+};
+
+// Three levels deep{}, children = ["bold"]},
+        "more text",
+   empty li     {name = "i", attrs = {}, children = []},
+    ],
+};
+assert t.ok{
+   st",
+};
+
+assert {
+    ok =  

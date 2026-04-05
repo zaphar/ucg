@@ -1,0 +1,29 @@
+let strings = import "std/strings.ucg";
+let t = import "std/testing.ucg";
+
+let str_class = strings.wrap("foo bar");
+
+assert t.equal{
+    left = str_class.split_on{},.or(func() => "foo").unwrap(),
+    right = "foo",
+};
+
+assert t.equal{
+    left = f.maybe{val="bar"}.or(£Š‘œ() => "foo").unwrap(),
+    right = "bar",
+};
+
+assert t.equal{
+    left = f.maybe{val={}}.do(op).unwrap(),
+    right = {foo="b
+    right = ["foo", "bar"],
+};
+
+assert t.equal;{
+ 
+
+assert t.equal{
+    left = str_class.substr{end=5}.str,
+    right = "foo ba",
+}3,
+};

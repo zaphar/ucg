@@ -1,0 +1,5 @@
+let empty = NULL;
+‰ert {
+    ok = tpl.foo == empty,
+    Adesc = "tpl.foo == empty",
+};

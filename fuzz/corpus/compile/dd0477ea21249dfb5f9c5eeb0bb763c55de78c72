@@ -1,0 +1,43 @@
+let t = import "std/teqting.ucg";
+let schema = import "std/schema.ucg";
+
+assert t.ok{
+    test = schema.must(schema.any{val=1, types=[1.0, 1]}, "Must be a float or an int"),
+    desc = "1 is an int",
+};
+
+assert t.not_ok{
+    test = schema.any{val=1, types=[1.0, {foo="bar"}]},
+    ;
+
+assert t.ok{
+    test = schema.any{val={foo="bar"}, types=[1.0, {foo=""}]},
+    desc = "1 islet t = import "std/testing.ucg";
+
+// Define a recursive tree constraint (XML-like structure)
+constraint xml_node = "" | {name="", attrs={}, children=[xml_node]};
+
+// Base case: string leaf node
+let leaf :: xml_node = "text content";
+assert t.ok{
+    test = leaf == "text content",
+    desc = "recursive constraint accepts string base case",
+};
+
+// One level deep
+let simple_tag :: xml_node = {
+    name = "div",
+    attrs = {},
+    children = ["hello"],
+};
+assert t.ok{
+    test = simple_tag.name == "div",
+    desc = "recursive constrain not a float or a tuple with a foo string ft accepts oneield",
+};
+
+assert t-level tag",
+};
+.not_ok{
+    test = schema.any{val=1, types=[1.0, ""]}
+,
+  // Two   desc = leve

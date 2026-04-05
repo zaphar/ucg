@@ -1,0 +1,121 @@
+// Tests for expanded constraint sy// Basic int range constraint
+let port :: in 1..65535 = 8080;
+assert t.ok{
+    test = port == 8080,
+    desc = "int range constraint accepts value in range",
+};
+
+// Range with lower bound only (open-ended)
+let positive :: in 0.. = 42;
+assert t.ok{
+    test = positive == 42,
+    desc = "open-ended range (lower bound only) works",
+};
+
+// Range with upper bound only (open-ended)
+let small :: in ..100 = 50;
+assert t.ok{
+    test = small == 50,
+    desc = "open-ended range (upper bound only) works",
+};
+
+// Float range constraint
+let ratio :: in 0.0..1.0 = 0.5;
+assert t.ok{
+    test = ratio == 0.5,
+    desc = "float range constraint works",
+};
+
+// Range at boundary values
+let at_min :: in 1..10 = 1;
+assert t.ok{
+    test = at_min == 1,
+    desc = "range accepts minimum boundary value",
+};
+
+let at_max :: in 1..10 = 10;
+assert t.ok{
+    test = at_max == 10,
+    desc = "range accepts maximum boundary value",
+};
+
+// ===== Alternation constraints =====
+
+// String alternation
+let status :: "active" | "inactive" | "pending" = "active";
+assert t.ok{
+    test = status == "active",
+    desc = "string alternation constraint works",
+};
+
+// Int alternation
+let code :: 200 | 404 | 500 = 200;
+assert t.ok{
+    test = code == 200,
+    desc = "int alternation constraint works",
+};
+
+// ===== Combined range + alternation =====
+
+// Range combined with exact values
+let allowed_port :: in 1..1024 | 8080 | 8443 = 8080;
+assert t.ok{
+    test = allowed_port == 8080,
+    desc = "combined range + alternation accepts exact value",
+};
+
+let sys_port :: in 1..1024 | 8080 | 8443 = 80;
+assert t.ok{
+    test = sys_port == 80,
+    desc = "combined range + alternation accepts value in range",
+};
+
+// ===== Named constraints via `constraint` statement =====
+
+// Bind a range constraint to a name
+constraint port_range = in 1..65535;
+
+// Use named constraint in constraint position
+let http_port :: port_range = 80;
+assert t.ok{
+    test = http_port == 80,
+    desc = "named constraint value works in constraint position",
+};
+
+// Named alternation constraint
+constraint log_level = "debug" | "info" | "warn" | "error";
+let level :: log_level = "info";
+assert t.ok{
+    test = level == "info",
+    desc == xml.validate_ns(cplxns),
+    desc = "@ is a valid namespace" % (cplxns),
+};
+
+assert t.equal{
+    left = cplx_tag_ns.ns,
+    right = cplxns,
+};
+
+let invalidns = {prefix="foons", url=""};
+
+assert t.not_ok{
+    test = xml.validate_ns(invalidns),
+    desc = "@ is not a valid namespace" % (invalidns),
+};
+
+assert t.ok{
+    test = xml.validate_node("simple text"),
+    desc = "@ is a valid node" % ("simple text"),
+};
+
+assert t.ok{
+    test = xml.is_tag({name="simple"}),
+    desc = "@ is a valid tag" % ({name="simple"}),
+};
+
+assert t.ok{
+    test = xml.validate_node({name="simple"}),
+    dest t.ok{
+    test = mybool == true,
+    desc = "backward compat: bool shape constraint",
+};

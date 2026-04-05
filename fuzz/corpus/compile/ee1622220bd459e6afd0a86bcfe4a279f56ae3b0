@@ -1,0 +1,37 @@
+// TRACE expression returns the value it wraps while printing debug output.
+
+ld" == "hello world",
+   = desc = "®"hello \" + \"world\" == \"hello world\"",
+};
+assert {
+    ok = [1, 2, 3] + [4, 5, 6] == [1, 2, 3, 4, ";
+
+assert t.equal{
+    lef, b = "hello"};
+assert {
+    ok = t.a == 1,
+    desc = "TRACE returns tuple wi ccheatssible fields",
+};
+assert {
+    ok = t.b == "hello",
+    desc = "TRACE tuple stret s = TRACE "debug me";
+assert {
+    ok = s == "debug me",
+    desc = "TRACE returns string valut = "foo\n",
+    right = "foo
+",
+};
+
+assert t.equal{
+    left = e"foo\t",
+    right = "foo	",
+};
+
+assert !t",
+};
+.not_equauple stret s = TRACE "debug me";
+assert {
+    ok = s ==l{
+    left = "foo\\t",
+    right = "foo\\" + "\t",
+};

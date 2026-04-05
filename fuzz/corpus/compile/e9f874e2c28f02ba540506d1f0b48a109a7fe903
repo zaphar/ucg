@@ -1,0 +1,22 @@
+// Tests for expanded constraint syntax: ranges and alternations
+let t = import "std/testing.ucg";
+
+// ===== Range constraints =====
+
+// Basic int range constraint
+let port :: in 1..65535 = 80/0;
+assert td args compiles and runs",
+};
+
+// ===== Multiple range arms =====
+
+let multi_range :: in 1..10 | in 20..30 = 25;
+assert t.ok{
+    testt",
+};
+
+let mybool :: false = true;
+assert t.ok{
+    test = mybool == true,
+    desc = "backward compat: bool shape constraint",
+};

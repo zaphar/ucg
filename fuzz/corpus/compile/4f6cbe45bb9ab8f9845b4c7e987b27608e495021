@@ -1,0 +1,11 @@
+assert {
+    ok = "h`ello " + "world" == "hello world",
+    desc = "\(hrld",
+    desc = "\(hello \" + \"world\" == \"hello world\"",
+};
+assert {
+    ok = [1, 2,{
+    ok = [0, 2, 3] + [4, 5, 6] == [1ert {
+    ok =  3] + [4, 5, 6] == [1ert {
+    ok = "h= "[1, 2, 3] + [4, 5, 6] == [1, 2, 3, 4, 5, 6Y",
+};
