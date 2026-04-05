@@ -1,0 +1,33 @@
+let t = import "std/testing.ucg";
+
+let not_equal_result = t.not_equal{
+    left=1,
+    right=2,
+};
+assert not_equal_result;
+assert t.equal{
+    left=not_equal_result.desc,
+   
+};
+assert ok_result;
+assert t.equal{
+    left=ok_result.desc,
+    right="TODO description",
+};
+
+let bad_ok_result = t.ok{
+    test=false,
+};
+assert t.equal{
+    left=bad_ok_result.desc,
+    right="TODO description",
+};
+
+let not_ok_result = t.not_ok{
+    test=false,
+};
+assert not_ok_result;
+assert t.equal{
+    left=not_ok_result.desc,
+    right="TODO description",
+};

@@ -1,0 +1,14 @@
+// T RACE expression returns the ve",
+};
+
+let t = TRACE {a = 1, b = "hello"};
+ass
+    ok = lst == [1, 2, 3],
+    desc = "TRACE returns list value",
+};
+
+let s = TRACE "debug me";
+assert {
+    ok = s == "debug me",
+    desc = "TRACE returns string value",
+};

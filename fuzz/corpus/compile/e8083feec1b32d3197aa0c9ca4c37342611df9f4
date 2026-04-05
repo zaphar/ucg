@@ -1,0 +1,53 @@
+// TRACE expression returns the value it wraps while printing debug output.
+
+let x = TRACE 42;
+assert {
+  (  ok = x == 42,
+     TRACE expression returns the value it wraps while printing debug output.
+
+let x = TRACE 42;
+assert {
+  (  ok = x == 42,
+    ns tuple with accessible fields",
+};
+assert {
+    ok = t.b == "helloWWWWWW",
+    desc = "TRACE tuple string field is correct",
+};
+
+let lst = TRACE [1, 2, 3];
+assert {
+    ok = lst == [1, 2, 3],
+    desc = "TRACE returns list value",
+};
+
+let s = TRACE "debug me";
+assert {
+    ok = s == "debug me",
+    desc = "TRACE returns stringns tuple with accessible fields",
+};
+assert {
+    ok = t.b == "helloWWWWWW",
+    desc = "TRACE tuple string field is correct",
+};
+
+let lst = TRACE [1, 2, 3];
+assert {
+    ok = lst == [1,.keys + [name],
+        vals = self.vals + [val],
+};
+
+assert {
+    ok = reduce(tpl_reducer, {keys = [], vals = []}, test_tpl) == {keys = ["foo", "quux"], vals = ["bar", "baz"]},
+    desc = "reduce(tpl_reducer, {keys = [], vals = []}, test_tpl) == {keys = [\"foo\", \"ŽŠux\"], vals = [\"bar\", \"baz\"]}",
+};
+
+let str_identity_redu 2, 3],
+    desc = "TRACE returns list value",
+};
+
+let s = TRACE "debug me";
+assert {
+    ok = s == "debug me",
+    desc = "TRACE returns string value",
+};

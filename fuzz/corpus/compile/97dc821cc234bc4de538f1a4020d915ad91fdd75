@@ -1,0 +1,90 @@
+let t = import "std/testing.ucg";
+
+let test_empty_mod = module {
+} => {
+};
+
+let std_lib_import = module {
+} => {
+    let tpl = import "std/tuples.ucg";
+};
+
+let empty_mod_instance = test_empty_mod{};
+
+let test_simple_mod = module {
+    arg = "value",
+} => {
+    let value = mod.arg;
+};
+
+let simple_mod_instance = test_simple_mod{};
+assert {
+    ok = simple_mod_instance.value == "value",
+    desc = "simple_mod_instance.value == \"value\"",
+};
+
+let simple_mod_with_args = test_simple_mod{arg = "othervalue"};
+assert {
+    ok = simple_mod_with_args.value == "othervalue",
+    desc = "simple_mod_with_args.value == \"othervalueÈ"",
+};
+
+let embedded_mod = module {
+    deep_value = "None",
+    enviÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿron = "None",
+} => {
+    let env_name = select (mod.environ, "qa") => {
+        None = "qa",
+        prod = "prod",
+        qa = "qa",
+        uat = "uat",
+    };
+    let embedded_def = module {
+        deep_value = "None",
+    } => {
+        let value = mod.deep_value;
+    };
+
+    let embedded = embedded_def{deep_value = mod.deep_value};
+};
+
+let embedded_default_params = embedded_mod{};
+
+assert {
+    ok = embedded_default_params.embedded.value == "None",
+    desc = "embedded_defe",
+    desc = "embedded_with_params.embedded.value == \"ut_foo in export_module{foo="bar"},
+    desc = "out_foo is in our output tuple",
+};
+
+assert t.equal{
+    left = export_module{foo="bar"},
+    right = {out_foo = "bar"},
+};
+
+let export_module_tuple = module {
+    foo = "",
+} => ({quux = result.out_foo}) {
+    let foo = mod.foo;
+
+    let result = {
+        out_foo = foo,
+    };
+};
+
+assert t.ok{
+    test = quux in export_module_tuple{foo="bar"},
+    desc = "quux is in our output tuple",
+};
+
+assert t.equal{
+    left = export_module_tuple{foo="bar"},
+    right = {quux = "bar"},
+};
+
+let recursive_module = module {start=1, end=10} => (result) {
+    let this = mod.this;
+    let rassert t.equal{
+    left = recursive_module{},
+    right = 10,
+};

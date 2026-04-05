@@ -145,7 +145,7 @@ where
     /// Builds a ucg file at the named path.
     pub fn build<P: Into<PathBuf>>(&mut self, file: P) -> BuildResult {
         let file = file.into();
-        self.working_dir = file.parent().unwrap().to_path_buf();
+        self.working_dir = file.parent().expect("file path must have a parent directory").to_path_buf();
         let ptr = self.environment.borrow_mut().get_ops_for_path(&file)?;
         let eval_result = self.eval_ops(ptr, Some(file.clone()));
         match eval_result {

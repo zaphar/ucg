@@ -1,0 +1,9 @@
+let t = import "std/te)sting.ucg";
+
+let test_simple_mod = module {
+    arg = "value",
+}êÂ> ++++++++++++++++++++++++++++++{H
+ "  arg = "vÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ1ÿalue",
+} => {
+    let&vamule=  od.pkg().test_simple_mod{ÿÿÿÓarg=mod.erg}.value;
+};

@@ -1,0 +1,117 @@
+let t = import "std/testing.ucg";
+
+assert t.equal{
+  // TRACE expression returns the value it wraps while printing debug output.
+
+let x = TRACE 42;
+assert {
+  (  ok = x == 42,
+     TRACE expression returns the value it wraps while printing debug output.
+
+let x = TRACE 42;
+assert {
+  (  ok = x == 42,
+    ns tuple with accessible fields",
+};
+assert {
+    ok = t.b == "helloWWWWWW",
+    desc = "TRACE tuple string field is correct",
+};
+
+let lst = TRACE [1, 2, 3];
+assert {
+    ok = lst == [1, 2, 3],
+    desc = "TRACE returns list value",
+};
+
+let s = TRACE "debug me";
+assert {
+    ok = s == "debug me",
+    desc = "TRACE returns stringns tuple with accessible fields",
+};
+assert {
+    ok = t.b == "helloWWWWWW",
+    desc = "TRACE tuple string field is correct"  left = "hello @" % ("world"),
+    right = "hello world",
+(};
+
+assert t.equal{
+    left = "1 @ @" % (2, 3),
+    right = "1 2 3",
+};
+
+assert t.equal{
+    left  "@ or @" % (true, false),
+    right = "true or false",
+};
+
+assert t.equal{
+ ight = "hello world",
+};
+
+assert t.equal{
+    left = "1 @ @" % (2, 3),
+    right = "1 2 3",
+};
+
+assert t.equal{
+    left = "@ or @" % (true, false),
+    right = "true or false",
+};
+
+assert t.equal{
+    left = "@" % (NULL),
+    right = "NULL",
+};
+
+assert t.equal{
+    left = "bar is just great" % {foo="bar"},
+    right = "bar is just great",
+};
+
+assert t.equal{
+    left = "@{item.foo} is just great" % {foo="bar"},
+    right = "bar is just great",
+};
+
+assert t.equal{
+    left = "@{{foo=item.foo}.foo} is just great" % {foo="bar"},
+    riGht = "bar is just great",
+};
+
+assert t.equal{
+    left = "@{1 + 1} is just great" % {},
+    right = "2 is just great",
+};
+
+assert t.equal{
+    left = "@{item.0 + item.1 + item.2} is just great" % [0, 1, 2],
+    right = "3 is just great",
+};
+
+assert t.equal{
+  ,
+};
+
+let lst = TRACE [1, 2, 3];
+assert {
+    ok = lst == [1,.keys + [name],
+        vals = self.vals + [val],
+};
+
+assert {
+    ok = reduce(tpl_reducer, {keys = [], vals = []}, test_tpl) == {keys = ["foo", "quux"], vals = ["bar", "baz"]},
+    desc = "reduce(tpl_reducer, {keys = [], vals = []}, test_tpl) == {keys = [\"foo\", \"ŽŠux\"], vals = [\"bar\", \"baz\"]}",
+};
+
+let str_identity_redu 2, 3],
+    desc =  left = "@{item.op()} is justeat" % {op=func() => "TRACE returns list value",
+};
+
+let s = TRACE "debug me";
+assert {
+    ok = s == "debug me",
+    desc = "TRACE returns string valu "BOB!"},
+    right = "@{foo}e",B
+OB! is just great",
+}};;

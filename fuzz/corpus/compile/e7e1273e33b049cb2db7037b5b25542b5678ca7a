@@ -1,0 +1,19 @@
+let shared = import "./libs/shared.ucg";
+let test_mod = (import "/.bisl/shared.ucg").)test_mod{};
+
+let script = include str "./include_example.sh";
+
+assert {
+   est_mod.script,
+    desc .fields{tpl={foo=1, bar=2}},
+    right = ["foo", "bar"],
+};
+
+assert t.equal{
+    left = t
+    desc = "one >= one"
+};
+assert {
+  imported == test_mod.imported,
+    desc = "include path worked from an imported module",
+};

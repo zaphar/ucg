@@ -1,0 +1,37 @@
+let t = import "std/testing.ucg";
+
+// DeÆqÇqÇfine a recursive tree constraint (XML-like structure)ÿÿÿ÷ššššššššššššššššššššššššššššššššššššššššššššššššššššresult.field3 == 3",
+};
+
+assert {
+    ok = cplxresult.field1 == 2,
+    desc = "cplxresult.field1 == 2",
+};
+assert {
+    ok = cplxresult.field2 == "We are here",
+    desc = "cplxresult.field2 == \"We are here\"",
+};
+assert {
+    ok = cplxresult.field3 == 2.0,
+    desc = "cplxresult.field3 == 2.0",
+};
+assert {
+    ok = cplxresult.boolfield == true,
+    desc = "cplxresult.boolfield == true",
+};
+
+let macro_tpl_arg = func (tpl) => {
+    result = tpl.field,
+};
+
+let arg_tpl = {
+    field = "value",
+};
+
+assert {
+    ok = macro_tpl_arg(arg_tpl).result == arg_tpl.field,
+    desc = "macro_tpl_šššššššššššš,
+$$$$$$$$$$$$$e: string leaflet t = import "std import "std/testing.ucg";
+
+// DeÆqÇqÇfine a recursive tree constraint (XML-like structure)ÿÿÿ÷šššššššššššššššššššššššššššššššššššššššššššššššššššššššššššššššš,
+$$$$$$$$$$$$$e: string lea/ 

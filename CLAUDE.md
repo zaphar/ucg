@@ -42,14 +42,38 @@ Traditional compiler pipeline in `src/`:
    - `format.rs` — UCG code formatter
 5. **Convert** (`convert/`) — Output format converters (json, yaml, toml, xml, env, flags, b64, exec)
 
+6. **Dep** (`dep/`) — Package management
+   - `manifest.rs` — `ucg-deps` TOML parsing and validation
+   - `lockfile.rs` — `ucg.lock` parsing and validation
+   - `resolve.rs` — MVS (Minimum Version Selection) resolver; extracts minimum version from constraint lower bounds (no tag listing)
+   - `registry.rs` — Repository fetching (git clone, hg clone)
+   - `vendor.rs` — Fetch, hash, and vendor dependencies
+   - `nix.rs` — Nix expression generation (`ucg-deps.nix`)
+   - `url.rs` — URL normalization for deduplication
+   - `error.rs` — Dep-specific error types
+
 Key design decisions:
 - VM-based execution (compiles to opcodes, not direct AST interpretation)
 - Standard library (`std/`) is embedded into the binary at compile time via `bin/build_main.rs`
 - Pluggable converter system for output formats
+- `vendor/` is a resolution keyword in imports, not a filesystem path — resolved against the package root's configured vendor directory
+- Package root detected once at startup, threaded through the build session
 
 ## CLI Subcommands
 
-`ucg build`, `ucg test`, `ucg fmt`, `ucg repl`, `ucg eval`, `ucg converters`, `ucg importers`, `ucg env`. The `-r` flag enables recursive directory processing. `--no-strict` disables strict type checking.
+`ucg build`, `ucg test`, `ucg fmt`, `ucg repl`, `ucg eval`, `ucg converters`, `ucg importers`, `ucg env`, `ucg dep`. The `-r` flag enables recursive directory processing. `--no-strict` disables strict type checking.
+
+### Package Management (`ucg dep`)
+
+- `ucg dep init [--vendor "vendor"] [--nix]` — Create `ucg-deps` file
+- `ucg dep add <url> --version ">=1.0.0" [--type "git"|"hg"]` — Add/update dependency, resolve, lock, vendor (`--version` is required)
+- `ucg dep remove <url>` — Remove direct dependency, re-resolve, clean vendor
+- `ucg dep lock [--dry-run]` — Re-resolve all deps and rewrite `ucg.lock`
+- `ucg dep vendor [--dry-run]` — Re-resolve, rewrite `ucg.lock`, and fetch deps into vendor directory
+- `ucg dep nix [--stdout] [--dry-run]` — Re-resolve, rewrite `ucg.lock`, and generate `ucg-deps.nix`
+
+Package files: `ucg-deps` (manifest), `ucg.lock` (lockfile), `ucg-deps.nix` (Nix expression).
+See `docs/package-management-spec.md` for full specification.
 
 ## Test Organization
 

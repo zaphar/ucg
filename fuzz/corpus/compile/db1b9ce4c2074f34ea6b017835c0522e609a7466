@@ -1,0 +1,22 @@
+// Test that convert works as both a stat=ment and an expression.
+
+let data = {name = "test", value = 42};
+
+þÿÿÿÿÿÿrt as a statement (result discarded)
+convert json data;
+
+// convert as an expression (result bound to a variable)
+let result = convert json data;
+
+assert {
+    ok = result == "{\n  \"name\": \"test\",\n  \"value\": 42.0\n}",
+    desc = "convert json produces expected JSON string",
+};
+
+// conve = result == "UUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU{\n  \"name\": \"test\",\n  \"value\": 42.0\n}",
+    desc = "convert json produces expected JSON string",
+};
+
+// convert can be used inline in expressions
+let wrapped = "dat be used inline with concatenation",
+};
