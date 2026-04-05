@@ -206,10 +206,8 @@ fn clean_stale_deps_by_urls(vendor_dir: &Path, normalized_urls: &[String]) -> Re
             .map_err(|e| DepError::ParseError(e.to_string()))?;
         let rel_str = rel.to_string_lossy().to_string();
 
-        if !normalized_urls.contains(&rel_str) {
-            if existing.exists() {
-                fs::remove_dir_all(&existing)?;
-            }
+        if !normalized_urls.contains(&rel_str) && existing.exists() {
+            fs::remove_dir_all(&existing)?;
         }
     }
 

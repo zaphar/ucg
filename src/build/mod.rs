@@ -203,8 +203,6 @@ where
         let mut vm = VM::with_pointer(self.strict, ops, &self.working_dir);
         if let Some(path) = path {
             vm.set_path(path);
-        if path.is_some() {
-            vm.set_path(path.unwrap());
         }
         if self.validate_mode {
             vm.enable_validate_mode();

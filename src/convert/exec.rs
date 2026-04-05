@@ -136,8 +136,6 @@ impl ExecConverter {
                     // We only allow string fields in our env tuple.
                     if let Val::Str(s) = v.as_ref() {
                         writeln!(script, "{}=\"{}\"", name, convert::shell_escape_double_quoted(s))?;
-                    if let &Val::Str(ref s) = v.as_ref() {
-                        write!(script, "{}=\"{}\"\n", name, convert::shell_escape_double_quoted(s))?;
                         continue;
                     }
                     return Err(BuildError::new(

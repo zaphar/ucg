@@ -18,7 +18,7 @@ pub fn nar_hash(dir: &Path) -> Result<String, DepError> {
     let output = std::process::Command::new("nix")
         .args(["hash", "path", &dir.to_string_lossy()])
         .output()
-        .map_err(|e| DepError::IoError(e))?;
+        .map_err(DepError::IoError)?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
