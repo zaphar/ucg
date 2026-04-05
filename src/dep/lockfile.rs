@@ -56,8 +56,8 @@ impl Lockfile {
     /// Packages with invalid URLs (no git or hg) sort last.
     pub fn sort(&mut self) {
         self.package.sort_by(|a, b| {
-            let a_norm = a.url().map(|u| normalize_url(u)).unwrap_or_default();
-            let b_norm = b.url().map(|u| normalize_url(u)).unwrap_or_default();
+            let a_norm = a.url().map(normalize_url).unwrap_or_default();
+            let b_norm = b.url().map(normalize_url).unwrap_or_default();
             a_norm.cmp(&b_norm)
         });
     }

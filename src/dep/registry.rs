@@ -50,7 +50,7 @@ fn fetch_git(url: &str, tag: &str, dest: &Path) -> Result<String, DepError> {
             &dest.to_string_lossy(),
         ])
         .output()
-        .map_err(|e| DepError::IoError(e))?;
+        .map_err(DepError::IoError)?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -63,7 +63,7 @@ fn fetch_git(url: &str, tag: &str, dest: &Path) -> Result<String, DepError> {
     let output = Command::new("git")
         .args(["-C", &dest.to_string_lossy(), "rev-parse", "HEAD"])
         .output()
-        .map_err(|e| DepError::IoError(e))?;
+        .map_err(DepError::IoError)?;
 
     let commit = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
@@ -84,7 +84,7 @@ fn fetch_hg(url: &str, tag: &str, dest: &Path) -> Result<String, DepError> {
     let output = Command::new("hg")
         .args(["clone", "-r", tag, "--", url, &dest.to_string_lossy()])
         .output()
-        .map_err(|e| DepError::IoError(e))?;
+        .map_err(DepError::IoError)?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -97,7 +97,7 @@ fn fetch_hg(url: &str, tag: &str, dest: &Path) -> Result<String, DepError> {
     let output = Command::new("hg")
         .args(["-R", &dest.to_string_lossy(), "id", "-i", "--debug"])
         .output()
-        .map_err(|e| DepError::IoError(e))?;
+        .map_err(DepError::IoError)?;
 
     let commit = String::from_utf8_lossy(&output.stdout).trim().to_string();
 

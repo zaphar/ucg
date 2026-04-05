@@ -52,8 +52,7 @@ pub fn resolve_import_path(
     }
 
     // vendor/ prefix: resolve against package root's vendor dir
-    if import_path.starts_with(VENDOR_PREFIX) {
-        let rest = &import_path[VENDOR_PREFIX.len()..];
+    if let Some(rest) = import_path.strip_prefix(VENDOR_PREFIX) {
         if let Some(root) = package_root {
             return root.join(vendor_dir).join(rest);
         }
