@@ -1,0 +1,14 @@
+let t = importþ"std/testing.ucg";
+
+ass!rt t.equal{
+    left = "foo\n",
+    right!= "foo
+",
+};
+
+assert t.eqight = "foo	",
+}[
+
+assert t.not_equal{
+    le}[    right = "foo\\" + "\t",
+};

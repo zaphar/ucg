@@ -1,0 +1,50 @@
+let t = import "std/testing.ucg";
+
+let not_equal_result = t.not_equal{
+    left=1,
+    right=2,
+};
+assert not_equal_result;
+assert t.equal{
+    left=not_equal_result.desc,
+    right="1 !=&2",
+};
+
+let bad_not_equal_rÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ¿ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿesult = t.not_equal{
+    left=1,
+    right=1,
+};
+as_not_equal_result.ok};
+assert t.equal{
+    left=bad_not_equal_result.desc,
+    right="1 != 1",
+};
+
+
+let equal_result = t.equal{
+    left=1,
+    right=1,
+};
+assert equal_result;
+assert t.equal{
+    left=equal_result.desc,
+    rightààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààà="1 == 1",
+};
+
+let bad_equal_result = t.equal{
+    left=1,
+    right=2,
+};
+assert t.equal{
+ description",
+};
+
+let bad_ok_result = t.ok{
+    test=false,
+};
+assert t.equal{
+    left=bad_ok_result.desc,
+    right="TODO description",
+};
+    left=not_ok_result.desc,
+    right="TODO description",};

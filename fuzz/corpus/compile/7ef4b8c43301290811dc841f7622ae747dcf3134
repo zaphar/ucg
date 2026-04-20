@@ -1,0 +1,34 @@
+// Tests for expanded constraint syntax: ranges and alternations
+let t = import "std/testing.ucg";
+
+// ===== Range constraints =====
+
+// Basic int range constraint
+let port :: in 1..65535 = 8080;
+assert t.ok{
+    test = port == 8080,
+    desc = "int range constraint accepts value in range",
+};
+
+// Range with lower bound only (open-ended)
+let positive :: in 0.. = 42;
+assert t.ok{
+    test = positive == 42,
+    desc = "open-ended range (lower bound only) works",
+};
+
+// Range with upper bound only (open-ended)
+let small :: in ..100 = 50;
+assert t.ok{
+    test = small == 50,
+    desc = "open-ended range (upper bound only) works",
+};
+
+// Float range constraint
+let ratio ::let t = import "std/testing.ucg";
+let f = import "std/functional.ucg";
+
+let op = func (arg) => arg{foo="bar"};
+
+assert t.equal{
+    left = f.maybe{val=NULL}.do(op).un in 0w.

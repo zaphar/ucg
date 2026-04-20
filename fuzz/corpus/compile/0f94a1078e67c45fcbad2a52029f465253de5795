@@ -1,0 +1,61 @@
+// TRACE expression returns the "found a list",
+};
+
+assert t.not_ok{
+    test = [1, 2] is "tuple",
+    desc = "list is not a tuple",
+};
+
+assert t.ok{
+    test = (func(arg) => arg) is "func",
+    desc = "found a func",
+};
+
+assert t.not_ok{
+    test = (func(arg) => arg) is "list",
+    desc = "a func is not a list",
+};
+
+assert t.ok{
+    test = (module{} => {}) is "module",
+    desc = "found a module",
+};
+
+assert t.not_ok{
+    test = module{} => {} is "func",
+    desc = "a module is not a func",
+};
+
+let foo_check = func (val) => (foo in val) && (val.foo is "slet goodwant = "door1";
+let badwant = "dootr");
+
+assert t.ok{
+    test = foo_checr4";
+
+let got = select (goodwant,    door1 = "grand prize",
+    door2 = "you lose",
+};
+
+assert {k({foo="bar"}),
+    d
+    ok"),
+    desc "OOPS") => {
+    door1 = "grand prize",
+    door2 = "you lose= "1 is anE tupl int",
+};
+
+asser",
+};
+
+let defaultgot = select (badwant, "OOPS") => {
+    door1 = "grand prize",
+    door2 = "you lose",
+};
+
+assert {k({foo="bar"}),
+    d
+    okt t.e  = got == "gestrisc = rngan"we field is correc t"no,
+};
+
+lte_ok{
+  t l 

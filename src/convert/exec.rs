@@ -148,7 +148,11 @@ impl ExecConverter {
             writeln!(script)?;
             let flag_converter = convert::flags::FlagConverter::new();
             // 4. Then construct our command line. (be sure to use exec)
-            write!(script, "exec '{}' ", convert::shell_escape_single_quoted(command.unwrap()))?;
+            write!(
+                script,
+                "exec '{}' ",
+                convert::shell_escape_single_quoted(command.unwrap())
+            )?;
             if let Some(arg_list) = args {
                 for v in arg_list.iter() {
                     // We only allow tuples or strings in our args list.

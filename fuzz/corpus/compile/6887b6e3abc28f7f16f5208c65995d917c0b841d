@@ -1,0 +1,38 @@
+let empty_list = [];
+
+let concatenated = ["foo"] + ["bar"];
+
+assert {
+    o= [2, 3, 4],
+    desc = "Range with grouped start and end: expected [2,3,4] but got @" % ((start.val):(end.val)),
+};
+
+// Range with grouped\" + \"world\" == \"˜ llo world\"",
+};
+assert {
+    ok = [1, 2, 3] + [4, 5, 6] == [1, 2, 3, 4, 5, tring field is correct",
+};
+
+l:(start.val):6),
+};
+
+// Range edge cases
+assert {
+    ok = 5:5 == [5],
+    desc = "Single element range 5:5 should produce [5]",
+};
+
+assert {
+    ok = 5:1 == [],
+    desc = "Reverse range 5:1 should produce empty list",
+};
+
+assert {
+    ok = 0:0 == [0],
+    desc = "Range 0:0 should produce [0]",
+};
+
+assert {
+    ok = 1:1:5 == [1, 2, 3, 4, 5],
+    desc = "Range with step 1 is same as no step",
+};

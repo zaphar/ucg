@@ -1,0 +1,7 @@
+// Test that relative imports still work alongside vendor imports.
+let lib = import "./vendor/example.com/org/lib/lib.ucg";
+
+assert {
+    ok = lib.name == "shared-lib",
+    desc = "relative import to vendor dir still works",
+};

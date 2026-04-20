@@ -37,6 +37,7 @@ pub mod ast;
 pub mod tokenizer;
 pub mod build;
 pub mod convert;
+pub mod dep;
 pub mod error;
 pub mod io;
 pub mod iter;

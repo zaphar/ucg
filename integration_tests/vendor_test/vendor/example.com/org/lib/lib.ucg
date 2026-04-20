@@ -1,0 +1,7 @@
+// A vendored library module
+let name = "shared-lib";
+let version = 1;
+let config = {
+    host = "localhost",
+    port = 8080,
+};
