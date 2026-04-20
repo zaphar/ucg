@@ -1,0 +1,133 @@
+==================
+Simple function
+==================
+
+let add = func (a, b) => a + b;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (func_expression
+      (func_arglist
+        (func_arg name: (identifier))
+        (func_arg name: (identifier)))
+      body: (binary_expression
+        left: (simple_expression (identifier))
+        right: (simple_expression (identifier))))))
+
+==================
+No-arg function
+==================
+
+let f = func () => 42;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (func_expression
+      body: (simple_expression (integer)))))
+
+==================
+Function returning tuple
+==================
+
+let f = func (x) => {
+    result = x,
+};
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (func_expression
+      (func_arglist
+        (func_arg name: (identifier)))
+      body: (simple_expression (tuple (field_list
+        (field name: (identifier) value: (simple_expression (identifier)))))))))
+
+==================
+Function with constrained args
+==================
+
+let add = func(a :: in 0..100, b :: in 0..100) => a + b;
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (func_expression
+      (func_arglist
+        (func_arg
+          name: (identifier)
+          (constraint_annotation
+            (constraint_expression
+              (constraint_arm
+                (constraint_range
+                  (simple_expression (integer))
+                  (simple_expression (integer)))))))
+        (func_arg
+          name: (identifier)
+          (constraint_annotation
+            (constraint_expression
+              (constraint_arm
+                (constraint_range
+                  (simple_expression (integer))
+                  (simple_expression (integer))))))))
+      body: (binary_expression
+        left: (simple_expression (identifier))
+        right: (simple_expression (identifier))))))
+
+==================
+Map expression
+==================
+
+let result = map(mapper, list1);
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (func_op_expression
+      (map_expression
+        function: (simple_expression (identifier))
+        collection: (simple_expression (identifier))))))
+
+==================
+Filter expression
+==================
+
+let result = filter(pred, list1);
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (func_op_expression
+      (filter_expression
+        function: (simple_expression (identifier))
+        collection: (simple_expression (identifier))))))
+
+==================
+Reduce expression
+==================
+
+let result = reduce(reducer, 0, list1);
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (func_op_expression
+      (reduce_expression
+        function: (simple_expression (identifier))
+        accumulator: (simple_expression (integer))
+        collection: (simple_expression (identifier))))))

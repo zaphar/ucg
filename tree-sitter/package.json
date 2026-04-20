@@ -1,0 +1,16 @@
+{
+  "name": "tree-sitter-ucg",
+  "version": "0.1.0",
+  "description": "Tree-sitter grammar for UCG (Universal Configuration Grammar)",
+  "main": "bindings/node",
+  "tree-sitter": [
+    {
+      "scope": "source.ucg",
+      "file-types": ["ucg"],
+      "highlights": "queries/highlights.scm"
+    }
+  ],
+  "devDependencies": {
+    "tree-sitter-cli": "^0.25.0"
+  }
+}

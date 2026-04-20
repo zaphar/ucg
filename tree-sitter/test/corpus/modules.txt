@@ -1,0 +1,54 @@
+==================
+Simple module
+==================
+
+let m = module { arg = "default" } => { let value = mod.arg; };
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (module_expression
+      (field_list
+        (field name: (identifier) value: (simple_expression (string (string_content)))))
+      (let_statement
+        name: (identifier)
+        value: (binary_expression
+          left: (simple_expression (identifier))
+          right: (simple_expression (identifier)))))))
+
+==================
+Module with export
+==================
+
+let m = module { foo = "" } => (result) { let result = { out = mod.foo }; };
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (module_expression
+      (field_list
+        (field name: (identifier) value: (simple_expression (string))))
+      (module_export (simple_expression (identifier)))
+      (let_statement
+        name: (identifier)
+        value: (simple_expression (tuple (field_list
+          (field name: (identifier) value: (binary_expression
+            left: (simple_expression (identifier))
+            right: (simple_expression (identifier)))))))))))
+
+==================
+Empty module
+==================
+
+let m = module {} => {};
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (module_expression)))

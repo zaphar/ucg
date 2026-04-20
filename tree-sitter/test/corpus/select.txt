@@ -1,0 +1,40 @@
+==================
+Select with default
+==================
+
+let got = select (want, "OOPS") => {
+    door1 = "grand prize",
+    door2 = "you lose",
+};
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (select_expression
+      value: (simple_expression (identifier))
+      default: (simple_expression (string (string_content)))
+      (field_list
+        (field name: (identifier) value: (simple_expression (string (string_content))))
+        (field name: (identifier) value: (simple_expression (string (string_content))))))))
+
+==================
+Select without default
+==================
+
+let result = select (b) => {
+    true = "yes",
+    false = "no",
+};
+
+---
+
+(source_file
+  (let_statement
+    name: (identifier)
+    value: (select_expression
+      value: (simple_expression (identifier))
+      (field_list
+        (field name: (identifier) value: (simple_expression (string (string_content))))
+        (field name: (identifier) value: (simple_expression (string (string_content))))))))

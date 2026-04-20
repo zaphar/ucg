@@ -1,0 +1,16 @@
+{
+  "metadata": {
+    "version": "0.1.0",
+    "language": "ucg",
+    "description": "Tree-sitter grammar for UCG (Universal Configuration Grammar)"
+  },
+  "grammars": [
+    {
+      "name": "ucg",
+      "camelCase": false,
+      "scope": "source.ucg",
+      "path": ".",
+      "file-types": ["ucg"]
+    }
+  ]
+}

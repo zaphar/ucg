@@ -32,10 +32,15 @@
             version = "0.8.2";
             src = ./.;
         };
+        tree-sitter-ucg = pkgs.tree-sitter.buildGrammar {
+            language = "ucg";
+            version = "0.1.0";
+            src = ./tree-sitter;
+        };
     in
     {
         packages = {
-            inherit ucg;
+            inherit ucg tree-sitter-ucg;
         };
         defaultPackage = ucg;
         defaultApp = {
@@ -43,7 +48,7 @@
             program = "${ucg}/bin/ucg";
         };
         devShells.default = craneLib.devShell {
-          packages = with pkgs; [ gnumake rust-analyzer cargo-tarpaulin zola jq];
+          packages = with pkgs; [ gnumake rust-analyzer cargo-tarpaulin zola jq tree-sitter nodejs];
         };
         devShells.fuzz = pkgs.mkShell {
           buildInputs = [ rust-nightly pkgs.cargo-fuzz pkgs.gnumake ];
