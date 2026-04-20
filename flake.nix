@@ -32,10 +32,15 @@
             version = "0.8.2";
             src = ./.;
         };
+        tree-sitter-ucg = pkgs.tree-sitter.buildGrammar {
+            language = "ucg";
+            version = "0.1.0";
+            src = ./tree-sitter;
+        };
     in
     {
         packages = {
-            inherit ucg;
+            inherit ucg tree-sitter-ucg;
         };
         defaultPackage = ucg;
         defaultApp = {

@@ -14,3 +14,4 @@ fuzz/target/
 fuzz/artifacts/
 fuzz-*.log
 result
+.nvimlog
